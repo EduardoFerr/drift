@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Drift — Arquitetura v5.2</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: #08080f;
+  color: #e2e8f0;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  min-height: 100vh;
+  padding: 40px 20px;
+}
+
+h1 {
+  text-align: center;
+  font-size: 1.3rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  color: #a78bfa;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+
+.subtitle {
+  text-align: center;
+  font-size: 0.7rem;
+  color: #64748b;
+  margin-bottom: 8px;
+  letter-spacing: 0.1em;
+}
+
+.badge {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.badge span {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+}
+
+.b-good { background: rgba(52, 211, 153, 0.15); color: #34d399; border: 1px solid rgba(52, 211, 153, 0.3); }
+.b-perf { background: rgba(167, 139, 250, 0.15); color: #a78bfa; border: 1px solid rgba(167, 139, 250, 0.3); }
+.b-warn { background: rgba(250, 204, 21, 0.12); color: #fbbf24; border: 1px solid rgba(250, 204, 21, 0.25); }
+.b-gone { background: rgba(248, 113, 113, 0.12); color: #f87171; border: 1px solid rgba(248, 113, 113, 0.25); text-decoration: line-through; }
+
+.tabs {
+  max-width: 980px;
+  margin: 0 auto 24px;
+  display: flex;
+  border-bottom: 1px solid #1f2937;
+}
+
+.tab {
+  padding: 10px 18px;
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #64748b;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s;
+}
+
+.tab:hover { color: #cbd5e1; }
+.tab.active { color: #a78bfa; border-bottom-color: #a78bfa; }
+
+.view {
+  max-width: 980px;
+  margin: 0 auto;
+  display: none;
+}
+.view.active { display: block; }
+
+.layer {
+  border: 1px solid #1f2937;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  background: #0d0d16;
+  overflow: hidden;
+}
+
+.layer-head {
+  padding: 14px 18px;
+  border-bottom: 1px solid #1f2937;
+  background: linear-gradient(to right, rgba(167, 139, 250, 0.05), transparent);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.layer-title {
+  font-size: 0.85rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #a78bfa;
+}
+
+.layer-tag {
+  font-size: 0.6rem;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgba(167, 139, 250, 0.1);
+  color: #c4b5fd;
+  letter-spacing: 0.05em;
+}
+
+.layer-body {
+  padding: 18px;
+}
+
+.module {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px dashed rgba(31, 41, 55, 0.5);
+}
+
+.module:last-child { border-bottom: none; }
+
+.module-name {
+  flex: 0 0 200px;
+  font-size: 0.78rem;
+  color: #cbd5e1;
+}
+
+.module-desc {
+  flex: 1;
+  font-size: 0.72rem;
+  color: #94a3b8;
+  line-height: 1.6;
+}
+
+.module-tag {
+  display: inline-block;
+  font-size: 0.55rem;
+  padding: 1px 6px;
+  border-radius: 3px;
+  margin-right: 4px;
+  letter-spacing: 0.05em;
+  vertical-align: middle;
+}
+
+.tag-mvp   { background: rgba(52, 211, 153, 0.12); color: #34d399; }
+.tag-fase3 { background: rgba(167, 139, 250, 0.12); color: #a78bfa; }
+.tag-fase4 { background: rgba(96, 165, 250, 0.12); color: #60a5fa; }
+.tag-fase5 { background: rgba(250, 204, 21, 0.12); color: #fbbf24; }
+.tag-fase6 { background: rgba(248, 113, 113, 0.12); color: #fca5a5; }
+
+.flow {
+  background: #0d0d16;
+  border: 1px solid #1f2937;
+  border-radius: 8px;
+  padding: 24px;
+  margin-bottom: 20px;
+}
+
+.flow-title {
+  font-size: 0.85rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #a78bfa;
+  margin-bottom: 16px;
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  margin-bottom: 8px;
+  background: #08080f;
+  border-radius: 6px;
+  border-left: 3px solid #1f2937;
+  font-size: 0.74rem;
+}
+
+.step-num {
+  flex: 0 0 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(167, 139, 250, 0.15);
+  color: #a78bfa;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.7rem;
+}
+
+.step-layer {
+  flex: 0 0 90px;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #64748b;
+}
+
+.step-action {
+  flex: 1;
+  color: #cbd5e1;
+}
+
+.step-perf {
+  flex: 0 0 auto;
+  font-size: 0.6rem;
+  color: #fbbf24;
+}
+
+.s-write    { border-left-color: #34d399; }
+.s-read     { border-left-color: #60a5fa; }
+.s-protocol { border-left-color: #a78bfa; }
+.s-mod      { border-left-color: #f87171; }
+.s-mod .step-layer { color: #fca5a5; }
+
+.note {
+  font-size: 0.7rem;
+  color: #64748b;
+  font-style: italic;
+  padding: 8px 12px;
+  margin-top: 8px;
+  background: rgba(31, 41, 55, 0.3);
+  border-radius: 4px;
+  line-height: 1.5;
+}
+
+code {
+  font-family: inherit;
+  background: rgba(167, 139, 250, 0.08);
+  padding: 1px 4px;
+  border-radius: 3px;
+  color: #c4b5fd;
+  font-size: 0.95em;
+}
+
+.legend {
+  max-width: 980px;
+  margin: 24px auto 0;
+  padding: 16px;
+  background: rgba(13, 13, 22, 0.6);
+  border: 1px solid #1f2937;
+  border-radius: 8px;
+  font-size: 0.7rem;
+  color: #94a3b8;
+}
+
+.legend strong { color: #cbd5e1; }
+.legend-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 6px;
+}
+.legend-row span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+</style>
+</head>
+<body>
+
+<h1>DRIFT</h1>
+<p class="subtitle">Arquitetura v5.2 · Manifesto v2.2 · Event Sourcing sobre Nostr · 82 tests passando</p>
+
+<div class="badge">
+  <span class="b-good">✓ Determinístico</span>
+  <span class="b-good">✓ Custo zero (PWA + relays públicos)</span>
+  <span class="b-good">✓ SQLite WASM (OPFS) + kvvfs fallback</span>
+  <span class="b-good">✓ Identidade portável + multi-id</span>
+  <span class="b-good">✓ NIP-65 + NIP-02 + NIP-06</span>
+  <span class="b-good">✓ Probe anti-eclipse + rebroadcast</span>
+  <span class="b-perf">⚡ Verify lazy</span>
+  <span class="b-perf">⚡ Recalc debounced 100ms</span>
+  <span class="b-perf">⚡ Feed reativo (Zustand, sem poll)</span>
+  <span class="b-perf">⚡ Mapbox/Deck.gl lazy import</span>
+  <span class="b-perf">⚡ 82 tests passando (vitest)</span>
+  <span class="b-warn">⚠ Sem scan automático no oficial padrão</span>
+  <span class="b-gone">Gun.js</span>
+  <span class="b-gone">CRDT</span>
+  <span class="b-gone">PhotoDNA / nsfwjs embutido</span>
+  <span class="b-gone">DDP custom protocol</span>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('layers')">Camadas</div>
+  <div class="tab" onclick="switchTab('flow')">Fluxos</div>
+  <div class="tab" onclick="switchTab('roadmap')">Roadmap</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- LAYERS                                                            -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="view active" id="view-layers">
+
+  <div class="layer">
+    <div class="layer-head">
+      <span class="layer-title">UI · React + Zustand</span>
+      <span class="layer-tag">stores reativas, sem poll</span>
+    </div>
+    <div class="layer-body">
+      <div class="module">
+        <div class="module-name">App.tsx</div>
+        <div class="module-desc"><span class="module-tag tag-mvp">MVP</span> Header · SubpostEditor · Feed · PostViewer wire-up · onboarding gate</div>
+      </div>
+      <div class="module">
+        <div class="module-name">components/Post/</div>
+        <div class="module-desc"><span class="module-tag tag-fase3">F3</span> SwipeHandler (Framer Motion) · SubpostCarousel · PostViewer fullscreen com content-warning blur</div>
+      </div>
+      <div class="module">
+        <div class="module-name">components/Create/</div>
+        <div class="module-desc"><span class="module-tag tag-fase3">F3</span> SubpostEditor — texto + upload imagem + checkboxes <code>content-warning</code></div>
+      </div>
+      <div class="module">
+        <div class="module-name">components/Settings/</div>
+        <div class="module-desc"><span class="module-tag tag-fase3">F3</span> ContentSettings + <span class="module-tag tag-fase5">F5</span> RelaySettings (add/remove/NIP-65) + LocalListsSettings (pinned/blocked/muted)</div>
+      </div>
+      <div class="module">
+        <div class="module-name">components/Identity/</div>
+        <div class="module-desc"><span class="module-tag tag-mvp">F2.5</span> IdentityPanel (backup nsec1 + QR + import + Passkey toggle) <span class="module-tag tag-fase5">F5</span> IdentitySwitcher (multi-id + BIP39 12 palavras NIP-06)</div>
+      </div>
+      <div class="module">
+        <div class="module-name">components/Profile/</div>
+        <div class="module-desc"><span class="module-tag tag-fase5">F5</span> ProfileModal — npub, peso composto, contadores (posts, spreads, buries, pinned, blocked, muted, seguindo), aberto pelo WeightBadge</div>
+      </div>
+      <div class="module">
+        <div class="module-name">components/Post/ReportModal</div>
+        <div class="module-desc"><span class="module-tag tag-fase4">F4</span> denúncia comunitária (illegal/spam/harassment) + links pra autoridades (NCMEC, SaferNet, IWF, INHOPE)</div>
+      </div>
+      <div class="module">
+        <div class="module-name">components/Onboarding/</div>
+        <div class="module-desc"><span class="module-tag tag-fase4">F4</span> OnboardingOverlay — 4 telas de boas-vindas (filosofia, swipes, identidade, regras)</div>
+      </div>
+      <div class="module">
+        <div class="module-name">components/Feed/SpreadMap</div>
+        <div class="module-desc"><span class="module-tag tag-fase4">F4</span> Mapbox + Deck.gl ArcLayer — env-gated (sem token = placeholder), só posts com tag location</div>
+      </div>
+      <div class="module">
+        <div class="module-name">components/UI/Image</div>
+        <div class="module-desc"><span class="module-tag tag-fase3">F3</span> wrapper <code>&lt;img&gt;</code> com skeleton de loading + fallback de erro</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="layer">
+    <div class="layer-head">
+      <span class="layer-title">Estado Reativo · Zustand</span>
+      <span class="layer-tag">UI consome via hooks; setters semânticos</span>
+    </div>
+    <div class="layer-body">
+      <div class="module">
+        <div class="module-name">useBootStore</div>
+        <div class="module-desc">step (idle → isolation → db → identity → sync → relays → ready) · isolated · hasOpfs · identity · relays</div>
+      </div>
+      <div class="module">
+        <div class="module-name">useSyncStore</div>
+        <div class="module-desc">active · cursor · eventsReceived (incrementa por subscribe) · rebuildsInProgress[]</div>
+      </div>
+      <div class="module">
+        <div class="module-name">useFeedStore</div>
+        <div class="module-desc">posts[] · loaded · limit. Atualizado por <code>invalidateFeed()</code> debounced 150ms</div>
+      </div>
+      <div class="module">
+        <div class="module-name">usePrefsStore</div>
+        <div class="module-desc"><span class="module-tag tag-fase3">F3</span> show_nsfw_default · hide_spoilers · hide_ads · location_granularity · onboarding_done. Persistido em <code>user_prefs</code></div>
+      </div>
+      <div class="module">
+        <div class="module-name">useRelaysStore</div>
+        <div class="module-desc"><span class="module-tag tag-fase5">F5</span> list[] reativa de relays. <code>activeReadRelays()/activeWriteRelays()</code> síncronos pra `wssTransport`</div>
+      </div>
+      <div class="module">
+        <div class="module-name">useFollowsStore</div>
+        <div class="module-desc"><span class="module-tag tag-fase5">F5</span> Set&lt;npub&gt; reativo da lista NIP-02 do user. Recalcula feed "Seguindo" via tab switch</div>
+      </div>
+      <div class="module">
+        <div class="module-name">useIdentitiesStore</div>
+        <div class="module-desc"><span class="module-tag tag-fase5">F5</span> list de identidades + activeNpub. Switch dispara location.reload</div>
+      </div>
+      <div class="module">
+        <div class="module-name">useModLocalStore</div>
+        <div class="module-desc"><span class="module-tag tag-fase5">F5</span> blocked + muted (Set&lt;npub&gt; cada). Consultado em hot path por <code>applyContentFilters</code></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="layer">
+    <div class="layer-head">
+      <span class="layer-title">Negócio · Funções Puras</span>
+      <span class="layer-tag">determinístico · `now` por parâmetro</span>
+    </div>
+    <div class="layer-body">
+      <div class="module">
+        <div class="module-name">scoring.ts</div>
+        <div class="module-desc"><code>calculateScore({ spreads, buries, createdAt, now })</code> — fórmula <em>(s − b·0.3) / (idade+2)^1.5</em></div>
+      </div>
+      <div class="module">
+        <div class="module-name">weight.ts</div>
+        <div class="module-desc"><span class="module-tag tag-fase4">F4</span> calculateAntiquity (0..40) · calculateEngagement (0..60) · calculateWeight · getMaxSubposts (1..8)</div>
+      </div>
+      <div class="module">
+        <div class="module-name">moderation.ts</div>
+        <div class="module-desc"><span class="module-tag tag-fase4">F4</span> getReportThreshold (dinâmico via base ativa, 'illegal' 2x mais agressivo) · getReportWeight (anti-sybil) · maybeModerate (UPDATE score=-999)</div>
+      </div>
+      <div class="module">
+        <div class="module-name">cache.ts</div>
+        <div class="module-desc"><span class="module-tag tag-fase4">F4</span> evictOldPosts respeitando spreads do user + pinned + próprios. NUNCA remove posts moderados como decisão própria (#13)</div>
+      </div>
+      <div class="module">
+        <div class="module-name">feed.ts</div>
+        <div class="module-desc">getGlobalFeed / getFollowingFeed / getTrendingFeed · setFeedTab · invalidateFeed (debounced) · applyContentFilters (RenderHint na renderização — score determinístico mantido)</div>
+      </div>
+      <div class="module">
+        <div class="module-name">moderation-local.ts</div>
+        <div class="module-desc"><span class="module-tag tag-fase5">F5</span> block/unblock + mute/unmute + isHidden/hiddenReason síncronos. Camada de visualização — não muda score (manifesto §24)</div>
+      </div>
+      <div class="module">
+        <div class="module-name">bip39.ts</div>
+        <div class="module-desc"><span class="module-tag tag-fase5">F5</span> NIP-06 — generateBip39Mnemonic + deriveNostrKeyFromMnemonic via path m/44'/1237'/0'/0/0 (compatível Damus/Snort/Iris)</div>
+      </div>
+      <div class="module">
+        <div class="module-name">passkey.ts</div>
+        <div class="module-desc"><span class="module-tag tag-fase5">F5</span> WebAuthn opt-in — enable/disable/verify Passkey. Gate antes de descriptografar master key no boot</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="layer">
+    <div class="layer-head">
+      <span class="layer-title">Protocolo · Drift sobre Nostr</span>
+      <span class="layer-tag">kinds 9078..9081 · regular events imutáveis</span>
+    </div>
+    <div class="layer-body">
+      <div class="module">
+        <div class="module-name">protocol.ts</div>
+        <div class="module-desc">createPost (k:9078) · spreadPost (k:9079) · buryPost (k:9080) · reportPost (k:9081). Aceita <code>contentWarning</code> opcional (manifesto §27)</div>
+      </div>
+      <div class="module">
+        <div class="module-name">events.ts</div>
+        <div class="module-desc"><strong>onNostrEvent — ÚNICA porta de escrita SQLite</strong>. Pipeline: kind check → schema check → verify Schnorr → persist → scheduleScoreRecalc + invalidateFeed. persistReport chama <code>maybeModerate</code></div>
+      </div>
+      <div class="module">
+        <div class="module-name">nostr.ts</div>
+        <div class="module-desc">signDriftEvent · verifyDriftEvent · publishToRelays · helpers de tag. Delega ao transport.</div>
+      </div>
+      <div class="module">
+        <div class="module-name">upload.ts</div>
+        <div class="module-desc"><span class="module-tag tag-fase3">F3</span> nostr.build com retry exponential + full jitter (3 tentativas, base 2s). Compressão local pre-upload (1920px, EXIF strip). <strong>Sem CSAM/NSFW scan no oficial padrão</strong> — manifesto §25</div>
+      </div>
+      <div class="module">
+        <div class="module-name">follows.ts</div>
+        <div class="module-desc"><span class="module-tag tag-fase5">F5</span> NIP-02 (kind 3) — follow/unfollow publica lista atualizada. <code>syncFollowsFromRelays</code> rehidrata após import</div>
+      </div>
+      <div class="module">
+        <div class="module-name">nip65.ts</div>
+        <div class="module-desc"><span class="module-tag tag-fase5">F5</span> NIP-65 (kind 10002) — publishRelayList + parseRelayList + fetchRelayList. Compatibilidade Nostr §30</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="layer">
+    <div class="layer-head">
+      <span class="layer-title">Transporte + Resiliência</span>
+      <span class="layer-tag">relays dinâmicos · probe + rebroadcast (F5) · Tor/WebRTC/Bundle (F6)</span>
+    </div>
+    <div class="layer-body">
+      <div class="module">
+        <div class="module-name">relays.ts</div>
+        <div class="module-desc"><span class="module-tag tag-fase5">F5</span> CRUD de relays + store reativa + ensureSeedRelays na primeira boot. <code>activeRelays/Read/Write</code> síncronos. Anti-eclipse: completa com seeds se user só tem 0-1</div>
+      </div>
+      <div class="module">
+        <div class="module-name">transport/wss.ts</div>
+        <div class="module-desc"><span class="module-tag tag-mvp">MVP</span> + <span class="module-tag tag-fase5">F5</span> WSS sobre SimplePool — agora consome <code>activeRead/WriteRelays()</code> dinâmicos. Registra last_ok_at/last_err em cada call</div>
+      </div>
+      <div class="module">
+        <div class="module-name">probe.ts</div>
+        <div class="module-desc"><span class="module-tag tag-fase5">F5</span> probe anti-eclipse periódico (30min) — pega 5 IDs conhecidos e pergunta a cada relay. Flag silent/incomplete/error. Manifesto §20</div>
+      </div>
+      <div class="module">
+        <div class="module-name">rebroadcast.ts</div>
+        <div class="module-desc"><span class="module-tag tag-fase5">F5</span> re-broadcast oportunista quando user adiciona relay novo — manifesto §16 (espalhar = seedear). Republica raw_event de posts próprios + espalhados</div>
+      </div>
+      <div class="module">
+        <div class="module-name">transport/tor.ts</div>
+        <div class="module-desc"><span class="module-tag tag-fase6">F6</span> WSS via .onion — Tauri command + arti-client (Rust). Bypass DNS/SNI/DPI</div>
+      </div>
+      <div class="module">
+        <div class="module-name">transport/webrtc.ts</div>
+        <div class="module-desc"><span class="module-tag tag-fase6">F6</span> P2P direto entre clientes Drift — signaling via Nostr, libp2p. Defesas anti-Sybil adaptativo (random walk + path diversity, §32.3.1)</div>
+      </div>
+      <div class="module">
+        <div class="module-name">transport/bundle.ts</div>
+        <div class="module-desc"><span class="module-tag tag-fase6">F6</span> Sneakernet — export/import de eventos via JSON ou QR. Último recurso anti-bloqueio total</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="layer">
+    <div class="layer-head">
+      <span class="layer-title">Identidade · Auto-Soberana e Portável</span>
+      <span class="layer-tag">secp256k1 · nsec1 nunca sai do device em claro</span>
+    </div>
+    <div class="layer-body">
+      <div class="module">
+        <div class="module-name">identity.ts</div>
+        <div class="module-desc">getOrCreateIdentity · setIdentityFromNsec · exportIdentity · resetIdentity. Recovery automático em master key dessincronizada</div>
+      </div>
+      <div class="module">
+        <div class="module-name">identities.ts</div>
+        <div class="module-desc"><span class="module-tag tag-fase5">F5</span> multi-identidade (manifesto §4) — createNewIdentity, importIdentityNsec, setActiveIdentity, renameIdentity, removeIdentity. Migração identity (singular) → identities (plural)</div>
+      </div>
+      <div class="module">
+        <div class="module-name">crypto.ts</div>
+        <div class="module-desc">AES-GCM 256 sobre master key não-exportável (CryptoKey em IndexedDB). encrypt/decrypt do nsec antes de persistir</div>
+      </div>
+      <div class="module">
+        <div class="module-name">sync.ts:rebuildIdentityHistory</div>
+        <div class="module-desc">subscribe sem janela filtrado por author — rehidrata SQLite após import de nsec em device novo</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="layer">
+    <div class="layer-head">
+      <span class="layer-title">SQLite WASM · OPFS</span>
+      <span class="layer-tag">Web Worker · cache reconstruível</span>
+    </div>
+    <div class="layer-body">
+      <div class="module">
+        <div class="module-name">db.ts / db.worker.ts</div>
+        <div class="module-desc">Worker SQLite WASM 3.51.2-build9. <span class="module-tag tag-fase5">F5</span> 3 modos de storage: OPFS (preferido) → kvvfs/localStorage (Safari &lt;17, ~5MB) → memória (último recurso). Migrações idempotentes via PRAGMA + auto-rebuild fallback</div>
+      </div>
+      <div class="module">
+        <div class="module-name">schema.sql</div>
+        <div class="module-desc">identity · posts (com <code>content_warning</code>, <code>raw_event</code>) · spreads/buries (com <code>raw_event</code>) · reports (com <code>reason</code>) · users · follows · sync_log · user_prefs · pinned · <span class="module-tag tag-fase5">F5</span> identities · relays_user · blocked · muted</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- FLOW                                                              -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="view" id="view-flow">
+
+  <div class="flow">
+    <div class="flow-title">📤 Escrita — publicar um post</div>
+    <div class="step s-write"><div class="step-num">1</div><div class="step-layer">UI</div><div class="step-action">SubpostEditor: user digita texto, opcionalmente upload imagem, marca <code>content-warning</code> se quiser</div></div>
+    <div class="step s-write"><div class="step-num">2</div><div class="step-layer">Upload</div><div class="step-action">upload.ts comprime localmente (1920px, EXIF strip) → POST nostr.build com retry exp+jitter</div><div class="step-perf">3 retries · base 2s</div></div>
+    <div class="step s-write"><div class="step-num">3</div><div class="step-layer">Negócio</div><div class="step-action">handlePublish chama protocol.createPost com subposts + tag content-warning opcional</div></div>
+    <div class="step s-protocol"><div class="step-num">4</div><div class="step-layer">Protocolo</div><div class="step-action">signDriftEvent: kind=9078, tags=[d, drift-version, client, content-warning?, location?], content=JSON({subposts}) · Schnorr secp256k1</div></div>
+    <div class="step s-write"><div class="step-num">5</div><div class="step-layer">Transporte</div><div class="step-action">wssTransport.publish → 4 relays clearnet em paralelo (Promise.allSettled)</div></div>
+    <div class="step s-protocol"><div class="step-num">6</div><div class="step-layer">Volta</div><div class="step-action">Mesmo evento volta pelo subscribe ativo (sync.ts) → onNostrEvent</div></div>
+    <div class="step s-write"><div class="step-num">7</div><div class="step-layer">events.ts</div><div class="step-action">kind check → schema check → verify Schnorr → INSERT OR IGNORE → invalidateFeed</div><div class="step-perf">~150ms total</div></div>
+    <div class="step s-read"><div class="step-num">8</div><div class="step-layer">UI</div><div class="step-action">useFeedStore re-renderiza · post aparece no Feed; <code>applyContentFilters</code> decide blur/hide</div></div>
+
+    <div class="note">
+      Optimistic UI usa <code>useState</code> local, NUNCA escreve no SQLite (invariante #2). Quando o evento real volta, o optimistic é descartado silenciosamente.
+    </div>
+  </div>
+
+  <div class="flow">
+    <div class="flow-title">📥 Leitura — feed reativo</div>
+    <div class="step s-read"><div class="step-num">1</div><div class="step-layer">Subscribe</div><div class="step-action">sync.ts: <code>pool.subscribeMany(relays, filter, ...)</code> — filtro único {kinds: [9078..9081], since: cursor}</div></div>
+    <div class="step s-read"><div class="step-num">2</div><div class="step-layer">events.ts</div><div class="step-action">Cada evento → onNostrEvent → persist + invalidateFeed (debounced 150ms colapsa rajadas)</div></div>
+    <div class="step s-read"><div class="step-num">3</div><div class="step-layer">feed.ts</div><div class="step-action">refreshFeed query: <code>SELECT * FROM posts WHERE score > -999 ORDER BY score DESC, created_at DESC</code></div></div>
+    <div class="step s-read"><div class="step-num">4</div><div class="step-layer">Zustand</div><div class="step-action">useFeedStore.setState({ posts }) — UI re-renderiza só onde post mudou (selectors granulares)</div></div>
+    <div class="step s-read"><div class="step-num">5</div><div class="step-layer">UI</div><div class="step-action">Feed: <code>applyContentFilters(post, prefs)</code> → blur/hide individual por post (filtro local não muda score)</div></div>
+  </div>
+
+  <div class="flow">
+    <div class="flow-title">↑ ↓ Spread / Bury — swipe vertical</div>
+    <div class="step s-write"><div class="step-num">1</div><div class="step-layer">UI</div><div class="step-action">PostViewer: SwipeHandler detecta gesto vertical (threshold 80px ou v>200px/s) → onSpread/onBury</div></div>
+    <div class="step s-protocol"><div class="step-num">2</div><div class="step-layer">Protocolo</div><div class="step-action">spreadPost(k:9079, tags=[e, p, location?]) ou buryPost(k:9080, tags=[e]) — sem 'p', sem 'reason' · manifesto §23</div></div>
+    <div class="step s-write"><div class="step-num">3</div><div class="step-layer">Transporte</div><div class="step-action">wssTransport.publish em paralelo → relays</div></div>
+    <div class="step s-protocol"><div class="step-num">4</div><div class="step-layer">events.ts</div><div class="step-action">persistSpread/persistBury → INSERT OR IGNORE → scheduleScoreRecalc(postId)</div><div class="step-perf">debounced 100ms</div></div>
+    <div class="step s-protocol"><div class="step-num">5</div><div class="step-layer">scoring.ts</div><div class="step-action">recalculateScore: query consolidada (1 round-trip) → calculateScore (puro) → UPDATE posts.score</div></div>
+    <div class="step s-read"><div class="step-num">6</div><div class="step-layer">UI</div><div class="step-action">invalidateFeed após recalc → Feed reordena</div></div>
+  </div>
+
+  <div class="flow">
+    <div class="flow-title">⚠ Report — moderação reativa (manifesto §26)</div>
+    <div class="step s-mod"><div class="step-num">1</div><div class="step-layer">UI</div><div class="step-action">User reporta com reason: 'illegal' | 'spam' | 'harassment' (Fase 4)</div></div>
+    <div class="step s-protocol"><div class="step-num">2</div><div class="step-layer">Protocolo</div><div class="step-action">reportPost(k:9081, tags=[e, p, reason]) → publish</div></div>
+    <div class="step s-mod"><div class="step-num">3</div><div class="step-layer">events.ts</div><div class="step-action">persistReport → INSERT reports(post_id, reporter_pub, reason, weight) → maybeModerate(postId)</div></div>
+    <div class="step s-mod"><div class="step-num">4</div><div class="step-layer">moderation.ts</div><div class="step-action">aggregateReports + countActiveUsers → getReportThreshold(activeUsers, reason). 'illegal' tem threshold 2x menor</div></div>
+    <div class="step s-mod"><div class="step-num">5</div><div class="step-layer">SQLite</div><div class="step-action">Se threshold atingido → UPDATE posts SET score = -999 (esconde do feed default — NÃO apaga)</div></div>
+    <div class="step s-read"><div class="step-num">6</div><div class="step-layer">UI</div><div class="step-action">Feed query <code>WHERE score > -999</code> remove naturalmente. Cliente alternativo pode exibir mesmo assim</div></div>
+
+    <div class="note">
+      Cliente NÃO escaneia conteúdo automaticamente (manifesto §25). Cliente NÃO deleta dados moderados do SQLite (invariante #13). O evento permanece nos relays — moderação é flag local, não delete global.
+    </div>
+  </div>
+
+  <div class="flow">
+    <div class="flow-title">🔑 Identidade — backup e portabilidade (Fase 2.5)</div>
+    <div class="step s-write"><div class="step-num">1</div><div class="step-layer">UI</div><div class="step-action">IdentityPanel: aba Backup → revela nsec1 + QR + copiar</div></div>
+    <div class="step s-write"><div class="step-num">2</div><div class="step-layer">UI</div><div class="step-action">Outro device: aba Importar → cola nsec1 → confirm() destrutivo (export oferecido antes — regra dura)</div></div>
+    <div class="step s-protocol"><div class="step-num">3</div><div class="step-layer">identity.ts</div><div class="step-action">setIdentityFromNsec → encrypt(nsec) → INSERT identity → cache em memória</div></div>
+    <div class="step s-protocol"><div class="step-num">4</div><div class="step-layer">sync.ts</div><div class="step-action">rebuildIdentityHistory(npub) — subscribe SEM janela filtrado por author</div></div>
+    <div class="step s-read"><div class="step-num">5</div><div class="step-layer">events.ts</div><div class="step-action">Cada evento histórico passa por onNostrEvent normal — schema → verify → persist</div></div>
+    <div class="step s-read"><div class="step-num">6</div><div class="step-layer">UI</div><div class="step-action">Feed se reconstrói. Posts próprios da identidade portada aparecem como "você"</div></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- ROADMAP                                                           -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="view" id="view-roadmap">
+  <div class="flow">
+    <div class="flow-title">Roadmap de Compromissos · Manifesto v2.2</div>
+
+    <div class="step"><div class="step-num">1</div><div class="step-layer"><span class="module-tag tag-mvp">MVP ✓</span></div><div class="step-action">Setup, SQLite WASM, identidade, conexão com relays · publicar/spread/bury via PWA</div></div>
+    <div class="step"><div class="step-num">2</div><div class="step-layer"><span class="module-tag tag-mvp">F2 ✓</span></div><div class="step-action">Protocolo Drift (kinds 9078..9081), onNostrEvent, feed reativo Zustand</div></div>
+    <div class="step"><div class="step-num">3</div><div class="step-layer"><span class="module-tag tag-mvp">F2.5 ✓</span></div><div class="step-action">Portabilidade de identidade — export/import nsec1, rebuildIdentityHistory</div></div>
+    <div class="step"><div class="step-num">4</div><div class="step-layer"><span class="module-tag tag-fase3">F3 ✓</span></div><div class="step-action">Swipes Framer Motion · upload imagens (sem scan automático) · tag content-warning + filtros locais · location off-default · transport abstrato</div></div>
+    <div class="step"><div class="step-num">5</div><div class="step-layer"><span class="module-tag tag-fase4">F4 ✓</span></div><div class="step-action">Mapa Mapbox+Deck.gl · peso de perfil · moderação threshold dinâmico · cache eviction respeita spreads · onboarding · UX denúncia autoridades</div></div>
+    <div class="step"><div class="step-num">6</div><div class="step-layer"><span class="module-tag tag-fase5">F5 ✓</span></div><div class="step-action">PWA polish · NIP-65 · NIP-02 · multi-identidade · BIP39 (NIP-06) · Passkey opt-in · probe anti-eclipse · re-broadcast oportunista · pinning local UI · block/mute · feed tabs (Global/Seguindo/Trending) · Profile · kvvfs fallback (Safari &lt;17) · 82 tests Vitest</div></div>
+    <div class="step"><div class="step-num">6.5</div><div class="step-layer"><span class="module-tag tag-fase5">F5.x</span></div><div class="step-action">Pendente (operacional): APK via TWA/Capacitor/Tauri Mobile · F-Droid manifest · CI GitHub Releases — sessão dedicada de packaging</div></div>
+    <div class="step"><div class="step-num">7</div><div class="step-layer"><span class="module-tag tag-fase6">F6</span></div><div class="step-action">Cliente nativo Tauri · Tor (arti) · WebRTC P2P (libp2p) · IPFS pin (Helia/Kubo) · run-your-own-relay · build reproduzível · sneakernet bundle · doc anti-censura</div></div>
+
+    <div class="note">
+      <strong>Fase 6 não é opcional</strong>. Manifesto §15 (anti-censura por país) e §16 (disponibilidade distribuída) só fecham completamente lá. Sem Fase 6, são marketing; com Fase 6, são propriedades verificáveis.
+    </div>
+  </div>
+
+  <div class="flow">
+    <div class="flow-title">🚫 Decisões já tomadas (não revisitar sem bump explícito)</div>
+    <div class="step"><div class="step-num">×</div><div class="step-layer">v3</div><div class="step-action"><strong>Sem Gun.js</strong> — duplica responsabilidades já melhor resolvidas (relays + event sourcing + SQLite)</div></div>
+    <div class="step"><div class="step-num">×</div><div class="step-layer">v3</div><div class="step-action"><strong>Sem CRDT</strong> (Automerge/Yjs) — Drift tem eventos imutáveis, não edição concorrente</div></div>
+    <div class="step"><div class="step-num">×</div><div class="step-layer">v5</div><div class="step-action"><strong>Sem feed personalizado / afinidade</strong> — score determinístico global, manifesto §24</div></div>
+    <div class="step"><div class="step-num">×</div><div class="step-layer">v5</div><div class="step-action"><strong>Sem chave mestra</strong> — não escrever <code>deletePost</code> / <code>banUser</code> globais (manifesto §17)</div></div>
+    <div class="step"><div class="step-num">×</div><div class="step-layer">v5.1</div><div class="step-action"><strong>Sem scan automático no cliente oficial padrão</strong> — sem PhotoDNA, sem nsfwjs embutido. Auto-classificação voluntária + reports comunitários (manifesto §25 v2.2)</div></div>
+    <div class="step"><div class="step-num">×</div><div class="step-layer">v5.1</div><div class="step-action">Plugin opt-in OFF-by-default <em>tolerado</em> em outros clientes ou plugins, sob restrições estritas — protocolo nunca obriga</div></div>
+    <div class="step"><div class="step-num">×</div><div class="step-layer">v5.1</div><div class="step-action"><strong>Sem DDP custom</strong> — defesas anti-Sybil adaptativo (random walk, path diversity, cluster detection) vivem dentro do <code>transport/webrtc.ts</code> (F6), não como protocolo paralelo. Drift fica cidadão Nostr (manifesto §30, arquitetura §30.12)</div></div>
+    <div class="step"><div class="step-num">✓</div><div class="step-layer">v5.2</div><div class="step-action"><strong>BIP39 (NIP-06) e Passkey são opt-ins</strong> — default continua nsec direto + AES-GCM auto. Compatibilidade Nostr verificada por testes contra vetores oficiais NIP-06 (arquitetura §30.13)</div></div>
+    <div class="step"><div class="step-num">✓</div><div class="step-layer">v5.2</div><div class="step-action"><strong>Tests automatizados de funções puras</strong> — Vitest, 82 testes cobrindo scoring, weight, moderation, applyContentFilters, BIP39 (vetores NIP-06), parseRelayList. Manifesto §7 (determinismo) verificável</div></div>
+  </div>
+</div>
+
+<div class="legend">
+  <strong>Tags de fase:</strong>
+  <div class="legend-row">
+    <span><span class="module-tag tag-mvp">MVP</span> implementado, em produção</span>
+    <span><span class="module-tag tag-fase3">F3</span> Fase 3 (esta sessão)</span>
+    <span><span class="module-tag tag-fase4">F4</span> Fase 4 (próxima)</span>
+    <span><span class="module-tag tag-fase5">F5</span> Fase 5</span>
+    <span><span class="module-tag tag-fase6">F6</span> Fase 6 (cliente nativo, vinculante)</span>
+  </div>
+</div>
+
+<script>
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'))
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'))
+  event.target.classList.add('active')
+  document.getElementById('view-' + name).classList.add('active')
+}
+</script>
+
+</body>
+</html>

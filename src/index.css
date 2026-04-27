@@ -1,0 +1,16 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body,
+  #root {
+    @apply h-full bg-drift-bg text-slate-200 antialiased;
+    overscroll-behavior: none;
+  }
+  body {
+    /* impede zoom acidental no swipe em mobile */
+    touch-action: pan-x pan-y;
+  }
+}

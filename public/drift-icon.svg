@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" rx="96" fill="#08080f"/>
+  <g transform="translate(256 256)">
+    <!-- Concentric rings — visualização do espalhamento -->
+    <circle cx="0" cy="0" r="180" fill="none" stroke="#a78bfa" stroke-width="3" opacity="0.18"/>
+    <circle cx="0" cy="0" r="140" fill="none" stroke="#a78bfa" stroke-width="3" opacity="0.30"/>
+    <circle cx="0" cy="0" r="100" fill="none" stroke="#a78bfa" stroke-width="3" opacity="0.50"/>
+    <!-- Up arrow — gesto de espalhar -->
+    <path d="M 0 30 L 0 -50 M -30 -20 L 0 -50 L 30 -20" fill="none" stroke="#a78bfa" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>

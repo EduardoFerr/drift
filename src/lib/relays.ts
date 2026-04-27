@@ -1,0 +1,282 @@
+/**
+ * Gerenciamento dinâmico de relays — manifesto §14 (Bootstrap Distribuído).
+ *
+ * Substitui a seed list estática (`config/relays.ts`) como fonte de
+ * verdade pra `wssTransport`. A seed continua sendo populada no banco
+ * na primeira boot (via `ensureSeedRelays`) — daí em diante tudo é
+ * gerenciado pelo user.
+ *
+ * Sources possíveis em `relays_user.source`:
+ *   - 'seed'      — pré-instalado pelo cliente (4 iniciais)
+ *   - 'user'      — adicionado manualmente
+ *   - 'nip65'     — descoberto via kind 10002 de algum user
+ *   - 'recommend' — sugerido por tag `recommend-relay` em algum evento
+ *
+ * Manifesto §20: cliente sempre mantém ao menos 1 relay aleatório fora
+ * da preferência do user pra resistir a eclipse por self-config. Isso
+ * acontece via `pickAntiEclipseRelay()` que, mesmo após o user remover
+ * todos os seeds, mantém **um** seed forçadamente ativo.
+ */
+
+import { create } from 'zustand'
+import { db } from './db'
+import { RELAYS as SEED_RELAYS } from '../config/relays'
+
+// ─── Tipos ───────────────────────────────────────────────────────────
+
+export type RelaySource = 'seed' | 'user' | 'nip65' | 'recommend'
+
+export interface RelayRecord {
+  url: string
+  read: boolean
+  write: boolean
+  source: RelaySource
+  addedAt: number
+  lastOkAt: number | null
+  lastErr: string | null
+  enabled: boolean
+}
+
+interface RelayRow {
+  url: string
+  read: number
+  write: number
+  source: string
+  added_at: number
+  last_ok_at: number | null
+  last_err: string | null
+  enabled: number
+}
+
+function rowToRecord(r: RelayRow): RelayRecord {
+  const source: RelaySource =
+    r.source === 'seed' ||
+    r.source === 'user' ||
+    r.source === 'nip65' ||
+    r.source === 'recommend'
+      ? r.source
+      : 'user'
+  return {
+    url: r.url,
+    read: r.read !== 0,
+    write: r.write !== 0,
+    source,
+    addedAt: r.added_at,
+    lastOkAt: r.last_ok_at,
+    lastErr: r.last_err,
+    enabled: r.enabled !== 0,
+  }
+}
+
+// ─── Store reativa ───────────────────────────────────────────────────
+
+interface RelaysState {
+  list: RelayRecord[]
+  loaded: boolean
+}
+
+export const useRelaysStore = create<RelaysState>(() => ({
+  list: [],
+  loaded: false,
+}))
+
+// ─── Carregamento + seed ─────────────────────────────────────────────
+
+let initialized = false
+
+/**
+ * Carrega relays do banco pra store. Idempotente.
+ *
+ * Na primeira corrida, popula a seed list (4 relays do `config/relays.ts`).
+ * Após isso, qualquer remoção é respeitada — re-rodar `ensureSeedRelays`
+ * não ressuscita relays que o user explicitamente removeu (manifesto §10:
+ * cliente é autoridade sobre próprio estado).
+ */
+export async function loadRelays(): Promise<void> {
+  if (initialized) return
+  initialized = true
+
+  await ensureSeedRelays()
+  const rows = await db.exec<RelayRow>(
+    `SELECT url, read, write, source, added_at, last_ok_at, last_err, enabled
+     FROM relays_user
+     ORDER BY enabled DESC, added_at ASC`,
+  )
+  useRelaysStore.setState({
+    list: rows.map(rowToRecord),
+    loaded: true,
+  })
+}
+
+/**
+ * Popula a seed list só se a tabela está completamente vazia.
+ *
+ * Se o user removeu todos os relays manualmente, NÃO ressuscita — só
+ * mantém o anti-eclipse aleatório via `pickAntiEclipseRelay()` depois.
+ */
+async function ensureSeedRelays(): Promise<void> {
+  const row = await db.get<{ n: number }>(`SELECT COUNT(*) AS n FROM relays_user`)
+  if ((row?.n ?? 0) > 0) return
+
+  const now = Date.now()
+  for (const url of SEED_RELAYS) {
+    await db.run(
+      `INSERT OR IGNORE INTO relays_user (url, read, write, source, added_at, enabled)
+       VALUES (?, 1, 1, 'seed', ?, 1)`,
+      [url, now],
+    )
+  }
+}
+
+async function refreshList(): Promise<void> {
+  const rows = await db.exec<RelayRow>(
+    `SELECT url, read, write, source, added_at, last_ok_at, last_err, enabled
+     FROM relays_user
+     ORDER BY enabled DESC, added_at ASC`,
+  )
+  useRelaysStore.setState({ list: rows.map(rowToRecord), loaded: true })
+}
+
+// ─── CRUD ────────────────────────────────────────────────────────────
+
+export interface AddRelayInput {
+  url: string
+  read?: boolean
+  write?: boolean
+  source?: RelaySource
+}
+
+export async function addRelay(input: AddRelayInput): Promise<void> {
+  const url = normalizeUrl(input.url)
+  if (!isValidWss(url)) {
+    throw new Error(`URL de relay inválida: ${input.url}. Esperado wss://...`)
+  }
+  // Detecta se já existia — se não, é "relay novo" e merece rebroadcast.
+  const existing = await db.get<{ url: string }>(
+    `SELECT url FROM relays_user WHERE url = ? LIMIT 1`,
+    [url],
+  )
+  const isNew = !existing
+
+  await db.run(
+    `INSERT INTO relays_user (url, read, write, source, added_at, enabled)
+     VALUES (?, ?, ?, ?, ?, 1)
+     ON CONFLICT(url) DO UPDATE SET
+       read = excluded.read,
+       write = excluded.write,
+       enabled = 1`,
+    [
+      url,
+      input.read === false ? 0 : 1,
+      input.write === false ? 0 : 1,
+      input.source ?? 'user',
+      Date.now(),
+    ],
+  )
+  await refreshList()
+
+  // Re-broadcast oportunista — manifesto §16. Roda fire-and-forget
+  // pra não bloquear UI. Identidade obtida lazy pra evitar import
+  // cíclico (relays.ts ← identity.ts ← bootstrap.ts ← relays.ts).
+  if (isNew && (input.write !== false)) {
+    void scheduleRebroadcast(url)
+  }
+}
+
+async function scheduleRebroadcast(relayUrl: string): Promise<void> {
+  try {
+    const [{ getOrCreateIdentity }, { rebroadcastToRelay }] = await Promise.all([
+      import('./identity'),
+      import('./rebroadcast'),
+    ])
+    const identity = await getOrCreateIdentity()
+    const result = await rebroadcastToRelay(relayUrl, identity.npub)
+    if (result.sent > 0) {
+      console.log(
+        `[relays] re-broadcast em ${relayUrl}: ${result.sent} eventos · ${result.durationMs}ms`,
+      )
+    }
+  } catch (err) {
+    console.warn('[relays] re-broadcast falhou:', err)
+  }
+}
+
+export async function removeRelay(url: string): Promise<void> {
+  await db.run(`DELETE FROM relays_user WHERE url = ?`, [normalizeUrl(url)])
+  await refreshList()
+}
+
+export async function setRelayEnabled(url: string, enabled: boolean): Promise<void> {
+  await db.run(
+    `UPDATE relays_user SET enabled = ? WHERE url = ?`,
+    [enabled ? 1 : 0, normalizeUrl(url)],
+  )
+  await refreshList()
+}
+
+export async function recordRelayOk(url: string): Promise<void> {
+  await db.run(
+    `UPDATE relays_user SET last_ok_at = ?, last_err = NULL WHERE url = ?`,
+    [Date.now(), normalizeUrl(url)],
+  )
+  // Não refresh aqui — chamado em hot path; UI consume snapshot atual.
+}
+
+export async function recordRelayError(url: string, err: string): Promise<void> {
+  await db.run(
+    `UPDATE relays_user SET last_err = ? WHERE url = ?`,
+    [err.slice(0, 200), normalizeUrl(url)],
+  )
+}
+
+// ─── Leitura ─────────────────────────────────────────────────────────
+
+/**
+ * URLs ativas (enabled=1) — substitui o uso direto de `RELAYS` em
+ * `wssTransport`. Snapshot síncrono da store.
+ *
+ * Inclui sempre ao menos 1 relay aleatório fora da preferência do user
+ * se o conjunto user-curado for muito pequeno (<2). Manifesto §20.
+ */
+export function activeRelays(): string[] {
+  const list = useRelaysStore.getState().list
+  const active = list.filter((r) => r.enabled).map((r) => r.url)
+  if (active.length >= 2) return active
+  // Anti-eclipse: se o user só tem 0-1 relay configurado, mistura
+  // seeds que ele NÃO removeu na rotação (não viola §10 — não
+  // ressuscita removidos, só completa).
+  const knownUrls = new Set(list.map((r) => r.url))
+  const fallback = SEED_RELAYS.filter((u) => !knownUrls.has(u))
+  return [...active, ...fallback]
+}
+
+/**
+ * URLs habilitadas pra escrita (publish). Subset de `activeRelays`.
+ * NIP-65: read e write podem divergir.
+ */
+export function activeWriteRelays(): string[] {
+  const list = useRelaysStore.getState().list
+  const active = list.filter((r) => r.enabled && r.write).map((r) => r.url)
+  if (active.length === 0) return activeRelays()
+  return active
+}
+
+/**
+ * URLs habilitadas pra leitura (subscribe). Subset de `activeRelays`.
+ */
+export function activeReadRelays(): string[] {
+  const list = useRelaysStore.getState().list
+  const active = list.filter((r) => r.enabled && r.read).map((r) => r.url)
+  if (active.length === 0) return activeRelays()
+  return active
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────
+
+function normalizeUrl(url: string): string {
+  return url.trim().replace(/\/$/, '').toLowerCase()
+}
+
+function isValidWss(url: string): boolean {
+  return /^wss?:\/\/[^\s/$.?#].[^\s]*$/i.test(url)
+}

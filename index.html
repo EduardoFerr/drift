@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/drift-icon.svg" />
+    <link rel="alternate icon" type="image/png" sizes="64x64" href="/pwa-64x64.png" />
+    <!-- iOS Safari: apple-touch-icon DEVE ser PNG; SVG é ignorado.
+         180x180 é o tamanho recomendado pra Home Screen do iOS. -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#0a0a0f" />
+    <!-- iOS web app meta tags — fazem o PWA rodar fullscreen sem barra
+         do Safari quando adicionado à Home Screen.
+         apple-mobile-web-app-capable está deprecated em favor de
+         display: 'standalone' no manifest, mas iOS Safari < 16.4
+         ainda precisa dele pra ativar fullscreen. -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Drift" />
+    <title>Drift</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
