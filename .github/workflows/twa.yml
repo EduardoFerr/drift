@@ -109,12 +109,15 @@ jobs:
       - name: Bubblewrap update
         working-directory: app/twa
         run: |
-          # Inicializa estrutura Android se não existe (primeira vez)
+          # Bubblewrap commands são interativos por design. Pipeamos `yes ""`
+          # pra aceitar o default em cada prompt (versão, packageId, etc) —
+          # os valores reais vêm do twa-manifest.json que já editamos acima.
+          # `yes ""` fornece linhas vazias infinitas; bubblewrap interpreta
+          # cada Enter como "use default".
           if [ ! -f "build.gradle" ]; then
-            bubblewrap init --manifest=https://drift-wheat-one.vercel.app/manifest.webmanifest --directory=. --skipPwaValidation || true
+            yes "" | bubblewrap init --manifest=https://drift-wheat-one.vercel.app/manifest.webmanifest --directory=. --skipPwaValidation || true
           fi
-          # Atualiza projeto pra refletir twa-manifest.json
-          bubblewrap update
+          yes "" | bubblewrap update
 
       - name: Bubblewrap build
         working-directory: app/twa
@@ -122,10 +125,13 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          # `bubblewrap build` interativo solicita passwords —
-          # passamos via stdin (linha 1: keystore pwd, linha 2: key pwd).
-          printf '%s\n%s\n' "$KEYSTORE_PASSWORD" "$KEY_PASSWORD" \
-            | bubblewrap build --skipPwaValidation
+          # `bubblewrap build` solicita passwords interativo. Passamos a
+          # password do keystore + da key + linhas vazias adicionais pra
+          # cobrir qualquer prompt de confirmação subsequente.
+          {
+            printf '%s\n%s\n' "$KEYSTORE_PASSWORD" "$KEY_PASSWORD"
+            yes ""
+          } | bubblewrap build --skipPwaValidation
           ls -lh ./*.apk ./*.aab 2>/dev/null || true
 
       - name: Rename artifacts
