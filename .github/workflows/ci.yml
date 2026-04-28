@@ -20,8 +20,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Node 20 LTS é o piso suportado. 22 mantém heads-up pra versão atual.
-        node: [20, 22]
+        # Node 22 é o piso — @sqlite.org/sqlite-wasm 3.51.2-build9 exige >=22.
+        # Adicionar 24 quando virar LTS (out/2026).
+        node: [22]
 
     steps:
       - uses: actions/checkout@v4
@@ -44,8 +45,7 @@ jobs:
       - name: Build (vite + tsc)
         run: npm run build
 
-      - name: Upload dist (Node 20 only — artifact pra inspeção)
-        if: matrix.node == 20
+      - name: Upload dist (artifact pra inspeção)
         uses: actions/upload-artifact@v4
         with:
           name: dist
