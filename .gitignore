@@ -70,3 +70,6 @@ memory/
 
 # vercel cli local link (auth + project ref) — gerado por `vercel link`
 .vercel
+
+
+*.keystore

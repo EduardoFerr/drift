@@ -47,6 +47,21 @@ jobs:
       - name: Install Bubblewrap
         run: npm install -g @bubblewrap/cli
 
+      - name: Pre-configure Bubblewrap (skip JDK install prompt)
+        # Bubblewrap pergunta interativamente "Install JDK? (Y/n)" na primeira
+        # execução. Como o setup-java action já instalou Java 17 e setup-android
+        # já populou o SDK, criamos `~/.bubblewrap/config.json` pré-emptivamente
+        # apontando pros paths do CI — Bubblewrap detecta e pula o wizard.
+        run: |
+          mkdir -p "$HOME/.bubblewrap"
+          cat > "$HOME/.bubblewrap/config.json" <<EOF
+          {
+            "jdkPath": "$JAVA_HOME",
+            "androidSdkPath": "$ANDROID_HOME"
+          }
+          EOF
+          cat "$HOME/.bubblewrap/config.json"
+
       - name: Validate secrets
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}

@@ -4,6 +4,25 @@ All notable changes to the Drift client. Uses [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+## [0.5.1] — 2026-04-27
+
+Sub-fases operacionais e antecipação de Fase 7 (distribuição):
+
+### Added
+
+- **Vercel deploy** + GitHub integration ativa (push em main → deploy automático). URL prod: https://drift-wheat-one.vercel.app
+- **`vercel.json` hardening**: COOP/COEP, X-Frame-Options DENY, Referrer-Policy no-referrer, Permissions-Policy restritiva, cache imutável em `/assets/*`, must-revalidate em `sw.js` e `manifest.webmanifest`, SPA rewrite excluindo `/.well-known/`
+- **`.github/workflows/release.yml`**: trigger em tag `v*`, build + valida package.json:version vs tag, empacota `dist-vX.Y.Z.zip` + `SHA256SUMS`, extrai release notes da seção do CHANGELOG, cria GitHub Release
+- **`.github/workflows/twa.yml`** (Fase 7 antecipada): build APK + AAB Android via Bubblewrap em CI. Java 17 + Android SDK + keystore dos secrets. Anexa ao Release.
+- **`app/twa/twa-manifest.json`**: config Bubblewrap (package `com.driftnet.client`, host fixo, ícones, shortcuts, signing path)
+- **`public/.well-known/assetlinks.json`**: Digital Asset Links pra TWA abrir sem barra do Chrome
+- **PWA polish**: manifest com `lang: pt-BR`, `display_override`, `launch_handler.client_mode: focus-existing`, `prefer_related_applications: false`, shortcuts (Novo post, Configurações). Meta description + application-name no `index.html`. Handler de `?action=compose|settings` em `App.tsx`
+- **Docs**: `Docs/deploy.md` (Vercel/self-host/tunnel/troubleshooting), `Docs/twa.md` (keystore, secrets, distribuição, troubleshooting Asset Links)
+
+### Changed
+
+- **Roadmap**: separação clara entre Fase 6 (cliente nativo, transportes) e **Fase 7 (distribuição do cliente E do protocolo)**. Manifesto §15 → 6; §16-§17 → 7.
+
 ## [0.5.0] — 2026-04-27
 
 First public release. Closes Phase 5 of the architecture roadmap. Manifesto v2.2 (34 principles + binding roadmap to Phase 6).
@@ -68,5 +87,6 @@ First public release. Closes Phase 5 of the architecture roadmap. Manifesto v2.2
 - **Phase 5.x** — APK distribution (TWA/Capacitor), F-Droid, CI GitHub Releases, hospedagem PWA
 - **Phase 6** — Cliente nativo Tauri (Tor via arti, WebRTC P2P, IPFS pin via helia, run-your-own-relay), build reproduzível, sneakernet bundle. Compromisso de manifesto §15-§17.
 
-[Unreleased]: https://github.com/EduardoFerr/drift/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/EduardoFerr/drift/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/EduardoFerr/drift/releases/tag/v0.5.1
 [0.5.0]: https://github.com/EduardoFerr/drift/releases/tag/v0.5.0
