@@ -19,7 +19,7 @@ OTIMISMO: UI ← React useState (descartado quando SQLite confirma)
 - Tailwind CSS + Framer Motion (gestos)
 - nostr-tools (Nostr) + @sqlite.org/sqlite-wasm 3.51.2-build9 (PIN exato)
 - Zustand (estado reativo) + Workbox (PWA)
-- Mapbox GL + Deck.gl (mapa de espalhamento, opt-in)
+- MapLibre GL + Deck.gl (tiles CARTO/OSM, sem API key — mapa de espalhamento, opt-in)
 - @scure/bip39 (NIP-06 opt-in) + WebAuthn (Passkey opt-in)
 
 ## Os 4 kinds Drift
@@ -122,12 +122,11 @@ src/
 - ✅ **Fase 3** — Swipes Framer Motion, upload, content-warning, location off-default
 - ✅ **Fase 4** — Mapa, peso de perfil, moderação threshold dinâmico, eviction respeita spreads
 - ✅ **Fase 5** — PWA polish, NIP-65, NIP-02, NIP-06, Passkey, multi-identidade, probe, re-broadcast, pinning, block/mute, feed tabs, kvvfs fallback, **99 tests Vitest**
-- ✅ **Fase 5.x.1-5.x.3+5.x.7+5.x.8** — versionamento, CI, PWA polish, deploy Vercel, release automation
-- ✅ **Fase 5.x.4** — TWA Android (build APK/AAB no CI via Bubblewrap)
-- ⏳ **Fase 5.x.5+5.x.6** — Capacitor (alternativa), F-Droid manifest
-- ⏳ **Fase 6** — Cliente nativo Tauri (Tor + WebRTC), IPFS pin, run-your-own-relay, build reproduzível
+- ✅ **Fase 5.x** — versionamento, CI, PWA polish, deploy Vercel, release automation, TWA Android (5.x.4 ⇒ relabeled como Fase 7 antecipada)
+- ⏳ **Fase 6** — Cliente nativo Tauri (Tor + WebRTC), build reproduzível
+- ⏳ **Fase 7** — Distribuição: TWA (✅ antecipada), Capacitor, F-Droid, Play Store, IPFS pin, run-your-own-relay, sneakernet bundle
 
-Fase 6 é compromisso, não opção: anti-censura por país (§15) e disponibilidade distribuída (§16) só fecham completamente lá.
+Fase 6 entrega a **capacidade técnica** (§15 — múltiplos transportes); Fase 7 entrega a **garantia política** (§16-§17 — disponibilidade distribuída + sem chave mestra na distribuição). Ambas são compromissos do manifesto.
 
 ## Filosofia
 

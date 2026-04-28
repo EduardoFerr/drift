@@ -32,7 +32,6 @@ Depois disso, push em `main` faz redeploy. PRs ganham URL de preview automática
 
 No painel da Vercel → Project → Settings → Environment Variables:
 
-- `VITE_MAPBOX_TOKEN` — pra mapa de espalhamento (Mapbox dá 50k carregamentos/mês free)
 - `VITE_APP_VERSION` — sincroniza com `package.json` (não obrigatório, default `0.5.0`)
 
 ### Smoke test pós-deploy
@@ -91,16 +90,16 @@ cloudflared tunnel --url http://localhost:5173
 
 URL `*.trycloudflare.com` tem cert válido — PWA instala em desktop e mobile sem ajustar trust store. Útil pra testar entre PC e celular antes de fazer deploy real.
 
-## 4. APK Android via TWA
+## 4. APK Android via TWA (Fase 7 antecipada)
 
-✅ Configurado. Detalhes em [`Docs/twa.md`](twa.md). Resumo:
+✅ Configurado. Detalhes em [`twa.md`](twa.md). Resumo:
 
 - `app/twa/twa-manifest.json` — config Bubblewrap (host, ícones, shortcuts, signing)
 - `public/.well-known/assetlinks.json` — Digital Asset Links (servido pela Vercel)
 - `.github/workflows/twa.yml` — build APK + AAB no CI em tag `v*`
-- Distribuição: GitHub Releases (sideload direto), F-Droid (Fase 5.x.6), Play Store opcional
+- Distribuição: GitHub Releases (sideload direto), F-Droid ([`fdroid.md`](fdroid.md), Fase 7.2), Play Store opcional
 
-Setup pendente (uma vez): gerar keystore, capturar SHA256, popular `assetlinks.json` + secrets no GitHub. Ver `Docs/twa.md`.
+Setup pendente (uma vez): gerar keystore, capturar SHA256, popular `assetlinks.json` + secrets no GitHub. Ver `twa.md`.
 
 ## Hardening adicional (quando virar produção)
 

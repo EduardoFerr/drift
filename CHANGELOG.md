@@ -4,6 +4,19 @@ All notable changes to the Drift client. Uses [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+## [0.5.2] — 2026-04-27
+
+### Changed
+
+- **Mapa**: migrado de Mapbox GL JS para MapLibre GL — sem token obrigatório, tiles raster CARTO Dark Matter (OSS, sem API key). Manifesto §17 (sem chave mestra / sem dependência crítica de fornecedor proprietário).
+- `package.json`: removidas deps `mapbox-gl` + `@types/mapbox-gl`; adicionado `maplibre-gl@5.24.0` (traz tipos próprios, sem `@types/`).
+- `.env.example`, `vite-env.d.ts`: removida referência a `VITE_MAPBOX_TOKEN`.
+- Docs (CHANGELOG, README, CLAUDE.md, Docs/deploy.md, Docs/drift-arquitetura-v4.md, Docs/drift-fluxograma-v4.html) atualizados.
+
+### Why
+
+Mapbox exige token obrigatório, free tier termina em 50k loads/mês com risco de cobrança, e o serviço pode virar ponto de falha/censura. MapLibre é fork OSS API-compatível; CARTO Dark Matter serve tiles raster gratuitos sem API key. `MapboxOverlay` do `@deck.gl/core` continua funcionando porque maplibre-gl é fork API-compatível com mapbox-gl.
+
 ## [0.5.1] — 2026-04-27
 
 Sub-fases operacionais e antecipação de Fase 7 (distribuição):
@@ -87,6 +100,7 @@ First public release. Closes Phase 5 of the architecture roadmap. Manifesto v2.2
 - **Phase 5.x** — APK distribution (TWA/Capacitor), F-Droid, CI GitHub Releases, hospedagem PWA
 - **Phase 6** — Cliente nativo Tauri (Tor via arti, WebRTC P2P, IPFS pin via helia, run-your-own-relay), build reproduzível, sneakernet bundle. Compromisso de manifesto §15-§17.
 
-[Unreleased]: https://github.com/EduardoFerr/drift/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/EduardoFerr/drift/compare/v0.5.2...HEAD
+[0.5.2]: https://github.com/EduardoFerr/drift/releases/tag/v0.5.2
 [0.5.1]: https://github.com/EduardoFerr/drift/releases/tag/v0.5.1
 [0.5.0]: https://github.com/EduardoFerr/drift/releases/tag/v0.5.0

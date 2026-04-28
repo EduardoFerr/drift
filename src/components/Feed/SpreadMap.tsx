@@ -1,11 +1,16 @@
 /**
  * SpreadMap — visualização geográfica do espalhamento de um post.
  *
- * Mapbox GL JS como base + Deck.gl ArcLayer pros arcos.
+ * MapLibre GL (fork OSS de mapbox-gl) + Deck.gl ArcLayer pros arcos.
+ * Tiles raster do CARTO Dark Matter (OSS, OSM-derived, sem API key).
+ *
+ * Por que NÃO Mapbox:
+ *  - Token obrigatório centraliza o serviço (manifesto §17 — sem
+ *    chave mestra, sem dependência crítica de fornecedor)
+ *  - Free tier termina em 50k loads/mês com risco de cobrança
+ *  - MapLibre tem API quase idêntica → migração trivial
  *
  * Comportamento:
- *   - Se `VITE_MAPBOX_TOKEN` não está configurado → mostra placeholder
- *     com mensagem clara. Não quebra a UI.
  *   - Se nenhum spread tem `location` (manifesto §28 — location é opt-in,
  *     default off) → mostra estado vazio educativo.
  *   - Senão → renderiza globo com arcos animados de origem → cada destino.
@@ -14,8 +19,8 @@
  * o autor do spread escolheu publicar. Nunca infere via IP, nunca por
  * heurística — só lê a tag `location` do evento Nostr.
  *
- * Ativação na UI: botão 🗺️ no header do PostViewer (Fase 4 quando feature
- * estiver completa). Por enquanto exportado pra wire-up incremental.
+ * Trocar de tile provider: editar `MAP_STYLE` abaixo. Qualquer estilo
+ * MapLibre style spec (https://maplibre.org/maplibre-style-spec/) serve.
  */
 
 import { useEffect, useRef } from 'react'
@@ -26,25 +31,77 @@ export interface SpreadMapProps {
   className?: string
 }
 
-const MAPBOX_TOKEN = (import.meta.env as { VITE_MAPBOX_TOKEN?: string }).VITE_MAPBOX_TOKEN ?? ''
+// CARTO Dark Matter — raster tiles OSS, sem chave de API. Subdomínios
+// {a,b,c,d} aliviam carga. Style inline em vez de URL pra não depender
+// de hospedagem externa.
+//
+// Atribuição CARTO+OSM é obrigatória pelos TOS — exibida em overlay
+// no canto inferior direito do mapa.
+const MAP_ATTRIBUTION =
+  '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · © <a href="https://carto.com/attributions">CARTO</a>'
 
-// ─── Subset mínimo dos tipos das libs externas ─────────────────────
-// Importamos lazy (dynamic import) e só usamos os métodos que precisamos.
-// Tipar minimamente evita `any` espalhado e mantém o callsite checável.
-
-interface MapboxStatic {
-  accessToken: string
-  Map: new (opts: {
-    container: HTMLElement
-    style: string
-    center: [number, number]
-    zoom: number
-    attributionControl: boolean
-    dragRotate: boolean
-  }) => MapboxMap
+const MAP_STYLE: maplibregl.StyleSpecification = {
+  version: 8,
+  sources: {
+    carto: {
+      type: 'raster',
+      tiles: [
+        'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
+        'https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
+        'https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
+        'https://d.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
+      ],
+      tileSize: 256,
+      attribution: MAP_ATTRIBUTION,
+    },
+  },
+  layers: [
+    {
+      id: 'carto',
+      type: 'raster',
+      source: 'carto',
+    },
+  ],
 }
 
-interface MapboxMap {
+// ─── Subset mínimo dos tipos das libs externas ─────────────────────
+// Importamos lazy (dynamic import). Tipar minimamente evita `any` sem
+// pesar o bundle inicial — as libs só carregam quando user abre o mapa.
+
+// eslint-disable-next-line @typescript-eslint/no-namespace
+declare namespace maplibregl {
+  // Subset mínimo do schema do StyleSpec — nosso style inline acima
+  // só usa o que está aqui, então não precisamos importar o tipo da lib.
+  interface StyleSpecification {
+    version: 8
+    sources: Record<string, RasterSource>
+    layers: RasterLayer[]
+  }
+  interface RasterSource {
+    type: 'raster'
+    tiles: string[]
+    tileSize: number
+    attribution?: string
+  }
+  interface RasterLayer {
+    id: string
+    type: 'raster'
+    source: string
+  }
+}
+
+interface MaplibreStatic {
+  Map: new (opts: {
+    container: HTMLElement
+    style: maplibregl.StyleSpecification
+    center: [number, number]
+    zoom: number
+    attributionControl: boolean | object
+    dragRotate: boolean
+  }) => MaplibreMap
+}
+
+interface MaplibreMap {
   addControl(ctrl: unknown): void
   remove(): void
 }
@@ -59,41 +116,42 @@ export function SpreadMap({ postId, className = '' }: SpreadMapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (!MAPBOX_TOKEN || !data || data.arcs.length === 0) return
+    if (!data || data.arcs.length === 0) return
     if (!containerRef.current) return
 
     let cancelled = false
     let cleanup: (() => void) | null = null
 
-    // Lazy import: Mapbox é grande (~500kb gzip). Sem token configurado,
-    // nem importamos. Sem location nos spreads, idem.
+    // Lazy import: maplibre-gl + deck.gl somam ~400kb gzip. Sem location
+    // nos spreads, nem importamos.
     void (async () => {
       try {
-        const [mapboxModule, deckgl, layersModule] = await Promise.all([
-          import('mapbox-gl'),
+        const [maplibreModule, deckgl, layersModule] = await Promise.all([
+          import('maplibre-gl'),
           import('@deck.gl/core'),
           import('@deck.gl/layers'),
         ])
         if (cancelled) return
 
-        const mapboxgl = mapboxModule.default as unknown as MapboxStatic
+        const maplibregl = maplibreModule.default as unknown as MaplibreStatic
         const { MapboxOverlay } = deckgl as unknown as {
+          // MapboxOverlay funciona com qualquer mapa compatível com a API
+          // do mapbox-gl — incluindo MapLibre, que é fork API-compatível.
+          // O nome continua "Mapbox" por razões históricas do deck.gl.
           MapboxOverlay: new (props: { layers: unknown[] }) => unknown
         }
         const { ArcLayer } = layersModule as unknown as {
           ArcLayer: new (props: Record<string, unknown>) => unknown
         }
 
-        mapboxgl.accessToken = MAPBOX_TOKEN
-
         const firstLoc = data.firstSpread?.location
         const center: [number, number] = firstLoc
           ? [firstLoc.lng, firstLoc.lat]
           : [0, 20]
 
-        const map = new mapboxgl.Map({
+        const map = new maplibregl.Map({
           container: containerRef.current!,
-          style: 'mapbox://styles/mapbox/dark-v11',
+          style: MAP_STYLE,
           center,
           zoom: 1.5,
           attributionControl: false,
@@ -125,7 +183,7 @@ export function SpreadMap({ postId, className = '' }: SpreadMapProps) {
           }
         }
       } catch (err) {
-        console.error('[SpreadMap] falha ao carregar mapbox/deckgl:', err)
+        console.error('[SpreadMap] falha ao carregar maplibre/deckgl:', err)
       }
     })()
 
@@ -135,22 +193,7 @@ export function SpreadMap({ postId, className = '' }: SpreadMapProps) {
     }
   }, [data])
 
-  // ─── Estados de fallback (renderizam sem importar Mapbox) ──────────
-
-  if (!MAPBOX_TOKEN) {
-    return (
-      <Placeholder
-        className={className}
-        title="mapa indisponível"
-        body={
-          <>
-            VITE_MAPBOX_TOKEN não configurado. Mapa é feature opcional —
-            cliente funciona normalmente sem ele.
-          </>
-        }
-      />
-    )
-  }
+  // ─── Estados de fallback (renderizam sem importar MapLibre) ────────
 
   if (loading) {
     return (
@@ -185,6 +228,12 @@ export function SpreadMap({ postId, className = '' }: SpreadMapProps) {
         {data.totalSpreads} spreads · {data.countries.length}{' '}
         {data.countries.length === 1 ? 'país' : 'países'}
       </div>
+      <div
+        className="pointer-events-auto absolute bottom-2 right-2 rounded bg-drift-bg/80 px-2 py-1 text-[9px] text-slate-500 backdrop-blur-sm [&_a]:underline [&_a]:hover:text-slate-300"
+        // Atribuição embutida (CARTO + OSM TOS exigem). HTML é constante
+        // estática — sem risco de XSS.
+        dangerouslySetInnerHTML={{ __html: MAP_ATTRIBUTION }}
+      />
     </div>
   )
 }

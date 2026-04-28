@@ -2,7 +2,6 @@
 /// <reference types="vite-plugin-pwa/client" />
 
 interface ImportMetaEnv {
-  readonly VITE_MAPBOX_TOKEN: string
   readonly VITE_APP_VERSION: string
 }
 

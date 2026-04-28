@@ -218,7 +218,7 @@ adiciona relay novo. Probe anti-eclipse roda a cada 30min via
 React 18 + TypeScript strict + Vite           [MVP-Fase 5]
 Tailwind CSS                                  [todas as fases]
 Framer Motion (gestos)                        [Fase 3]
-Mapbox GL + Deck.gl ArcLayer                  [Fase 4]
+MapLibre GL + Deck.gl ArcLayer (CARTO tiles)  [Fase 4]
 nostr-tools (Nostr)                           [todas]
 @sqlite.org/sqlite-wasm 3.51.2-build9 (PIN)  [todas]
 zustand                                        [todas]
@@ -323,12 +323,15 @@ src/
 - ✅ **Manifesto v2.2** — 34 princípios + roadmap vinculante
 - ✅ **Fase 3** — Swipes Framer Motion, upload imagens (sem scan automático), tag `content-warning` + filtros locais, location off-default, transport abstrato
 - ✅ **Fase 4** — Mapa, peso de perfil, moderação threshold dinâmico, eviction respeita spreads, onboarding, denúncia autoridades
-- ✅ **Fase 5** — PWA polish, NIP-65, NIP-02, NIP-06 (BIP39 opt-in), Passkey opt-in, multi-identidade, probe anti-eclipse, re-broadcast oportunista, pinning UI, block/mute, feed tabs (Global/Seguindo/Trending), Profile, kvvfs fallback, 82 tests Vitest
-- ⏳ **Fase 5.x (operacional)** — APK distribution (TWA/Capacitor/Tauri Mobile), F-Droid manifest, CI GitHub Releases — sessão dedicada de packaging
-- ⏳ **Fase 6** — Cliente nativo Tauri (Tor + WebRTC), IPFS pin, run-your-own-relay, build reproduzível, sneakernet bundle
+- ✅ **Fase 5** — PWA polish, NIP-65, NIP-02, NIP-06 (BIP39 opt-in), Passkey opt-in, multi-identidade, probe anti-eclipse, re-broadcast oportunista, pinning UI, block/mute, feed tabs (Global/Seguindo/Trending), Profile, kvvfs fallback, 99 tests Vitest
+- ✅ **Fase 5.x (operacional)** — versionamento + CHANGELOG, CI GitHub Actions (tsc + tests + build), PWA polish (manifest enriched + shortcuts + meta description + ?action= URL handling), deploy Vercel + GitHub integration, release automation (tag v* → GitHub Release com dist.zip + SHA256SUMS)
+- ⏳ **Fase 6** — Cliente nativo Tauri (Tor via arti, WebRTC P2P, multi-transport orchestration), build reproduzível. **Capacidade técnica** de §15 (anti-censura por país)
+- ⏳ **Fase 7** — Distribuição do cliente E do protocolo: TWA Android (✅ antecipada — Bubblewrap CI), Capacitor (alternativa), F-Droid manifest, Play Store opcional, IPFS pin via helia, run-your-own-relay, sneakernet bundle. **Garantia política** de §16 (disponibilidade distribuída) e §17 (sem chave mestra na distribuição)
 
-Fase 6 é compromisso, não opção. Manifesto §15 (anti-censura por
-país) só fecha completamente lá.
+Fase 6 + Fase 7 são compromissos do manifesto, não opções:
+- §15 anti-censura por país → cabe em Fase 6 (transporte: Tor + WebRTC)
+- §16 disponibilidade distribuída → cabe em Fase 7 (IPFS pin, sneakernet, re-broadcast, run-your-own-relay)
+- §17 sem chave mestra + build reproduzível → cabe em Fase 7 (F-Droid build reproduzível, hashes públicos, sideload sem store)
 
 ---
 

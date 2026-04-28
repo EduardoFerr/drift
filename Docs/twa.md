@@ -1,6 +1,10 @@
 # TWA (Trusted Web Activity) — APK Android
 
+**Fase**: 7 (distribuição) — sub-fase 7.1, antecipada e ✅ implementada.
+
 Embrulha o PWA hospedado em https://drift-wheat-one.vercel.app dentro de uma WebView Chrome num APK Android. O usuário instala como app nativo, sem barra de URL, sem layout de browser.
+
+Vê também: [`Docs/fdroid.md`](fdroid.md) (Fase 7.2 — submissão ao catálogo F-Droid OSS).
 
 **Quando usar TWA vs. Capacitor**:
 - **TWA** (este doc): apk/aab fininho (~3MB), só carrega o PWA. Atualização via deploy do site (instantânea). Ideal pra Drift porque a UI é toda web.

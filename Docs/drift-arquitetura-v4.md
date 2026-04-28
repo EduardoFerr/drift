@@ -163,7 +163,7 @@ Verificável, auditável, debugável. Base de toda a arquitetura.
 Framework:   React 18 + Vite
 Estilo:      Tailwind CSS
 Gestos:      Framer Motion
-Mapa:        Mapbox GL JS + Deck.gl ArcLayer
+Mapa:        MapLibre GL JS + Deck.gl ArcLayer (tiles CARTO Dark Matter, sem API key)
 PWA:         Workbox
 Estado:      Zustand
 Linguagem:   TypeScript strict
@@ -780,7 +780,7 @@ drift/
     "nostr-tools": "^2.7.0",
     "@sqlite.org/sqlite-wasm": "3.51.2-build9",
     "framer-motion": "^11.0.0",
-    "mapbox-gl": "^3.0.0",
+    "maplibre-gl": "^4.0.0",
     "@deck.gl/core": "^9.0.0",
     "@deck.gl/layers": "^9.0.0",
     "qrcode": "^1.5.4",
@@ -811,7 +811,8 @@ helia / kubo                 # IPFS embedado (decisão na Fase 6)
 ## 18. VARIÁVEIS DE AMBIENTE
 
 ```env
-VITE_MAPBOX_TOKEN=
+# Mapa usa MapLibre GL + tiles CARTO Dark Matter (OSS, OSM-derived, sem API key).
+# Não há token de mapa no cliente oficial — manifesto §17 (sem dependência crítica de fornecedor proprietário).
 VITE_APP_VERSION=0.1.0
 
 # Fase 6 (cliente nativo):
@@ -830,7 +831,7 @@ fora do default config.
 
 | Fase | Custo mensal |
 |---|---|
-| MVP - Fase 5 | ~R$0 (Vercel + relays públicos + nostr.build + Mapbox grátis) |
+| MVP - Fase 5 | ~R$0 (Vercel + relays públicos + nostr.build + MapLibre/CARTO OSS, sem cobrança) |
 | Fase 6 (cliente nativo) | ~R$0 fixo + IPFS pin variável conforme viralidade |
 
 Pin de posts virais em IPFS pode crescer com escala. Modelo de custeio:
@@ -899,7 +900,7 @@ da arquitetura, §26).
 23. Tag `location` opt-in com granularidade `off | country | city | precise` (default `off` — manifesto §28)
 
 ### Fase 4 — Features
-20. Mapa de espalhamento — Mapbox + Deck.gl
+20. Mapa de espalhamento — MapLibre + Deck.gl
 21. Sistema de peso do perfil (`weight.ts`)
 22. Moderação — reports e threshold dinâmico (`moderation.ts`)
 23. Onboarding overlay
@@ -1000,7 +1001,7 @@ Aparece uma única vez. Persiste em `user_prefs` com
 ### 23.4 Mapa de Espalhamento
 
 Botão 🗺️. Animação automática de ~30s mostrando propagação geográfica
-via Mapbox + Deck.gl ArcLayer. Só posts com tags `location` aparecem
+via MapLibre + Deck.gl ArcLayer. Só posts com tags `location` aparecem
 no mapa.
 
 ### 23.5 Modal de Identidade
@@ -1176,9 +1177,9 @@ export const RELAYS = [
 npm create vite@latest drift -- --template react-ts
 cd drift
 npm install nostr-tools "@sqlite.org/sqlite-wasm@3.51.2-build9" framer-motion \
-  mapbox-gl @deck.gl/core @deck.gl/layers qrcode workbox-window zustand
+  maplibre-gl @deck.gl/core @deck.gl/layers qrcode workbox-window zustand
 npm install -D tailwindcss autoprefixer postcss vite-plugin-pwa \
-  @vitejs/plugin-basic-ssl @types/qrcode @types/mapbox-gl
+  @vitejs/plugin-basic-ssl @types/qrcode
 npx tailwindcss init -p
 ```
 
