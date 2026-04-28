@@ -38,9 +38,9 @@ O Drift opera sem dependência obrigatória de infraestrutura central.
 
 **Implementação:**
 - PWA estática em CDN (MVP, hoje)
-- APK direto via GitHub Releases (Fase 5)
+- TWA Android via GitHub Releases (Fase 7.1 ✅ antecipada — Bubblewrap CI)
 - Cliente desktop nativo via Tauri (Fase 6) — habilita Tor + WebRTC
-- F-Droid (Fase 6) — distribuição alternativa
+- F-Droid (Fase 7.2) — distribuição alternativa OSS-only, build reproduzível
 
 ### 2. Identidade Auto-Soberana
 
@@ -254,7 +254,7 @@ Eventos são independentes do meio de transmissão.
 
 **Implementação:**
 - Eventos Drift são eventos Nostr padrão (MVP)
-- Export/import de bundle de eventos via JSON ou QR (Fase 6)
+- Export/import de bundle de eventos via JSON ou QR (Fase 7 — sneakernet)
 
 ### 14. Bootstrap Distribuído
 
@@ -325,8 +325,8 @@ da boa vontade de operadores de relay.
 **Implementação:**
 - Eviction respeita posts espalhados pelo user (MVP, na Fase 4)
 - Re-broadcast em conexão a relay novo (Fase 5)
-- Pin em IPFS/Arweave de posts virais (Fase 6)
-- WebRTC seeding pelo cliente nativo (Fase 6)
+- Pin em IPFS/Arweave de posts virais (Fase 7)
+- WebRTC seeding pelo cliente nativo (Fase 7 — usa transporte habilitado em Fase 6)
 
 > **Disponibilidade vs anonimato:** seedear posts pode revelar quem
 > tem o quê. Em modo paranoia, seeding é desligado por padrão; user
@@ -878,44 +878,46 @@ impedir Y, Z, W amanhã, e o Drift seria o que está tentando substituir.
 
 Para cada princípio, qual fase entrega:
 
-| Princípio | MVP atual | Fase 3-4 | Fase 5 | Fase 6 |
-|---|---|---|---|---|
-| §1 Existência Autônoma | PWA | — | APK + F-Droid | Tauri desktop |
-| §2 Auto-soberania | ✓ | — | — | — |
-| §3 Identidade portável | ✓ | — | Multi-identidade | — |
-| §4 Anonimato | ✓ (sem login) | Location off-default | Multi-identidade | Tor |
-| §5 Autenticidade | ✓ | — | — | — |
-| §6-10 Estado/determinismo | ✓ | — | — | — |
-| §11 Rede como meio | ✓ | — | — | — |
-| §12 Múltiplos transportes | WSS | — | NIP-65 | Tor + WebRTC |
-| §13 Neutralidade transporte | ✓ | — | Export bundle | QR / sneakernet |
-| §14 Bootstrap distribuído | Seed estático | — | UI relays + NIP-65 | Pref .onion |
-| §15 Anti-censura por país | Parcial | — | APK + tutorial | Tor + run-your-own |
-| §16 Disponibilidade | Cache local | Eviction respeita spreads | Re-broadcast | IPFS pin + WebRTC seed |
-| §17 Resistência fundador | ✓ | — | — | Build reproduzível |
-| §18 Cliente sem privilégios | ✓ | — | — | — |
-| §19 Anti-captura | ✓ | — | — | — |
-| §20 Resistência isolamento | 4 relays | — | Probe + relay aleatório | — |
-| §21 Custo assimétrico | Parcial | — | + APK + relays user | + Tor + WebRTC + IPFS |
-| §22-24 Score/Bury/Feed | ✓ | — | — | — |
-| §25 Sem scan automático | ✓ (decisão registrada) | — | — | — |
-| §26 Moderação comunitária | — | Reports + threshold básico | Threshold dinâmico + UX de denúncia | — |
-| §27 Auto-classificação | — | Tag content-warning + filtros locais | — | — |
-| §28 Privacidade mínima | ✓ | Location off | — | Tor |
-| §29 Privacidade conteúdo | — | — | — | DMs (NIP-44) opcional |
-| §30-32 Compatibilidade | ✓ | — | — | — |
-| §33 Anti-spam social | Score + bury | + Reports | Threshold dinâmico | — |
-| §34 Simplicidade | ✓ | — | — | — |
+| Princípio | MVP atual | Fase 3-4 | Fase 5 | Fase 6 | Fase 7 |
+|---|---|---|---|---|---|
+| §1 Existência Autônoma | PWA | — | — | Tauri desktop | TWA + F-Droid |
+| §2 Auto-soberania | ✓ | — | — | — | — |
+| §3 Identidade portável | ✓ | — | Multi-identidade | — | — |
+| §4 Anonimato | ✓ (sem login) | Location off-default | Multi-identidade | Tor | — |
+| §5 Autenticidade | ✓ | — | — | — | — |
+| §6-10 Estado/determinismo | ✓ | — | — | — | — |
+| §11 Rede como meio | ✓ | — | — | — | — |
+| §12 Múltiplos transportes | WSS | — | NIP-65 | Tor + WebRTC | sneakernet |
+| §13 Neutralidade transporte | ✓ | — | Export bundle | — | QR / sneakernet |
+| §14 Bootstrap distribuído | Seed estático | — | UI relays + NIP-65 | Pref .onion | run-your-own-relay |
+| §15 Anti-censura por país | Parcial | — | — | Tor + WebRTC | + sneakernet bundle |
+| §16 Disponibilidade | Cache local | Eviction respeita spreads | Re-broadcast | — | IPFS pin + WebRTC seed |
+| §17 Resistência fundador | ✓ | — | — | Build reproduzível (capacidade) | F-Droid build reproduzível (garantia) |
+| §18 Cliente sem privilégios | ✓ | — | — | — | — |
+| §19 Anti-captura | ✓ | — | — | — | — |
+| §20 Resistência isolamento | 4 relays | — | Probe + relay aleatório | — | — |
+| §21 Custo assimétrico | Parcial | — | — | + Tor + WebRTC | + APK + IPFS + relays user |
+| §22-24 Score/Bury/Feed | ✓ | — | — | — | — |
+| §25 Sem scan automático | ✓ (decisão registrada) | — | — | — | — |
+| §26 Moderação comunitária | — | Reports + threshold básico | Threshold dinâmico + UX de denúncia | — | — |
+| §27 Auto-classificação | — | Tag content-warning + filtros locais | — | — | — |
+| §28 Privacidade mínima | ✓ | Location off | — | Tor | — |
+| §29 Privacidade conteúdo | — | — | — | DMs (NIP-44) opcional | — |
+| §30-32 Compatibilidade | ✓ | — | — | — | — |
+| §33 Anti-spam social | Score + bury | + Reports | Threshold dinâmico | — | — |
+| §34 Simplicidade | ✓ | — | — | — | — |
 
 **Definições de fase:**
 - **MVP (atual):** publicar/spread/bury via PWA, identidade portável, sem scan
 - **Fase 3:** swipes Framer Motion, upload imagem (sem CSAM scan), tag content-warning, filtros locais, location off-default
 - **Fase 4:** mapa, peso, moderação reativa (reports + threshold), onboarding, UX de denúncia a autoridades
-- **Fase 5:** PWA polish, APK, F-Droid, NIP-65, multi-identidade, probe anti-eclipse, re-broadcast
-- **Fase 6:** cliente desktop nativo (Tauri) com Tor e WebRTC, IPFS pin, run-your-own-relay, build reproduzível
+- **Fase 5:** PWA polish, NIP-65, multi-identidade, probe anti-eclipse, re-broadcast
+- **Fase 5.x (operacional):** versionamento + CHANGELOG, CI, PWA polish, deploy Vercel, release automation
+- **Fase 6:** cliente desktop nativo (Tauri) com Tor e WebRTC, multi-transport orchestration, build reproduzível — **capacidade técnica** de §15
+- **Fase 7:** distribuição (TWA Android ✅ antecipada, Capacitor, F-Droid, Play Store opcional, IPFS pin, run-your-own-relay, sneakernet bundle) — **garantia política** de §16-§17
 
-**Compromisso:** Fase 6 não é "talvez". É "vai acontecer". Se em
-algum momento o caminho técnico mostrar que algo da Fase 6 é
+**Compromisso:** Fase 6 + Fase 7 não são "talvez". São "vão acontecer". Se em
+algum momento o caminho técnico mostrar que algo dessas fases é
 inviável como prometido, o manifesto é atualizado com bump de
 versão e justificativa pública. Não cala, não promete e não entrega.
 

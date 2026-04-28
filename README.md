@@ -45,7 +45,7 @@ Regular events imutáveis (faixa 1–9999). Drift roda em qualquer relay Nostr p
 - **Bury não pune** o autor (§23) — diferença filosófica central
 - **Compatível com ecossistema Nostr** (§28-30) — sem extensões obrigatórias
 
-Especificação completa: [`Docs/manifesto.md`](Docs/manifesto.md) (34 princípios + roadmap vinculante até Fase 6).
+Especificação completa: [`Docs/manifesto.md`](Docs/manifesto.md) (34 princípios + roadmap vinculante até Fase 7).
 
 ## Setup
 

@@ -64,9 +64,9 @@ Não são aspirações. Cada item será entregue na fase indicada.
 
 - **Identidade auto-soberana e portável** — secp256k1 local, exportável (✓ Fase 2.5)
 - **Anonimato por design** — sem KYC, multi-identidade, Tor opt-in (✓ MVP / Fase 5 / Fase 6)
-- **Anti-censura por país** — múltiplos transportes (WSS / Tor / WebRTC), múltiplos clientes, múltiplos relays (Fase 6)
-- **Disponibilidade distribuída** — re-broadcast, IPFS pin, "espalhar = seedear" (Fase 5 / Fase 6)
-- **Sem chave mestra** — não existe `deletePost()` global, build reproduzível (✓ MVP / Fase 6)
+- **Anti-censura por país** — múltiplos transportes (WSS / Tor / WebRTC), múltiplos clientes, múltiplos relays (Fase 6 capacidade técnica + Fase 7 sneakernet)
+- **Disponibilidade distribuída** — re-broadcast, IPFS pin, "espalhar = seedear" (Fase 5 ✓ + Fase 7 IPFS/WebRTC seed)
+- **Sem chave mestra** — não existe `deletePost()` global, build reproduzível (✓ MVP + Fase 6 capacidade + Fase 7 F-Droid garantia)
 - **Bury não pune** — autores não perdem engajamento (✓)
 - **Score determinístico** — sem afinidade, sem feed personalizado (✓)
 - **Compatibilidade preservada** — Nostr, entre versões Drift, entre clientes (✓)
@@ -917,22 +917,30 @@ da arquitetura, §26).
 32. **Re-broadcast oportunista** — republica posts próprios + espalhados em relays novos
 33. **Pinning local** — UI para "fixar" um post (cliente garante re-broadcast e mantém em cache)
 34. Bloqueio/silenciamento local (camada de visualização, não ranking)
-35. Deploy Vercel + GitHub Releases (APK) + F-Droid
+35. Deploy Vercel + GitHub Releases (PWA dist.zip + SHA256SUMS)
 
-### Fase 6 — Cliente Nativo (Anti-Censura Forte)
+### Fase 6 — Cliente Nativo (Capacidade Técnica Anti-Censura, §15)
 36. **Setup Tauri** — desktop (macOS/Windows/Linux) + Android
-37. **Camada de transporte abstrata** (`lib/transport/`)
+37. **Camada de transporte abstrata** (`lib/transport/`) — multi-transport orchestration
 38. **Tor integrado via arti** — modo paranoia opt-in / always-on
 39. **WebRTC P2P** — sinalização via Nostr, conexão direta entre clientes
-40. **IPFS embarcado (Helia ou Kubo)** — pin automático de posts virais
-41. **"Espalhar = seedear"** — cliente nativo seedeia conteúdo espalhado via WebRTC
-42. **Run-your-own-relay** — wizard para o user subir um relay local
-43. **Export/import de bundle de eventos via QR/JSON** — sneakernet anti-bloqueio total
-44. **Build reproduzível** — Tauri lockfiles + CI verificável + assinatura de releases
-45. **Documentação anti-censura** — guia público de instalação em país censurado
+40. **Build reproduzível** — Tauri lockfiles + CI verificável + assinatura de releases (capacidade verificável de §17)
 
-**Compromisso:** Fase 6 não é opcional. O manifesto §15 (Anti-Censura
-por País) e §16 (Disponibilidade Distribuída) só fecham aqui. Se em
+### Fase 7 — Distribuição (Garantia Política, §16-§17)
+41. **TWA Android** ✅ antecipada — Bubblewrap CI, APK + AAB em GitHub Releases
+42. **Capacitor** (alternativa) — webview controlada + plugins nativos
+43. **F-Droid manifest** — submissão ao catálogo OSS-only, build reproduzível
+44. **Play Store opcional** — distribuição mainstream
+45. **IPFS embarcado (Helia ou Kubo)** — pin automático de posts virais
+46. **"Espalhar = seedear"** — cliente seedeia conteúdo espalhado via WebRTC
+47. **Run-your-own-relay** — wizard para o user subir um relay local
+48. **Export/import de bundle de eventos via QR/JSON** — sneakernet anti-bloqueio total
+49. **Documentação anti-censura** — guia público de instalação em país censurado
+
+**Compromisso:** Fase 6 + Fase 7 não são opcionais. §15 (Anti-Censura
+por País) cabe em Fase 6 (capacidade técnica: Tor + WebRTC + multi-transport).
+§16 (Disponibilidade Distribuída) e §17 (Sem Chave Mestra na distribuição)
+cabem em Fase 7 (IPFS pin, sneakernet, run-your-own-relay, F-Droid). Se em
 algum momento o caminho técnico mostrar inviabilidade, o manifesto
 ganha bump explícito com justificativa pública. Não cala, não promete
 e não entrega.
@@ -1768,18 +1776,18 @@ Permite ao user ver se um post crítico está bem distribuído ou não.
 
 (Cópia do manifesto §Roadmap, para referência cruzada.)
 
-| Princípio do Manifesto | MVP | Fase 3-4 | Fase 5 | Fase 6 |
-|---|---|---|---|---|
-| §1 Existência Autônoma | PWA | — | APK + F-Droid | Tauri |
-| §3 Identidade portável | ✓ | — | Multi-id | — |
-| §4 Anonimato | ✓ | Location off | Multi-id | Tor |
-| §12 Múltiplos transportes | WSS | — | NIP-65 | Tor + WebRTC |
-| §14 Bootstrap distribuído | Seed | — | UI relays | Pref .onion |
-| §15 Anti-censura país | Parcial | — | APK | Tor + run-your-own |
-| §16 Disponibilidade | Cache | Eviction respeita spreads | Re-broadcast | IPFS + WebRTC seed |
-| §17 Resistência fundador | ✓ | — | — | Build reproduzível |
-| §20 Resistência isolamento | 4 relays | — | Probe + relay aleatório | — |
-| §21 Custo assimétrico | Parcial | — | + APK + relays user | + Tor + WebRTC + IPFS |
+| Princípio do Manifesto | MVP | Fase 3-4 | Fase 5 | Fase 6 | Fase 7 |
+|---|---|---|---|---|---|
+| §1 Existência Autônoma | PWA | — | — | Tauri | TWA + F-Droid |
+| §3 Identidade portável | ✓ | — | Multi-id | — | — |
+| §4 Anonimato | ✓ | Location off | Multi-id | Tor | — |
+| §12 Múltiplos transportes | WSS | — | NIP-65 | Tor + WebRTC | sneakernet |
+| §14 Bootstrap distribuído | Seed | — | UI relays | Pref .onion | run-your-own-relay |
+| §15 Anti-censura país | Parcial | — | — | Tor + WebRTC | + sneakernet bundle |
+| §16 Disponibilidade | Cache | Eviction respeita spreads | Re-broadcast | — | IPFS pin + WebRTC seed |
+| §17 Resistência fundador | ✓ | — | — | Build reproduzível (capacidade) | F-Droid build reproduzível (garantia) |
+| §20 Resistência isolamento | 4 relays | — | Probe + relay aleatório | — | — |
+| §21 Custo assimétrico | Parcial | — | — | + Tor + WebRTC | + APK + IPFS + relays user |
 
 Ver manifesto completo em `Docs/manifesto.md`.
 
@@ -1792,7 +1800,7 @@ saída sempre**. Pra que isso seja propriedade verificável e não promessa,
 funções puras críticas têm tests automatizados rodando em Node via
 Vitest.
 
-**Cobertura atual** (`tests/*.test.ts`, 82 tests passando):
+**Cobertura atual** (`tests/*.test.ts`, 99 tests passando):
 
 - `tests/scoring.test.ts` — `calculateScore` (decay temporal, peso de
   bury 0.3x, simetria de net engagement, idade negativa clampada)
@@ -1842,12 +1850,12 @@ seção lista de forma honesta o que o cliente oficial protege e o que
 | Vetor | Defesa | Onde |
 |---|---|---|
 | Censura por servidor central | Não tem servidor central — só relays Nostr múltiplos | Manifesto §1, §11 |
-| Banimento pelo fundador | Sem chave mestra técnica; build reproduzível (Fase 6) | Manifesto §17, arquitetura §17 |
-| Confisco de relay individual | Replicação multi-relay + re-broadcast oportunista (Fase 5) + IPFS pin (Fase 6) | Manifesto §16, arquitetura §33 |
+| Banimento pelo fundador | Sem chave mestra técnica; build reproduzível (Fase 6 capacidade + Fase 7 F-Droid garantia) | Manifesto §17, arquitetura §17 |
+| Confisco de relay individual | Replicação multi-relay + re-broadcast oportunista (Fase 5) + IPFS pin (Fase 7) | Manifesto §16, arquitetura §33 |
 | Eclipse local por relay malicioso | Probe periódico + path diversity (Fase 5/6) + relay aleatório fora da config do user | Manifesto §20, arquitetura §32.3.1 |
 | Vinculação a identidade real | Sem KYC, sem email/telefone, multi-identidade | Manifesto §4, §28 |
-| Bloqueio de WSS clearnet por país | Tor (.onion) + WebRTC P2P (Fase 6) + sneakernet bundle | Manifesto §15, arquitetura §31 |
-| Remoção das app stores | PWA + APK direto + F-Droid (Fase 5) + cliente Tauri (Fase 6) | Manifesto §1, §15 |
+| Bloqueio de WSS clearnet por país | Tor (.onion) + WebRTC P2P (Fase 6) + sneakernet bundle (Fase 7) | Manifesto §15, arquitetura §31 |
+| Remoção das app stores | PWA + TWA Android (Fase 7.1 ✅) + F-Droid (Fase 7.2) + cliente Tauri (Fase 6) | Manifesto §1, §15 |
 | Algoritmo de feed escondido | Score determinístico, mesma fórmula em todos os clientes; tests verificam | Manifesto §22, §24, arquitetura §35 |
 | Sybil simples / flooding | Score + reports + threshold dinâmico + peso assimétrico | Manifesto §26, §33 |
 

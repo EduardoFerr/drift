@@ -5,7 +5,7 @@ Caminhos públicos pra rodar Drift:
 1. **Vercel** — PWA hospedada com COOP/COEP corretos e preview por PR
 2. **GitHub Releases** — bundle `dist.zip` por tag `v*` pra self-host/auditoria
 3. **Cloudflare Tunnel** — dev local exposto via HTTPS válido (já no `dev:tunnel`)
-4. **F-Droid / Google Play** — APK via TWA (Fase 5.x.4, futuro)
+4. **F-Droid / Google Play** — APK via TWA (Fase 7.1 ✅ antecipada / Fase 7.2 F-Droid pendente)
 
 ## 1. Vercel (recomendado pra PWA)
 
@@ -105,8 +105,8 @@ Setup pendente (uma vez): gerar keystore, capturar SHA256, popular `assetlinks.j
 
 - **CSP** — não habilitado por padrão porque WASM precisa `'wasm-unsafe-eval'` e isso requer testes cuidadosos. Adicionar em uma sessão dedicada
 - **HSTS** — Vercel adiciona automaticamente em domínios verificados
-- **Subresource Integrity (SRI)** — Vite não gera SRI por padrão; trabalho de Fase 5.x ou 6
-- **Build reproduzível** — compromisso de manifesto §17, foco da Fase 6.8
+- **Subresource Integrity (SRI)** — Vite não gera SRI por padrão; trabalho de Fase 6 ou 7
+- **Build reproduzível** — compromisso de manifesto §17, foco da Fase 7 (F-Droid build reproduzível)
 
 ## Troubleshooting
 

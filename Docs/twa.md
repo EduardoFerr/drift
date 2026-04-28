@@ -8,7 +8,7 @@ Vê também: [`Docs/fdroid.md`](fdroid.md) (Fase 7.2 — submissão ao catálogo
 
 **Quando usar TWA vs. Capacitor**:
 - **TWA** (este doc): apk/aab fininho (~3MB), só carrega o PWA. Atualização via deploy do site (instantânea). Ideal pra Drift porque a UI é toda web.
-- **Capacitor** (Fase 5.x.5, opcional): traz Webview controlada + plugins nativos. Maior, mas permite features OS-específicas (Tor nativo, IPFS embarcado, etc — cobre a Fase 6 também).
+- **Capacitor** (Fase 7, opcional): traz Webview controlada + plugins nativos. Maior, mas permite features OS-específicas (Tor nativo, IPFS embarcado, etc — sobreposição com Fase 6 cliente nativo).
 
 ## Pré-requisitos
 
@@ -143,7 +143,7 @@ Roda como app standalone. Se `assetlinks.json` está correto, sem barra de URL.
 F-Droid build é reproduzível, exige:
 
 1. Toda dependência buildável a partir de fonte (Bubblewrap atende)
-2. Manifest em `metadata/com.driftnet.client.yml` no [fdroid/fdroiddata](https://gitlab.com/fdroid/fdroiddata) (PR separada — Fase 5.x.6)
+2. Manifest em `metadata/com.driftnet.client.yml` no [fdroid/fdroiddata](https://gitlab.com/fdroid/fdroiddata) (PR separada — Fase 7.2)
 3. Tag `v*` é a build target
 
 ### Play Store (opcional, fora do roadmap atual)
@@ -190,7 +190,7 @@ Causa: TWA é "selado" no domínio do build. Mudou de `drift-wheat-one.vercel.ap
 4. Bumpar `appVersionCode` (e `appVersionName`)
 5. Build + tag novo
 
-Custom domain estável (`drift.app`, `drift.eduardoferr.dev` etc.) evita esse retrabalho — ver Fase 5.x.8 follow-up.
+Custom domain estável (`drift.app`, `drift.eduardoferr.dev` etc.) evita esse retrabalho — follow-up de Fase 7.
 
 ## Versionamento
 

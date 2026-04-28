@@ -39,9 +39,41 @@ export default defineConfig({
         navigateFallback: 'index.html',
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,wasm}'],
-        // SQLite WASM é grande — limite generoso para não pular ele
+        // Precache só os assets críticos pra abrir o app — chunks lazy do
+        // maplibre-gl (1.1MB) e tesselator do deck.gl (467K) NÃO entram aqui;
+        // são cacheados sob demanda via runtimeCaching abaixo. Isso baixa o
+        // precache de ~3.8MB pra ~800KB no PWA install.
+        globPatterns: [
+          'index.html',
+          'manifest.webmanifest',
+          'assets/index-*.{js,css}',
+          'assets/db.worker-*.js',
+          'assets/sqlite3-*.js',
+          '*.{wasm,svg,png,ico}',
+        ],
+        // Defesa: SQLite WASM ainda é grande (~860KB). Mantém limite generoso.
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+        runtimeCaching: [
+          {
+            // Lazy chunks do mapa: cacheia ao primeiro uso, mantém indefinidamente.
+            urlPattern: /\/assets\/(maplibre-gl|tesselator|rebroadcast)-[^.]+\.js$/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'lazy-chunks',
+              expiration: { maxEntries: 20, maxAgeSeconds: 60 * 60 * 24 * 30 },
+            },
+          },
+          {
+            // Tiles do CARTO — bom cachear pra mapa funcionar offline depois
+            // que o user abriu uma vez.
+            urlPattern: /^https:\/\/[a-d]\.basemaps\.cartocdn\.com\//,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'carto-tiles',
+              expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 * 7 },
+            },
+          },
+        ],
       },
       includeAssets: [
         'drift-icon.svg',

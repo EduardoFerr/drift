@@ -446,4 +446,4 @@ código. Especialmente Fase 6 — várias features aparentemente
 
 ---
 
-*Última atualização: Abril 2026 · Manifesto v2.2 · Arquitetura v5.2 · 34 princípios · 82 tests Vitest · Fase 5 fechada · roadmap vinculante até Fase 6*
+*Última atualização: Abril 2026 · Manifesto v2.2 · Arquitetura v5.2 · 34 princípios · 99 tests Vitest · Fase 5 + 5.x fechadas · roadmap vinculante até Fase 7*
