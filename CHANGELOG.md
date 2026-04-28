@@ -4,6 +4,13 @@ All notable changes to the Drift client. Uses [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+## [0.5.4] — 2026-04-27
+
+### Fixed
+
+- **TWA build (continuação)**: `bubblewrap update` também é interativo e pede senhas quando detecta mudança de signingKey. v0.5.3 só tinha o expect driver no `build`; o `update` ainda usava `yes ""` que falha com "Minimum length is 1 but input is 0" → loop infinito → OOM (exit 134) após ~8min.
+- Extraído `scripts/bubblewrap-driver.sh` reusável que casa prompts pelo texto (regex case-insensitive) e responde com a senha correta. Workflow chama o driver tanto em `update` quanto em `build`. Inclui handler de timeout, prompts yes/no, e diagnóstico de prompt não-mapeado.
+
 ## [0.5.3] — 2026-04-27
 
 ### Fixed
@@ -107,7 +114,8 @@ First public release. Closes Phase 5 of the architecture roadmap. Manifesto v2.2
 - **Phase 5.x** — APK distribution (TWA/Capacitor), F-Droid, CI GitHub Releases, hospedagem PWA
 - **Phase 6** — Cliente nativo Tauri (Tor via arti, WebRTC P2P, IPFS pin via helia, run-your-own-relay), build reproduzível, sneakernet bundle. Compromisso de manifesto §15-§17.
 
-[Unreleased]: https://github.com/EduardoFerr/drift/compare/v0.5.3...HEAD
+[Unreleased]: https://github.com/EduardoFerr/drift/compare/v0.5.4...HEAD
+[0.5.4]: https://github.com/EduardoFerr/drift/releases/tag/v0.5.4
 [0.5.3]: https://github.com/EduardoFerr/drift/releases/tag/v0.5.3
 [0.5.2]: https://github.com/EduardoFerr/drift/releases/tag/v0.5.2
 [0.5.1]: https://github.com/EduardoFerr/drift/releases/tag/v0.5.1
