@@ -67,6 +67,10 @@ cloudflared tunnel --url http://localhost:5173
 
 URL `*.trycloudflare.com` tem cert válido — PWA instala em desktop e mobile.
 
+## Deploy
+
+Ver [`Docs/deploy.md`](Docs/deploy.md) — Vercel (recomendado), GitHub Releases, self-host.
+
 ## Testes
 
 ```bash

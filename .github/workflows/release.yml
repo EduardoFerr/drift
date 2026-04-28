@@ -1,0 +1,97 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    name: Build + publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    permissions:
+      contents: write  # criar Release + anexar assets
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # CHANGELOG.md precisa do histórico pra extrair seção da versão
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm install --no-audit --no-fund --prefer-offline
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Tests
+        run: npm run test
+
+      - name: Build
+        run: npm run build
+
+      - name: Resolve version from tag
+        id: version
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Sanity check — package.json version vs tag
+        run: |
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          if [ "$PKG_VERSION" != "${{ steps.version.outputs.version }}" ]; then
+            echo "::error::Tag ${{ steps.version.outputs.tag }} não bate com package.json (version=$PKG_VERSION)"
+            exit 1
+          fi
+          echo "✓ package.json $PKG_VERSION ↔ tag ${{ steps.version.outputs.tag }}"
+
+      - name: Package dist
+        run: |
+          ZIP_NAME="dist-${{ steps.version.outputs.tag }}.zip"
+          (cd dist && zip -r "../${ZIP_NAME}" .)
+          ls -lh "${ZIP_NAME}"
+
+      - name: Generate SHA256SUMS
+        run: |
+          sha256sum \
+            "dist-${{ steps.version.outputs.tag }}.zip" \
+            package.json \
+            package-lock.json \
+            > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Extract release notes from CHANGELOG
+        id: notes
+        run: |
+          # Extrai a seção [VERSION] do CHANGELOG.md até a próxima [versão] ou EOF.
+          VERSION="${{ steps.version.outputs.version }}"
+          awk -v v="$VERSION" '
+            $0 ~ "^## \\["v"\\]" { capture=1; next }
+            capture && /^## \[/ { exit }
+            capture { print }
+          ' CHANGELOG.md > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            echo "Release notes vazias — usando fallback" > release-notes.md
+            echo "" >> release-notes.md
+            echo "Veja [CHANGELOG.md](CHANGELOG.md) para detalhes." >> release-notes.md
+          fi
+          echo "--- release-notes.md ---"
+          cat release-notes.md
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ steps.version.outputs.tag }}" \
+            --title "Drift ${{ steps.version.outputs.tag }}" \
+            --notes-file release-notes.md \
+            "dist-${{ steps.version.outputs.tag }}.zip" \
+            SHA256SUMS
