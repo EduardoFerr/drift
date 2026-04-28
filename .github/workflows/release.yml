@@ -72,16 +72,19 @@ jobs:
         id: notes
         run: |
           # Extrai a seção [VERSION] do CHANGELOG.md até a próxima [versão] ou EOF.
+          # Usa sed por simplicidade — `awk` com regex contendo colchetes literais
+          # é instável entre dialects (gawk vs busybox awk vs git-bash awk).
           VERSION="${{ steps.version.outputs.version }}"
-          awk -v v="$VERSION" '
-            $0 ~ "^## \\["v"\\]" { capture=1; next }
-            capture && /^## \[/ { exit }
-            capture { print }
-          ' CHANGELOG.md > release-notes.md
+          sed -n "/^## \[$VERSION\]/,/^## \[/p" CHANGELOG.md \
+            | sed '$d' \
+            | sed '1d' \
+            > release-notes.md
           if [ ! -s release-notes.md ]; then
-            echo "Release notes vazias — usando fallback" > release-notes.md
-            echo "" >> release-notes.md
-            echo "Veja [CHANGELOG.md](CHANGELOG.md) para detalhes." >> release-notes.md
+            {
+              echo "Release notes vazias — usando fallback"
+              echo
+              echo "Veja [CHANGELOG.md](CHANGELOG.md) para detalhes."
+            } > release-notes.md
           fi
           echo "--- release-notes.md ---"
           cat release-notes.md
