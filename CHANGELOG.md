@@ -4,6 +4,13 @@ All notable changes to the Drift client. Uses [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+## [0.5.3] — 2026-04-27
+
+### Fixed
+
+- **TWA build**: `bubblewrap init` no CI sobrescreve `twa-manifest.json` com seus defaults (signingKey aponta pra `android.keystore` + alias `android`; packageId genérico; versionName 1.0.0). Build subsequente procurava `android.keystore` (que não existia) → travava no prompt de senha → expect timeout após 20min.
+- **Solução**: workflow agora tem step explícito "Sync twa-manifest" que roda APÓS init e re-aplica os campos críticos do projeto (signingKey aponta pra `drift-release.keystore` + alias `drift`, packageId `com.driftnet.client`, versionName/Code da tag git). Garantia idempotente independente de init sobrescrever ou não.
+
 ## [0.5.2] — 2026-04-27
 
 ### Changed
@@ -100,7 +107,8 @@ First public release. Closes Phase 5 of the architecture roadmap. Manifesto v2.2
 - **Phase 5.x** — APK distribution (TWA/Capacitor), F-Droid, CI GitHub Releases, hospedagem PWA
 - **Phase 6** — Cliente nativo Tauri (Tor via arti, WebRTC P2P, IPFS pin via helia, run-your-own-relay), build reproduzível, sneakernet bundle. Compromisso de manifesto §15-§17.
 
-[Unreleased]: https://github.com/EduardoFerr/drift/compare/v0.5.2...HEAD
+[Unreleased]: https://github.com/EduardoFerr/drift/compare/v0.5.3...HEAD
+[0.5.3]: https://github.com/EduardoFerr/drift/releases/tag/v0.5.3
 [0.5.2]: https://github.com/EduardoFerr/drift/releases/tag/v0.5.2
 [0.5.1]: https://github.com/EduardoFerr/drift/releases/tag/v0.5.1
 [0.5.0]: https://github.com/EduardoFerr/drift/releases/tag/v0.5.0

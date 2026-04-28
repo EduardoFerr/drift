@@ -89,7 +89,7 @@ jobs:
           echo "$KEYSTORE_BASE64" | base64 -d > app/twa/drift-release.keystore
           ls -lh app/twa/drift-release.keystore
 
-      - name: Resolve version + sync twa-manifest
+      - name: Resolve version
         id: version
         run: |
           # Tag: v0.5.0 → 0.5.0 ; manual: pega de package.json
@@ -99,31 +99,53 @@ jobs:
             VERSION=$(node -p "require('./package.json').version")
           fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          # appVersionCode = 1 + número de commits (monotônico, único por build)
+          # appVersionCode = total de commits (monotônico, único por build)
           VERSION_CODE=$(($(git rev-list --count HEAD)))
           echo "version_code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
-          # Sincroniza versão no twa-manifest.json
-          node -e "
-            const fs=require('fs');
-            const m=JSON.parse(fs.readFileSync('app/twa/twa-manifest.json','utf8'));
-            m.appVersionName='$VERSION';
-            m.appVersion=$VERSION_CODE;
-            m.appVersionCode=$VERSION_CODE;
-            fs.writeFileSync('app/twa/twa-manifest.json',JSON.stringify(m,null,2)+'\n');
-          "
-          echo "✓ TWA manifest sincronizado: version=$VERSION code=$VERSION_CODE"
+          echo "✓ Version: $VERSION (code $VERSION_CODE)"
 
-      - name: Bubblewrap update
+      - name: Bubblewrap init (cria estrutura Android se primeira vez)
         working-directory: app/twa
         run: |
-          # Bubblewrap commands são interativos por design. Pipeamos `yes ""`
-          # pra aceitar o default em cada prompt (versão, packageId, etc) —
-          # os valores reais vêm do twa-manifest.json que já editamos acima.
-          # `yes ""` fornece linhas vazias infinitas; bubblewrap interpreta
-          # cada Enter como "use default".
           if [ ! -f "build.gradle" ]; then
-            yes "" | bubblewrap init --manifest=https://drift-wheat-one.vercel.app/manifest.webmanifest --directory=. --skipPwaValidation || true
+            # init pergunta vários valores interativos — `yes ""` aceita defaults.
+            # IMPORTANTE: init SOBRESCREVE twa-manifest.json com defaults dele
+            # (signingKey: ./android.keystore + alias android, packageId genérico,
+            # versionName=1.0.0). Re-aplicamos nossa config no próximo step.
+            yes "" | bubblewrap init \
+              --manifest=https://drift-wheat-one.vercel.app/manifest.webmanifest \
+              --directory=. \
+              --skipPwaValidation || true
           fi
+
+      - name: Sync twa-manifest com config do projeto
+        working-directory: app/twa
+        run: |
+          # bubblewrap init pode ter sobrescrito twa-manifest.json com defaults.
+          # Este step garante os campos críticos do PROJETO (não da PWA online):
+          #   - signingKey aponta pra keystore decodificada dos secrets
+          #   - packageId é o nosso (com.driftnet.client), não auto-gerado
+          #   - versionName/Code vêm da tag git, não do package.json default
+          VERSION="${{ steps.version.outputs.version }}"
+          VERSION_CODE="${{ steps.version.outputs.version_code }}"
+          node -e "
+            const fs = require('fs');
+            const m = JSON.parse(fs.readFileSync('twa-manifest.json', 'utf8'));
+            m.signingKey = { path: './drift-release.keystore', alias: 'drift' };
+            m.packageId = 'com.driftnet.client';
+            m.appVersionName = '$VERSION';
+            m.appVersion = $VERSION_CODE;
+            m.appVersionCode = $VERSION_CODE;
+            fs.writeFileSync('twa-manifest.json', JSON.stringify(m, null, 2) + '\n');
+          "
+          echo "✓ twa-manifest sincronizado:"
+          node -e "const m=JSON.parse(require('fs').readFileSync('twa-manifest.json','utf8')); console.log('  signingKey:', m.signingKey); console.log('  packageId:', m.packageId); console.log('  version:', m.appVersionName, '(code', m.appVersionCode, ')')"
+
+      - name: Bubblewrap update (aplica manifest no Android project)
+        working-directory: app/twa
+        run: |
+          # update propaga twa-manifest.json → build.gradle / AndroidManifest.xml.
+          # Pipeamos yes "" pra aceitar prompts de confirmação (regenerar key etc).
           yes "" | bubblewrap update
 
       - name: Bubblewrap build (via expect)
