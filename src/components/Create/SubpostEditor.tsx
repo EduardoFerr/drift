@@ -221,6 +221,7 @@ function SubpostBlock({
         onChange={(e) => onChange({ text: e.target.value })}
         placeholder={index === 0 ? 'o que está acontecendo?' : 'continua…'}
         rows={2}
+        data-subpost-input={index === 0 ? '' : undefined}
         className="w-full resize-none bg-transparent text-sm text-slate-200 placeholder:text-slate-700 focus:outline-none"
       />
 

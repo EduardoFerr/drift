@@ -64,6 +64,30 @@ function App() {
     void startBoot()
   }, [])
 
+  // PWA shortcuts: manifest declara `/?action=compose` e `/?action=settings`
+  // (long-press no ícone do app). Lemos o param no mount e abrimos o estado
+  // certo, depois limpamos a URL pra não disparar de novo num refresh.
+  useEffect(() => {
+    if (boot.step !== 'ready') return
+    const params = new URLSearchParams(window.location.search)
+    const action = params.get('action')
+    if (action === 'compose') {
+      // SubpostEditor já está sempre montado no topo do feed —
+      // foca o textarea pra UX consistente com "abrir compose".
+      const textarea = document.querySelector<HTMLTextAreaElement>(
+        'textarea[data-subpost-input]',
+      )
+      textarea?.focus()
+    } else if (action === 'settings') {
+      setShowSettings(true)
+    }
+    if (action) {
+      const url = new URL(window.location.href)
+      url.searchParams.delete('action')
+      window.history.replaceState({}, '', url.toString())
+    }
+  }, [boot.step])
+
   // Carregamento inicial do feed quando boot fica ready. A partir daí,
   // onNostrEvent chama invalidateFeed() automaticamente — sem poll.
   useEffect(() => {

@@ -57,12 +57,42 @@ export default defineConfig({
         short_name: 'Drift',
         description:
           'Rede social descentralizada onde o conteúdo se espalha pelo comportamento humano',
+        // PT-BR explícito — o conteúdo do app, manifesto e UI são em PT.
+        // Sem isso, o plugin emite default 'en' que confunde screen readers.
+        lang: 'pt-BR',
+        dir: 'ltr',
         theme_color: '#0a0a0f',
         background_color: '#08080f',
         display: 'standalone',
+        // Fallback gracioso — alguns browsers desktop preferem
+        // window-controls-overlay (WCO) pra integração de barra de título.
+        display_override: ['window-controls-overlay', 'standalone', 'minimal-ui'],
         orientation: 'portrait',
         start_url: '/',
         scope: '/',
+        // Foca instância existente em vez de abrir nova aba — comportamento
+        // esperado de "app aberto via link". Cobre também o caso do TWA.
+        launch_handler: { client_mode: 'focus-existing' },
+        // Reforça que queremos o PWA, não redireciona pra app store.
+        // Manifesto §17 (sem dependência de loja proprietária).
+        prefer_related_applications: false,
+        // Atalhos no long-press do ícone (Android) e jump list (Windows).
+        shortcuts: [
+          {
+            name: 'Novo post',
+            short_name: 'Novo',
+            description: 'Compor um post novo',
+            url: '/?action=compose',
+            icons: [{ src: 'pwa-192x192.png', sizes: '192x192' }],
+          },
+          {
+            name: 'Configurações',
+            short_name: 'Settings',
+            description: 'Identidade, relays, filtros',
+            url: '/?action=settings',
+            icons: [{ src: 'pwa-192x192.png', sizes: '192x192' }],
+          },
+        ],
         // Categorias ajudam o app a aparecer corretamente em stores tipo
         // F-Droid e listings PWA. `social` é a categoria oficial.
         categories: ['social'],
