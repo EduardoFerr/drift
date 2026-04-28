@@ -33,8 +33,13 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: npm
 
-      - name: Install (deterministic)
-        run: npm ci
+      - name: Install
+        # `npm ci` falha com EBADPLATFORM em binários cross-platform do esbuild
+        # quando o lockfile foi gerado em outro OS (bug conhecido do npm com
+        # entries "extraneous": true). `npm install` é mais permissivo —
+        # versões ainda travadas pelo lockfile, só a resolução de optional
+        # deps é mais flexível.
+        run: npm install --no-audit --no-fund --prefer-offline
 
       - name: Typecheck (tsc strict)
         run: npx tsc --noEmit
