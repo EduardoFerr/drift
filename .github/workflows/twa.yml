@@ -44,8 +44,15 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install Bubblewrap
-        run: npm install -g @bubblewrap/cli
+      - name: Install Bubblewrap + expect
+        # `expect` automatiza prompts interativos do bubblewrap — necessário
+        # porque os comandos build/update são interativos por design e
+        # `bubblewrap build` faz vários prompts antes dos de senha (que
+        # quebraria com pipe simples).
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y expect
+          npm install -g @bubblewrap/cli
 
       - name: Pre-configure Bubblewrap (skip JDK install prompt)
         # Bubblewrap pergunta interativamente "Install JDK? (Y/n)" na primeira
@@ -119,19 +126,52 @@ jobs:
           fi
           yes "" | bubblewrap update
 
-      - name: Bubblewrap build
+      - name: Bubblewrap build (via expect)
         working-directory: app/twa
         env:
           KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          # `bubblewrap build` solicita passwords interativo. Passamos a
-          # password do keystore + da key + linhas vazias adicionais pra
-          # cobrir qualquer prompt de confirmação subsequente.
-          {
-            printf '%s\n%s\n' "$KEYSTORE_PASSWORD" "$KEY_PASSWORD"
-            yes ""
-          } | bubblewrap build --skipPwaValidation
+          # bubblewrap build pergunta tanto coisas de confirmação ("regenerate
+          # signing key?", "Yes/No") quanto passwords. expect casa pelo texto
+          # do prompt e responde corretamente — pipe simples não dá conta
+          # porque a ordem dos prompts varia entre primeira e N-ésima execução.
+          #
+          # exp_continue depois de cada match faz o expect continuar
+          # observando outros prompts no mesmo spawn.
+          expect <<'EOF'
+          set timeout 1200
+          set keystore_pwd $env(KEYSTORE_PASSWORD)
+          set key_pwd      $env(KEY_PASSWORD)
+
+          spawn bubblewrap build --skipPwaValidation
+
+          expect {
+            -re "(?i)password for the key store" {
+              send -- "$keystore_pwd\r"
+              exp_continue
+            }
+            -re "(?i)password for the key:" {
+              send -- "$key_pwd\r"
+              exp_continue
+            }
+            -re "\\(Y/n\\)|\\(y/N\\)" {
+              # Aceita default de qualquer prompt yes/no (ex: regenerar key)
+              send -- "\r"
+              exp_continue
+            }
+            timeout {
+              puts "::error::expect timeout"
+              exit 2
+            }
+            eof {
+              # Bubblewrap saiu — pega o exit code
+              catch wait result
+              set exit_status [lindex $result 3]
+              exit $exit_status
+            }
+          }
+          EOF
           ls -lh ./*.apk ./*.aab 2>/dev/null || true
 
       - name: Rename artifacts
