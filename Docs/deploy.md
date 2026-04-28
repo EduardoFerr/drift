@@ -91,11 +91,16 @@ cloudflared tunnel --url http://localhost:5173
 
 URL `*.trycloudflare.com` tem cert válido — PWA instala em desktop e mobile sem ajustar trust store. Útil pra testar entre PC e celular antes de fazer deploy real.
 
-## 4. F-Droid / Play Store (Fase 5.x.4, futuro)
+## 4. APK Android via TWA
 
-Plano: TWA (Trusted Web Activity) via [Bubblewrap](https://github.com/GoogleChromeLabs/bubblewrap) embrulhando o PWA já hospedado. Manifest assinado submetido ao F-Droid (build reproduzível) e Play Internal Testing.
+✅ Configurado. Detalhes em [`Docs/twa.md`](twa.md). Resumo:
 
-Documentação detalhada virá quando o trabalho for executado.
+- `app/twa/twa-manifest.json` — config Bubblewrap (host, ícones, shortcuts, signing)
+- `public/.well-known/assetlinks.json` — Digital Asset Links (servido pela Vercel)
+- `.github/workflows/twa.yml` — build APK + AAB no CI em tag `v*`
+- Distribuição: GitHub Releases (sideload direto), F-Droid (Fase 5.x.6), Play Store opcional
+
+Setup pendente (uma vez): gerar keystore, capturar SHA256, popular `assetlinks.json` + secrets no GitHub. Ver `Docs/twa.md`.
 
 ## Hardening adicional (quando virar produção)
 

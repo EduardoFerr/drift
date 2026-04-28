@@ -1,0 +1,63 @@
+{
+  "packageId": "com.driftnet.client",
+  "host": "drift-wheat-one.vercel.app",
+  "name": "Drift",
+  "launcherName": "Drift",
+  "display": "standalone",
+  "themeColor": "#0a0a0f",
+  "themeColorDark": "#0a0a0f",
+  "navigationColor": "#0a0a0f",
+  "navigationColorDark": "#0a0a0f",
+  "navigationDividerColor": "#0a0a0f",
+  "navigationDividerColorDark": "#0a0a0f",
+  "backgroundColor": "#08080f",
+  "enableNotifications": false,
+  "startUrl": "/",
+  "iconUrl": "https://drift-wheat-one.vercel.app/pwa-512x512.png",
+  "maskableIconUrl": "https://drift-wheat-one.vercel.app/pwa-maskable-512.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "./drift-release.keystore",
+    "alias": "drift"
+  },
+  "appVersionName": "0.5.0",
+  "appVersion": 1,
+  "appVersionCode": 1,
+  "shortcuts": [
+    {
+      "name": "Novo post",
+      "shortName": "Novo",
+      "url": "/?action=compose",
+      "chosenIconUrl": "https://drift-wheat-one.vercel.app/pwa-192x192.png"
+    },
+    {
+      "name": "Configurações",
+      "shortName": "Settings",
+      "url": "/?action=settings",
+      "chosenIconUrl": "https://drift-wheat-one.vercel.app/pwa-192x192.png"
+    }
+  ],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://drift-wheat-one.vercel.app/manifest.webmanifest",
+  "fallbackType": "customtabs",
+  "features": {
+    "locationDelegation": {
+      "enabled": false
+    },
+    "playBilling": {
+      "enabled": false
+    }
+  },
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fullScopeUrl": "https://drift-wheat-one.vercel.app/",
+  "minSdkVersion": 23,
+  "orientation": "portrait",
+  "fingerprints": [],
+  "additionalTrustedOrigins": [],
+  "retainedBundles": []
+}

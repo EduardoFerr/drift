@@ -122,7 +122,9 @@ src/
 - ✅ **Fase 3** — Swipes Framer Motion, upload, content-warning, location off-default
 - ✅ **Fase 4** — Mapa, peso de perfil, moderação threshold dinâmico, eviction respeita spreads
 - ✅ **Fase 5** — PWA polish, NIP-65, NIP-02, NIP-06, Passkey, multi-identidade, probe, re-broadcast, pinning, block/mute, feed tabs, kvvfs fallback, **99 tests Vitest**
-- ⏳ **Fase 5.x** — APK distribution (TWA/Capacitor), F-Droid, CI Releases
+- ✅ **Fase 5.x.1-5.x.3+5.x.7+5.x.8** — versionamento, CI, PWA polish, deploy Vercel, release automation
+- ✅ **Fase 5.x.4** — TWA Android (build APK/AAB no CI via Bubblewrap)
+- ⏳ **Fase 5.x.5+5.x.6** — Capacitor (alternativa), F-Droid manifest
 - ⏳ **Fase 6** — Cliente nativo Tauri (Tor + WebRTC), IPFS pin, run-your-own-relay, build reproduzível
 
 Fase 6 é compromisso, não opção: anti-censura por país (§15) e disponibilidade distribuída (§16) só fecham completamente lá.
