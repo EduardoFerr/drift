@@ -67,3 +67,6 @@ skills-lock.json
 
 # memory files (per-conversation, não-commitar)
 memory/
+
+# vercel cli local link (auth + project ref) — gerado por `vercel link`
+.vercel
