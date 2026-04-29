@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AnimatePresence } from 'framer-motion'
+import { OPTIMISTIC_TIMEOUT_MS } from './config/constants'
 import { db } from './lib/db'
+import { getCurrentLocation } from './lib/geolocation'
 import { restartSync, useSyncStore } from './lib/sync'
 import { createPost, spreadPost, buryPost } from './lib/protocol'
 import { applyContentFilters, getMyAction, refreshFeed, setFeedTab, useFeedStore } from './lib/feed'
@@ -9,7 +11,7 @@ import {
   useBootStore,
   type BootState,
 } from './lib/bootstrap'
-import { usePrefsStore } from './lib/prefs'
+import { getPrefs, usePrefsStore } from './lib/prefs'
 import { useUserWeight } from './hooks/useUserWeight'
 import { useInstallPrompt } from './hooks/useInstallPrompt'
 import { IdentityPanel } from './components/Identity/IdentityPanel'
@@ -161,6 +163,11 @@ function App() {
     if (publishing || input.subposts.length === 0) return
     setPublishing(true)
     try {
+      // Captura location se o user habilitou em settings (default: off).
+      // Manifesto §28 — opt-in granular. getCurrentLocation respeita a
+      // granularidade declarada (country/city/precise) e arredonda lat/lng.
+      const location = await getCurrentLocation(getPrefs().location_granularity)
+
       // Sem `postId` — protocol.ts gera o evento e o `event.id` resultante
       // é o identificador canônico do post. NIP-01: kind 9078 é regular
       // event, sem `d` tag. UUID local violava o formato hex 64 quando
@@ -168,6 +175,7 @@ function App() {
       await createPost({
         subposts: input.subposts,
         ...(input.contentWarning ? { contentWarning: input.contentWarning } : {}),
+        ...(location ? { location } : {}),
       })
     } catch (err) {
       console.error('publish failed', err)
@@ -190,15 +198,24 @@ function App() {
       setPending((p) => {
         if (p[post.id] !== 'spread') return p
         console.warn(
-          `[spread] post ${post.id.slice(0, 8)}… não confirmou em 15s — descartando optimistic`,
+          `[spread] post ${post.id.slice(0, 8)}… não confirmou em ${OPTIMISTIC_TIMEOUT_MS / 1000}s — descartando optimistic`,
         )
         const { [post.id]: _omit, ...rest } = p
         return rest
       })
-    }, 15000)
+    }, OPTIMISTIC_TIMEOUT_MS)
 
     try {
-      await spreadPost({ postId: post.id, authorPub: post.authorPub })
+      // Location opt-in — mesma regra de createPost (manifesto §28).
+      // Spread propaga geograficamente: arcos no mapa só aparecem com
+      // location nos spreads (origem do arc = primeiro spread, destino =
+      // cada subsequente). Ver useSpreadMap.ts.
+      const location = await getCurrentLocation(getPrefs().location_granularity)
+      await spreadPost({
+        postId: post.id,
+        authorPub: post.authorPub,
+        ...(location ? { location } : {}),
+      })
     } catch (err) {
       clearTimeout(safetyTimeout)
       console.error('spread failed', err)
@@ -217,12 +234,12 @@ function App() {
       setPending((p) => {
         if (p[post.id] !== 'bury') return p
         console.warn(
-          `[bury] post ${post.id.slice(0, 8)}… não confirmou em 15s — descartando optimistic`,
+          `[bury] post ${post.id.slice(0, 8)}… não confirmou em ${OPTIMISTIC_TIMEOUT_MS / 1000}s — descartando optimistic`,
         )
         const { [post.id]: _omit, ...rest } = p
         return rest
       })
-    }, 15000)
+    }, OPTIMISTIC_TIMEOUT_MS)
 
     try {
       await buryPost({ postId: post.id })

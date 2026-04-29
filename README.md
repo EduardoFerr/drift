@@ -71,9 +71,10 @@ URL `*.trycloudflare.com` tem cert válido — PWA instala em desktop e mobile.
 
 Ver [`Docs/deploy.md`](Docs/deploy.md) — Vercel (recomendado), GitHub Releases, self-host.
 
-## Testes
+## Testes & build
 
 ```bash
+npm run lint             # tsc -b --noEmit (typecheck strict, sem emitir)
 npm run test             # 99 tests Vitest — funções puras (scoring, weight, moderation, NIP-65, NIP-06, schema check)
 npm run build            # vite build + tsc strict
 ```
@@ -122,7 +123,8 @@ src/
 - ✅ **Fase 3** — Swipes Framer Motion, upload, content-warning, location off-default
 - ✅ **Fase 4** — Mapa, peso de perfil, moderação threshold dinâmico, eviction respeita spreads
 - ✅ **Fase 5** — PWA polish, NIP-65, NIP-02, NIP-06, Passkey, multi-identidade, probe, re-broadcast, pinning, block/mute, feed tabs, kvvfs fallback, **99 tests Vitest**
-- ✅ **Fase 5.x** — versionamento, CI, PWA polish, deploy Vercel, release automation, TWA Android (5.x.4 ⇒ relabeled como Fase 7 antecipada)
+- ✅ **Fase 5.x** — versionamento, CI, PWA polish, deploy Vercel, release automation
+- ✅ **Fase 7.1 antecipada** — TWA Android (Bubblewrap CI, infra completa; primeiro APK assinado pendente em sessão dedicada com Java local)
 - ⏳ **Fase 6** — Cliente nativo Tauri (Tor + WebRTC), build reproduzível
 - ⏳ **Fase 7** — Distribuição: TWA (✅ antecipada), Capacitor, F-Droid, Play Store, IPFS pin, run-your-own-relay, sneakernet bundle
 

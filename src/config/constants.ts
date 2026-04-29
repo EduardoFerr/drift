@@ -53,6 +53,18 @@ export const ENGAGEMENT_POINTS = {
 export const CLIENT_ID = 'drift-official'
 export const DRIFT_VERSION = '1'
 
+/**
+ * Janela de safety pra optimistic UI. Após esse tempo sem confirmação
+ * via subscribe, a UI descarta o `pending` e volta ao estado real do
+ * SQLite.
+ *
+ * 30s cobre a maioria das rotas: WSS reconnect (~3s) + relay propaga
+ * pro nosso subscribe (~1s) + verify Schnorr + persist + invalidateFeed
+ * (debounced 150ms). Em 3G ruim, ainda dá margem. Manifesto §10:
+ * optimistic não pode mentir indefinidamente.
+ */
+export const OPTIMISTIC_TIMEOUT_MS = 30_000
+
 /** Janela de debounce para recalcular score quando rajadas de
  *  spreads/buries chegam pelo subscribe. */
 export const SCORE_RECALC_DEBOUNCE_MS = 100
