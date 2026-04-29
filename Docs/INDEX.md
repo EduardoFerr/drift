@@ -1,0 +1,121 @@
+# Drift — Índice de Documentação
+
+> last-updated: 2026-04-28 · curador: Robin (research)
+
+Mapa navegável de toda a documentação do repositório. Se você é novo aqui,
+comece pela seção **Pra novo contribuidor**. Se já conhece, use **Por área**
+ou **Por persona** pra pular direto.
+
+---
+
+## Pra novo contribuidor (ler nessa ordem)
+
+1. **[../README.md](../README.md)** — visão geral 30s, swipes, stack, status
+2. **[manifesto.md](manifesto.md)** — 34 princípios, contrato público (vence sobre arquitetura)
+3. **[drift-arquitetura-v4.md](drift-arquitetura-v4.md)** — fonte da verdade técnica
+4. **[../CLAUDE.md](../CLAUDE.md)** — invariantes operacionais (relevante mesmo sem usar Claude Code)
+
+---
+
+## Por área
+
+### Manifesto / contrato
+- **[manifesto.md](manifesto.md)** — 34 princípios + roadmap vinculante (v2.2, abril 2026)
+
+### Arquitetura
+- **[drift-arquitetura-v4.md](drift-arquitetura-v4.md)** — modelo, fluxos, decisões técnicas (v5.3, abril 2026)
+- **[drift-fluxograma-v4.html](drift-fluxograma-v4.html)** — fluxograma visual interativo (v5.3)
+- **[../CLAUDE.md](../CLAUDE.md)** — 17 invariantes operacionais (abril 2026)
+
+### Fase 6 (cliente nativo + transports)
+- **[webrtc-seeding.md](webrtc-seeding.md)** — visão geral WebRTC + Proof of Interest (TBD)
+- **[webrtc-6.1a-plan.md](webrtc-6.1a-plan.md)** — esqueleto `transport/webrtc.ts` + signaling mock (em andamento)
+- **[webrtc-6.1b-plan.md](webrtc-6.1b-plan.md)** — signaling real via Nostr DM (NIP-44 + kind 1059)
+- **[webrtc-threats.md](webrtc-threats.md)** — threat model WebRTC, 23+ ameaças classificadas (v1.0, 2026-04-28)
+
+### Fase 7 (distribuição)
+- **[twa.md](twa.md)** — Trusted Web Activity Android (sub-fase 7.1, ✅ antecipada)
+- **[fdroid.md](fdroid.md)** — submissão ao catálogo F-Droid (7.2, pendente)
+- *(futuro: `ipfs-pin.md`, `sneakernet.md`, `run-your-own-relay.md`)*
+
+### Operacional
+- **[deploy.md](deploy.md)** — Vercel + GitHub Releases + Cloudflare Tunnel + F-Droid/Play
+- **[../CHANGELOG.md](../CHANGELOG.md)** — histórico de versões (último: v0.5.4, 2026-04-27)
+
+### Pesquisa / backlog
+- **[research-backlog.md](research-backlog.md)** — itens externos pendentes enquanto WebFetch está bloqueado
+
+---
+
+## Por persona
+
+### Sou um user querendo entender Drift
+[../README.md](../README.md) → [manifesto.md](manifesto.md)
+
+### Sou um dev querendo contribuir
+[../README.md](../README.md) → [manifesto.md](manifesto.md) → [../CLAUDE.md](../CLAUDE.md) → [drift-arquitetura-v4.md](drift-arquitetura-v4.md)
+
+### Sou um auditor de segurança
+[manifesto.md](manifesto.md) §17 + §25 → [../CLAUDE.md](../CLAUDE.md) (invariantes #7, #8, #12) → [webrtc-threats.md](webrtc-threats.md) → [drift-arquitetura-v4.md](drift-arquitetura-v4.md) §36 (threat model geral)
+
+### Quero rodar Drift no meu servidor
+[deploy.md](deploy.md) → [../CHANGELOG.md](../CHANGELOG.md) (versões testadas) → release artifacts (`dist.zip` + `SHA256SUMS` em GitHub Releases)
+
+### Quero contribuir pra Fase 6 (WebRTC)
+[webrtc-seeding.md](webrtc-seeding.md) → [webrtc-6.1a-plan.md](webrtc-6.1a-plan.md) → [webrtc-6.1b-plan.md](webrtc-6.1b-plan.md) → [webrtc-threats.md](webrtc-threats.md)
+
+### Quero empacotar Drift pra Android / F-Droid
+[twa.md](twa.md) → [fdroid.md](fdroid.md) → [deploy.md](deploy.md) §4
+
+### Sou pesquisador / quero atacar dúvidas externas
+[research-backlog.md](research-backlog.md)
+
+---
+
+## Por princípio do manifesto
+
+| Princípio | Onde é tratado |
+|-----------|----------------|
+| §2-3 identidade portável | [../CLAUDE.md](../CLAUDE.md) invariantes #8, #9, #15; `src/lib/identity.ts`, `lib/identities.ts` |
+| §4 anonimato (não-mixnet) | [drift-arquitetura-v4.md](drift-arquitetura-v4.md) §36 threat model |
+| §7 determinismo | [../CLAUDE.md](../CLAUDE.md) invariantes #3, #16 (Vitest tests) |
+| §12 múltiplos transportes | [webrtc-seeding.md](webrtc-seeding.md), [webrtc-6.1a-plan.md](webrtc-6.1a-plan.md), `src/lib/transport/` |
+| §15 anti-censura por país | [webrtc-seeding.md](webrtc-seeding.md), Fase 6.3 (TBD: Tor via arti) |
+| §16 disponibilidade distribuída | [webrtc-seeding.md](webrtc-seeding.md) (PoI seeder), [fdroid.md](fdroid.md), `lib/rebroadcast.ts` |
+| §17 sem chave mestra + build reproduzível | [fdroid.md](fdroid.md), [../CLAUDE.md](../CLAUDE.md) invariante #12 |
+| §20 resistência a isolamento | `lib/probe.ts` (probe anti-eclipse), [webrtc-threats.md](webrtc-threats.md) |
+| §22, §24 score sem afinidade | [../CLAUDE.md](../CLAUDE.md) invariante #11; `src/lib/scoring.ts` |
+| §23 bury não pune | `src/lib/scoring.ts` (peso simétrico) |
+| §25 sem scan automático | [../CLAUDE.md](../CLAUDE.md) invariante #7 |
+| §26 moderação reativa | `src/lib/moderation.ts` (threshold dinâmico) |
+| §27 auto-classificação voluntária | `content-warning` tag, `lib/feed.ts:applyContentFilters` |
+| §28-30 compatibilidade Nostr | [drift-arquitetura-v4.md](drift-arquitetura-v4.md) §30.12-13; `lib/nip65.ts`, `lib/follows.ts`, `lib/bip39.ts` |
+
+---
+
+## TL;DR de cada doc
+
+| Doc | TL;DR |
+|-----|-------|
+| [../README.md](../README.md) | Visão de 30s. Stack, kinds 9078-9081, garantias resumidas, setup local. Aponta pra manifesto pra spec completa. |
+| [../CLAUDE.md](../CLAUDE.md) | Instruções pra Claude Code: TL;DR do sistema, 17 invariantes que se quebrados quebram o sistema, stack pinado, padrões (Zustand, SQL via worker, idempotência), tecnologias proibidas. Útil pra qualquer dev. |
+| [../CHANGELOG.md](../CHANGELOG.md) | Keep a Changelog. Última: v0.5.4 (TWA bubblewrap driver), v0.5.2 (MapLibre substitui Mapbox), v0.5.1 (Vercel + release automation). |
+| [manifesto.md](manifesto.md) | Contrato técnico v2.2. 34 princípios divididos em 5 partes (Existência/Identidade, Eventos, Transporte, Score/Comunidade, Compromisso). Cada princípio tem Regras + Implementação + Fase. Vence sobre arquitetura quando conflita. |
+| [drift-arquitetura-v4.md](drift-arquitetura-v4.md) | Documento técnico completo v5.3. 36 seções incluindo modelo de dados, fluxos, schema SQLite, transport abstract, decisões registradas (§30.x), tests (§34), threat model (§36). Mudanças vs v5.2 documentadas no topo. |
+| [drift-fluxograma-v4.html](drift-fluxograma-v4.html) | Visualização interativa dos fluxos da arquitetura v5.3. Página HTML standalone, fundo escuro, monospace. |
+| [deploy.md](deploy.md) | 4 caminhos pra rodar Drift em produção: Vercel (recomendado, COOP/COEP corretos, push em main → deploy), GitHub Releases (`dist.zip` por tag), Cloudflare Tunnel (dev), F-Droid/Play (TWA). |
+| [twa.md](twa.md) | Sub-fase 7.1, ✅ implementada. Embrulha PWA Vercel num APK Android via Bubblewrap. ~3MB, atualização instantânea via deploy do site. Inclui keystore setup + assetlinks SHA256. Comparação com Capacitor. |
+| [fdroid.md](fdroid.md) | Sub-fase 7.2, pendente. Submissão ao catálogo F-Droid OSS. Lista pré-requisitos, conflitos identificados (`VITE_PHOTODNA_KEY` no `.env.example`, host Vercel = AntiFeature `NonFreeNet`), esboço `metadata/com.driftnet.client.yml`. Bloqueador atual: repo precisa ser público. |
+| [webrtc-seeding.md](webrtc-seeding.md) | Visão geral: dispositivos Drift como relays Nostr efêmeros via WebRTC, ativados por interesse contextual (abrir mapa de spread → vira seeder). Compatibilidade com manifesto detalhada (fortalece §12/§16/§15/§20; tensões com invariante #14 e como resolver via NIP-65 estendido + DM NIP-44). |
+| [webrtc-6.1a-plan.md](webrtc-6.1a-plan.md) | Plano de execução da sub-fase 6.1a: especificação da interface `Transport` (já em `src/lib/transport/index.ts`), esqueleto `webrtc.ts`, BroadcastChannel mock signaling, armadilhas de teste. Status: aprovado pelo Ted. |
+| [webrtc-6.1b-plan.md](webrtc-6.1b-plan.md) | Plano sub-fase 6.1b: substitui mock por signaling real via Nostr DM cifrado (NIP-44 v2 + kind 1059 gift wrap minimal, sem NIP-17 seal). Zero deps novas (nostr-tools 2.7.0 já tem `nip44`). Discovery PoI-only. |
+| [webrtc-threats.md](webrtc-threats.md) | Threat model dedicado WebRTC v1.0 (Barney, 2026-04-28). 23+ ameaças classificadas em 5 categorias (Peer / Rede / Signaling / Discovery / Recursos), cada uma com probabilidade, mitigação por fase, status (Aceito / Aberto / Crítico). Complementa §36 da arquitetura. |
+| [research-backlog.md](research-backlog.md) | Itens externos pendentes enquanto WebFetch está bloqueado. Cada item: pergunta + por quê bloqueia + workaround interim + fonte ideal. Mantida pela Robin. ~25 itens organizados por fase. |
+
+---
+
+## Buracos conhecidos
+
+- Docs prometidos pelas Fases 6/7 ainda não criados: `ipfs-pin.md` (Fase 7), `sneakernet.md` (Fase 7), `run-your-own-relay.md` (Fase 7), `tor-arti.md` (Fase 6.3), `capacitor.md` (alternativa TWA).
+- Nenhum doc tem campo formal `last-updated:` no frontmatter — datas inferidas via versão (manifesto v2.2, arquitetura v5.3) ou cabeçalho (`webrtc-threats.md` 2026-04-28).
+- `Docs/icones-oquesao-cada um.PNG` é asset órfão (sem doc explicando o que documenta).

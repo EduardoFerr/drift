@@ -144,6 +144,77 @@ describe('calculateWeight', () => {
   })
 })
 
+describe('calculateEngagement — edge cases (2ª onda)', () => {
+  function input(overrides: Partial<WeightInput> = {}): WeightInput {
+    return {
+      createdAt: NOW_MS - 10 * ONE_WEEK_MS,
+      spreadsReceived: 0,
+      lastActive: NOW_MS,
+      now: NOW_MS,
+      ...overrides,
+    }
+  }
+
+  it('comments contribuem +1 por comment recebido (Fase 5)', () => {
+    expect(calculateEngagement(input({ commentsReceived: 7 }))).toBe(7)
+  })
+
+  it('combinação spreads + comments soma antes do clamp', () => {
+    // 5 spreads (50) + 9 comments (9) = 59 (abaixo do clamp 60)
+    expect(calculateEngagement(input({ spreadsReceived: 5, commentsReceived: 9 }))).toBe(59)
+    // mais 5 comments → 64, clampa em 60
+    expect(calculateEngagement(input({ spreadsReceived: 5, commentsReceived: 14 }))).toBe(60)
+  })
+
+  it('clamp 0 mesmo com inatividade gigante e zero atividade', () => {
+    // 365 dias inativo, sem spreads → -365 → clamp 0
+    const oneYearAgo = NOW_MS - 365 * 86400 * 1000
+    expect(calculateEngagement(input({ spreadsReceived: 0, lastActive: oneYearAgo }))).toBe(0)
+  })
+
+  it('lastActive no futuro (clock skew) não vira penalidade negativa', () => {
+    const futureLastActive = NOW_MS + 5 * 86400 * 1000
+    // spreads 3 = 30; sem penalty de inatividade
+    expect(
+      calculateEngagement(input({ spreadsReceived: 3, lastActive: futureLastActive })),
+    ).toBe(30)
+  })
+
+  it('reports + inatividade combinados respeitam clamp 0 (não fica < 0)', () => {
+    const fiveDaysAgo = NOW_MS - 5 * 86400 * 1000
+    // 1 spread (10) - 1 report (15) - 5 dias (5) = -10 → clamp 0
+    expect(
+      calculateEngagement(
+        input({ spreadsReceived: 1, reportsConfirmed: 1, lastActive: fiveDaysAgo }),
+      ),
+    ).toBe(0)
+  })
+})
+
+describe('calculateWeight — edge cases (2ª onda)', () => {
+  it('identidade nova-do-zero (0 dias, 0 spreads) → peso 0', () => {
+    const w = calculateWeight({
+      createdAt: NOW_MS,
+      spreadsReceived: 0,
+      lastActive: null,
+      now: NOW_MS,
+    })
+    expect(w).toBe(0)
+  })
+
+  it('antiguidade sub-semana é fracionária (não saturada por floor)', () => {
+    // 3.5 dias = 0.5 semanas
+    const halfWeek = NOW_MS - 3.5 * 86400 * 1000
+    const w = calculateWeight({
+      createdAt: halfWeek,
+      spreadsReceived: 0,
+      lastActive: NOW_MS,
+      now: NOW_MS,
+    })
+    expect(w).toBeCloseTo(0.5, 5)
+  })
+})
+
 describe('getMaxSubposts', () => {
   it('peso < 20 → 1 subpost', () => {
     expect(getMaxSubposts(0)).toBe(1)

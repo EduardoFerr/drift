@@ -11,7 +11,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { getCurrentLocation } from '../src/lib/geolocation'
+import { getCurrentLocation, warmUpGpsLocation } from '../src/lib/geolocation'
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 
@@ -185,5 +185,36 @@ describe('getCurrentLocation — erros retornam null silencioso', () => {
     mockGeolocationError(3)
     const result = await getCurrentLocation('city')
     expect(result).toBeNull()
+  })
+})
+
+// ─── Warm-up GPS no idle ─────────────────────────────────────────────
+
+describe('warmUpGpsLocation — fire-and-forget', () => {
+  it("retorna void (não Promise) quando granularity === 'off'", () => {
+    const fn = mockGeolocationSuccess({ latitude: 0, longitude: 0 })
+    const result = warmUpGpsLocation('off')
+    expect(result).toBeUndefined()
+    expect(fn).not.toHaveBeenCalled()
+  })
+
+  it('retorna void quando navigator.geolocation indisponível', () => {
+    vi.stubGlobal('navigator', {})
+    const result = warmUpGpsLocation('city')
+    expect(result).toBeUndefined()
+  })
+
+  it('dispara getCurrentPosition em background com granularity ativo', () => {
+    const fn = mockGeolocationSuccess({ latitude: 10, longitude: 20 })
+    const result = warmUpGpsLocation('city')
+    // Fire-and-forget — não retorna Promise.
+    expect(result).toBeUndefined()
+    // Mas internamente já agendou a chamada (síncrono até o new Promise).
+    expect(fn).toHaveBeenCalledTimes(1)
+  })
+
+  it('swallow erros silenciosamente (não throw)', () => {
+    mockGeolocationError(1)
+    expect(() => warmUpGpsLocation('precise')).not.toThrow()
   })
 })

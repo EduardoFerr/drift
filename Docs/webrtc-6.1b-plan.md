@@ -15,7 +15,8 @@ Fluxo end-to-end (A.npub conhecido por discovery; A inicia):
 5. **A publica via wssTransport.publish** evento Drift assinado **kind 1059** (gift wrap NIP-59 minimal):
    - Payload já cifrado NIP-44 v2 vai em `content`
    - Tag `['p', B.npub]`
-   - **Drift NÃO usa NIP-17 seal layer completo** — só camada 1059 com cifra direta. Trade: vaza pubkey do remetente em `event.pubkey`. Aceitável pra signaling — nó hostil já saberia npub via `from` interno do msg.
+   - **Drift NÃO usa NIP-17 seal layer completo** — só camada 1059 com cifra direta.
+   - **AJUSTE CRÍTICO (Barney peer review #1)**: por default, A usa **nsec EFÊMERO** (gerado por sessão de seeding) em vez do nsec principal. Razão: sem isso, todo relay vê grafo `(A.npub_principal → B.npub_principal)` em claro — agrava T-005 (mapping social) e T-004 (linkability) cruzando com kinds 9079 (SPREAD) públicos. Nsec efêmero rotaciona por sessão; payload interno cifrado (`from`) carrega o npub principal pra B saber quem é. Custo: extra Schnorr verify (~1ms) e 1 ECDH adicional. Trade aceitável.
 6. **B subscribe** desde o boot: `wssTransport.subscribe({ kinds:[1059], '#p':[B.npub], since: bootTs - 60 })` com handler que decifra e despacha pra `nostrSignalingChannel.onmessage`.
 7. **B decifra**: `getConversationKey(B.nsecBytes, event.pubkey)` (npub do remetente está validado via Schnorr — invariante #5). Decrypt falha → drop silencioso (defesa contra spam).
 8. **B parseia** msg, vê `to===B.npub`, processa offer (createAnswer, setLocalDescription, manda answer cifrado de volta).
@@ -116,7 +117,11 @@ import { nip44 } from 'nostr-tools'
 - **Trickle ICE batching**: implementar simples primeiro (1 evento por candidate). Batching 200ms vira 6.2.
 - **Relay storm**: SimplePool já reusa conexões. Throttle no publish vira 6.2.
 - **Spam defense**: NIP-44 decrypt falha = drop silencioso. Pra flood deliberado >50 falhas, blacklist 5min — issue 6.2.
-- **Replay window**: `IceMsg` com `ts` antiga reaplicada — reject se `ts < now - 120s`. **Implementar em 6.1b** (5 linhas).
+- **Replay window** (Barney peer review #2 — corrigido): `IceMsg` com `ts` antiga reaplicada por adversário. Defesa em 2 camadas:
+  1. Window: reject se `ts < now - 60s` (NÃO 120s — Nostr clock drift típico é <30s; 60s é tolerância folgada).
+  2. Dedup por `event.id` em LRU cache TTL 5min. Atacante não pode replay mesmo evento dentro do mesmo par A→B.
+  Sem dedup, replay no mesmo par cria DC fantasma. Implementar **em 6.1b** (~15 linhas com LRU).
+- **Rate limit por sender pubkey** (Barney peer review #4): C honesto-na-cripto pode flood B com 10k offers/s usando próprio nsec_C. Token bucket por `event.pubkey`: drop após 10 msgs/min do mesmo sender. Threat model T-006/T-008.
 
 ## 6. Sub-fases concretas
 
@@ -134,10 +139,12 @@ PoI integration (`useSpreadMap` → `connectTo`) **fica fora de 6.1b**, vira **7
 
 ## 7. Critério de aceite 6.1b
 
-E2e manual cross-machine real:
+**AJUSTE Barney peer review #5**: smoke test mobile real adiado pra 6.3 (TURN). Sem TURN, symmetric NAT em 4G bloqueia conexão na maioria dos casos. Critério realista pra 6.1b é 2 PCs em LANs residenciais distintas.
 
-- PC (peer A): npub_A. Boot Drift, copiar npub.
-- Celular (peer B, 4G/Wi-Fi diferente): npub_B. Boot Drift.
+E2e manual cross-machine:
+
+- PC-A (LAN residencial 1): npub_A. Boot Drift, copiar npub.
+- PC-B (LAN residencial 2 — VPN ou rede física diferente): npub_B. Boot Drift.
 - A console: `await window.driftWebRTC.transport.connectTo('<npub_B>')`. Aguarda DC open (~2-5s, NAT-dependente).
 - A: `getPeers()` → `[{ id: '<npub_B>', status: 'open', latencyMs: ~50-200 }]`.
 - B subscreve `{ kinds: [9078] }` no `webrtcTransport`.
@@ -159,7 +166,27 @@ Riscos não-óbvios:
 2. **Relays podem não aceitar kind 1059**: alguns têm policy `allow_kinds`. Validar nos 4 relays seed antes de 6.1b-D (5min de teste com `wscat`). Fallback: kind 4 NIP-04 legado com payload NIP-44 v2 dentro.
 3. **`getConversationKey` exige `Uint8Array` 32 bytes**: identity.ts já tem `nsecHexToBytes`. Casar tipos — não passar nsec hex crua.
 
-## 9. Pré-requisitos
+## 9. Threat coverage (Barney peer review)
+
+Status de cada ameaça do `webrtc-threats.md` no plano 6.1b:
+
+| ID | Status |
+|----|--------|
+| T-001 (IP leak ICE) | adiado pra 6.3 (mDNS automático mitiga parcial) |
+| T-004 (linkability) | ✅ mitigado: nsec efêmero (§1 ajuste) |
+| T-005 (mapping social) | ✅ mitigado: nsec efêmero |
+| T-006 (Sybil signaling) | ✅ mitigado: rate limit por sender pubkey |
+| T-007 (eclipse bootstrap) | adiado pra 6.2 (random walk) |
+| T-008 (DC flooding) | mitigado em 6.1a (DRIFT_KIND_SET) + rate limit 6.1b |
+| T-011 (MITM) | ✅ mitigado: NIP-44 v2 AEAD + Schnorr verify |
+| T-012 (replay) | ✅ mitigado: window 60s + LRU dedup TTL 5min |
+| T-013 (kind injection) | ✅ mitigado em 6.1a |
+| T-017 (path diversity) | adiado pra 6.2 |
+| T-023 (decrypt timing) | ✅ NIP-44 v2 constant-time |
+
+Top-3 críticas: T-004/T-005 (#1 fix), T-006 (#4 fix), T-007/T-017 (Fase 6.2).
+
+## 10. Pré-requisitos
 
 - 6.1a merged (mock signaling funcionando, smoke 2-tabs OK)
 - Test suite 6.1a verde

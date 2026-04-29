@@ -98,3 +98,24 @@ export async function getCurrentLocation(
     return null
   }
 }
+
+/**
+ * Warm-up GPS no idle (fire-and-forget). Dispara uma chamada em background
+ * pra que o browser pré-aqueça o cache de fix de localização (até
+ * `maximumAge: 60_000` ms). Próxima chamada de `getCurrentLocation` num
+ * spread/publish pega o cache em ~50ms ao invés de 1-3s de GPS lock.
+ *
+ * IMPORTANTE: NÃO chamar se permissão ainda não foi concedida — o browser
+ * mostraria prompt no boot, UX terrível. Caller deve checar
+ * `navigator.permissions.query({name: 'geolocation'})` antes.
+ *
+ * Não retorna Promise — silenciosamente swallow de erros. Manifesto §28
+ * (privacidade pelo mínimo): warm-up só roda se user já optou em
+ * `prefs.location_granularity !== 'off'` E já concedeu permissão.
+ */
+export function warmUpGpsLocation(granularity: LocationGranularity): void {
+  if (granularity === 'off') return
+  if (typeof navigator === 'undefined' || !navigator.geolocation) return
+  // Fire-and-forget. Erros silenciados — é só pré-aquecimento.
+  void getCurrentLocation(granularity).catch(() => {})
+}

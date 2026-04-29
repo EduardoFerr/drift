@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import { OPTIMISTIC_TIMEOUT_MS } from './config/constants'
 import { db } from './lib/db'
-import { getCurrentLocation } from './lib/geolocation'
+import { getCurrentLocation, warmUpGpsLocation } from './lib/geolocation'
 import { restartSync, useSyncStore } from './lib/sync'
 import { createPost, spreadPost, buryPost } from './lib/protocol'
 import { applyContentFilters, getMyAction, refreshFeed, setFeedTab, useFeedStore } from './lib/feed'
@@ -23,7 +23,13 @@ import { RelaySettings } from './components/Settings/RelaySettings'
 import { LocalListsSettings } from './components/Settings/LocalListsSettings'
 import { OnboardingOverlay } from './components/Onboarding/OnboardingOverlay'
 import { ProfileModal } from './components/Profile/ProfileModal'
-import type { DriftIdentity, Post, Subpost, ContentWarning } from './types/drift'
+import type {
+  DriftIdentity,
+  LocationGranularity,
+  Post,
+  Subpost,
+  ContentWarning,
+} from './types/drift'
 
 function App() {
   const boot = useBootStore()
@@ -33,6 +39,7 @@ function App() {
   const installPrompt = useInstallPrompt()
 
   const onboardingDone = usePrefsStore((s) => s.onboarding_done)
+  const locationGranularity = usePrefsStore((s) => s.location_granularity)
 
   const [publishing, setPublishing] = useState(false)
   const [pending, setPending] = useState<Record<string, 'spread' | 'bury'>>({})
@@ -45,6 +52,9 @@ function App() {
   const [showDiagnostic, setShowDiagnostic] = useState(false)
   const [showIdentity, setShowIdentity] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  // Quando o user clica no indicador 📍 do Header, abre Settings já
+  // scrollado pra seção location_granularity. Default null = sem scroll.
+  const [settingsScrollTo, setSettingsScrollTo] = useState<'location' | null>(null)
   const [showRelays, setShowRelays] = useState(false)
   const [showSwitcher, setShowSwitcher] = useState(false)
   const [showLists, setShowLists] = useState(false)
@@ -102,6 +112,33 @@ function App() {
     if (boot.step !== 'ready' || feedLoaded) return
     void refreshFeed()
   }, [boot.step, feedLoaded])
+
+  // Warm-up GPS no idle: quando boot ready + user já optou por location +
+  // permissão JÁ concedida → dispara fix em background pra próxima
+  // chamada de spread/publish pegar cache fresco em ~50ms ao invés de
+  // 1-3s de GPS lock. NÃO dispara se permission === 'prompt' (evita
+  // prompt aparecer no boot — UX ruim, manifesto §28).
+  useEffect(() => {
+    if (boot.step !== 'ready') return
+    if (locationGranularity === 'off') return
+    if (typeof navigator === 'undefined' || !navigator.permissions) return
+    let cancelled = false
+    void navigator.permissions
+      .query({ name: 'geolocation' as PermissionName })
+      .then((status) => {
+        if (cancelled) return
+        if (status.state === 'granted') {
+          warmUpGpsLocation(locationGranularity)
+        }
+      })
+      .catch(() => {
+        // Safari < 16 não suporta permissions.query pra geolocation.
+        // Sem warm-up nesse caso — fallback é o cold path normal.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [boot.step, locationGranularity])
 
   // Limpa pending quando a ação real chega no SQLite. Reage a mudanças
   // no array de posts (que vem da feed store, atualizada por
@@ -323,7 +360,15 @@ function App() {
           onToggleDiagnostic={() => setShowDiagnostic((s) => !s)}
           onOpenIdentity={() => setShowIdentity(true)}
           onOpenSwitcher={() => setShowSwitcher(true)}
-          onOpenSettings={() => setShowSettings(true)}
+          onOpenSettings={() => {
+            setSettingsScrollTo(null)
+            setShowSettings(true)
+          }}
+          onOpenSettingsLocation={() => {
+            setSettingsScrollTo('location')
+            setShowSettings(true)
+          }}
+          locationGranularity={locationGranularity}
           onOpenRelays={() => setShowRelays(true)}
           onOpenLists={() => setShowLists(true)}
           onOpenProfile={() => setShowProfile(true)}
@@ -385,7 +430,13 @@ function App() {
 
       <AnimatePresence>
         {showSettings && (
-          <ContentSettings onClose={() => setShowSettings(false)} />
+          <ContentSettings
+            onClose={() => {
+              setShowSettings(false)
+              setSettingsScrollTo(null)
+            }}
+            {...(settingsScrollTo ? { scrollTo: settingsScrollTo } : {})}
+          />
         )}
       </AnimatePresence>
 
@@ -454,10 +505,12 @@ function Header({
   onOpenIdentity,
   onOpenSwitcher,
   onOpenSettings,
+  onOpenSettingsLocation,
   onOpenRelays,
   onOpenLists,
   onOpenProfile,
   onClearLocal,
+  locationGranularity,
 }: {
   identity: DriftIdentity | null
   userWeight: { weight: number; engagement: number; antiquity: number; maxSubposts: number }
@@ -466,10 +519,12 @@ function Header({
   onOpenIdentity: () => void
   onOpenSwitcher: () => void
   onOpenSettings: () => void
+  onOpenSettingsLocation: () => void
   onOpenRelays: () => void
   onOpenLists: () => void
   onOpenProfile: () => void
   onClearLocal: () => void
+  locationGranularity: LocationGranularity
 }) {
   // Selectors granulares — re-render só quando o campo específico muda.
   const active = useSyncStore((s) => s.active)
@@ -489,6 +544,16 @@ function Header({
         </button>
       </div>
       <div className="flex flex-wrap items-center gap-2 text-[10px] text-slate-500">
+        {locationGranularity !== 'off' && (
+          <button
+            onClick={onOpenSettingsLocation}
+            className="text-[12px] leading-none text-amber-300 hover:opacity-80"
+            title={`Location declarado: ${locationGranularity}. Cliente vai pedir GPS antes de cada spread.`}
+            aria-label={`Location declarado: ${locationGranularity}. Cliente vai pedir GPS antes de cada spread.`}
+          >
+            📍
+          </button>
+        )}
         <button
           onClick={onOpenProfile}
           className="rounded hover:opacity-80"

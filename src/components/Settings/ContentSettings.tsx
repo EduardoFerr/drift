@@ -9,18 +9,31 @@
  */
 
 import { motion } from 'framer-motion'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { setPref, usePrefsStore } from '../../lib/prefs'
 import { db } from '../../lib/db'
 import type { LocationGranularity } from '../../types/drift'
 
 export interface ContentSettingsProps {
   onClose: () => void
+  /**
+   * Ancora opcional pra scroll-to-section ao montar. Atualmente só
+   * 'location' é reconhecido (vem do indicador 📍 no Header).
+   */
+  scrollTo?: 'location'
 }
 
-export function ContentSettings({ onClose }: ContentSettingsProps) {
+export function ContentSettings({ onClose, scrollTo }: ContentSettingsProps) {
   const prefs = usePrefsStore()
   const [rebuilding, setRebuilding] = useState(false)
+  const locationSectionRef = useRef<HTMLDivElement | null>(null)
+
+  // Scroll-to-section quando aberto via indicador GPS no Header.
+  useEffect(() => {
+    if (scrollTo === 'location' && locationSectionRef.current) {
+      locationSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }, [scrollTo])
 
   async function handleRebuild() {
     if (
@@ -103,7 +116,7 @@ export function ContentSettings({ onClose }: ContentSettingsProps) {
             onChange={(v) => setPref('hide_ads', v)}
           />
 
-          <div className="border-t border-drift-border pt-4">
+          <div ref={locationSectionRef} className="border-t border-drift-border pt-4">
             <div className="mb-2 text-[11px] text-slate-300">
               location nos meus posts
             </div>

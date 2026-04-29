@@ -43,7 +43,7 @@ export interface RecentEvent {
   ref: string | null
 }
 
-const RECENT_EVENTS_CAP = 20
+export const RECENT_EVENTS_CAP = 20
 
 export interface SyncStatus {
   active: boolean
@@ -172,7 +172,7 @@ export async function restartSync(): Promise<void> {
  *
  *  POST: ref = event.id (próprio post). SPREAD/BURY/REPORT: ref = tag `e`
  *  (postId referenciado). Sem `d` tag — kind 9078 é regular event (NIP-01). */
-function pushRecent(prev: RecentEvent[], event: SignedEvent): RecentEvent[] {
+export function pushRecent(prev: RecentEvent[], event: SignedEvent): RecentEvent[] {
   const ref =
     event.kind === DRIFT_KIND.POST ? event.id : getTag(event, 'e')
   const entry: RecentEvent = {
