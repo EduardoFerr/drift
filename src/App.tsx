@@ -36,6 +36,12 @@ function App() {
 
   const [publishing, setPublishing] = useState(false)
   const [pending, setPending] = useState<Record<string, 'spread' | 'bury'>>({})
+  // GPS capture pode demorar até 8s (timeout de getCurrentLocation). Sem
+  // feedback, parece travado. Trackeamos quais postIds estão capturando
+  // pra UI mostrar "📍 capturando…" ao lado do ↑/↓ pendente. Set ao invés
+  // de Record porque é só um boolean por id. publishing usa o mesmo
+  // mecanismo via key especial '__publish__' (não colide com event.id hex).
+  const [gpsCapturing, setGpsCapturing] = useState<Set<string>>(new Set())
   const [showDiagnostic, setShowDiagnostic] = useState(false)
   const [showIdentity, setShowIdentity] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
@@ -162,11 +168,20 @@ function App() {
   }) {
     if (publishing || input.subposts.length === 0) return
     setPublishing(true)
+    const granularity = getPrefs().location_granularity
+    const willCapture = granularity !== 'off'
+    if (willCapture) setGpsCapturing((s) => new Set(s).add('__publish__'))
     try {
       // Captura location se o user habilitou em settings (default: off).
       // Manifesto §28 — opt-in granular. getCurrentLocation respeita a
       // granularidade declarada (country/city/precise) e arredonda lat/lng.
-      const location = await getCurrentLocation(getPrefs().location_granularity)
+      const location = await getCurrentLocation(granularity)
+      if (willCapture)
+        setGpsCapturing((s) => {
+          const n = new Set(s)
+          n.delete('__publish__')
+          return n
+        })
 
       // Sem `postId` — protocol.ts gera o evento e o `event.id` resultante
       // é o identificador canônico do post. NIP-01: kind 9078 é regular
@@ -182,6 +197,14 @@ function App() {
       alert(`Falha ao publicar: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
       setPublishing(false)
+      // Garante limpeza mesmo se getCurrentLocation throw (não deveria —
+      // ela retorna null em erro — mas defensivo).
+      setGpsCapturing((s) => {
+        if (!s.has('__publish__')) return s
+        const n = new Set(s)
+        n.delete('__publish__')
+        return n
+      })
     }
   }
 
@@ -205,12 +228,22 @@ function App() {
       })
     }, OPTIMISTIC_TIMEOUT_MS)
 
+    const granularity = getPrefs().location_granularity
+    const willCapture = granularity !== 'off'
+    if (willCapture) setGpsCapturing((s) => new Set(s).add(post.id))
+
     try {
       // Location opt-in — mesma regra de createPost (manifesto §28).
       // Spread propaga geograficamente: arcos no mapa só aparecem com
       // location nos spreads (origem do arc = primeiro spread, destino =
       // cada subsequente). Ver useSpreadMap.ts.
-      const location = await getCurrentLocation(getPrefs().location_granularity)
+      const location = await getCurrentLocation(granularity)
+      if (willCapture)
+        setGpsCapturing((s) => {
+          const n = new Set(s)
+          n.delete(post.id)
+          return n
+        })
       await spreadPost({
         postId: post.id,
         authorPub: post.authorPub,
@@ -222,6 +255,12 @@ function App() {
       setPending((p) => {
         const { [post.id]: _omit, ...rest } = p
         return rest
+      })
+      setGpsCapturing((s) => {
+        if (!s.has(post.id)) return s
+        const n = new Set(s)
+        n.delete(post.id)
+        return n
       })
     }
   }
@@ -305,6 +344,7 @@ function App() {
 
         <SubpostEditor
           publishing={publishing}
+          capturingLocation={gpsCapturing.has('__publish__')}
           maxSubposts={userWeight.maxSubposts}
           onPublish={handlePublish}
         />
@@ -313,6 +353,7 @@ function App() {
           posts={posts}
           identity={boot.identity}
           pending={pending}
+          gpsCapturing={gpsCapturing}
           onSpread={handleSpread}
           onBury={handleBury}
           onSelect={openViewer}
@@ -327,6 +368,7 @@ function App() {
             post={viewerPost}
             isMine={viewerPost.authorPub === boot.identity?.npub}
             pendingAction={pending[viewerPost.id] ?? null}
+            capturingLocation={gpsCapturing.has(viewerPost.id)}
             queue={{ index: viewerIdx, total: posts.length, next: nextPost }}
             onSpread={() => {
               handleSpread(viewerPost)
@@ -632,6 +674,7 @@ function Feed({
   posts,
   identity,
   pending,
+  gpsCapturing,
   onSpread,
   onBury,
   onSelect,
@@ -639,6 +682,7 @@ function Feed({
   posts: Post[]
   identity: DriftIdentity | null
   pending: Record<string, 'spread' | 'bury'>
+  gpsCapturing: Set<string>
   onSpread: (p: Post) => void
   onBury: (p: Post) => void
   onSelect: (postId: string) => void
@@ -684,6 +728,7 @@ function Feed({
               post={post}
               isMine={post.authorPub === identity?.npub}
               pending={pending[post.id] ?? null}
+              capturingLocation={gpsCapturing.has(post.id)}
               blurred={hint.blur}
               onOpen={() => onSelect(post.id)}
               onSpread={() => onSpread(post)}
@@ -770,6 +815,7 @@ function PostCard({
   post,
   isMine,
   pending,
+  capturingLocation,
   blurred,
   onOpen,
   onSpread,
@@ -778,6 +824,8 @@ function PostCard({
   post: Post
   isMine: boolean
   pending: 'spread' | 'bury' | null
+  /** GPS capture em curso pra spread/bury deste post (até 8s). */
+  capturingLocation: boolean
   blurred: boolean
   onOpen: () => void
   onSpread: () => void
@@ -850,8 +898,17 @@ function PostCard({
             onClick={onSpread}
             disabled={pending !== null}
             className="rounded border border-drift-spread/40 px-2 py-1 text-drift-spread transition-colors hover:bg-emerald-950/30 disabled:opacity-40"
+            title={
+              capturingLocation && pending === 'spread'
+                ? 'capturando localização (até 8s)'
+                : undefined
+            }
           >
-            {pending === 'spread' ? 'enviando…' : '↑ espalhar'}
+            {pending === 'spread'
+              ? capturingLocation
+                ? '📍 location…'
+                : 'enviando…'
+              : '↑ espalhar'}
           </button>
           <button
             onClick={onBury}

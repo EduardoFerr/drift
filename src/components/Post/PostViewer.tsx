@@ -52,6 +52,11 @@ export interface PostViewerProps {
   isMine: boolean
   /** `'spread' | 'bury' | null` — null = nenhuma ação pendente. */
   pendingAction: 'spread' | 'bury' | null
+  /**
+   * Captura GPS em curso pra spread/bury deste post. getCurrentLocation
+   * pode levar até 8s — UX precisa indicar que não travou.
+   */
+  capturingLocation?: boolean
   /** Direção de saída (Tinder-like). Recebida via `custom` do AnimatePresence parent. */
   custom?: QueueExitDir
   /** Metadados de fila — opcional pra abrir um post avulso fora de fila. */
@@ -65,6 +70,7 @@ export function PostViewer({
   post,
   isMine,
   pendingAction,
+  capturingLocation = false,
   custom,
   queue,
   onSpread,
@@ -404,8 +410,17 @@ export function PostViewer({
             onClick={onSpread}
             disabled={pendingAction !== null}
             className="rounded border border-drift-spread/40 px-2 py-1 text-drift-spread hover:bg-emerald-950/30 disabled:opacity-40"
+            title={
+              capturingLocation && pendingAction === 'spread'
+                ? 'capturando localização (até 8s)'
+                : undefined
+            }
           >
-            {pendingAction === 'spread' ? '…' : '↑'}
+            {pendingAction === 'spread'
+              ? capturingLocation
+                ? '📍'
+                : '…'
+              : '↑'}
           </button>
           <button
             onClick={onBury}

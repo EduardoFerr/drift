@@ -24,6 +24,12 @@ import { Image } from '../UI/Image'
 
 export interface SubpostEditorProps {
   publishing: boolean
+  /**
+   * Captura GPS em curso antes do publish. UX: getCurrentLocation pode
+   * demorar até 8s (timeout do navigator.geolocation). Sem feedback,
+   * o user acha que travou. Quando true, botão mostra "📍 capturando…".
+   */
+  capturingLocation?: boolean
   /** Limite de subposts pra esta identidade. Vem de `getMaxSubposts(weight)`. */
   maxSubposts: number
   onPublish: (input: {
@@ -72,7 +78,7 @@ function isDraftEmpty(d: DraftSubpost): boolean {
   return !d.text.trim() && !d.imageUrl
 }
 
-export function SubpostEditor({ publishing, maxSubposts, onPublish }: SubpostEditorProps) {
+export function SubpostEditor({ publishing, capturingLocation = false, maxSubposts, onPublish }: SubpostEditorProps) {
   const [drafts, setDrafts] = useState<DraftSubpost[]>(() => [newDraft()])
   const [contentWarning, setContentWarning] = useState<ContentWarning | null>(null)
 
@@ -170,7 +176,13 @@ export function SubpostEditor({ publishing, maxSubposts, onPublish }: SubpostEdi
           disabled={blocked}
           className="rounded border border-drift-accent px-3 py-1 text-xs uppercase tracking-widest text-drift-accent transition-colors hover:bg-drift-accent/10 disabled:cursor-not-allowed disabled:opacity-30"
         >
-          {publishing ? 'publicando…' : anyUploading ? 'aguardando upload…' : 'publicar'}
+          {publishing
+            ? capturingLocation
+              ? '📍 capturando location…'
+              : 'publicando…'
+            : anyUploading
+            ? 'aguardando upload…'
+            : 'publicar'}
         </button>
       </div>
     </div>
