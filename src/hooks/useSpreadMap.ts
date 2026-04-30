@@ -1,19 +1,34 @@
 /**
- * useSpreadMap — agrega spreads de um post pra renderização no mapa.
+ * useSpreadMap — agrega origem + spreads de um post pra renderização no mapa.
  *
- * Lê do SQLite (tabela `spreads`), parseia a coluna `location` (JSON
- * `GeoPoint`), e devolve uma estrutura amigável pro Deck.gl ArcLayer.
+ * **Origem** = `posts.location` do autor original (capturada quando o post foi
+ * criado, se granularity != 'off'). É o "ground zero" geográfico do post.
+ *
+ * **Destinos** = cada `spreads.location` com a coordenada de quem espalhou.
+ *
+ * Lê do SQLite (tabelas `posts` e `spreads`), parseia a coluna `location`
+ * (JSON `GeoPoint`), e devolve `{origin, destinations, arcs}` pro Deck.gl.
+ *
+ * **Bug histórico (pré-2026-04-29)**: o hook só lia `spreads.location` e
+ * usava `spreads[0]` como origem. Semanticamente errado — o "primeiro
+ * espalhador" não é a origem do post; o autor é. Pior: `_buildArcs`
+ * exigia `>=2` records, então post com 1 spread renderizava mapa vazio.
+ * Fix: separar origin de destinations, aceitar 1 destino, fallback legacy
+ * só quando origin é null.
  *
  * Determinismo: dado o mesmo SQLite, retorna o mesmo conjunto. Não
  * polla — é refeito sob demanda (chamada de hook em mount).
  *
- * Spreads sem `location` são ignorados (manifesto §28 — location é
- * opt-in; default off; muitos usuários nunca vão ligar).
+ * Eventos sem `location` são ignorados (manifesto §28 — opt-in).
  */
 
 import { useEffect, useState } from 'react'
 import { db } from '../lib/db'
 import type { GeoPoint, SpreadArc, SpreadMapData, SpreadRecord } from '../types/drift'
+
+interface PostRow {
+  location: string | null
+}
 
 interface SpreadRow {
   post_id: string
@@ -45,21 +60,22 @@ export function useSpreadMap(postId: string | null): {
 
     ;(async () => {
       try {
-        // Origem do arc = primeiro spread (geograficamente o "ground zero").
-        // Destino = cada spread subsequente. Visualmente: arcos saindo
-        // de um ponto e se espalhando pelo globo.
-        const rows = await db.exec<SpreadRow>(
-          `SELECT post_id, spreader_pub, created_at, location, event_id
-           FROM spreads
-           WHERE post_id = ? AND location IS NOT NULL
-           ORDER BY created_at ASC`,
-          [postId],
-        )
+        const [postRow, spreadRows] = await Promise.all([
+          db.get<PostRow>(`SELECT location FROM posts WHERE id = ?`, [postId]),
+          db.exec<SpreadRow>(
+            `SELECT post_id, spreader_pub, created_at, location, event_id
+             FROM spreads
+             WHERE post_id = ? AND location IS NOT NULL
+             ORDER BY created_at ASC`,
+            [postId],
+          ),
+        ])
 
-        // Mantém o tipo "estreito" — location já garantido non-null pelo filtro.
+        const origin = parseLocation(postRow?.location ?? null)
+
         type LocatedSpread = Omit<SpreadRecord, 'location'> & { location: GeoPoint }
 
-        const records: LocatedSpread[] = rows
+        const records: LocatedSpread[] = spreadRows
           .map((row): LocatedSpread | null => {
             const loc = parseLocation(row.location)
             if (!loc) return null
@@ -73,15 +89,25 @@ export function useSpreadMap(postId: string | null): {
           })
           .filter((r): r is LocatedSpread => r !== null)
 
-        const arcs = buildArcs(records)
-        const countries = Array.from(
-          new Set(records.map((r) => r.location.country).filter(Boolean)),
-        )
+        const destinations = records.map((r) => ({
+          point: r.location,
+          createdAt: r.createdAt,
+        }))
+
+        const arcs = _buildArcs(origin, destinations)
+
+        const allCountries = new Set<string>()
+        if (origin?.country) allCountries.add(origin.country)
+        for (const r of records) {
+          if (r.location.country) allCountries.add(r.location.country)
+        }
 
         const data: SpreadMapData = {
+          origin,
+          destinations,
           arcs,
           totalSpreads: records.length,
-          countries,
+          countries: Array.from(allCountries),
           firstSpread: (records[0] ?? null) as SpreadRecord | null,
           latestSpread: (records[records.length - 1] ?? null) as SpreadRecord | null,
         }
@@ -122,13 +148,42 @@ function parseLocation(raw: string | null): GeoPoint | null {
   }
 }
 
-function buildArcs(records: { location: GeoPoint; createdAt: number }[]): SpreadArc[] {
-  if (records.length < 2) return []
-  const origin = records[0]?.location
-  if (!origin) return []
-  return records.slice(1).map((rec) => ({
-    origin: [origin.lng, origin.lat] as [number, number],
-    destination: [rec.location.lng, rec.location.lat] as [number, number],
-    createdAt: rec.createdAt,
+/**
+ * Constrói arcos pro Deck.gl ArcLayer a partir da origem do post + destinos.
+ *
+ * Casos:
+ *   - `origin` presente, `destinations.length >= 1` → 1 arco por destino,
+ *     todos partindo de `origin` (caso comum: autor publicou com location,
+ *     N pessoas espalharam com location).
+ *   - `origin` presente, `destinations` vazio → `[]` (renderiza só o ponto
+ *     da origem via ScatterplotLayer; sem arco).
+ *   - `origin` null, `destinations.length >= 2` → **fallback legacy**: usa
+ *     `destinations[0]` como origem e os demais como destinos. Cobre posts
+ *     antigos (autor sem location, mas espalhadores com location).
+ *   - `origin` null, `destinations.length < 2` → `[]`.
+ *
+ * Coords retornadas no formato `[lng, lat]` (convenção Deck.gl, invertida
+ * vs `{lat, lng}`).
+ *
+ * Exportada como `_buildArcs` (prefixo underscore = test-only) pra que
+ * `tests/spread-map.test.ts` possa cobrir os 5 estados sem mockar SQLite.
+ */
+export function _buildArcs(
+  origin: GeoPoint | null,
+  destinations: { point: GeoPoint; createdAt: number }[],
+): SpreadArc[] {
+  if (origin) {
+    return destinations.map((d) => ({
+      origin: [origin.lng, origin.lat],
+      destination: [d.point.lng, d.point.lat],
+      createdAt: d.createdAt,
+    }))
+  }
+  if (destinations.length < 2) return []
+  const fallbackOrigin = destinations[0]!.point
+  return destinations.slice(1).map((d) => ({
+    origin: [fallbackOrigin.lng, fallbackOrigin.lat],
+    destination: [d.point.lng, d.point.lat],
+    createdAt: d.createdAt,
   }))
 }

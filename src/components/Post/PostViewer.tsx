@@ -68,6 +68,12 @@ export interface PostViewerProps {
   custom?: QueueExitDir
   /** Metadados de fila — opcional pra abrir um post avulso fora de fila. */
   queue?: QueueContext
+  /**
+   * Callback opcional pra abrir Settings na seção `location`. Repassado
+   * ao SpreadMap pra que o estado "GPS off" tenha um CTA acionável —
+   * sem isso, user via texto sem caminho de saída.
+   */
+  onOpenLocationSettings?: () => void
   onSpread: () => void
   onBury: () => void
   onClose: () => void
@@ -81,6 +87,7 @@ export function PostViewer({
   capturingLocation = false,
   custom,
   queue,
+  onOpenLocationSettings,
   onSpread,
   onBury,
   onClose,
@@ -347,7 +354,11 @@ export function PostViewer({
             exit={{ height: 0, opacity: 0 }}
             className="overflow-hidden border-b border-drift-border"
           >
-            <SpreadMap postId={post.id} className="h-60 w-full" />
+            <SpreadMap
+              postId={post.id}
+              className="h-60 w-full"
+              {...(onOpenLocationSettings ? { onOpenLocationSettings } : {})}
+            />
           </motion.div>
         )}
       </AnimatePresence>

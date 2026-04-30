@@ -157,6 +157,20 @@ export interface SpreadArc {
 }
 
 export interface SpreadMapData {
+  /**
+   * Origem do post — `posts.location` do autor original. `null` se o
+   * autor não publicou com location (manifesto §28 — opt-in). Quando
+   * presente, é a fonte de todos os arcos; senão a UI faz fallback pro
+   * primeiro spread (legacy).
+   */
+  origin: GeoPoint | null
+  /** Cada spread com location, em ordem cronológica de espalhamento. */
+  destinations: { point: GeoPoint; createdAt: number }[]
+  /**
+   * Arcos prontos pro Deck.gl ArcLayer. Derivados de origin+destinations
+   * por `_buildArcs` (ver useSpreadMap.ts). Vazio quando não dá pra
+   * desenhar arco (sem origem nem >=2 destinos).
+   */
   arcs: SpreadArc[]
   totalSpreads: number
   countries: string[]

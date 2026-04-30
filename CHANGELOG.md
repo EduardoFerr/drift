@@ -16,6 +16,7 @@ All notable changes to the Drift client. Uses [Keep a Changelog](https://keepach
 - **Mapa não abre**: faltava migration adicionando coluna `location` em `spreads` — `MapView` quebrava ao tentar `SELECT location FROM spreads`. Migration aplicada em `schema.sql` + step de migração runtime. Commit 6062422.
 - **Spread+bury simultâneo do mesmo user**: scoring agora aplica semântica "última ação vale" — quando o mesmo `pubkey` tem SPREAD e BURY do mesmo post, o `created_at` mais recente prevalece e o anterior é ignorado no score. Endereça bug identificado por Marshall em [conformance-conversa-29-04.md](Docs/conformance-conversa-29-04.md) §1 (manifesto §6 verdade por eventos). Commit 3cdd211.
 - **Hints enganosos em `location_granularity`**: textos descritivos das opções de granularidade GPS em `ContentSettings.tsx` davam expectativa errada do que é coletado/exposto. Reescritos pra refletir o que de fato vai pro evento Nostr (manifesto §28 privacidade pelo mínimo). Commit 9240064.
+- **Mapa de spread sem origem nem arcos** (3 bugs arquiteturais coordenados por 5 agentes): (1) `useSpreadMap.ts:125-134` — `buildArcs` exigia `records.length >= 2`, então post com 1 espalhador renderizava mapa vazio; agora aceita `origin: GeoPoint | null` separado de `destinations[]` e desenha arco mesmo com 1 destino. (2) `useSpreadMap.ts` — origem do arco era `spreads[0]`, semanticamente errado ("primeiro espalhador" tratado como "origem do post"); agora consome `posts.location` (autor) como origem verdadeira, com fallback graceful. (3) `SpreadMap.tsx` — só registrava `ArcLayer`; sem `ScatterplotLayer` os pontos individuais (origem + destinos) ficavam invisíveis quando geometria não suportava arco. Manifesto §28 (transparência: o mapa precisa refletir o que de fato existe).
 
 ### Changed
 
@@ -23,6 +24,9 @@ All notable changes to the Drift client. Uses [Keep a Changelog](https://keepach
 - **Manifesto §23 (bury não pune)**: estendido com seção **"Mudança de opinião"** (user pode reverter SPREAD↔BURY publicando novo evento, último vale) e **"Score weighted"** (especifica fórmula Σ`weight` vs COUNT).
 - **Manifesto §24 (score determinístico)**: fórmula atualizada pra refletir Σ`weight` e semântica última-ação.
 - **`ProfileModal` removeu weight numérico exato**: substituído por badge de tier discreto via `getWeightTier` (gaming-resistant — exibir o número exato incentiva farming pra atingir thresholds visíveis). 3 tiers: 🏆 estabelecido (amber), ⭐ ativo (slate), 🌱 novo (green); tooltip cita manifesto §22.
+- **Mapa de spread — estado vazio acionável** (`SpreadMap.tsx`): empty state antes mostrava texto "Ative em Settings" sem CTA; agora renderiza botão "Ativar GPS" que abre Settings com scroll-to-section direto na seção de location. Reduz fricção do opt-in sem violar §28 (continua opt-in explícito).
+- **Header `📍` sempre visível** (`App.tsx`): antes o ícone só aparecia DEPOIS de ativar location (UX circular: "ative pra ver o controle de ativar"). Agora sempre presente — cinza off / accent on — e clique sempre abre Settings na seção de location, independente do estado atual. Manifesto §28 (transparência: controle visível mesmo quando inativo).
+- **Onboarding menciona location** (`Onboarding/OnboardingOverlay.tsx`): adicionada tela skipável explicando o opt-in de GPS (off por default, granularidade configurável, ligada ao mapa de spread). Endereça gap de descoberta — usuário não sabia que o recurso existia. Manifesto §28 (consentimento informado, não enterrado em Settings).
 
 ### Added
 

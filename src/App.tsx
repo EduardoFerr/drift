@@ -547,6 +547,10 @@ function App() {
             myAction={myActions[viewerPost.id] ?? null}
             capturingLocation={gpsCapturing.has(viewerPost.id)}
             queue={{ index: viewerIdx, total: posts.length, next: nextPost }}
+            onOpenLocationSettings={() => {
+              setSettingsScrollTo('location')
+              setShowSettings(true)
+            }}
             onSpread={() => {
               handleSpread(viewerPost)
               advanceViewer('up')
@@ -676,16 +680,28 @@ function Header({
         </button>
       </div>
       <div className="flex flex-wrap items-center gap-2 text-[10px] text-slate-500">
-        {locationGranularity !== 'off' && (
-          <button
-            onClick={onOpenSettingsLocation}
-            className="text-[12px] leading-none text-amber-300 hover:opacity-80"
-            title={`Location declarado: ${locationGranularity}. Cliente vai pedir GPS antes de cada spread.`}
-            aria-label={`Location declarado: ${locationGranularity}. Cliente vai pedir GPS antes de cada spread.`}
-          >
-            📍
-          </button>
-        )}
+        {/* Indicador 📍 — sempre visível pra dar caminho direto pras settings
+            de location. Cor sinaliza estado: cinza=off (default privacidade,
+            manifesto §28), âmbar=ativo. Click sempre abre Settings scrollado
+            pra seção location. */}
+        <button
+          onClick={onOpenSettingsLocation}
+          className={`text-[12px] leading-none hover:opacity-80 ${
+            locationGranularity === 'off' ? 'text-slate-600' : 'text-amber-300'
+          }`}
+          title={
+            locationGranularity === 'off'
+              ? 'GPS desativado — clique pra ativar'
+              : `Location declarado: ${locationGranularity}. Cliente vai pedir GPS antes de cada spread.`
+          }
+          aria-label={
+            locationGranularity === 'off'
+              ? 'GPS desativado — clique pra ativar'
+              : `Location declarado: ${locationGranularity}. Cliente vai pedir GPS antes de cada spread.`
+          }
+        >
+          📍
+        </button>
         <button
           onClick={onOpenProfile}
           className="rounded hover:opacity-80"

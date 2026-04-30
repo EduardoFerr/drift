@@ -37,6 +37,12 @@ export default defineConfig({
         type: 'module',
         // Não navegue agressivamente em dev — HMR pode conflitar.
         navigateFallback: 'index.html',
+        // Em dev, `globPatterns` (configurado em `workbox` abaixo) aponta pra
+        // arquivos de build (assets/index-*.js, *.wasm, etc.) que só existem
+        // após `npm run build`. Workbox emite warning pra cada glob não-matched,
+        // poluindo o terminal a cada reload. Suprime — em prod o build casa
+        // os globs e os warnings somem.
+        suppressWarnings: true,
       },
       workbox: {
         // Precache só os assets críticos pra abrir o app — chunks lazy do

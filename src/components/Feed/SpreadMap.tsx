@@ -25,10 +25,19 @@
 
 import { useEffect, useRef } from 'react'
 import { useSpreadMap } from '../../hooks/useSpreadMap'
+import { usePrefsStore } from '../../lib/prefs'
 
 export interface SpreadMapProps {
   postId: string
   className?: string
+  /**
+   * Callback opcional pra abrir Settings na seção `location` (manifesto §28
+   * — location é opt-in). Se passada, o estado vazio do mapa renderiza um
+   * CTA acionável quando `location_granularity === 'off'`. Sem callback,
+   * o placeholder mostra só texto (sem botão) — útil pra contextos onde
+   * o user não tem como navegar pra settings (e.g. preview).
+   */
+  onOpenLocationSettings?: () => void
 }
 
 // CARTO Dark Matter — raster tiles OSS, sem chave de API. Subdomínios
@@ -111,19 +120,35 @@ interface ArcLayerProps {
   destination: [number, number]
 }
 
-export function SpreadMap({ postId, className = '' }: SpreadMapProps) {
+interface PointLayerProps {
+  position: [number, number]
+}
+
+export function SpreadMap({
+  postId,
+  className = '',
+  onOpenLocationSettings,
+}: SpreadMapProps) {
   const { data, loading, error } = useSpreadMap(postId)
+  const granularity = usePrefsStore((s) => s.location_granularity)
   const containerRef = useRef<HTMLDivElement>(null)
 
+  // "Tem algo pra mostrar" = origem do post OU pelo menos 1 destino com
+  // location. Antes o gate era `arcs.length === 0`, mas mapa com 1 ponto
+  // só (origem sem espalhamento, ou 1 spread sem origem) também é visual
+  // útil — bug histórico que escondia esses casos.
+  const hasGeometry =
+    !!data && (!!data.origin || data.destinations.length > 0)
+
   useEffect(() => {
-    if (!data || data.arcs.length === 0) return
+    if (!hasGeometry || !data) return
     if (!containerRef.current) return
 
     let cancelled = false
     let cleanup: (() => void) | null = null
 
-    // Lazy import: maplibre-gl + deck.gl somam ~400kb gzip. Sem location
-    // nos spreads, nem importamos.
+    // Lazy import: maplibre-gl + deck.gl somam ~400kb gzip. Sem location,
+    // nem importamos.
     void (async () => {
       try {
         const [maplibreModule, deckgl, layersModule] = await Promise.all([
@@ -140,13 +165,17 @@ export function SpreadMap({ postId, className = '' }: SpreadMapProps) {
           // O nome continua "Mapbox" por razões históricas do deck.gl.
           MapboxOverlay: new (props: { layers: unknown[] }) => unknown
         }
-        const { ArcLayer } = layersModule as unknown as {
+        const { ArcLayer, ScatterplotLayer } = layersModule as unknown as {
           ArcLayer: new (props: Record<string, unknown>) => unknown
+          ScatterplotLayer: new (props: Record<string, unknown>) => unknown
         }
 
-        const firstLoc = data.firstSpread?.location
-        const center: [number, number] = firstLoc
-          ? [firstLoc.lng, firstLoc.lat]
+        // Centro: prefere a origem (autor do post). Se não há origem mas
+        // há destinos, usa o primeiro destino. Fallback é centro do globo.
+        const centerPoint =
+          data.origin ?? data.destinations[0]?.point ?? null
+        const center: [number, number] = centerPoint
+          ? [centerPoint.lng, centerPoint.lat]
           : [0, 20]
 
         const map = new maplibregl.Map({
@@ -158,15 +187,48 @@ export function SpreadMap({ postId, className = '' }: SpreadMapProps) {
           dragRotate: false,
         })
 
+        // Pontos da origem e dos destinos. Origem é amber + raio maior
+        // (manifesto §28 — "ground zero" do post merece destaque visual).
+        const originPoints: PointLayerProps[] = data.origin
+          ? [{ position: [data.origin.lng, data.origin.lat] }]
+          : []
+        const destPoints: PointLayerProps[] = data.destinations.map((d) => ({
+          position: [d.point.lng, d.point.lat],
+        }))
+
         const overlay = new MapboxOverlay({
           layers: [
+            // Ponto da origem (autor do post). Amber, raio grande.
+            new ScatterplotLayer({
+              id: 'spread-origin',
+              data: originPoints,
+              getPosition: (p: PointLayerProps) => p.position,
+              getFillColor: [251, 191, 36, 230], // drift amber
+              getRadius: 8,
+              radiusUnits: 'pixels',
+              stroked: true,
+              getLineColor: [251, 191, 36, 255],
+              lineWidthUnits: 'pixels',
+              getLineWidth: 1.5,
+            }),
+            // Pontos dos destinos (espalhadores). Verde drift-spread, menor.
+            new ScatterplotLayer({
+              id: 'spread-destinations',
+              data: destPoints,
+              getPosition: (p: PointLayerProps) => p.position,
+              getFillColor: [52, 211, 153, 200], // drift-spread
+              getRadius: 5,
+              radiusUnits: 'pixels',
+            }),
+            // Arcos origem → destinos. Pode estar vazio (origem sem destino,
+            // ou caso degenerado sem origem nem destinos suficientes).
             new ArcLayer({
               id: 'spread-arcs',
               data: data.arcs,
               getSourcePosition: (a: ArcLayerProps) => a.origin,
               getTargetPosition: (a: ArcLayerProps) => a.destination,
-              getSourceColor: [167, 139, 250, 220], // drift-accent
-              getTargetColor: [52, 211, 153, 200], // drift-spread
+              getSourceColor: [251, 191, 36, 220], // amber (origem)
+              getTargetColor: [52, 211, 153, 200], // verde (destino)
               getWidth: 1.5,
               greatCircle: true,
             }),
@@ -191,7 +253,7 @@ export function SpreadMap({ postId, className = '' }: SpreadMapProps) {
       cancelled = true
       cleanup?.()
     }
-  }, [data])
+  }, [data, hasGeometry])
 
   // ─── Estados de fallback (renderizam sem importar MapLibre) ────────
 
@@ -205,16 +267,43 @@ export function SpreadMap({ postId, className = '' }: SpreadMapProps) {
     return <Placeholder className={className} title="erro no mapa" body={error} />
   }
 
-  if (!data || data.arcs.length === 0) {
+  if (!hasGeometry) {
+    // Duas razões possíveis pro mapa estar vazio:
+    //   1. User desligou GPS (granularity === 'off') — pode acionar CTA
+    //      pra abrir Settings na seção location.
+    //   2. User está com GPS ligado mas nenhum spread deste post tem
+    //      location ainda — só esperar; CTA seria ruído.
+    if (granularity === 'off') {
+      return (
+        <Placeholder
+          className={className}
+          title="GPS desativado nas suas configurações"
+          body={
+            <>
+              Mapa de spreads precisa de location opt-in (manifesto §28 —
+              default off por privacidade). Ative se quiser que seus spreads
+              apareçam no mapa de outros posts.
+            </>
+          }
+          {...(onOpenLocationSettings
+            ? {
+                action: {
+                  label: 'ativar GPS',
+                  onClick: onOpenLocationSettings,
+                },
+              }
+            : {})}
+        />
+      )
+    }
     return (
       <Placeholder
         className={className}
         title="sem dados de localização"
         body={
           <>
-            Spreads deste post não têm tag <code>location</code> (default
-            é off — manifesto §28). Ative em Settings → location se quiser
-            que seus próprios spreads apareçam no mapa de outros posts.
+            Spreads deste post ainda não têm tag <code>location</code>.
+            Quando alguém com GPS ativo espalhar, os arcos aparecem aqui.
           </>
         }
       />
@@ -242,10 +331,17 @@ function Placeholder({
   className,
   title,
   body,
+  action,
 }: {
   className: string
   title: string
   body: React.ReactNode
+  /**
+   * CTA opcional. Quando presente, renderiza um botão abaixo do body —
+   * usado no estado "GPS off" pra dar caminho direto pras settings em vez
+   * de só mandar o user procurar.
+   */
+  action?: { label: string; onClick: () => void }
 }) {
   return (
     <div
@@ -254,6 +350,14 @@ function Placeholder({
       <span className="text-base">🗺️</span>
       <strong className="text-slate-400">{title}</strong>
       <p className="max-w-xs leading-relaxed">{body}</p>
+      {action && (
+        <button
+          onClick={action.onClick}
+          className="mt-1 rounded border border-drift-accent px-3 py-1 text-[10px] uppercase tracking-widest text-drift-accent hover:bg-drift-accent/10"
+        >
+          {action.label}
+        </button>
+      )}
     </div>
   )
 }

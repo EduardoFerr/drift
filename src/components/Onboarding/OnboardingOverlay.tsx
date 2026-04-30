@@ -2,11 +2,12 @@
  * OnboardingOverlay — primeira execução. Aparece UMA vez. Persiste em
  * `user_prefs.onboarding_done` quando o user fecha (skip ou conclui).
  *
- * 4 telas curtas:
+ * 5 telas curtas:
  *   1. Boas-vindas + ideia central (Drift = comportamento humano > algoritmo)
  *   2. Os swipes (↑ espalha, ↓ enterra, ← → carousel)
  *   3. Identidade (nsec1 portável; backup é sua responsabilidade)
- *   4. Filosofia (anti-censura, sem chave mestra, sem scan automático)
+ *   4. Location é opcional (manifesto §28 — opt-in, default off)
+ *   5. Filosofia (anti-censura, sem chave mestra, sem scan automático)
  *
  * Filosofia visual: zero animação chamativa, zero CTA exagerado. Drift
  * é um produto sóbrio. Onboarding deve refletir isso — informativo,
@@ -92,6 +93,21 @@ export function OnboardingOverlay({ onClose, onOpenIdentity }: OnboardingOverlay
           >
             abrir backup agora →
           </button>
+        </>
+      ),
+    },
+    {
+      title: '📍 location é opcional',
+      body: (
+        <>
+          <p>
+            Se ativar em <code>Settings → location</code>, seus spreads aparecem no
+            mapa de outros posts. Default é <span className="text-slate-300">off</span>{' '}
+            por privacidade (manifesto §28).
+          </p>
+          <p className="text-slate-500">
+            Pode ativar depois — granularidade é sua (country, city ou precise).
+          </p>
         </>
       ),
     },
