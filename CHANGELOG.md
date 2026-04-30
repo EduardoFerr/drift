@@ -4,6 +4,10 @@ All notable changes to the Drift client. Uses [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+### Fixed (mapa render — follow-up do 414430d)
+
+- **`MapboxOverlay is not a constructor`** (`SpreadMap.tsx:199`): import vinha de `@deck.gl/core` (errado — `MapboxOverlay` mora em `@deck.gl/mapbox`). Cast `as unknown as` silenciava o erro de tipos; runtime explodia assim que o `useEffect` disparava. Bug latente — só visível depois que `useSpreadMap` passou a retornar `hasGeometry === true` (commit anterior). Adicionada dep `@deck.gl/mapbox@^9.0.0`; trocado o `import('@deck.gl/core')` por `import('@deck.gl/mapbox')`.
+
 ### Security
 
 - **WebRTC: ICE timeout 30s** (`transport/webrtc.ts`, Barney audit #1, HIGH): peers travados em `connecting` (ICE não resolve por firewall/STUN down) viravam zombie no map → RAM leak linear. Agora `setTimeout` em `getOrCreatePeer` mata e remove peer após 30s sem resolver.

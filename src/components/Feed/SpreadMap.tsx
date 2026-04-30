@@ -151,15 +151,20 @@ export function SpreadMap({
     // nem importamos.
     void (async () => {
       try {
-        const [maplibreModule, deckgl, layersModule] = await Promise.all([
+        const [maplibreModule, deckMapbox, layersModule] = await Promise.all([
           import('maplibre-gl'),
-          import('@deck.gl/core'),
+          // `MapboxOverlay` mora em `@deck.gl/mapbox`, NÃO em `@deck.gl/core`.
+          // Antes importávamos de `core` e o cast `as unknown` silenciava o
+          // erro de tipos — runtime explodia com "MapboxOverlay is not a
+          // constructor" assim que o useEffect disparava (sintoma só visível
+          // quando havia dados pra renderizar).
+          import('@deck.gl/mapbox'),
           import('@deck.gl/layers'),
         ])
         if (cancelled) return
 
         const maplibregl = maplibreModule.default as unknown as MaplibreStatic
-        const { MapboxOverlay } = deckgl as unknown as {
+        const { MapboxOverlay } = deckMapbox as unknown as {
           // MapboxOverlay funciona com qualquer mapa compatível com a API
           // do mapbox-gl — incluindo MapLibre, que é fork API-compatível.
           // O nome continua "Mapbox" por razões históricas do deck.gl.

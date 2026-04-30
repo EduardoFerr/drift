@@ -20,6 +20,7 @@
   "dependencies": {
     "@deck.gl/core": "^9.0.0",
     "@deck.gl/layers": "^9.0.0",
+    "@deck.gl/mapbox": "^9.3.1",
     "@scure/bip32": "^2.2.0",
     "@scure/bip39": "^2.2.0",
     "@sqlite.org/sqlite-wasm": "3.51.2-build9",
