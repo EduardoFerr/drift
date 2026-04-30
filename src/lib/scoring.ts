@@ -7,19 +7,36 @@
  * existe ranking secreto, é tudo derivado de eventos públicos.
  *
  * Fórmula:
- *   score = (spreads - buries * 0.3) / (ageHours + 2) ^ 1.5
+ *   score = (spreadWeight - buryWeight * 0.3) / (ageHours + 2) ^ 1.5
  *
  * Por quê:
- *  - spreads pesam 1, buries pesam 0.3 — enterro é julgamento estético,
- *    não punição. Reduz menos do que espalhar adiciona.
+ *  - spreadWeight = SOMA dos pesos dos spreaders (cada spreader
+ *    contribui com seu próprio `weight` de identidade Drift, 0..100).
+ *    Sybil novo tem weight ~0 → spread vale ~0 (manifesto §22 + §32).
+ *  - Buries idem com burier weight, multiplicado por 0.3 — enterro é
+ *    julgamento estético, não punição. Reduz menos do que espalhar.
  *  - +2 nos ageHours evita divisão explosiva nos primeiros minutos.
  *  - expoente 1.5 dá decaimento suave; um post fica relevante por
  *    horas, não minutos.
+ *
+ * **Mudança 2026-04-29** (pré-Fase-6): score deixou de contar EVENTOS
+ * (`COUNT(*) FROM spreads`) e passou a somar PESOS dos spreaders/buriers.
+ * Justificativa em `Docs/conformance-conversa-29-04.md` §"Recomendação
+ * central" (Marshall). Mitiga Sybil engagement (1000 npubs novos
+ * auto-espalhando = peso quase zero).
+ *
+ * **Mudança "última ação vale"**: cada (post_id, user_pub) contribui
+ * com APENAS sua ação líquida — última cronologicamente entre seus
+ * spreads e buries. Implementado em `events.ts:recalculateScore`.
+ * Manifesto §23 (mudança de opinião). Detalhes em
+ * `Docs/conversa-29-04-analise.md` §Seção 2.
  */
 
 export interface ScoreInput {
-  spreads: number
-  buries: number
+  /** Soma de pesos dos spreaders cuja ação líquida é 'spread'. */
+  spreadWeight: number
+  /** Soma de pesos dos buriers cuja ação líquida é 'bury'. */
+  buryWeight: number
   /** unix seconds (mesmo formato dos eventos Nostr) */
   createdAt: number
   /** unix seconds — passado explicitamente para preservar pureza */
@@ -27,22 +44,22 @@ export interface ScoreInput {
 }
 
 export function calculateScore(input: ScoreInput): number {
-  const { spreads, buries, createdAt, now } = input
+  const { spreadWeight, buryWeight, createdAt, now } = input
   const ageHours = Math.max(0, (now - createdAt) / 3600)
-  const netEngagement = spreads - buries * 0.3
+  const netEngagement = spreadWeight - buryWeight * 0.3
   return netEngagement / Math.pow(ageHours + 2, 1.5)
 }
 
 /** Conveniência: usa o relógio atual. Use apenas em paths de
  *  materialização (recalculateScore), nunca em testes. */
 export function calculateScoreNow(
-  spreads: number,
-  buries: number,
+  spreadWeight: number,
+  buryWeight: number,
   createdAt: number,
 ): number {
   return calculateScore({
-    spreads,
-    buries,
+    spreadWeight,
+    buryWeight,
     createdAt,
     now: Math.floor(Date.now() / 1000),
   })

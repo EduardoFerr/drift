@@ -28,7 +28,7 @@ import { DRIFT_KIND, DRIFT_KIND_SET, SCORE_RECALC_DEBOUNCE_MS } from '../config/
 import { calculateScoreNow } from './scoring'
 import { invalidateFeed } from './feed'
 import { getReportWeight, maybeModerate } from './moderation'
-import { calculateUserWeight } from './weight'
+import { calculateUserWeight, calculateWeight } from './weight'
 import type { ReportReason } from '../types/drift'
 
 export async function onNostrEvent(event: SignedEvent): Promise<void> {
@@ -301,29 +301,148 @@ function scheduleScoreRecalc(postId: string): void {
   )
 }
 
-interface RecalcRow {
+interface PostRow {
   created_at: number
-  spreads: number
-  buries: number
 }
 
+interface ActionRow {
+  kind: 'spread' | 'bury'
+  user_pub: string
+  created_at: number
+}
+
+interface UserAggRow {
+  npub: string
+  user_created_at: number
+  last_active: number | null
+  spreads_received: number
+}
+
+/**
+ * Recalcula score de um post agregando ações líquidas com pesos.
+ *
+ * **Semântica "última ação vale"** (manifesto §23, Docs/conversa-29-04-
+ * analise.md §Seção 2): cada (post_id, user_pub) contribui com APENAS
+ * sua ação cronologicamente mais recente entre seus spreads e buries.
+ * Pessoas mudam de opinião — eventos imutáveis preservam histórico,
+ * mas o score líquido só conta a última.
+ *
+ * **Score weighted by spreader weight** (Docs/conformance-conversa-29-
+ * 04.md §Recomendação central, Marshall): cada ação contribui com o
+ * `weight` da identidade Drift do user (0..100). Sybil novo tem
+ * weight ~0 → spread vale ~0. Determinístico, função pura — preserva
+ * §22 (sem reputação subjetiva) e §11 (sem afinidade no feed).
+ *
+ * Pipeline:
+ *   1. Buscar created_at do post.
+ *   2. Buscar TODAS as ações (spreads + buries) do post via UNION.
+ *   3. Pra cada user, achar ação líquida (MAX created_at; tie-break
+ *      por kind ASC determinístico).
+ *   4. Batch-fetch dados de peso pra todos users únicos com ação.
+ *   5. Aplicar `calculateUserWeight` puro pra cada um.
+ *   6. Somar pesos por kind → spreadWeight, buryWeight.
+ *   7. UPDATE posts.score = calculateScore(...).
+ *   8. UPDATE posts.spreads/buries = COUNT(distinct users com ação
+ *      líquida) — preserva semântica UI ("3 espalharam").
+ */
 async function recalculateScore(postId: string): Promise<void> {
-  const row = await db.get<RecalcRow>(
-    `SELECT
-       p.created_at,
-       (SELECT COUNT(*) FROM spreads WHERE post_id = p.id) AS spreads,
-       (SELECT COUNT(*) FROM buries  WHERE post_id = p.id) AS buries
-     FROM posts p
-     WHERE p.id = ?`,
+  // 1. Post info (existência + created_at)
+  const postRow = await db.get<PostRow>(
+    `SELECT created_at FROM posts WHERE id = ?`,
     [postId],
   )
-  if (!row) return
+  if (!postRow) return
 
-  const score = calculateScoreNow(row.spreads, row.buries, row.created_at)
+  // 2. Todas as ações do post (spreads + buries) ordenadas por tempo
+  const actions = await db.exec<ActionRow>(
+    `SELECT 'spread' AS kind, spreader_pub AS user_pub, created_at FROM spreads WHERE post_id = ?
+     UNION ALL
+     SELECT 'bury' AS kind, burier_pub AS user_pub, created_at FROM buries WHERE post_id = ?
+     ORDER BY created_at ASC`,
+    [postId, postId],
+  )
+
+  // 3. Pra cada user, fica com ação mais recente. Em empate de
+  // created_at, kind ASC vence ('bury' < 'spread') — determinístico.
+  // Como ORDER BY ASC, sobrescritas naturais resolvem o empate
+  // ascendente; iteramos e o último update vence (que é o mais recente).
+  const latestActionByUser = new Map<string, 'spread' | 'bury'>()
+  const latestTsByUser = new Map<string, number>()
+  for (const row of actions) {
+    const prevTs = latestTsByUser.get(row.user_pub)
+    if (prevTs === undefined || row.created_at > prevTs) {
+      latestTsByUser.set(row.user_pub, row.created_at)
+      latestActionByUser.set(row.user_pub, row.kind)
+    } else if (row.created_at === prevTs) {
+      // Tie: kind ASC ('bury' lex < 'spread'). Mantém o que vem
+      // primeiro alfabeticamente.
+      const prev = latestActionByUser.get(row.user_pub)!
+      if (row.kind < prev) {
+        latestActionByUser.set(row.user_pub, row.kind)
+      }
+    }
+  }
+
+  if (latestActionByUser.size === 0) {
+    // Nenhuma ação — score puro por idade.
+    const score = calculateScoreNow(0, 0, postRow.created_at)
+    await db.run(
+      `UPDATE posts SET score = ?, spreads = 0, buries = 0 WHERE id = ?`,
+      [score, postId],
+    )
+    invalidateFeed()
+    return
+  }
+
+  // 4. Batch-fetch dados de peso pra todos users únicos com ação.
+  const userPubs = Array.from(latestActionByUser.keys())
+  const placeholders = userPubs.map(() => '?').join(',')
+  const userRows = await db.exec<UserAggRow>(
+    `SELECT
+       u.npub AS npub,
+       u.created_at AS user_created_at,
+       u.last_active AS last_active,
+       (SELECT COUNT(*) FROM spreads s
+          INNER JOIN posts p ON p.id = s.post_id
+          WHERE p.author_pub = u.npub) AS spreads_received
+     FROM users u
+     WHERE u.npub IN (${placeholders})`,
+    userPubs,
+  )
+
+  // 5+6. Aplicar fórmula pura de weight a cada user e somar por kind.
+  const userWeightMap = new Map<string, number>()
+  for (const row of userRows) {
+    const weight = calculateWeight({
+      createdAt: row.user_created_at * 1000, // unix seconds → ms
+      spreadsReceived: row.spreads_received,
+      lastActive: row.last_active !== null ? row.last_active * 1000 : null,
+      now: Date.now(),
+    })
+    userWeightMap.set(row.npub, weight)
+  }
+
+  let spreadWeight = 0
+  let buryWeight = 0
+  let spreadCount = 0
+  let buryCount = 0
+  for (const [userPub, action] of latestActionByUser) {
+    // User sem entry em `users` (raro — possível em flush race) → weight 0
+    const weight = userWeightMap.get(userPub) ?? 0
+    if (action === 'spread') {
+      spreadWeight += weight
+      spreadCount++
+    } else {
+      buryWeight += weight
+      buryCount++
+    }
+  }
+
+  // 7+8. Persistir. UI conta pessoas (count); score usa pesos somados.
+  const score = calculateScoreNow(spreadWeight, buryWeight, postRow.created_at)
   await db.run(
     `UPDATE posts SET score = ?, spreads = ?, buries = ? WHERE id = ?`,
-    [score, row.spreads, row.buries, postId],
+    [score, spreadCount, buryCount, postId],
   )
-  // score mudou: feed precisa reordenar
   invalidateFeed()
 }

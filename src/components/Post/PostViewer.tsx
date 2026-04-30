@@ -53,6 +53,13 @@ export interface PostViewerProps {
   /** `'spread' | 'bury' | null` — null = nenhuma ação pendente. */
   pendingAction: 'spread' | 'bury' | null
   /**
+   * Última ação confirmada do user neste post (lida do SQLite). Usado pra
+   * destacar o botão correspondente (semântica "última ação vale" —
+   * Docs/conversa-29-04-analise.md §2). User PODE clicar na ação oposta
+   * pra reverter; clicar na mesma é no-op silencioso (App.tsx).
+   */
+  myAction?: 'spread' | 'bury' | null
+  /**
    * Captura GPS em curso pra spread/bury deste post. getCurrentLocation
    * pode levar até 8s — UX precisa indicar que não travou.
    */
@@ -70,6 +77,7 @@ export function PostViewer({
   post,
   isMine,
   pendingAction,
+  myAction = null,
   capturingLocation = false,
   custom,
   queue,
@@ -103,6 +111,12 @@ export function PostViewer({
   // (já incluindo o evento confirmado, sem flicker).
   const displaySpreads = post.spreads + (pendingAction === 'spread' ? 1 : 0)
   const displayBuries = post.buries + (pendingAction === 'bury' ? 1 : 0)
+
+  // Estado visual efetivo: pending (em vôo) > myAction (confirmada).
+  // "Última ação vale" — botão destacado mostra o que conta no score.
+  const effectiveAction: 'spread' | 'bury' | null = pendingAction ?? myAction
+  const spreadActive = effectiveAction === 'spread'
+  const buryActive = effectiveAction === 'bury'
 
   // Carrega estado de pin
   useEffect(() => {
@@ -409,12 +423,19 @@ export function PostViewer({
           <button
             onClick={onSpread}
             disabled={pendingAction !== null}
-            className="rounded border border-drift-spread/40 px-2 py-1 text-drift-spread hover:bg-emerald-950/30 disabled:opacity-40"
+            className={`rounded border px-2 py-1 disabled:opacity-40 ${
+              spreadActive
+                ? 'border-drift-spread bg-emerald-900/40 text-emerald-300'
+                : 'border-drift-spread/40 text-drift-spread hover:bg-emerald-950/30'
+            }`}
             title={
               capturingLocation && pendingAction === 'spread'
                 ? 'capturando localização (até 8s)'
+                : myAction === 'spread'
+                ? 'você espalhou — ↓ pra mudar de opinião'
                 : undefined
             }
+            aria-pressed={spreadActive}
           >
             {pendingAction === 'spread'
               ? capturingLocation
@@ -425,7 +446,17 @@ export function PostViewer({
           <button
             onClick={onBury}
             disabled={pendingAction !== null}
-            className="rounded border border-drift-bury/40 px-2 py-1 text-drift-bury hover:bg-red-950/30 disabled:opacity-40"
+            className={`rounded border px-2 py-1 disabled:opacity-40 ${
+              buryActive
+                ? 'border-drift-bury bg-red-900/40 text-red-300'
+                : 'border-drift-bury/40 text-drift-bury hover:bg-red-950/30'
+            }`}
+            title={
+              myAction === 'bury'
+                ? 'você enterrou — ↑ pra mudar de opinião'
+                : undefined
+            }
+            aria-pressed={buryActive}
           >
             {pendingAction === 'bury' ? '…' : '↓'}
           </button>

@@ -496,8 +496,41 @@ autores não são punidos.
 - Bury não tem `reason` — não precisa de justificativa
 - Posts enterrados descem por gravidade, não somem abruptamente
 
-**Implementação:** `persistBury` em `events.ts` — sem chamada a
-`updateEngagement`. Ver arquitetura §8.
+**Mudança de opinião** (adicionado 2026-04-29):
+
+Pessoas mudam de opinião. Cliente Drift permite que o mesmo user
+espalhe E enterre o mesmo post — eventos imutáveis preservam todo
+o histórico. Mas para evitar manipulação de score e dupla contagem,
+**o cliente conta apenas a ação líquida (mais recente cronologicamente)
+de cada (post, user) ao calcular score**.
+
+- Eventos antigos permanecem no banco e nos relays — auditáveis
+- O score reflete a opinião atual, não acumula intenções contraditórias
+- Tie-break determinístico: empate exato em `created_at` resolve por
+  `kind` ASC (`bury` < `spread`)
+- Detalhes em `Docs/conversa-29-04-analise.md` §Seção 2
+
+**Score weighted** (adicionado 2026-04-29):
+
+Score do post deixou de contar **eventos** (`COUNT(*)` de spreads/buries)
+e passou a somar **pesos das identidades** dos spreaders/buriers:
+
+```
+score = (Σ weight(spreader) − Σ weight(burier) × 0.3) / (idade+2)^1.5
+```
+
+Sybil engagement (1000 npubs novos auto-espalhando) deixa de inflar
+score — cada Sybil tem `weight ≈ 0`. Determinístico (mesma fórmula
+em todos os clientes), preserva §22 (sem reputação subjetiva) e §11
+(sem afinidade no feed). Detalhes em
+`Docs/conformance-conversa-29-04.md` §"Recomendação central".
+
+**Implementação:** `recalculateScore` em `events.ts` agora agrupa ações
+por `(post_id, user_pub)` via UNION + MAX(`created_at`), depois soma
+`calculateWeight(...)` por kind. `posts.spreads` e `posts.buries`
+permanecem como COUNT (UI mostra "3 espalharam"); `posts.score` usa
+soma de pesos. Sem chamada a `updateEngagement` no autor (§23 preservado).
+Ver arquitetura §8.
 
 ### 24. Sem Algoritmo Personalizado de Feed
 
@@ -505,8 +538,9 @@ Ranking é determinístico e público. Sem feed "para você", sem bolha,
 sem afinidade automática.
 
 **Regras:**
-- Ordem do feed é função pura: `score = (spreads − buries × 0.3) /
-  (idade + 2)^1.5`, depois `created_at` desc, depois `id` asc
+- Ordem do feed é função pura: `score = (Σ weight(spreader) −
+  Σ weight(burier) × 0.3) / (idade + 2)^1.5`, depois `created_at`
+  desc, depois `id` asc (ver §23 "Score weighted" para detalhes)
 - Qualquer cliente Drift mostra a mesma ordem global
 - Não há scoring personalizado por usuário
 - Bloquear / silenciar / seguir são camada de filtragem **local** na

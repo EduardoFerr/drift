@@ -43,6 +43,15 @@ function App() {
 
   const [publishing, setPublishing] = useState(false)
   const [pending, setPending] = useState<Record<string, 'spread' | 'bury'>>({})
+  // Última ação confirmada do user atual por post — semântica "última ação
+  // vale" (Docs/conversa-29-04-analise.md §2). Populado a partir do SQLite
+  // sempre que `posts` ou identity mudam. UI usa pra:
+  //   1. Destacar o botão correspondente (verde forte / vermelho forte)
+  //   2. No-op silencioso se user clicar na ação que já fez (evita duplicar
+  //      eventos no banco e nos relays)
+  // Não impede ação oposta — user PODE mudar de opinião; scoring atualizado
+  // (src/lib/scoring.ts) só considera a última ação líquida.
+  const [myActions, setMyActions] = useState<Record<string, 'spread' | 'bury' | null>>({})
   // GPS capture pode demorar até 8s (timeout de getCurrentLocation). Sem
   // feedback, parece travado. Trackeamos quais postIds estão capturando
   // pra UI mostrar "📍 capturando…" ao lado do ↑/↓ pendente. Set ao invés
@@ -166,6 +175,29 @@ function App() {
     }
   }, [posts, pending, boot.identity])
 
+  // Popula `myActions` a cada mudança no feed/identity. Batch de N queries
+  // (uma por post) é aceitável até ~100 posts; se virar gargalo, dá pra
+  // mover pra view SQL única (LEFT JOIN spreads/buries por author atual).
+  // Nota: queries são serializadas no worker — em prática 50 queries leves
+  // levam <30ms. Sem early exit aqui pois posts podem ter sumido (moderação)
+  // e é importante limpar entradas stale.
+  useEffect(() => {
+    if (!boot.identity) return
+    const npub = boot.identity.npub
+    let cancelled = false
+    ;(async () => {
+      const next: Record<string, 'spread' | 'bury' | null> = {}
+      for (const post of posts) {
+        next[post.id] = await getMyAction(post.id, npub)
+      }
+      if (cancelled) return
+      setMyActions(next)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [posts, boot.identity])
+
   // Resolve o post visível e o próximo da fila. Memoiza pra evitar O(n)
   // findIndex em cada render (feed pode ter centenas de posts).
   // Se o post atual saiu do feed (moderado, etc.), fecha o viewer.
@@ -247,6 +279,10 @@ function App() {
 
   async function handleSpread(post: Post) {
     if (pending[post.id]) return
+    // No-op silencioso se user já espalhou este post — evita duplicar
+    // evento no SQLite/relays. "Última ação vale" não significa permitir
+    // ação idêntica repetida. Pra reverter, user clica ↓ (ação oposta).
+    if (myActions[post.id] === 'spread') return
     setPending((p) => ({ ...p, [post.id]: 'spread' }))
 
     // Timeout de safety: se o evento não voltar pelo subscribe em 15s
@@ -304,6 +340,8 @@ function App() {
 
   async function handleBury(post: Post) {
     if (pending[post.id]) return
+    // No-op silencioso se user já enterrou — ver handleSpread.
+    if (myActions[post.id] === 'bury') return
     setPending((p) => ({ ...p, [post.id]: 'bury' }))
 
     const safetyTimeout = setTimeout(() => {
@@ -398,6 +436,7 @@ function App() {
           posts={posts}
           identity={boot.identity}
           pending={pending}
+          myActions={myActions}
           gpsCapturing={gpsCapturing}
           onSpread={handleSpread}
           onBury={handleBury}
@@ -413,6 +452,7 @@ function App() {
             post={viewerPost}
             isMine={viewerPost.authorPub === boot.identity?.npub}
             pendingAction={pending[viewerPost.id] ?? null}
+            myAction={myActions[viewerPost.id] ?? null}
             capturingLocation={gpsCapturing.has(viewerPost.id)}
             queue={{ index: viewerIdx, total: posts.length, next: nextPost }}
             onSpread={() => {
@@ -739,6 +779,7 @@ function Feed({
   posts,
   identity,
   pending,
+  myActions,
   gpsCapturing,
   onSpread,
   onBury,
@@ -747,6 +788,7 @@ function Feed({
   posts: Post[]
   identity: DriftIdentity | null
   pending: Record<string, 'spread' | 'bury'>
+  myActions: Record<string, 'spread' | 'bury' | null>
   gpsCapturing: Set<string>
   onSpread: (p: Post) => void
   onBury: (p: Post) => void
@@ -793,6 +835,7 @@ function Feed({
               post={post}
               isMine={post.authorPub === identity?.npub}
               pending={pending[post.id] ?? null}
+              myAction={myActions[post.id] ?? null}
               capturingLocation={gpsCapturing.has(post.id)}
               blurred={hint.blur}
               onOpen={() => onSelect(post.id)}
@@ -880,6 +923,7 @@ function PostCard({
   post,
   isMine,
   pending,
+  myAction,
   capturingLocation,
   blurred,
   onOpen,
@@ -889,6 +933,12 @@ function PostCard({
   post: Post
   isMine: boolean
   pending: 'spread' | 'bury' | null
+  /**
+   * Última ação do user neste post (lida do SQLite). Usado pra destacar
+   * o botão correspondente — semântica "última ação vale". `null` quando
+   * o user ainda não interagiu.
+   */
+  myAction: 'spread' | 'bury' | null
   /** GPS capture em curso pra spread/bury deste post (até 8s). */
   capturingLocation: boolean
   blurred: boolean
@@ -906,6 +956,12 @@ function PostCard({
   // post.spreads do banco já incluiu o evento.
   const displaySpreads = post.spreads + (pending === 'spread' ? 1 : 0)
   const displayBuries = post.buries + (pending === 'bury' ? 1 : 0)
+
+  // Estado visual efetivo dos botões: pending (em vôo) toma precedência,
+  // depois myAction (confirmada). Botão destacado = última ação do user.
+  const effectiveAction: 'spread' | 'bury' | null = pending ?? myAction
+  const spreadActive = effectiveAction === 'spread'
+  const buryActive = effectiveAction === 'bury'
 
   return (
     <article className="rounded border border-drift-border bg-drift-surface p-4">
@@ -962,12 +1018,19 @@ function PostCard({
           <button
             onClick={onSpread}
             disabled={pending !== null}
-            className="rounded border border-drift-spread/40 px-2 py-1 text-drift-spread transition-colors hover:bg-emerald-950/30 disabled:opacity-40"
+            className={`rounded border px-2 py-1 transition-colors disabled:opacity-40 ${
+              spreadActive
+                ? 'border-drift-spread bg-emerald-900/40 text-emerald-300'
+                : 'border-drift-spread/40 text-drift-spread hover:bg-emerald-950/30'
+            }`}
             title={
               capturingLocation && pending === 'spread'
                 ? 'capturando localização (até 8s)'
+                : myAction === 'spread'
+                ? 'você espalhou — clique ↓ pra mudar de opinião'
                 : undefined
             }
+            aria-pressed={spreadActive}
           >
             {pending === 'spread'
               ? capturingLocation
@@ -978,7 +1041,17 @@ function PostCard({
           <button
             onClick={onBury}
             disabled={pending !== null}
-            className="rounded border border-drift-bury/40 px-2 py-1 text-drift-bury transition-colors hover:bg-red-950/30 disabled:opacity-40"
+            className={`rounded border px-2 py-1 transition-colors disabled:opacity-40 ${
+              buryActive
+                ? 'border-drift-bury bg-red-900/40 text-red-300'
+                : 'border-drift-bury/40 text-drift-bury hover:bg-red-950/30'
+            }`}
+            title={
+              myAction === 'bury'
+                ? 'você enterrou — clique ↑ pra mudar de opinião'
+                : undefined
+            }
+            aria-pressed={buryActive}
           >
             {pending === 'bury' ? 'enviando…' : '↓ enterrar'}
           </button>
