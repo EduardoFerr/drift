@@ -243,6 +243,18 @@ function applyMigrations(schema: string) {
       column: 'raw_event',
       sql: `ALTER TABLE buries ADD COLUMN raw_event TEXT`,
     },
+    {
+      // Fase 4 — geo do espalhamento (manifesto §28 — opt-in).
+      // Coluna existe em schema.sql desde Fase 4 mas nenhuma migration
+      // a adicionava em bancos pré-Fase-4. Devices antigos persistiam
+      // SPREAD sem location → SpreadMap sempre vazio.
+      // Bug identificado por Lily peer review 29-04. Idempotente via
+      // tableHasColumn check no apply loop.
+      name: 'add_location_to_spreads',
+      table: 'spreads',
+      column: 'location',
+      sql: `ALTER TABLE spreads ADD COLUMN location TEXT`,
+    },
   ]
 
   let anyFailed = false

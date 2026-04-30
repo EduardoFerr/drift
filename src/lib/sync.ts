@@ -25,7 +25,20 @@ import { activeReadRelays } from './relays'
 import type { SignedEvent } from '../types/nostr'
 
 const NAMESPACE = 'global'
-const INITIAL_WINDOW_SECONDS = 24 * 60 * 60 // 24h
+/**
+ * Janela inicial de sync pra primeiro boot (sync_log vazio).
+ *
+ * Antes era 24h, mas Barney peer review 29-04 identificou bug: ao criar
+ * conta nova ou recriar app, sync_log volta vazio → since = now-24h →
+ * posts mais antigos invisíveis. Bumpado pra 7 dias cobre 99% dos casos
+ * de "novo device sem regredir banda em sessions subsequentes
+ * (incremental sync continua via cursor real depois do primeiro boot).
+ *
+ * Trade-off: 7d ainda é limite artificial. Pra histórico maior, user
+ * pode usar `rebuildIdentityHistory(npub)` (sem limite, mas só pega do
+ * próprio author) ou Settings → "sync inicial: 30d/sem limite" (futuro).
+ */
+const INITIAL_WINDOW_SECONDS = 7 * 24 * 60 * 60 // 7d (Barney peer review 29-04)
 const FLUSH_INTERVAL_MS = 30_000
 
 /** Item do ring buffer de últimos eventos recebidos — usado pra
