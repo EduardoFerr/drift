@@ -4,6 +4,14 @@ All notable changes to the Drift client. Uses [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+### Added
+
+- **Pref `map_view: 'fit-bounds' | 'open'`** (`types/drift.ts`, `lib/prefs.ts`): controla enquadramento do mapa de spread.
+  - `fit-bounds` (default): foca o viewport nos pontos do post (origem + destinos) via `MapLibre.fitBounds` com `padding: 60, maxZoom: 11`. Caso comum — "quero entender este post".
+  - `open`: globo inteiro com `zoom: 1.5`. Útil pra posts virais com espalhamento intercontinental.
+  - UI em `ContentSettings.tsx` → seção "mapa de spread" com radio fechado/aberto.
+  - `_computeBounds` exportada (test-only); 5 tests novos em `tests/spread-map.test.ts` cobrindo bbox vazio, 1 ponto degenerado, N pontos, hemisférios mistos, determinismo (manifesto §7).
+
 ### Fixed (mapa render — follow-up do 414430d)
 
 - **`MapboxOverlay is not a constructor`** (`SpreadMap.tsx:199`): import vinha de `@deck.gl/core` (errado — `MapboxOverlay` mora em `@deck.gl/mapbox`). Cast `as unknown as` silenciava o erro de tipos; runtime explodia assim que o `useEffect` disparava. Bug latente — só visível depois que `useSpreadMap` passou a retornar `hasGeometry === true` (commit anterior). Adicionada dep `@deck.gl/mapbox@^9.0.0`; trocado o `import('@deck.gl/core')` por `import('@deck.gl/mapbox')`.

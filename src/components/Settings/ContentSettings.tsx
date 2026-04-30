@@ -12,7 +12,7 @@ import { motion } from 'framer-motion'
 import { useEffect, useRef, useState } from 'react'
 import { setPref, usePrefsStore } from '../../lib/prefs'
 import { db } from '../../lib/db'
-import type { LocationGranularity } from '../../types/drift'
+import type { LocationGranularity, MapView } from '../../types/drift'
 
 export interface ContentSettingsProps {
   onClose: () => void
@@ -132,6 +132,19 @@ export function ContentSettings({ onClose, scrollTo }: ContentSettingsProps) {
           </div>
 
           <div className="border-t border-drift-border pt-4">
+            <div className="mb-2 text-[11px] text-slate-300">mapa de spread</div>
+            <div className="mb-2 text-[10px] leading-relaxed text-slate-500">
+              Como o mapa enquadra os pontos do post. <code>fechado</code>{' '}
+              foca na região onde houve espalhamento; <code>aberto</code>{' '}
+              mostra o globo todo (útil pra posts intercontinentais).
+            </div>
+            <MapViewPicker
+              value={prefs.map_view}
+              onChange={(v) => setPref('map_view', v)}
+            />
+          </div>
+
+          <div className="border-t border-drift-border pt-4">
             <div className="mb-2 text-[11px] text-slate-300">
               diagnóstico
             </div>
@@ -218,6 +231,49 @@ const GRANULARITY_OPTIONS: { value: LocationGranularity; label: string; hint: st
       hint: 'lat/lng exato ~1m (cuidado — identifica quarteirão)',
     },
   ]
+
+const MAP_VIEW_OPTIONS: { value: MapView; label: string; hint: string }[] = [
+  {
+    value: 'fit-bounds',
+    label: 'fechado',
+    hint: 'foca na região (origem + espalhadores)',
+  },
+  {
+    value: 'open',
+    label: 'aberto',
+    hint: 'globo inteiro, zoom baixo',
+  },
+]
+
+function MapViewPicker({
+  value,
+  onChange,
+}: {
+  value: MapView
+  onChange: (v: MapView) => void
+}) {
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      {MAP_VIEW_OPTIONS.map((opt) => {
+        const active = value === opt.value
+        return (
+          <button
+            key={opt.value}
+            onClick={() => onChange(opt.value)}
+            className={`rounded border px-2 py-2 text-[11px] transition-colors ${
+              active
+                ? 'border-drift-accent bg-drift-accent/10 text-drift-accent'
+                : 'border-drift-border text-slate-500 hover:border-drift-accent/40'
+            }`}
+            title={opt.hint}
+          >
+            {opt.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
 
 function LocationGranularityPicker({
   value,

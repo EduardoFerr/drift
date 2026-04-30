@@ -113,6 +113,18 @@ interface MaplibreStatic {
 interface MaplibreMap {
   addControl(ctrl: unknown): void
   remove(): void
+  /**
+   * Ajusta viewport pra caber um bounding box em coords `[[swLng, swLat],
+   * [neLng, neLat]]`. Quando `padding` é número, aplica em todos os lados
+   * (pixels). `maxZoom` evita zoom excessivo num único ponto. `duration: 0`
+   * = sem animação (instantâneo).
+   */
+  fitBounds(
+    bounds: [[number, number], [number, number]],
+    options?: { padding?: number; maxZoom?: number; duration?: number },
+  ): void
+  /** Registra handler one-shot pra evento (ex.: `'load'`). */
+  once(event: string, callback: () => void): void
 }
 
 interface ArcLayerProps {
@@ -131,6 +143,7 @@ export function SpreadMap({
 }: SpreadMapProps) {
   const { data, loading, error } = useSpreadMap(postId)
   const granularity = usePrefsStore((s) => s.location_granularity)
+  const mapView = usePrefsStore((s) => s.map_view)
   const containerRef = useRef<HTMLDivElement>(null)
 
   // "Tem algo pra mostrar" = origem do post OU pelo menos 1 destino com
@@ -183,6 +196,12 @@ export function SpreadMap({
           ? [centerPoint.lng, centerPoint.lat]
           : [0, 20]
 
+        // `mapView`:
+        //  - `'fit-bounds'` (default): zoom inicial baixo (1.5) e depois
+        //    `fitBounds` ajusta pro bbox dos pontos quando o map carrega.
+        //  - `'open'`: deixa zoom 1.5 estático mostrando o globo todo.
+        // Inicializar zoom em 1.5 nos dois casos evita flash de zoom alto
+        // enquanto tiles carregam — o `fitBounds` já roda no `'load'`.
         const map = new maplibregl.Map({
           container: containerRef.current!,
           style: MAP_STYLE,
@@ -191,6 +210,28 @@ export function SpreadMap({
           attributionControl: false,
           dragRotate: false,
         })
+
+        if (mapView === 'fit-bounds') {
+          const bounds = computeBounds([
+            ...(data.origin ? [[data.origin.lng, data.origin.lat] as [number, number]] : []),
+            ...data.destinations.map(
+              (d): [number, number] => [d.point.lng, d.point.lat],
+            ),
+          ])
+          if (bounds) {
+            // Espera o style carregar antes — `fitBounds` antes do `'load'`
+            // pode ser ignorado em algumas versões do MapLibre.
+            map.once('load', () => {
+              map.fitBounds(bounds, {
+                padding: 60,
+                // maxZoom 11 = ~rua/quarteirão; evita zoom 22 quando todos
+                // os pontos coincidem (granularity 'precise' no mesmo lugar).
+                maxZoom: 11,
+                duration: 0,
+              })
+            })
+          }
+        }
 
         // Pontos da origem e dos destinos. Origem é amber + raio maior
         // (manifesto §28 — "ground zero" do post merece destaque visual).
@@ -258,7 +299,7 @@ export function SpreadMap({
       cancelled = true
       cleanup?.()
     }
-  }, [data, hasGeometry])
+  }, [data, hasGeometry, mapView])
 
   // ─── Estados de fallback (renderizam sem importar MapLibre) ────────
 
@@ -331,6 +372,38 @@ export function SpreadMap({
     </div>
   )
 }
+
+/**
+ * Calcula bounding box de uma lista de pontos `[lng, lat]`.
+ * Retorna `null` se a lista está vazia. Output no formato esperado por
+ * `MapLibre.fitBounds`: `[[swLng, swLat], [neLng, neLat]]`.
+ *
+ * Função pura — exposta como `_computeBounds` pra teste.
+ */
+export function _computeBounds(
+  points: [number, number][],
+): [[number, number], [number, number]] | null {
+  if (points.length === 0) return null
+  let minLng = Infinity
+  let maxLng = -Infinity
+  let minLat = Infinity
+  let maxLat = -Infinity
+  for (const [lng, lat] of points) {
+    if (lng < minLng) minLng = lng
+    if (lng > maxLng) maxLng = lng
+    if (lat < minLat) minLat = lat
+    if (lat > maxLat) maxLat = lat
+  }
+  return [
+    [minLng, minLat],
+    [maxLng, maxLat],
+  ]
+}
+
+// Alias usado dentro deste módulo. `_computeBounds` é o nome exportado
+// (test-only) e mantém o prefixo undescore — mesma convenção do
+// `_buildArcs` em useSpreadMap.ts.
+const computeBounds = _computeBounds
 
 function Placeholder({
   className,

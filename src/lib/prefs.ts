@@ -22,6 +22,7 @@ import {
   DEFAULT_USER_PREFS,
   type UserPrefs,
   type LocationGranularity,
+  type MapView,
 } from '../types/drift'
 
 // ─── Store reativa ───────────────────────────────────────────────────
@@ -73,6 +74,9 @@ function applyRow(target: UserPrefs, key: string, value: string): void {
     case 'onboarding_done':
       target.onboarding_done = value === '1'
       return
+    case 'map_view':
+      if (isMapView(value)) target.map_view = value
+      return
     default:
       // chave desconhecida — pode ser de fase futura, ignora silenciosamente
       return
@@ -81,6 +85,10 @@ function applyRow(target: UserPrefs, key: string, value: string): void {
 
 function isLocationGranularity(v: string): v is LocationGranularity {
   return v === 'off' || v === 'country' || v === 'city' || v === 'precise'
+}
+
+function isMapView(v: string): v is MapView {
+  return v === 'fit-bounds' || v === 'open'
 }
 
 /**

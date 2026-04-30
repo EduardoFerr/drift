@@ -196,7 +196,19 @@ export interface UserPrefs {
   location_granularity: LocationGranularity
   /** Onboarding visto. Default: false. */
   onboarding_done: boolean
+  /**
+   * Modo de visualização do mapa de spread.
+   *  - `fit-bounds` (default): foca o viewport nos pontos do post (origem +
+   *    destinos), mostrando só a região onde houve espalhamento.
+   *  - `open`: globo inteiro com zoom baixo, vê o espalhamento "no mundo".
+   * Default `fit-bounds` porque o caso comum é "quero entender este post";
+   * `open` é útil pra posts virais com espalhamento intercontinental.
+   */
+  map_view: MapView
 }
+
+/** Modo de visualização do mapa de spread. */
+export type MapView = 'fit-bounds' | 'open'
 
 export const DEFAULT_USER_PREFS: UserPrefs = {
   show_nsfw_default: false,
@@ -204,4 +216,5 @@ export const DEFAULT_USER_PREFS: UserPrefs = {
   hide_ads: false,
   location_granularity: 'off',
   onboarding_done: false,
+  map_view: 'fit-bounds',
 }

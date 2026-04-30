@@ -12,6 +12,7 @@ vi.mock('../src/lib/db', () => ({
 }))
 
 import { _buildArcs } from '../src/hooks/useSpreadMap'
+import { _computeBounds } from '../src/components/Feed/SpreadMap'
 import type { GeoPoint } from '../src/types/drift'
 
 function geo(lat: number, lng: number, country = 'BR', city = ''): GeoPoint {
@@ -135,5 +136,52 @@ describe('_buildArcs', () => {
     const a = _buildArcs(SP, destinations)
     const b = _buildArcs(SP, destinations)
     expect(a).toEqual(b)
+  })
+})
+
+describe('_computeBounds', () => {
+  it('lista vazia → null', () => {
+    expect(_computeBounds([])).toBeNull()
+  })
+
+  it('1 ponto → bbox degenerado (sw === ne)', () => {
+    // fitBounds com sw === ne é tratado pelo MapLibre (vai pro maxZoom).
+    expect(_computeBounds([[10, 20]])).toEqual([
+      [10, 20],
+      [10, 20],
+    ])
+  })
+
+  it('N pontos → bbox cobre todos (formato [[swLng,swLat],[neLng,neLat]])', () => {
+    // SP (lng=-46.63, lat=-23.55), RJ (lng=-43.17, lat=-22.9)
+    const bounds = _computeBounds([
+      [SP.lng, SP.lat],
+      [RJ.lng, RJ.lat],
+    ])
+    expect(bounds).toEqual([
+      [SP.lng, SP.lat], // sudoeste = mais a oeste e mais ao sul
+      [RJ.lng, RJ.lat], // nordeste = mais a leste e mais ao norte
+    ])
+  })
+
+  it('hemisférios mistos — coordenadas com sinais opostos', () => {
+    // NY (lng=-74, lat=40.71), Paris (lng=2.35, lat=48.85)
+    const bounds = _computeBounds([
+      [NY.lng, NY.lat],
+      [PA.lng, PA.lat],
+    ])
+    expect(bounds).toEqual([
+      [NY.lng, NY.lat], // sw = NY (mais a oeste, mais ao sul)
+      [PA.lng, PA.lat], // ne = Paris (mais a leste, mais ao norte)
+    ])
+  })
+
+  it('é determinístico (manifesto §7)', () => {
+    const points: [number, number][] = [
+      [SP.lng, SP.lat],
+      [RJ.lng, RJ.lat],
+      [PA.lng, PA.lat],
+    ]
+    expect(_computeBounds(points)).toEqual(_computeBounds(points))
   })
 })
