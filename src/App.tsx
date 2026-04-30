@@ -2,7 +2,12 @@ import { useEffect, useMemo, useState } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import { OPTIMISTIC_TIMEOUT_MS } from './config/constants'
 import { db } from './lib/db'
-import { getCurrentLocation, warmUpGpsLocation } from './lib/geolocation'
+import {
+  getCurrentLocation,
+  getLastFailureReason,
+  warmUpGpsLocation,
+  type GeolocationFailureReason,
+} from './lib/geolocation'
 import { restartSync, useSyncStore } from './lib/sync'
 import { createPost, spreadPost, buryPost } from './lib/protocol'
 import { applyContentFilters, getMyAction, refreshFeed, setFeedTab, useFeedStore } from './lib/feed'
@@ -23,6 +28,7 @@ import { RelaySettings } from './components/Settings/RelaySettings'
 import { LocalListsSettings } from './components/Settings/LocalListsSettings'
 import { OnboardingOverlay } from './components/Onboarding/OnboardingOverlay'
 import { ProfileModal } from './components/Profile/ProfileModal'
+import { GpsErrorBanner } from './components/UI/GpsErrorBanner'
 import type {
   DriftIdentity,
   LocationGranularity,
@@ -69,6 +75,28 @@ function App() {
   const [showLists, setShowLists] = useState(false)
   const [showProfile, setShowProfile] = useState(false)
   const [showOnboarding, setShowOnboarding] = useState(false)
+
+  // Banner de erro GPS (Lily 29-04): user habilita location_granularity
+  // mas browser bloqueia silenciosamente. Trackeamos timestamp da última
+  // falha + motivo. Banner visível se < 60s, não-dismissed, granularity
+  // ativo. sessionStorage persiste dismiss durante a sessão sem poluir
+  // localStorage (some quando aba fecha).
+  const [gpsFailedAt, setGpsFailedAt] = useState<number | null>(null)
+  const [gpsFailReason, setGpsFailReason] =
+    useState<Exclude<GeolocationFailureReason, null> | null>(null)
+  const [gpsBannerDismissed, setGpsBannerDismissed] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false
+    return window.sessionStorage.getItem('drift:gps-banner-dismissed') === '1'
+  })
+  // Tick force-refresh do banner pra ele sumir após 60s sem precisar de
+  // outro evento. setInterval barato; pode pausar quando banner não está
+  // visível, mas custo é desprezível.
+  const [, setBannerTick] = useState(0)
+  useEffect(() => {
+    if (gpsFailedAt === null) return
+    const id = setInterval(() => setBannerTick((t) => t + 1), 5_000)
+    return () => clearInterval(id)
+  }, [gpsFailedAt])
 
   // Viewer-as-queue (Tinder-like): rastreamos o postId visível no viewer.
   // Ao espalhar/enterrar, avançamos pro próximo post da fila com animação
@@ -261,6 +289,15 @@ function App() {
           `[publish] location_granularity='${granularity}' mas getCurrentLocation retornou null — ` +
             'post publicado SEM location. Ver warnings de [geolocation] acima pra motivo.',
         )
+        const reason = getLastFailureReason()
+        if (reason) {
+          setGpsFailedAt(Date.now())
+          setGpsFailReason(reason)
+        }
+      } else if (willCapture && location) {
+        // Sucesso na captura — limpa state pra banner sumir.
+        setGpsFailedAt(null)
+        setGpsFailReason(null)
       }
 
       // Sem `postId` — protocol.ts gera o evento e o `event.id` resultante
@@ -338,6 +375,14 @@ function App() {
             'spread publicado SEM location (mapa não vai mostrar arco daqui). ' +
             'Ver warnings de [geolocation] acima pra motivo.',
         )
+        const reason = getLastFailureReason()
+        if (reason) {
+          setGpsFailedAt(Date.now())
+          setGpsFailReason(reason)
+        }
+      } else if (willCapture && location) {
+        setGpsFailedAt(null)
+        setGpsFailReason(null)
       }
 
       await spreadPost({
@@ -435,6 +480,30 @@ function App() {
           onOpenProfile={() => setShowProfile(true)}
           onClearLocal={handleClearLocal}
         />
+
+        {(() => {
+          // Banner GPS: visível só se user optou por location, falhou nos
+          // últimos 60s, ainda não dispensou nesta sessão. Wrapped em IIFE
+          // pra calcular condição inline sem poluir top-level.
+          if (locationGranularity === 'off') return null
+          if (gpsBannerDismissed) return null
+          if (gpsFailedAt === null || gpsFailReason === null) return null
+          if (Date.now() - gpsFailedAt > 60_000) return null
+          return (
+            <GpsErrorBanner
+              reason={gpsFailReason}
+              onDismiss={() => {
+                setGpsBannerDismissed(true)
+                if (typeof window !== 'undefined') {
+                  window.sessionStorage.setItem(
+                    'drift:gps-banner-dismissed',
+                    '1',
+                  )
+                }
+              }}
+            />
+          )
+        })()}
 
         {showDiagnostic && <DiagnosticPanel boot={boot} />}
 

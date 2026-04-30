@@ -91,3 +91,4 @@ export interface Transport {
 // só o WSS pra manter MVP simples.
 
 export { wssTransport } from './wss'
+export { webrtcTransport } from './webrtc'

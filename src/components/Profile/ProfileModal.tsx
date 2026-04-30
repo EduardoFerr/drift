@@ -19,6 +19,7 @@ import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { db } from '../../lib/db'
 import { useUserWeight } from '../../hooks/useUserWeight'
+import { getWeightTier, type WeightTier } from '../../lib/weight'
 import { useFollowsStore } from '../../lib/follows'
 import { useIdentitiesStore } from '../../lib/identities'
 import { useModLocalStore } from '../../lib/moderation-local'
@@ -104,18 +105,15 @@ export function ProfileModal({ identity, onClose }: ProfileModalProps) {
           <div className="break-all font-mono text-[10px] text-slate-500">
             {identity.npubBech32}
           </div>
-          <div className="mt-2 text-[10px] text-slate-600">
-            criada: {new Date(identity.createdAt).toLocaleString()}
+          <div className="mt-2 flex items-center justify-between">
+            <span className="text-[10px] text-slate-600">
+              criada: {new Date(identity.createdAt).toLocaleString()}
+            </span>
+            <TierBadge tier={getWeightTier(userWeight.weight)} />
           </div>
         </section>
 
-        <section className="mb-4 grid grid-cols-3 gap-2 text-center">
-          <Stat
-            label="peso"
-            value={userWeight.weight.toFixed(0)}
-            tone="accent"
-            tooltip={`antiguidade ${userWeight.antiquity.toFixed(1)} + engajamento ${userWeight.engagement.toFixed(1)}`}
-          />
+        <section className="mb-4 grid grid-cols-2 gap-2 text-center">
           <Stat
             label="max subposts"
             value={String(userWeight.maxSubposts)}
@@ -153,6 +151,25 @@ export function ProfileModal({ identity, onClose }: ProfileModalProps) {
         </p>
       </motion.div>
     </motion.div>
+  )
+}
+
+function TierBadge({ tier }: { tier: WeightTier | null }) {
+  if (tier === null) return null
+  const config =
+    tier === 'established'
+      ? { emoji: '🏆', label: 'estabelecido', color: 'text-amber-300 border-amber-300/40' }
+      : tier === 'active'
+      ? { emoji: '⭐', label: 'ativo', color: 'text-slate-300 border-slate-300/40' }
+      : { emoji: '🌱', label: 'novo', color: 'text-green-300 border-green-300/40' }
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded border px-2 py-0.5 text-[10px] ${config.color}`}
+      title="weight é determinístico — função pura de antiquity (semanas) + spreads recebidos. Manifesto §22."
+    >
+      <span aria-hidden>{config.emoji}</span>
+      <span>{config.label}</span>
+    </span>
   )
 }
 

@@ -11,7 +11,12 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { getCurrentLocation, warmUpGpsLocation } from '../src/lib/geolocation'
+import {
+  _resetLastFailureReason,
+  getCurrentLocation,
+  getLastFailureReason,
+  warmUpGpsLocation,
+} from '../src/lib/geolocation'
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 
@@ -79,6 +84,7 @@ function mockGeolocationError(code: 1 | 2 | 3) {
 beforeEach(() => {
   // Silencia console.warn (geolocation.ts loga em PERMISSION_DENIED).
   vi.spyOn(console, 'warn').mockImplementation(() => {})
+  _resetLastFailureReason()
 })
 
 afterEach(() => {
@@ -189,6 +195,55 @@ describe('getCurrentLocation — erros retornam null silencioso', () => {
 })
 
 // ─── Warm-up GPS no idle ─────────────────────────────────────────────
+
+// ─── lastFailureReason ───────────────────────────────────────────────
+
+describe('getLastFailureReason — atomicidade do estado de falha', () => {
+  it('inicia null antes de qualquer chamada', () => {
+    expect(getLastFailureReason()).toBeNull()
+  })
+
+  it("granularity 'off' não muta lastFailureReason", async () => {
+    mockGeolocationSuccess({ latitude: 0, longitude: 0 })
+    await getCurrentLocation('off')
+    expect(getLastFailureReason()).toBeNull()
+  })
+
+  it("PERMISSION_DENIED → lastFailureReason === 'permission'", async () => {
+    mockGeolocationError(1)
+    await getCurrentLocation('city')
+    expect(getLastFailureReason()).toBe('permission')
+  })
+
+  it("POSITION_UNAVAILABLE → lastFailureReason === 'unavailable'", async () => {
+    mockGeolocationError(2)
+    await getCurrentLocation('city')
+    expect(getLastFailureReason()).toBe('unavailable')
+  })
+
+  it("TIMEOUT → lastFailureReason === 'timeout'", async () => {
+    mockGeolocationError(3)
+    await getCurrentLocation('city')
+    expect(getLastFailureReason()).toBe('timeout')
+  })
+
+  it("navigator.geolocation ausente → lastFailureReason === 'no-api'", async () => {
+    vi.stubGlobal('navigator', {})
+    await getCurrentLocation('precise')
+    expect(getLastFailureReason()).toBe('no-api')
+  })
+
+  it('sucesso após falha reseta lastFailureReason pra null', async () => {
+    mockGeolocationError(1)
+    await getCurrentLocation('city')
+    expect(getLastFailureReason()).toBe('permission')
+
+    mockGeolocationSuccess({ latitude: 1, longitude: 2 })
+    const result = await getCurrentLocation('city')
+    expect(result).not.toBeNull()
+    expect(getLastFailureReason()).toBeNull()
+  })
+})
 
 describe('warmUpGpsLocation — fire-and-forget', () => {
   it("retorna void (não Promise) quando granularity === 'off'", () => {
