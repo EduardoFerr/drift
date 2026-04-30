@@ -4,6 +4,10 @@ All notable changes to the Drift client. Uses [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+### Operacional
+
+- **Vercel Deployment Protection: `Standard` → `Only Preview`** (2026-04-29). Hostnames auto-gerados de production (`drift-{hash}-...vercel.app`) estavam retornando 401 em `manifest.webmanifest`, quebrando PWA install. Causa: `ssoProtection.deploymentType: "all_except_custom_domains"` (default Vercel pra projetos comerciais) bloqueava todos os hostnames exceto o alias custom `drift-wheat-one.vercel.app`. Mudou pra `"preview"` via REST API — production deployments públicos, previews continuam protegidos. Justificativa + comandos de reversão em [Docs/vercel-protection.md](Docs/vercel-protection.md). Manifesto §16/§17.
+
 ### Added
 
 - **Pref `map_view: 'fit-bounds' | 'open'`** (`types/drift.ts`, `lib/prefs.ts`): controla enquadramento do mapa de spread.

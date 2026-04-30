@@ -43,6 +43,7 @@ ou **Por persona** pra pular direto.
 
 ### Operacional
 - **[deploy.md](deploy.md)** — Vercel + GitHub Releases + Cloudflare Tunnel + F-Droid/Play
+- **[vercel-protection.md](vercel-protection.md)** — histórico do Deployment Protection (2026-04-29: mudou pra `preview-only`, justificativa + reversão)
 - **[../CHANGELOG.md](../CHANGELOG.md)** — histórico de versões (último: v0.5.4, 2026-04-27)
 - **[../LICENSE](../LICENSE)** — licença do projeto
 
