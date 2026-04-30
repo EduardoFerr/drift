@@ -48,6 +48,14 @@ CREATE TABLE IF NOT EXISTS posts (
   client          TEXT,                    -- 'drift-official' ou outro
   content_warning TEXT,                    -- 'nsfw' | 'violence' | 'spoiler' | 'ad' | string livre
   raw_event       TEXT,                    -- JSON do evento original (re-broadcast Fase 5+, manifesto §16)
+  -- ATENÇÃO: a partir de 2026-04-29 (manifesto §23 "Score weighted"),
+  -- `score` e `spreads`/`buries` têm UNIDADES DISTINTAS:
+  --   • score   = (Σ weight(spreader) − 0.3·Σ weight(burier)) / (idade+2)^1.5
+  --                weight ∈ [0..100] da identidade Drift; Sybil novo ≈ 0
+  --   • spreads = COUNT distinct users com ação líquida = 'spread' (p/ UI)
+  --   • buries  = COUNT distinct users com ação líquida = 'bury'   (p/ UI)
+  -- Ranking continua monotônico em `score`. UI mostra spreads/buries como
+  -- contadores ("3 espalharam"). Ver `events.ts:recalculateScore`.
   score           REAL DEFAULT 0,
   spreads         INTEGER DEFAULT 0,
   buries          INTEGER DEFAULT 0

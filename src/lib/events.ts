@@ -395,29 +395,26 @@ async function recalculateScore(postId: string): Promise<void> {
   }
 
   // 4. Batch-fetch dados de peso pra todos users únicos com ação.
+  // Chunking: SQLite WASM 3.51 tem SQLITE_MAX_VARIABLE_NUMBER 32766
+  // mas alguns builds antigos limitam em 999. Posts virais (>5k spreaders)
+  // estourariam parser sem chunk. CHUNK_SIZE conservador (500) cobre todos
+  // os builds + bom balanço entre número de queries e tamanho de cada uma.
+  // Ted follow-up #2 (sessão 29-04, alta prioridade).
   const userPubs = Array.from(latestActionByUser.keys())
-  const placeholders = userPubs.map(() => '?').join(',')
-  const userRows = await db.exec<UserAggRow>(
-    `SELECT
-       u.npub AS npub,
-       u.created_at AS user_created_at,
-       u.last_active AS last_active,
-       (SELECT COUNT(*) FROM spreads s
-          INNER JOIN posts p ON p.id = s.post_id
-          WHERE p.author_pub = u.npub) AS spreads_received
-     FROM users u
-     WHERE u.npub IN (${placeholders})`,
-    userPubs,
-  )
+  const userRows = await fetchUserAggsInChunks(userPubs)
 
   // 5+6. Aplicar fórmula pura de weight a cada user e somar por kind.
+  // Capturamos `now` UMA vez antes do loop (Marshall peer review):
+  // todos os users do mesmo recalc usam o mesmo timestamp, fortalecendo
+  // determinismo intra-execução. Cross-execution ainda varia naturalmente.
+  const recalcNow = Date.now()
   const userWeightMap = new Map<string, number>()
   for (const row of userRows) {
     const weight = calculateWeight({
       createdAt: row.user_created_at * 1000, // unix seconds → ms
       spreadsReceived: row.spreads_received,
       lastActive: row.last_active !== null ? row.last_active * 1000 : null,
-      now: Date.now(),
+      now: recalcNow,
     })
     userWeightMap.set(row.npub, weight)
   }
@@ -445,4 +442,43 @@ async function recalculateScore(postId: string): Promise<void> {
     [score, spreadCount, buryCount, postId],
   )
   invalidateFeed()
+}
+
+/**
+ * Tamanho máximo de chunk em queries com `IN (?, ?, ...)`. SQLite WASM
+ * tem limite de bound params (default 32766 nas builds modernas, 999
+ * em builds antigas). 500 é conservador — cobre todos os builds e dá
+ * bom balanço: poucos round-trips ao worker pra posts médios, sem
+ * estourar limite em posts virais (>5k spreaders).
+ *
+ * Exportado pra teste — permite verificar comportamento de chunking
+ * com sample sizes que cruzam o limite.
+ */
+export const RECALC_USER_CHUNK_SIZE = 500
+
+/**
+ * Busca dados agregados de um conjunto de users em chunks (evita
+ * estourar limite de bound params do SQLite). Idempotente — chunks
+ * disjuntos (sem dedup necessário porque user_pubs é Set originalmente).
+ */
+async function fetchUserAggsInChunks(userPubs: string[]): Promise<UserAggRow[]> {
+  const all: UserAggRow[] = []
+  for (let i = 0; i < userPubs.length; i += RECALC_USER_CHUNK_SIZE) {
+    const chunk = userPubs.slice(i, i + RECALC_USER_CHUNK_SIZE)
+    const placeholders = chunk.map(() => '?').join(',')
+    const rows = await db.exec<UserAggRow>(
+      `SELECT
+         u.npub AS npub,
+         u.created_at AS user_created_at,
+         u.last_active AS last_active,
+         (SELECT COUNT(*) FROM spreads s
+            INNER JOIN posts p ON p.id = s.post_id
+            WHERE p.author_pub = u.npub) AS spreads_received
+       FROM users u
+       WHERE u.npub IN (${placeholders})`,
+      chunk,
+    )
+    all.push(...rows)
+  }
+  return all
 }

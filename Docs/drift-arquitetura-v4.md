@@ -473,9 +473,14 @@ atualização da `useFeedStore` (Zustand). UI re-renderiza sozinha.
 ## 8. CÁLCULO DE SCORE (FUNÇÃO PURA)
 
 ```typescript
-function calculateScore(input: { spreads: number, buries: number, createdAt: number, now: number }): number {
+// Atualizado 2026-04-29 (manifesto §23 "Score weighted"):
+// - Inputs renomeados: spreads/buries → spreadWeight/buryWeight
+// - Semântica: soma de PESOS das identidades (Sybil novo ≈ 0)
+// - Aplicado em conjunto com "última ação vale" (MAX created_at por
+//   (post,user)) — ver Docs/conformance-conversa-29-04.md
+function calculateScore(input: { spreadWeight: number, buryWeight: number, createdAt: number, now: number }): number {
   const ageHours      = Math.max(0, (input.now - input.createdAt) / 3600)
-  const netEngagement = input.spreads - (input.buries * 0.3)
+  const netEngagement = input.spreadWeight - (input.buryWeight * 0.3)
   return netEngagement / Math.pow(ageHours + 2, 1.5)
 }
 

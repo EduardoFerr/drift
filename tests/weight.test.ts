@@ -17,6 +17,7 @@ import {
   calculateEngagement,
   calculateWeight,
   getMaxSubposts,
+  getWeightTier,
   type WeightInput,
 } from '../src/lib/weight'
 
@@ -253,6 +254,51 @@ describe('getMaxSubposts', () => {
       const max = getMaxSubposts(w)
       expect(max).toBeGreaterThanOrEqual(prev)
       prev = max
+    }
+  })
+})
+
+describe('getWeightTier — sinal social discreto (manifesto §22)', () => {
+  it('weight 0 → null (identidade fresca não envergonha)', () => {
+    expect(getWeightTier(0)).toBe(null)
+  })
+
+  it('weight 19.99 → null (boundary pra new)', () => {
+    expect(getWeightTier(19.99)).toBe(null)
+  })
+
+  it('weight 20 → new (boundary inclusivo)', () => {
+    expect(getWeightTier(20)).toBe('new')
+  })
+
+  it('weight 39.99 → new', () => {
+    expect(getWeightTier(39.99)).toBe('new')
+  })
+
+  it('weight 40 → active (boundary inclusivo)', () => {
+    expect(getWeightTier(40)).toBe('active')
+  })
+
+  it('weight 59.99 → active', () => {
+    expect(getWeightTier(59.99)).toBe('active')
+  })
+
+  it('weight 60 → established (boundary inclusivo)', () => {
+    expect(getWeightTier(60)).toBe('established')
+  })
+
+  it('weight 100 → established (limite máximo)', () => {
+    expect(getWeightTier(100)).toBe('established')
+  })
+
+  it('é monotônico — peso maior nunca dá tier menor', () => {
+    const tierRank: Record<string, number> = { null: 0, new: 1, active: 2, established: 3 }
+    let prev = 0
+    for (let w = 0; w <= 100; w += 5) {
+      const tier = getWeightTier(w)
+      const rank = tierRank[tier ?? 'null']!
+      expect(rank).toBeGreaterThanOrEqual(prev)
+      prev = rank
     }
   })
 })

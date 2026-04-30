@@ -134,12 +134,15 @@ ou **Por persona** pra pular direto.
 - plano 6.2 ([webrtc-6.2-plan.md](webrtc-6.2-plan.md)) — Ted
 - fix GPS warm-up + indicador (captura antes de `createPost`/`spreadPost`)
 
-### 2026-04-29 — Análise conversa Gemini/ChatGPT
+### 2026-04-29 — Análise conversa Gemini/ChatGPT + scoring weighted
 - [conversa-29-04-analise.md](conversa-29-04-analise.md) (Ted) — síntese das propostas externas
 - [conformance-conversa-29-04.md](conformance-conversa-29-04.md) (Marshall) — validação contra invariantes/manifesto
-- bug sync entre devices (Barney) — investigação em andamento
-- bug mapa não abre (Lily) — investigação em andamento
-- atualização do INDEX (Robin)
+- fix sync entre devices (Barney) — janela 24h→7d em `sync.ts` (commit 6062422)
+- fix mapa não abre (Lily) — migration `spreads.location` (commit 6062422)
+- scoring "última ação vale" (spread+bury simultâneo do mesmo user resolve pelo `created_at` mais recente) + scoring weighted Σ`weight` em vez de COUNT (anti-Sybil, manifesto §22/§24) + UX `myActions` em `ProfileModal` (commit 3cdd211)
+- chunking 500-by-500 em `recalculateScore` (mitiga estouro `IN(?)` em posts virais) + `getWeightTier` função pura (sinal social, manifesto §22) — em andamento
+- manifesto §23 estendido com seções "Mudança de opinião" e "Score weighted"; §24 fórmula atualizada
+- atualização do INDEX + CHANGELOG (Robin)
 
 ---
 
@@ -148,4 +151,4 @@ ou **Por persona** pra pular direto.
 - Docs prometidos pelas Fases 6/7 ainda não criados: `ipfs-pin.md` (Fase 7), `sneakernet.md` (Fase 7), `run-your-own-relay.md` (Fase 7), `tor-arti.md` (Fase 6.3), `capacitor.md` (alternativa TWA).
 - Nenhum doc tem campo formal `last-updated:` no frontmatter — datas inferidas via versão (manifesto v2.2, arquitetura v5.3) ou cabeçalho (`webrtc-threats.md` 2026-04-28, `webrtc-6.2-plan.md` 2026-04-28).
 - `Docs/icones-oquesao-cada um.PNG` é asset órfão (sem doc explicando o que documenta).
-- Bug "spread+bury simultâneo do mesmo user" identificado por Marshall em [conformance-conversa-29-04.md](conformance-conversa-29-04.md) §1 ainda sem fix — depende de PR.
+- `getWeightTier` (função pura criada em 2026-04-29, sinal social manifesto §22) ainda **não aplicada** na UI — falta badge de tier no `ProfileModal`.

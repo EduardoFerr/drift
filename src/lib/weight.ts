@@ -89,6 +89,35 @@ export function calculateWeight(input: WeightInput): number {
 }
 
 /**
+ * Tier de peso pra exibição UI — sinal social, NÃO filtro.
+ *
+ * Manifesto §22 (transparência): algoritmo é legível, mas user não
+ * deveria competir/gamificar números exatos. Tier é discreto: 4 níveis,
+ * baseados nos thresholds já usados em `getMaxSubposts`.
+ *
+ * Manifesto §11 (sem afinidade): UI **não pode** virar filtro
+ * "só posts com weight ≥ X" — isso é afinidade no feed. Badge é
+ * exibição passiva no perfil, não propriedade que altera ranking.
+ *
+ * Tiers:
+ *   weight ≥ 60   →  'established'  ('🏆 estabelecido', amber)
+ *   weight ≥ 40   →  'active'       ('⭐ ativo', slate)
+ *   weight ≥ 20   →  'new'          ('🌱 novo', green)
+ *   weight < 20   →  null           (sem badge — identidade fresca,
+ *                                    não envergonha)
+ *
+ * Função pura, determinística, testável.
+ */
+export type WeightTier = 'established' | 'active' | 'new'
+
+export function getWeightTier(weight: number): WeightTier | null {
+  if (weight >= 60) return 'established'
+  if (weight >= 40) return 'active'
+  if (weight >= 20) return 'new'
+  return null
+}
+
+/**
  * Quantos subposts cada autor pode publicar em um POST.
  *
  * Defesa anti-spam baseada em peso (manifesto §33 — anti-spam pela

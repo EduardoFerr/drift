@@ -252,6 +252,17 @@ function App() {
           return n
         })
 
+      // Diagnóstico (Lily peer review 29-04): se user habilitou GPS mas
+      // captura falhou, log explícito ajuda debug via DevTools. Causas
+      // comuns já logadas em geolocation.ts (PERMISSION_DENIED, TIMEOUT,
+      // POSITION_UNAVAILABLE). Aqui adiciona contexto da action.
+      if (willCapture && !location) {
+        console.warn(
+          `[publish] location_granularity='${granularity}' mas getCurrentLocation retornou null — ` +
+            'post publicado SEM location. Ver warnings de [geolocation] acima pra motivo.',
+        )
+      }
+
       // Sem `postId` — protocol.ts gera o evento e o `event.id` resultante
       // é o identificador canônico do post. NIP-01: kind 9078 é regular
       // event, sem `d` tag. UUID local violava o formato hex 64 quando
@@ -317,6 +328,18 @@ function App() {
           n.delete(post.id)
           return n
         })
+
+      // Diagnóstico (Lily peer review 29-04): user reportou "GPS não pega"
+      // sem feedback. Log explícito ajuda debug — motivo da falha já vem
+      // de geolocation.ts (PERMISSION_DENIED / TIMEOUT / POSITION_UNAVAILABLE).
+      if (willCapture && !location) {
+        console.warn(
+          `[spread] location_granularity='${granularity}' mas getCurrentLocation retornou null — ` +
+            'spread publicado SEM location (mapa não vai mostrar arco daqui). ' +
+            'Ver warnings de [geolocation] acima pra motivo.',
+        )
+      }
+
       await spreadPost({
         postId: post.id,
         authorPub: post.authorPub,

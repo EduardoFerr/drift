@@ -89,11 +89,35 @@ export async function getCurrentLocation(
       country: '',
     }
   } catch (err) {
-    // Permission denied (1), unavailable (2), timeout (3). Não loga
-    // nem alerta — location é opt-in silencioso. UI já mostrou modal
-    // pedindo permissão se foi PERMISSION_DENIED.
-    if (err instanceof GeolocationPositionError && err.code === err.PERMISSION_DENIED) {
-      console.warn('[geolocation] permissão negada — caindo pra null')
+    // Diagnóstico explícito por motivo de falha (Lily peer review 29-04 —
+    // user reportou "GPS não pega" sem feedback). Cada motivo distinto
+    // ajuda debugar via DevTools console. Manter `null` como retorno
+    // mantém location opt-in silencioso na UI.
+    if (err instanceof GeolocationPositionError) {
+      switch (err.code) {
+        case err.PERMISSION_DENIED:
+          console.warn(
+            '[geolocation] PERMISSION_DENIED — browser bloqueou. ' +
+              'Ícone de cadeado na URL → Site settings → Geolocation → Permitir.',
+          )
+          break
+        case err.POSITION_UNAVAILABLE:
+          console.warn(
+            '[geolocation] POSITION_UNAVAILABLE — GPS indisponível ' +
+              '(indoor sem rede? device sem GPS? VPN?).',
+          )
+          break
+        case err.TIMEOUT:
+          console.warn(
+            `[geolocation] TIMEOUT após ${GEOLOCATION_TIMEOUT_MS}ms — ` +
+              'GPS lock demorou; tentar de novo ou aproximar de janela/wifi.',
+          )
+          break
+        default:
+          console.warn('[geolocation] erro desconhecido:', err)
+      }
+    } else {
+      console.warn('[geolocation] erro inesperado:', err)
     }
     return null
   }

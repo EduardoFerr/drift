@@ -4,6 +4,24 @@ All notable changes to the Drift client. Uses [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+### Fixed
+
+- **Sync entre devices**: janela de fetch em `sync.ts` ampliada de 24h para 7d. Devices que ficavam offline >1 dia perdiam eventos próprios ao reabrir. Commit 6062422.
+- **Mapa não abre**: faltava migration adicionando coluna `location` em `spreads` — `MapView` quebrava ao tentar `SELECT location FROM spreads`. Migration aplicada em `schema.sql` + step de migração runtime. Commit 6062422.
+- **Spread+bury simultâneo do mesmo user**: scoring agora aplica semântica "última ação vale" — quando o mesmo `pubkey` tem SPREAD e BURY do mesmo post, o `created_at` mais recente prevalece e o anterior é ignorado no score. Endereça bug identificado por Marshall em [conformance-conversa-29-04.md](Docs/conformance-conversa-29-04.md) §1 (manifesto §6 verdade por eventos). Commit 3cdd211.
+
+### Changed
+
+- **Scoring weighted (anti-Sybil)**: `calculateScore` agora soma `weight` dos espalhadores/enterradores em vez de `COUNT(*)`. 1 conta com peso 5 vale o mesmo que 5 contas com peso 1 — Sybil farms perdem o ganho assimétrico. Manifesto §22 (peso de perfil) + §24 (score determinístico). Commit 3cdd211.
+- **Manifesto §23 (bury não pune)**: estendido com seção **"Mudança de opinião"** (user pode reverter SPREAD↔BURY publicando novo evento, último vale) e **"Score weighted"** (especifica fórmula Σ`weight` vs COUNT).
+- **Manifesto §24 (score determinístico)**: fórmula atualizada pra refletir Σ`weight` e semântica última-ação.
+
+### Added
+
+- **`getWeightTier(weight)`**: função pura em `lib/weight.ts` que classifica peso de perfil em tiers (sinal social, manifesto §22). Pronta pra uso em UI; **ainda não aplicada** no `ProfileModal` (badge pendente).
+- **Chunking 500-by-500 em `recalculateScore`**: evita estouro do limite SQLite `IN(?)` (~999 placeholders) em posts virais com muitos espalhadores. Lote os IDs e agrega resultados.
+- **Docs**: [Docs/conversa-29-04-analise.md](Docs/conversa-29-04-analise.md) (Ted) — síntese das propostas Gemini/ChatGPT; [Docs/conformance-conversa-29-04.md](Docs/conformance-conversa-29-04.md) (Marshall) — validação contra invariantes e manifesto.
+
 ## [0.5.4] — 2026-04-27
 
 ### Fixed
