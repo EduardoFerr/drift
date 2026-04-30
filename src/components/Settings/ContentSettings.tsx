@@ -193,12 +193,30 @@ function Toggle({
   )
 }
 
+// Hints descrevem o que VAI pra rede (transparência manifesto §28).
+// Implementação real em `lib/geolocation.ts` apenas ARREDONDA lat/lng —
+// não faz reverse geocoding. `GeoPoint.city`/`country` ficam vazios.
+// Esta é uma escolha consciente: reverse geocoding exigiria lib de
+// ~500KB ou serviço externo (manifesto §17 — sem deps proprietárias
+// críticas). User decide a granularidade pelo arredondamento.
 const GRANULARITY_OPTIONS: { value: LocationGranularity; label: string; hint: string }[] =
   [
     { value: 'off', label: 'off', hint: 'sem location (recomendado)' },
-    { value: 'country', label: 'país', hint: 'só país no evento' },
-    { value: 'city', label: 'cidade', hint: 'cidade + país' },
-    { value: 'precise', label: 'GPS', hint: 'lat/lng exatos' },
+    {
+      value: 'country',
+      label: 'país',
+      hint: 'lat/lng arredondado ~111km (1° de precisão)',
+    },
+    {
+      value: 'city',
+      label: 'cidade',
+      hint: 'lat/lng arredondado ~11km (área metropolitana)',
+    },
+    {
+      value: 'precise',
+      label: 'GPS',
+      hint: 'lat/lng exato ~1m (cuidado — identifica quarteirão)',
+    },
   ]
 
 function LocationGranularityPicker({

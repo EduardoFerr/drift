@@ -30,6 +30,37 @@ const GEOLOCATION_TIMEOUT_MS = 8000
 const HIGH_ACCURACY_THRESHOLD: LocationGranularity = 'precise'
 
 /**
+ * Motivo da última falha de getCurrentLocation. UI lê pra mostrar banner
+ * amistoso (Lily 29-04 — user reportou "GPS não pega" sem feedback).
+ *
+ * - 'permission'  : browser bloqueou (PERMISSION_DENIED)
+ * - 'unavailable' : sem fix de GPS/network (POSITION_UNAVAILABLE)
+ * - 'timeout'     : GPS lock demorou mais que 8s
+ * - 'no-api'      : navigator.geolocation indisponível (Tor browser, etc.)
+ * - null          : nenhuma falha desde a última captura bem-sucedida
+ *
+ * Reset pra null em sucesso. Único módulo que muta é geolocation.ts —
+ * UI só lê via `getLastFailureReason()`.
+ */
+export type GeolocationFailureReason =
+  | 'permission'
+  | 'unavailable'
+  | 'timeout'
+  | 'no-api'
+  | null
+
+let lastFailureReason: GeolocationFailureReason = null
+
+export function getLastFailureReason(): GeolocationFailureReason {
+  return lastFailureReason
+}
+
+/** Test-only: limpa estado interno entre testes. */
+export function _resetLastFailureReason(): void {
+  lastFailureReason = null
+}
+
+/**
  * Casas decimais por granularidade. Cada decimal corta a precisão por
  * fator de ~10. Grau ≈ 111km, então:
  *   - 0 dec → 111km
@@ -63,7 +94,10 @@ export async function getCurrentLocation(
   granularity: LocationGranularity,
 ): Promise<GeoPoint | null> {
   if (granularity === 'off') return null
-  if (typeof navigator === 'undefined' || !navigator.geolocation) return null
+  if (typeof navigator === 'undefined' || !navigator.geolocation) {
+    lastFailureReason = 'no-api'
+    return null
+  }
 
   const decimals = DECIMAL_PLACES[granularity]
 
@@ -80,6 +114,8 @@ export async function getCurrentLocation(
       })
     })
 
+    // Sucesso — reset failure reason.
+    lastFailureReason = null
     return {
       lat: roundTo(position.coords.latitude, decimals),
       lng: roundTo(position.coords.longitude, decimals),
@@ -96,27 +132,32 @@ export async function getCurrentLocation(
     if (err instanceof GeolocationPositionError) {
       switch (err.code) {
         case err.PERMISSION_DENIED:
+          lastFailureReason = 'permission'
           console.warn(
             '[geolocation] PERMISSION_DENIED — browser bloqueou. ' +
               'Ícone de cadeado na URL → Site settings → Geolocation → Permitir.',
           )
           break
         case err.POSITION_UNAVAILABLE:
+          lastFailureReason = 'unavailable'
           console.warn(
             '[geolocation] POSITION_UNAVAILABLE — GPS indisponível ' +
               '(indoor sem rede? device sem GPS? VPN?).',
           )
           break
         case err.TIMEOUT:
+          lastFailureReason = 'timeout'
           console.warn(
             `[geolocation] TIMEOUT após ${GEOLOCATION_TIMEOUT_MS}ms — ` +
               'GPS lock demorou; tentar de novo ou aproximar de janela/wifi.',
           )
           break
         default:
+          lastFailureReason = 'unavailable'
           console.warn('[geolocation] erro desconhecido:', err)
       }
     } else {
+      lastFailureReason = 'unavailable'
       console.warn('[geolocation] erro inesperado:', err)
     }
     return null
