@@ -68,6 +68,13 @@ interface PeerState {
   /** Buffer pra publishes antes de dc.readyState === 'open'.
    *  Em transição → failed/closed, RESETAR pra evitar leak (Barney #4). */
   outboundQueue: string[]
+  /** Token bucket — Barney audit #3 (rate limit anti-DoS).
+   *  Refill RATE_REFILL_PER_SEC tokens/seg, cap em RATE_BURST. */
+  rateBudget: number
+  lastRefillTs: number
+  /** Timestamps recentes (ms) de violação de rate limit, capped em
+   *  RATE_VIOLATION_CAP. 3 violações em RATE_VIOLATION_WINDOW_MS → kill. */
+  rateViolations: number[]
 }
 
 interface SubscriptionRecord {
@@ -92,6 +99,21 @@ const ICE_SERVERS: RTCIceServer[] = [
   { urls: 'stun:stun.l.google.com:19302' },
 ]
 const SEEN_IDS_CAP = 1000
+/** Timeout pra peer stuck em 'connecting' (Barney audit #1, HIGH).
+ *  Sem isso, ICE travado em firewall vira zombie peer + RAM leak linear. */
+const ICE_CONNECT_TIMEOUT_MS = 30_000
+
+// ─── Rate limit (Barney audit #3, anti-DoS) ──────────────────────────
+// Token bucket por peer. Sustained ~100 msgs/seg, burst 200.
+// 3 violações em 60s → peer killed. Manifesto §15.
+const RATE_BURST = 200
+const RATE_REFILL_PER_SEC = 100
+const RATE_VIOLATION_CAP = 16
+const RATE_VIOLATION_WINDOW_MS = 60_000
+const RATE_VIOLATION_THRESHOLD = 3
+/** Throttle do warn pra evitar log flood do próprio defensor. */
+const RATE_WARN_THROTTLE_MS = 5_000
+const lastRateWarnAt = new Map<string, number>()
 
 function myPeerId(): string {
   if (_myPeerId) return _myPeerId
@@ -154,6 +176,9 @@ function getOrCreatePeer(remoteId: string): PeerState {
     createdAt: Date.now(),
     lastPingMs: null,
     outboundQueue: [],
+    rateBudget: RATE_BURST,
+    lastRefillTs: Date.now(),
+    rateViolations: [],
   }
   peers.set(remoteId, peer)
 
@@ -183,6 +208,18 @@ function getOrCreatePeer(remoteId: string): PeerState {
 
   // Side B: receberá o data channel via ondatachannel.
   pc.ondatachannel = (ev) => attachDataChannel(peer, ev.channel)
+
+  // ICE timeout — Barney audit #1 (HIGH). Se ICE não resolver em 30s,
+  // peer fica zombie em 'connecting' e vaza RAM. Mata e remove do map.
+  setTimeout(() => {
+    const current = peers.get(remoteId)
+    if (!current || current !== peer) return
+    if (peer.status === 'connecting') {
+      console.warn('[webrtc] ICE timeout', remoteId.slice(0, 8), '— cleanup zombie')
+      peer.status = 'failed'
+      cleanupPeer(remoteId)
+    }
+  }, ICE_CONNECT_TIMEOUT_MS)
 
   return peer
 }
@@ -235,17 +272,40 @@ async function initiateOffer(peer: PeerState): Promise<void> {
 
 async function handleRemoteOffer(remoteId: string, sdp: string): Promise<void> {
   const peer = getOrCreatePeer(remoteId)
-  await peer.pc.setRemoteDescription({ type: 'offer', sdp })
-  const answer = await peer.pc.createAnswer()
-  await peer.pc.setLocalDescription(answer)
-  if (!signalingChannel || !answer.sdp) return
-  await signalingChannel.send({
-    type: 'answer',
-    from: myPeerId(),
-    to: remoteId,
-    ts: Date.now(),
-    sdp: answer.sdp,
-  })
+  // Glare collision — Barney audit #2 (CRITICAL). Se nosso lado já criou
+  // offer (signalingState === 'have-local-offer'), aplicar setRemoteDescription
+  // direto explode com DOMException. Padrão "perfect negotiation": o lado
+  // não-polite (lex-loser via shouldInitiateOffer) cede, faz rollback e
+  // aceita a offer remota. shouldInitiateOffer(me, peer)===true → eu sou
+  // o initiator → ignoro a offer dele (ele faz rollback). Caso contrário,
+  // se eu já tinha local offer, faço rollback antes de aceitar.
+  const me = myPeerId()
+  const iAmInitiator = shouldInitiateOffer(me, remoteId)
+  const haveLocalOffer = peer.pc.signalingState === 'have-local-offer'
+  if (haveLocalOffer && iAmInitiator) {
+    // Eu venço o tie-break — ignoro offer dele, ele que faz rollback.
+    return
+  }
+  try {
+    if (haveLocalOffer) {
+      // Eu perco o tie-break — rollback minha offer e aceita a dele.
+      await peer.pc.setLocalDescription({ type: 'rollback' })
+    }
+    await peer.pc.setRemoteDescription({ type: 'offer', sdp })
+    const answer = await peer.pc.createAnswer()
+    await peer.pc.setLocalDescription(answer)
+    if (!signalingChannel || !answer.sdp) return
+    await signalingChannel.send({
+      type: 'answer',
+      from: me,
+      to: remoteId,
+      ts: Date.now(),
+      sdp: answer.sdp,
+    })
+  } catch (err) {
+    console.warn('[webrtc] handleRemoteOffer falhou', remoteId.slice(0, 8), err)
+    peer.status = 'failed'
+  }
 }
 
 async function handleRemoteAnswer(remoteId: string, sdp: string): Promise<void> {
@@ -328,7 +388,57 @@ function handleSignalingMessage(msg: SignalingMessage): void {
 
 // ─── DataChannel pipeline (invariante #5) ────────────────────────────
 
+/** Retorna `true` se a mensagem cabe no orçamento; `false` se rate-limited.
+ *  Side effects: atualiza rateBudget/lastRefillTs e, em violação,
+ *  empurra timestamp em rateViolations (caped). Após threshold em janela,
+ *  marca peer como failed e cleanup. */
+function consumeRateBudget(peer: PeerState, now: number): boolean {
+  // Refill linear desde lastRefillTs.
+  const elapsedSec = (now - peer.lastRefillTs) / 1000
+  if (elapsedSec > 0) {
+    peer.rateBudget = Math.min(
+      RATE_BURST,
+      peer.rateBudget + elapsedSec * RATE_REFILL_PER_SEC,
+    )
+    peer.lastRefillTs = now
+  }
+  if (peer.rateBudget >= 1) {
+    peer.rateBudget -= 1
+    return true
+  }
+  // Violation. Push timestamp, cap, prune fora da janela.
+  peer.rateViolations.push(now)
+  if (peer.rateViolations.length > RATE_VIOLATION_CAP) {
+    peer.rateViolations.splice(0, peer.rateViolations.length - RATE_VIOLATION_CAP)
+  }
+  const cutoff = now - RATE_VIOLATION_WINDOW_MS
+  while (peer.rateViolations.length && peer.rateViolations[0]! < cutoff) {
+    peer.rateViolations.shift()
+  }
+  // Throttled warn.
+  const last = lastRateWarnAt.get(peer.id) ?? 0
+  if (now - last > RATE_WARN_THROTTLE_MS) {
+    lastRateWarnAt.set(peer.id, now)
+    console.warn(
+      '[webrtc] rate-limit drop',
+      peer.id.slice(0, 8),
+      `violations=${peer.rateViolations.length}`,
+    )
+  }
+  if (peer.rateViolations.length >= RATE_VIOLATION_THRESHOLD) {
+    console.warn('[webrtc] peer killed (rate abuse)', peer.id.slice(0, 8))
+    peer.status = 'failed'
+    cleanupPeer(peer.id)
+    lastRateWarnAt.delete(peer.id)
+  }
+  return false
+}
+
 function handleDataChannelMessage(peer: PeerState, raw: string): void {
+  // 0. Rate limit cheap-first (Barney #3) — antes mesmo do JSON.parse.
+  //    Invariante #5 preservada: continua cheap → caro.
+  if (!consumeRateBudget(peer, Date.now())) return
+
   // 1. Parse defensivo
   let parsed: unknown
   try {
@@ -466,6 +576,36 @@ export const webrtcTransport: Transport = {
   subscribe,
   health,
 }
+
+// ─── Test-only exports (rate limit unit tests) ───────────────────────
+
+/** Test-only: cria um PeerState mínimo sem RTCPeerConnection real.
+ *  Usar APENAS em tests Node — em runtime, peers nascem via getOrCreatePeer.
+ *  `now0` permite usar timeline sintética (default Date.now()). */
+export function _createPeerStateForTest(id: string, now0?: number): PeerState {
+  const t = now0 ?? Date.now()
+  return {
+    id,
+    pc: {} as RTCPeerConnection,
+    dc: null,
+    status: 'connecting',
+    createdAt: t,
+    lastPingMs: null,
+    outboundQueue: [],
+    rateBudget: RATE_BURST,
+    lastRefillTs: t,
+    rateViolations: [],
+  }
+}
+
+export const _RATE_LIMIT_CONSTANTS = {
+  RATE_BURST,
+  RATE_REFILL_PER_SEC,
+  RATE_VIOLATION_THRESHOLD,
+  RATE_VIOLATION_WINDOW_MS,
+} as const
+
+export { consumeRateBudget as _consumeRateBudget }
 
 // ─── DEV / teardown helpers ──────────────────────────────────────────
 

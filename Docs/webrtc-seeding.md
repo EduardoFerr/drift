@@ -103,8 +103,10 @@ Gating técnico:
 
 ### Fase 6.1 — `transport/webrtc.ts` esqueleto
 
-- **6.1a** — Implementa interface `Transport` (publish/subscribe/health) com mock signaling local. Teste: 2 browsers em localhost trocam evento via DataChannel. Vitest + e2e manual.
-- **6.1b** — Signaling real via Nostr DM NIP-44 sobre `wssTransport`. Teste: peer A publica oferta, peer B responde, DataChannel abre.
+- **6.1a-A** ✅ — `matchFilter` NIP-01 + cobertura de tests pré-6.1a (2026-04-28).
+- **6.1a-B** ✅ — `webrtc-signaling-mock` BroadcastChannel pra smoke test local (2026-04-28).
+- **6.1a-C** ✅ — `transport/webrtc.ts` core implementado (2026-04-29, 432 LOC): `publish`/`subscribe`/`health` + `RTCPeerConnection` lifecycle, pipeline §5 com kind check pré-verify, `pagehide` cleanup, `outboundQueue` reset em failed/closed. DEV bridge `window.driftWebRTC` em `src/main.tsx`. Apenas mock signaling — real fica pra 6.1b. Checklist de aceite em [webrtc-6.1a-c-checklist.md](webrtc-6.1a-c-checklist.md) (Barney).
+- **6.1b** — Signaling real via Nostr DM NIP-44 sobre `wssTransport`. Teste: peer A publica oferta, peer B responde, DataChannel abre. Plano em [webrtc-6.1b-plan.md](webrtc-6.1b-plan.md).
 
 ### Fase 6.2 — Peer registry + path diversity
 

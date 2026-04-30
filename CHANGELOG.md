@@ -4,23 +4,35 @@ All notable changes to the Drift client. Uses [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+### Security
+
+- **WebRTC: ICE timeout 30s** (`transport/webrtc.ts`, Barney audit #1, HIGH): peers travados em `connecting` (ICE não resolve por firewall/STUN down) viravam zombie no map → RAM leak linear. Agora `setTimeout` em `getOrCreatePeer` mata e remove peer após 30s sem resolver.
+- **WebRTC: glare collision (perfect negotiation)** (`handleRemoteOffer`, Barney audit #2, CRITICAL): quando ambos os lados disparavam `initiateOffer` pelo tie-break, o `setRemoteDescription` no estado `'have-local-offer'` explodia com DOMException e o handshake falhava silencioso. Agora o lado lex-loser faz `setLocalDescription({type: 'rollback'})` e aceita a offer remota; lex-winner descarta.
+- **WebRTC: rate limit por peer (token bucket)** (`consumeRateBudget`, Barney audit #3): peer malicioso podia inundar o cliente com mensagens lixo afogando o event-loop antes mesmo do kind check. Bucket 200 burst / 100 msg-s sustained, 3 violações em 60s → peer killed. Cobertura: 8 tests em `tests/webrtc-ratelimit.test.ts`. Manifesto §15.
+
 ### Fixed
 
 - **Sync entre devices**: janela de fetch em `sync.ts` ampliada de 24h para 7d. Devices que ficavam offline >1 dia perdiam eventos próprios ao reabrir. Commit 6062422.
 - **Mapa não abre**: faltava migration adicionando coluna `location` em `spreads` — `MapView` quebrava ao tentar `SELECT location FROM spreads`. Migration aplicada em `schema.sql` + step de migração runtime. Commit 6062422.
 - **Spread+bury simultâneo do mesmo user**: scoring agora aplica semântica "última ação vale" — quando o mesmo `pubkey` tem SPREAD e BURY do mesmo post, o `created_at` mais recente prevalece e o anterior é ignorado no score. Endereça bug identificado por Marshall em [conformance-conversa-29-04.md](Docs/conformance-conversa-29-04.md) §1 (manifesto §6 verdade por eventos). Commit 3cdd211.
+- **Hints enganosos em `location_granularity`**: textos descritivos das opções de granularidade GPS em `ContentSettings.tsx` davam expectativa errada do que é coletado/exposto. Reescritos pra refletir o que de fato vai pro evento Nostr (manifesto §28 privacidade pelo mínimo). Commit 9240064.
 
 ### Changed
 
 - **Scoring weighted (anti-Sybil)**: `calculateScore` agora soma `weight` dos espalhadores/enterradores em vez de `COUNT(*)`. 1 conta com peso 5 vale o mesmo que 5 contas com peso 1 — Sybil farms perdem o ganho assimétrico. Manifesto §22 (peso de perfil) + §24 (score determinístico). Commit 3cdd211.
 - **Manifesto §23 (bury não pune)**: estendido com seção **"Mudança de opinião"** (user pode reverter SPREAD↔BURY publicando novo evento, último vale) e **"Score weighted"** (especifica fórmula Σ`weight` vs COUNT).
 - **Manifesto §24 (score determinístico)**: fórmula atualizada pra refletir Σ`weight` e semântica última-ação.
+- **`ProfileModal` removeu weight numérico exato**: substituído por badge de tier discreto via `getWeightTier` (gaming-resistant — exibir o número exato incentiva farming pra atingir thresholds visíveis). 3 tiers: 🏆 estabelecido (amber), ⭐ ativo (slate), 🌱 novo (green); tooltip cita manifesto §22.
 
 ### Added
 
-- **`getWeightTier(weight)`**: função pura em `lib/weight.ts` que classifica peso de perfil em tiers (sinal social, manifesto §22). Pronta pra uso em UI; **ainda não aplicada** no `ProfileModal` (badge pendente).
+- **`getWeightTier(weight)`**: função pura em `lib/weight.ts` que classifica peso de perfil em tiers (sinal social, manifesto §22). Aplicada no `ProfileModal` como badge.
 - **Chunking 500-by-500 em `recalculateScore`**: evita estouro do limite SQLite `IN(?)` (~999 placeholders) em posts virais com muitos espalhadores. Lote os IDs e agrega resultados.
-- **Docs**: [Docs/conversa-29-04-analise.md](Docs/conversa-29-04-analise.md) (Ted) — síntese das propostas Gemini/ChatGPT; [Docs/conformance-conversa-29-04.md](Docs/conformance-conversa-29-04.md) (Marshall) — validação contra invariantes e manifesto.
+- **`GpsErrorBanner`** (`src/components/UI/GpsErrorBanner.tsx`): banner de feedback UI quando `getCurrentLocation` falha, com `GpsHelpModal` interno cobrindo 4 plataformas (Chrome desktop, Firefox, iOS Safari, Android Chrome). Gating em `App.tsx`: aparece apenas quando `granularity != 'off'`, falha ocorreu há <60s, e não foi dismissed pelo user.
+- **`getLastFailureReason()`** em `src/lib/geolocation.ts`: getter sobre estado interno `lastFailureReason` (denied / unavailable / timeout / insecure-context) consumido pelo banner. +7 tests cobrindo transições.
+- **`transport/webrtc.ts` core** (Fase 6.1a-C, 432 LOC): implementação completa `publish` / `subscribe` / `health` + `RTCPeerConnection` lifecycle. Pipeline §5 com kind check pré-verify (Barney peer review #1), `pagehide` cleanup (#10), `outboundQueue` reset em estado `failed`/`closed` (#4). **Apenas com mock signaling local** (`webrtc-signaling-mock.ts` via BroadcastChannel) — signaling real via Nostr DM NIP-44 fica pra 6.1b.
+- **DEV bridge `window.driftWebRTC`** em `src/main.tsx`: expõe handle do transporte WebRTC pro console em build de dev pra smoke test e2e (2 abas trocando evento via DataChannel).
+- **Docs**: [Docs/conversa-29-04-analise.md](Docs/conversa-29-04-analise.md) (Ted) — síntese das propostas Gemini/ChatGPT; [Docs/conformance-conversa-29-04.md](Docs/conformance-conversa-29-04.md) (Marshall) — validação contra invariantes e manifesto; [Docs/webrtc-6.1a-c-checklist.md](Docs/webrtc-6.1a-c-checklist.md) (Barney) — checklist de aceite 6.1a-C.
 
 ## [0.5.4] — 2026-04-27
 

@@ -30,7 +30,8 @@ ou **Por persona** pra pular direto.
 
 ### Fase 6 (cliente nativo + transports)
 - **[webrtc-seeding.md](webrtc-seeding.md)** — visão geral WebRTC + Proof of Interest (TBD)
-- **[webrtc-6.1a-plan.md](webrtc-6.1a-plan.md)** — esqueleto `transport/webrtc.ts` + signaling mock (entregue)
+- **[webrtc-6.1a-plan.md](webrtc-6.1a-plan.md)** — esqueleto `transport/webrtc.ts` + signaling mock (entregue; 6.1a-C core shipped 2026-04-29)
+- **[webrtc-6.1a-c-checklist.md](webrtc-6.1a-c-checklist.md)** — checklist de aceite 6.1a-C (Barney, 2026-04-29) — peer review + smoke test e2e
 - **[webrtc-6.1b-plan.md](webrtc-6.1b-plan.md)** — signaling real via Nostr DM (NIP-44 + kind 1059)
 - **[webrtc-6.2-plan.md](webrtc-6.2-plan.md)** — peer registry SQLite + path diversity scoring + orchestrator multi-transport (em planejamento)
 - **[webrtc-threats.md](webrtc-threats.md)** — threat model WebRTC, 23+ ameaças classificadas (v1.0, 2026-04-28)
@@ -134,14 +135,19 @@ ou **Por persona** pra pular direto.
 - plano 6.2 ([webrtc-6.2-plan.md](webrtc-6.2-plan.md)) — Ted
 - fix GPS warm-up + indicador (captura antes de `createPost`/`spreadPost`)
 
-### 2026-04-29 — Análise conversa Gemini/ChatGPT + scoring weighted
+### 2026-04-29 — Análise conversa Gemini/ChatGPT + scoring weighted + Fase 6.1a-C
 - [conversa-29-04-analise.md](conversa-29-04-analise.md) (Ted) — síntese das propostas externas
 - [conformance-conversa-29-04.md](conformance-conversa-29-04.md) (Marshall) — validação contra invariantes/manifesto
 - fix sync entre devices (Barney) — janela 24h→7d em `sync.ts` (commit 6062422)
 - fix mapa não abre (Lily) — migration `spreads.location` (commit 6062422)
 - scoring "última ação vale" (spread+bury simultâneo do mesmo user resolve pelo `created_at` mais recente) + scoring weighted Σ`weight` em vez de COUNT (anti-Sybil, manifesto §22/§24) + UX `myActions` em `ProfileModal` (commit 3cdd211)
-- chunking 500-by-500 em `recalculateScore` (mitiga estouro `IN(?)` em posts virais) + `getWeightTier` função pura (sinal social, manifesto §22) — em andamento
+- chunking 500-by-500 em `recalculateScore` (mitiga estouro `IN(?)` em posts virais) + `getWeightTier` função pura (sinal social, manifesto §22)
 - manifesto §23 estendido com seções "Mudança de opinião" e "Score weighted"; §24 fórmula atualizada
+- fix hints enganosos em `location_granularity` (manifesto §28) — commit 9240064
+- **GpsErrorBanner** (Lily) — `src/components/UI/GpsErrorBanner.tsx` + `GpsHelpModal` interno; `geolocation.ts` ganhou `lastFailureReason` + getter; `App.tsx` integra banner gated por `granularity != 'off'` + janela <60s + não-dismissed; +7 tests
+- **Badge weight tier no ProfileModal** (Marshall) — integra `getWeightTier`, remove número exato (gaming-resistant), 3 tiers (🏆 estabelecido / ⭐ ativo / 🌱 novo) com tooltip §22
+- **`transport/webrtc.ts` core** (Ted, Fase 6.1a-C) — 432 LOC publish/subscribe/health + RTCPeerConnection; pipeline §5 com kind check pré-verify; `pagehide` cleanup; outboundQueue reset em failed/closed; DEV bridge `window.driftWebRTC` em `src/main.tsx`
+- **Checklist 6.1a-C** (Barney) — [webrtc-6.1a-c-checklist.md](webrtc-6.1a-c-checklist.md) peer review + smoke test e2e
 - atualização do INDEX + CHANGELOG (Robin)
 
 ---
@@ -151,4 +157,4 @@ ou **Por persona** pra pular direto.
 - Docs prometidos pelas Fases 6/7 ainda não criados: `ipfs-pin.md` (Fase 7), `sneakernet.md` (Fase 7), `run-your-own-relay.md` (Fase 7), `tor-arti.md` (Fase 6.3), `capacitor.md` (alternativa TWA).
 - Nenhum doc tem campo formal `last-updated:` no frontmatter — datas inferidas via versão (manifesto v2.2, arquitetura v5.3) ou cabeçalho (`webrtc-threats.md` 2026-04-28, `webrtc-6.2-plan.md` 2026-04-28).
 - `Docs/icones-oquesao-cada um.PNG` é asset órfão (sem doc explicando o que documenta).
-- `getWeightTier` (função pura criada em 2026-04-29, sinal social manifesto §22) ainda **não aplicada** na UI — falta badge de tier no `ProfileModal`.
+- ~~`getWeightTier` ainda não aplicada na UI~~ — resolvido em 2026-04-29 (badge tier no `ProfileModal`, Marshall).
