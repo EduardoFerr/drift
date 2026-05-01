@@ -599,6 +599,37 @@ describe('nostrSignalingChannel — send semantics', () => {
     expect(received[0].from).toBe(alice.pk)
   })
 
+  it('rate limit local: 31 sends em <60s → 30 publicam, 31º drop', async () => {
+    // Defesa contra flood self-imposto (bug em layer acima fazendo
+    // ICE trickle infinito). 30 msgs/min (limite hardcoded).
+    const alice = pair()
+    const bob = pair()
+    const relay = fakeRelay()
+    const tA = fakeTransport(relay)
+
+    const chA = nostrSignalingChannel({
+      myNpub: alice.pk,
+      myNsecBytes: alice.sk,
+      transport: tA,
+      signEvent: makeSigner(alice.sk),
+    })
+    channels.push(chA)
+
+    for (let i = 0; i < 31; i++) {
+      await chA.send({
+        type: 'ice',
+        from: alice.pk,
+        to: bob.pk,
+        ts: Date.now(),
+        candidate: { candidate: `cand-${i}`, sdpMLineIndex: 0, sdpMid: '0' },
+      })
+    }
+    await flush()
+
+    // 30 publicaram; 31ª foi drop pelo rate limit local.
+    expect(tA.published).toHaveLength(30)
+  })
+
   it('send após close é no-op', async () => {
     const alice = pair()
     const bob = pair()

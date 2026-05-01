@@ -52,6 +52,19 @@ const SUBSCRIBE_SINCE_WINDOW_MS = 24 * 60 * 60 * 1_000
 const DEDUP_TTL_MS = 5 * 60_000
 const RATE_LIMIT_PER_SENDER = 10
 const RATE_WINDOW_MS = 60_000
+/**
+ * Rate limit LOCAL no `send()` — limita quantos eventos kind 1059 esta
+ * instância publica nos relays. Defesa contra bug em layer acima fazendo
+ * flood (ex: ICE trickle infinito por loop em pc.onicecandidate).
+ *
+ * 30 msgs/min ≈ 0.5/seg, suficiente pra ICE trickle típico (10-20
+ * candidates em ~5s) + offer/answer. Burst maior implica bug, drop.
+ *
+ * Diferente do `RATE_LIMIT_PER_SENDER` acima, que é receive-side
+ * (anti-Sybil de remetentes). Este é send-side (anti-self-flood).
+ */
+const SEND_RATE_LIMIT = 30
+const SEND_RATE_WINDOW_MS = 60_000
 /** Limite máximo da LRU de event.id pra evitar growth ilimitado. */
 const DEDUP_MAX_ENTRIES = 5_000
 
@@ -86,6 +99,8 @@ export function nostrSignalingChannel(opts: NostrSignalingOpts): SignalingChanne
   const seenEventIds = new Map<string, number>()
   // Rate limit per-sender: pubkey → array de timestamps ms (janela 60s).
   const rateBuckets = new Map<string, number[]>()
+  // Rate limit LOCAL do send() — array de timestamps ms (janela 60s).
+  const sendBucket: number[] = []
   let closed = false
 
   const filter: Filter = {
@@ -208,6 +223,22 @@ export function nostrSignalingChannel(opts: NostrSignalingOpts): SignalingChanne
       const to = msg.to
       if (typeof to !== 'string' || to.length === 0) return
 
+      // Rate limit local — defesa contra flood self-imposto (bug em layer
+      // acima ou loop infinito em ICE trickle). Drop silencioso quando
+      // exceder; caller não deve reagir (não há fallback razoável).
+      const tNow = now()
+      while (sendBucket.length && tNow - sendBucket[0]! >= SEND_RATE_WINDOW_MS) {
+        sendBucket.shift()
+      }
+      if (sendBucket.length >= SEND_RATE_LIMIT) {
+        console.warn(
+          '[nostr-signaling] send rate-limited locally —',
+          `${sendBucket.length}/${SEND_RATE_LIMIT} em ${SEND_RATE_WINDOW_MS}ms`,
+        )
+        return
+      }
+      sendBucket.push(tNow)
+
       let ciphertext: string
       try {
         ciphertext = encryptDM(JSON.stringify(msg), to, opts.myNsecBytes)
@@ -242,6 +273,7 @@ export function nostrSignalingChannel(opts: NostrSignalingOpts): SignalingChanne
       handlers.clear()
       seenEventIds.clear()
       rateBuckets.clear()
+      sendBucket.length = 0
       try {
         unsub()
       } catch {

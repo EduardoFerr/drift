@@ -4,6 +4,12 @@ All notable changes to the Drift client. Uses [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+### Added (defense in depth — peer review pendências)
+
+- **Rate limit local no `send()` do `nostrSignalingChannel`** (`webrtc-signaling-nostr.ts`): token bucket 30 msgs/60s. Defesa contra flood self-imposto (bug em layer acima ou loop infinito em ICE trickle). Drop silencioso quando exceder; caller não deve reagir. Diferente do `RATE_LIMIT_PER_SENDER` receive-side (anti-Sybil de remetentes); este é send-side (anti-self-flood). +1 test em `tests/signaling-nostr.test.ts` (305 verdes).
+
+- **`myPeerId()` defense in depth** (`webrtc.ts`): retorna `signalingChannel.peerId` quando disponível em vez de só `_myPeerId` cacheado. Garante consistência caso algum caller hipotético chame antes de `ensureSignalingAsync` completar (improvável — todos os call sites awaitam, mas defesa em profundidade barata).
+
 ### Fixed (signaling Nostr — follow-up de 0.6.0-alpha.1)
 
 - **Store-and-forward signaling não funcionava** (`webrtc-signaling-nostr.ts:78,96`, peer review do próprio release). O `replay window` usava `Math.abs(tNow - eventTsMs) > 60s` (simétrico) — droppava eventos legítimos do passado também. Combinado com `subscribe.since: now-60s`, peers que bootavam mais de 1 minuto após A publicar offer perdiam todos os signals acumulados nos relays. Quebrava o caso de uso "A publica offer enquanto B offline; B recebe ao bootar" documentado em `webrtc-6.1b-plan.md` §2 e manifesto §16. **Fix**: 

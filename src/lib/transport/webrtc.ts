@@ -116,6 +116,14 @@ const RATE_WARN_THROTTLE_MS = 5_000
 const lastRateWarnAt = new Map<string, number>()
 
 function myPeerId(): string {
+  // Quando signaling está booted, usa peerId canônico do canal (UUID em
+  // mock, npub em Nostr). Defesa contra race: se algum caller hipotético
+  // chamar antes do `ensureSignalingAsync` completar (improvável — todos
+  // os call sites passam por await), retorna UUID temporário do fallback.
+  // Após boot, `_myPeerId` é setado pelo próprio `ensureSignalingAsync`
+  // pro npub em modo Nostr — então `myPeerId()` continua retornando o
+  // mesmo valor pra esse runtime.
+  if (signalingChannel) return signalingChannel.peerId
   if (_myPeerId) return _myPeerId
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     _myPeerId = crypto.randomUUID()
