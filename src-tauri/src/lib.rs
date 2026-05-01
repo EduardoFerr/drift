@@ -11,10 +11,18 @@
 #[cfg(debug_assertions)]
 use tauri::Manager;
 
+mod tor;
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .manage(tor::TorState::default())
+        .invoke_handler(tauri::generate_handler![
+            tor::tor_connect,
+            tor::tor_disconnect,
+            tor::tor_status,
+        ])
         .setup(|_app| {
             #[cfg(debug_assertions)]
             {

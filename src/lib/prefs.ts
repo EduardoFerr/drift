@@ -23,6 +23,7 @@ import {
   type UserPrefs,
   type LocationGranularity,
   type MapView,
+  type NetworkMode,
 } from '../types/drift'
 
 // ─── Store reativa ───────────────────────────────────────────────────
@@ -77,6 +78,9 @@ function applyRow(target: UserPrefs, key: string, value: string): void {
     case 'map_view':
       if (isMapView(value)) target.map_view = value
       return
+    case 'network_mode':
+      if (isNetworkMode(value)) target.network_mode = value
+      return
     default:
       // chave desconhecida — pode ser de fase futura, ignora silenciosamente
       return
@@ -89,6 +93,10 @@ function isLocationGranularity(v: string): v is LocationGranularity {
 
 function isMapView(v: string): v is MapView {
   return v === 'fit-bounds' || v === 'open'
+}
+
+function isNetworkMode(v: string): v is NetworkMode {
+  return v === 'clearnet' || v === 'tor' || v === 'onion-only'
 }
 
 /**

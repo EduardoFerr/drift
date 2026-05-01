@@ -17,6 +17,7 @@ import {
   type BootState,
 } from './lib/bootstrap'
 import { getPrefs, usePrefsStore } from './lib/prefs'
+import { isTauri } from './lib/transport/tor'
 import { useUserWeight } from './hooks/useUserWeight'
 import { useInstallPrompt } from './hooks/useInstallPrompt'
 import { IdentityPanel } from './components/Identity/IdentityPanel'
@@ -33,6 +34,7 @@ import { MultiTabModal } from './components/UI/MultiTabModal'
 import type {
   DriftIdentity,
   LocationGranularity,
+  NetworkMode,
   Post,
   Subpost,
   ContentWarning,
@@ -47,6 +49,7 @@ function App() {
 
   const onboardingDone = usePrefsStore((s) => s.onboarding_done)
   const locationGranularity = usePrefsStore((s) => s.location_granularity)
+  const networkMode = usePrefsStore((s) => s.network_mode)
 
   const [publishing, setPublishing] = useState(false)
   const [pending, setPending] = useState<Record<string, 'spread' | 'bury'>>({})
@@ -68,9 +71,10 @@ function App() {
   const [showDiagnostic, setShowDiagnostic] = useState(false)
   const [showIdentity, setShowIdentity] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
-  // Quando o user clica no indicador 📍 do Header, abre Settings já
-  // scrollado pra seção location_granularity. Default null = sem scroll.
-  const [settingsScrollTo, setSettingsScrollTo] = useState<'location' | null>(null)
+  // Quando o user clica num indicador do Header (📍 location ou 🌐/🧅/🛡
+  // network), abre Settings já scrollado pra seção certa. Default null =
+  // sem scroll.
+  const [settingsScrollTo, setSettingsScrollTo] = useState<'location' | 'network' | null>(null)
   const [showRelays, setShowRelays] = useState(false)
   const [showSwitcher, setShowSwitcher] = useState(false)
   const [showLists, setShowLists] = useState(false)
@@ -479,7 +483,12 @@ function App() {
             setSettingsScrollTo('location')
             setShowSettings(true)
           }}
+          onOpenSettingsNetwork={() => {
+            setSettingsScrollTo('network')
+            setShowSettings(true)
+          }}
           locationGranularity={locationGranularity}
+          networkMode={networkMode}
           onOpenRelays={() => setShowRelays(true)}
           onOpenLists={() => setShowLists(true)}
           onOpenProfile={() => setShowProfile(true)}
@@ -647,11 +656,13 @@ function Header({
   onOpenSwitcher,
   onOpenSettings,
   onOpenSettingsLocation,
+  onOpenSettingsNetwork,
   onOpenRelays,
   onOpenLists,
   onOpenProfile,
   onClearLocal,
   locationGranularity,
+  networkMode,
 }: {
   identity: DriftIdentity | null
   userWeight: { weight: number; engagement: number; antiquity: number; maxSubposts: number }
@@ -661,12 +672,24 @@ function Header({
   onOpenSwitcher: () => void
   onOpenSettings: () => void
   onOpenSettingsLocation: () => void
+  onOpenSettingsNetwork: () => void
   onOpenRelays: () => void
   onOpenLists: () => void
   onOpenProfile: () => void
   onClearLocal: () => void
   locationGranularity: LocationGranularity
+  networkMode: NetworkMode
 }) {
+  const tauri = isTauri()
+  const networkIcon =
+    networkMode === 'tor' ? '🧅' : networkMode === 'onion-only' ? '🛡' : '🌐'
+  const networkTitle = !tauri
+    ? 'Tor exige cliente desktop (Tauri) — atual: clearnet. Clique pra ver opções.'
+    : networkMode === 'clearnet'
+    ? 'Rede: clearnet (WSS direto). Clique pra trocar pra Tor.'
+    : networkMode === 'tor'
+    ? 'Rede: Tor (WSS via SOCKS5 local — IP não vaza pro relay).'
+    : 'Rede: onion-only (paranoia máxima — só relays .onion).'
   // Selectors granulares — re-render só quando o campo específico muda.
   const active = useSyncStore((s) => s.active)
   const events = useSyncStore((s) => s.eventsReceived)
@@ -706,6 +729,25 @@ function Header({
           }
         >
           📍
+        </button>
+        {/* Indicador de modo de rede (Fase 6.4) — manifesto §15.
+            🌐 clearnet (default) · 🧅 tor · 🛡 onion-only.
+            Em PWA browser, opacidade reduzida + tooltip explica que Tor
+            exige cliente desktop. Click sempre abre Settings na seção
+            "modo de rede". */}
+        <button
+          onClick={onOpenSettingsNetwork}
+          className={`text-[12px] leading-none hover:opacity-80 ${
+            !tauri
+              ? 'text-slate-700 opacity-60'
+              : networkMode === 'clearnet'
+              ? 'text-slate-600'
+              : 'text-amber-300'
+          }`}
+          title={networkTitle}
+          aria-label={networkTitle}
+        >
+          {networkIcon}
         </button>
         <button
           onClick={onOpenProfile}

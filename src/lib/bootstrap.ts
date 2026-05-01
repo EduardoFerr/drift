@@ -174,6 +174,20 @@ async function doBootstrap(): Promise<void> {
     // pra peers em redes diferentes). Manifesto §12 (múltiplos transportes).
     registerTransport(wssTransport, { weight: 10 })
     registerTransport(webrtcTransport, { weight: 5 })
+    // TODO(Fase 6.4 — arti integration): quando `src-tauri/src/tor.rs::tor_connect`
+    // sair do stub e expor SOCKS5 local real, registrar `torTransport` aqui
+    // condicional ao prefs.network_mode. Esqueleto:
+    //
+    //   import { torTransport, torConnect } from './transport/tor'
+    //   const mode = getPrefs().network_mode
+    //   if (mode === 'tor' || mode === 'onion-only') {
+    //     await torConnect()
+    //     registerTransport(torTransport, { weight: 8 })
+    //   }
+    //
+    // Hoje NÃO registramos: `tor_connect()` retorna erro stub, o que faria
+    // o orchestrator acumular failures permanentes em modo tor. UI já gating
+    // o picker pra disabled em PWA browser. Manifesto §15.
 
     await startSync()
 

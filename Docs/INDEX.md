@@ -34,6 +34,7 @@ ou **Por persona** pra pular direto.
 - **[webrtc-6.1a-c-checklist.md](webrtc-6.1a-c-checklist.md)** — checklist de aceite 6.1a-C (Barney, 2026-04-29) — peer review + smoke test e2e
 - **[webrtc-6.1b-plan.md](webrtc-6.1b-plan.md)** ✅ — signaling real via Nostr DM (NIP-44 + kind 1059) — shipped `0.6.0-alpha.1`
 - **[webrtc-6.2-plan.md](webrtc-6.2-plan.md)** — peer registry SQLite + path diversity scoring + orchestrator multi-transport (em planejamento)
+- **[webrtc-6.4-plan.md](webrtc-6.4-plan.md)** 🟡 — Tor transport: scaffold + stub IPC shipped em `[Unreleased]` (2026-04-29); integração `arti` real pendente em sessão dedicada. Manifesto §4/§15/§28.
 - **[webrtc-threats.md](webrtc-threats.md)** — threat model WebRTC, 23+ ameaças classificadas (v1.0, 2026-04-28)
 
 ### Fase 7 (distribuição)
@@ -91,7 +92,7 @@ ou **Por persona** pra pular direto.
 | §6 verdade por eventos | [conformance-conversa-29-04.md](conformance-conversa-29-04.md) §1 (spread+bury simultâneo) |
 | §7 determinismo | [../CLAUDE.md](../CLAUDE.md) invariantes #3, #16 (Vitest tests) |
 | §12 múltiplos transportes | [webrtc-seeding.md](webrtc-seeding.md), [webrtc-6.1a-plan.md](webrtc-6.1a-plan.md), [webrtc-6.2-plan.md](webrtc-6.2-plan.md), `src/lib/transport/` |
-| §15 anti-censura por país | [webrtc-seeding.md](webrtc-seeding.md), Fase 6.3 (TBD: Tor via arti) |
+| §15 anti-censura por país | [webrtc-seeding.md](webrtc-seeding.md), [webrtc-6.4-plan.md](webrtc-6.4-plan.md) (Tor transport: scaffold shipped, arti real pendente) |
 | §16 disponibilidade distribuída | [webrtc-seeding.md](webrtc-seeding.md) (PoI seeder), [fdroid.md](fdroid.md), `lib/rebroadcast.ts` |
 | §17 sem chave mestra + build reproduzível | [fdroid.md](fdroid.md), [../CLAUDE.md](../CLAUDE.md) invariante #12 |
 | §20 resistência a isolamento | `lib/probe.ts` (probe anti-eclipse), [webrtc-threats.md](webrtc-threats.md), [webrtc-6.2-plan.md](webrtc-6.2-plan.md) (path diversity scoring) |
@@ -122,6 +123,7 @@ ou **Por persona** pra pular direto.
 | [webrtc-6.1a-plan.md](webrtc-6.1a-plan.md) | Plano da sub-fase 6.1a: especificação `Transport`, esqueleto `webrtc.ts`, BroadcastChannel mock signaling, armadilhas de teste. Status: entregue (matchFilter + signaling-mock shipped 2026-04-28). |
 | [webrtc-6.1b-plan.md](webrtc-6.1b-plan.md) | Sub-fase 6.1b ✅ entregue em `0.6.0-alpha.1`: signaling via Nostr DM cifrado (NIP-44 v2 + kind 1059 gift wrap minimal, sem NIP-17 seal). Zero deps novas (nostr-tools 2.7.0 já tem `nip44`). Discovery PoI-only. Doc mantido como referência histórica do plano executado. |
 | [webrtc-6.2-plan.md](webrtc-6.2-plan.md) | Plano sub-fase 6.2 (Ted, 2026-04-28): `peers_known` SQLite (migration v7) + `scorePeer()` puro (latência+fail+ASN/country diversity) + `transport/orchestrator.ts` que substitui chamadas diretas a `wssTransport` em `sync.ts` + caps (MAX_PEERS=32, 1 conn/pubkey, 100 msg/s). Endereça T-WRTC-006/007/008/010/017. |
+| [webrtc-6.4-plan.md](webrtc-6.4-plan.md) | Plano sub-fase 6.4 (Robin, 2026-04-29): Tor transport. Scaffold + stub IPC shipped — `tor.rs` (3 commands `tor_connect/disconnect/status` retornando `TorStatus`), `NetworkMode = 'clearnet' \| 'tor' \| 'onion-only'` em UserPrefs, `RelayConfig.onion?` opcional, `transport/tor.ts` consumindo IPC, UI toggle Header. Integração `arti` real (Rust crate Tor) fica pra sessão dedicada (~10-15h). §15 só fica cumprido inteiro com arti real. |
 | [webrtc-threats.md](webrtc-threats.md) | Threat model dedicado WebRTC v1.0 (Barney, 2026-04-28). 23+ ameaças classificadas em 5 categorias (Peer / Rede / Signaling / Discovery / Recursos), cada uma com probabilidade, mitigação por fase, status (Aceito / Aberto / Crítico). Complementa §36 da arquitetura. |
 | [research-backlog.md](research-backlog.md) | Itens externos pendentes enquanto WebFetch está bloqueado. Cada item: pergunta + por quê bloqueia + workaround interim + fonte ideal. Mantida pela Robin. ~25 itens organizados por fase. |
 | [conversa-29-04-analise.md](conversa-29-04-analise.md) | Análise técnica da conversa do dia com Gemini/ChatGPT — propostas de defesa Sybil, EigenTrust, debate sobre afinidade no feed, decisões registradas (Ted, 2026-04-29). |
@@ -159,7 +161,7 @@ ou **Por persona** pra pular direto.
 
 ## Buracos conhecidos
 
-- Docs prometidos pelas Fases 6/7 ainda não criados: `ipfs-pin.md` (Fase 7), `sneakernet.md` (Fase 7), `run-your-own-relay.md` (Fase 7), `tor-arti.md` (Fase 6.3), `capacitor.md` (alternativa TWA).
+- Docs prometidos pelas Fases 6/7 ainda não criados: `ipfs-pin.md` (Fase 7), `sneakernet.md` (Fase 7), `run-your-own-relay.md` (Fase 7), `capacitor.md` (alternativa TWA). (`webrtc-6.4-plan.md` cobre Tor — scaffold shipped 2026-04-29, arti real pendente).
 - Nenhum doc tem campo formal `last-updated:` no frontmatter — datas inferidas via versão (manifesto v2.2, arquitetura v5.3) ou cabeçalho (`webrtc-threats.md` 2026-04-28, `webrtc-6.2-plan.md` 2026-04-28).
 - `Docs/icones-oquesao-cada um.PNG` é asset órfão (sem doc explicando o que documenta).
 - ~~`getWeightTier` ainda não aplicada na UI~~ — resolvido em 2026-04-29 (badge tier no `ProfileModal`, Marshall).

@@ -192,10 +192,23 @@ export interface UserPrefs {
    * `open` é útil pra posts virais com espalhamento intercontinental.
    */
   map_view: MapView
+  /** Modo de rede pro tráfego (Fase 6.4). Default 'clearnet'. */
+  network_mode: NetworkMode
 }
 
 /** Modo de visualização do mapa de spread. */
 export type MapView = 'fit-bounds' | 'open'
+
+/** Modo de rede pro tráfego pros relays (Fase 6.4).
+ *  - `clearnet`: WSS direto pros relays públicos (default).
+ *  - `tor`: WSS via SOCKS5 proxy local (arti embedded no Tauri shell).
+ *    IP do user não vaza pro relay. Manifesto §28.
+ *  - `onion-only`: só conecta a relays `.onion`; clearnet bloqueado.
+ *    Modo paranoia máximo. Manifesto §4 (anonimato por design).
+ *
+ *  Em PWA browser: setting fica disabled (Tor exige cliente nativo Tauri).
+ */
+export type NetworkMode = 'clearnet' | 'tor' | 'onion-only'
 
 export const DEFAULT_USER_PREFS: UserPrefs = {
   show_nsfw_default: false,
@@ -204,4 +217,5 @@ export const DEFAULT_USER_PREFS: UserPrefs = {
   location_granularity: 'off',
   onboarding_done: false,
   map_view: 'fit-bounds',
+  network_mode: 'clearnet',
 }

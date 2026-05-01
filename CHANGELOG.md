@@ -4,6 +4,29 @@ All notable changes to the Drift client. Uses [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+### Added (Fase 6.4 — Tor transport scaffold + stub)
+
+🟡 **Scaffold + stub shipped**. Integração `arti` real (Rust crate Tor client) fica pra sessão dedicada (~10-15h Rust). Coordenado por 4 personas (Ted Rust IPC / Marshall types+config / Lily TS transport+UI / Robin docs):
+
+- **`src-tauri/src/tor.rs`** (Ted): 3 IPC commands Tauri retornando `TorStatus { state: 'disconnected'|'connecting'|'connected'|'error', circuitCount, lastError }`. `tor_connect()` é STUB — retorna `state: 'error'` + `lastError: "STUB: arti integration pending"`. `tor_disconnect()` zera estado. `tor_status()` snapshot do TorState global. API estável — quando `arti-client` chegar, internals mudam sem quebrar callers TS.
+
+- **`NetworkMode` type + `UserPrefs.network_mode`** (Marshall, `src/types/drift.ts` + `src/lib/prefs.ts`): `'clearnet' | 'tor' | 'onion-only'`, default `'clearnet'`. Guard `isNetworkMode` em `applyRow`.
+
+- **`RelayConfig.onion?: string`** (Marshall, `src/config/relays.ts`): alias `.onion` opcional ao lado de `url` clearnet. `activeReadRelays/Write` consomem `network_mode`: clearnet → todos `url`; tor → prefere `onion` se existir, fallback `url`; onion-only → filtra fora relays sem `onion`. Seed list atual com `onion` undefined em todos — user popula via Settings (próxima sessão).
+
+- **`src/lib/transport/tor.ts`** (Lily): implementa `Transport` interface consumindo IPC via `@tauri-apps/api/core`. Em PWA browser (sem `window.__TAURI_INTERNALS__`), `publish/subscribe` lança `Error("Tor exige cliente nativo Tauri — instale o desktop")`. Em Tauri, status atual sempre `'error'` (stub). Wire em orchestrator condicional ao `network_mode === 'tor' || 'onion-only'` — não registrado por default.
+
+- **UI toggle Header** (Lily): ícone status 🌐 (clearnet) / 🧅 (tor) / 🛡️ (onion-only). Click abre Settings → seção "modo de rede".
+
+- **`Docs/webrtc-6.4-plan.md`** (Robin): doc completo (mecânica, scaffold shipped, limitações honestas, roadmap arti, manifesto coverage). [INDEX.md](Docs/INDEX.md) e [fase-6-roadmap.md](Docs/fase-6-roadmap.md) §6.4 atualizados — status 🟡.
+
+**Limitações honestas**:
+- Stub não conecta de fato. Útil pra testar UI flow + integração TS↔Rust IPC, **não** pra ativar Tor real.
+- IP leak via WebRTC ICE: em modo `tor`/`onion-only`, WebRTC será desabilitado pelo orchestrator (sessão futura — não implementado hoje).
+- Capacitor/Android via Orbot: frente separada, não coberta aqui.
+
+**Manifesto**: §15 (anti-censura por país) só fica cumprido **inteiro** quando `arti` real integrar. Hoje, scaffold serve pra preparar terreno + permitir Lily testar flow TS↔Rust. §28 (privacidade pelo mínimo) já cumprido (opt-in, default clearnet).
+
 ### Added (Fase 7.1a — PoI auto-discovery via SpreadMap)
 
 - **`src/lib/seeder.ts`** (Lily): nova função `seedFromSpreaders(postId)` que lê `spreader_pub` distintos do SQLite local e dispara `webrtcTransport.connectTo(npub)` paralelo pra cada um. Idempotente (dedup por postId na sessão), respeita `WEBRTC_LIMITS.MAX_PEERS=32`, best-effort (failures swallow — `peerRegistry` registra via `recordFailure` em outras camadas).

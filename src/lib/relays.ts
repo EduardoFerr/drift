@@ -20,7 +20,12 @@
 
 import { create } from 'zustand'
 import { db } from './db'
-import { RELAYS as SEED_RELAYS } from '../config/relays'
+import {
+  RELAYS as SEED_RELAYS,
+  SEED_RELAY_CONFIGS,
+} from '../config/relays'
+import { getPrefs } from './prefs'
+import type { NetworkMode } from '../types/drift'
 
 // ─── Tipos ───────────────────────────────────────────────────────────
 
@@ -232,22 +237,64 @@ export async function recordRelayError(url: string, err: string): Promise<void> 
 // ─── Leitura ─────────────────────────────────────────────────────────
 
 /**
+ * Aplica `NetworkMode` (Fase 6.4) sobre uma lista de URLs clearnet.
+ *
+ *  - `clearnet`: retorna URLs como vieram (default).
+ *  - `tor`: troca por `.onion` quando o config seed tiver alias; senão
+ *    mantém clearnet (o WSS via Tor segue funcionando, só não anônimo
+ *    end-to-end no nível de hidden-service).
+ *  - `onion-only`: filtra fora qualquer URL sem `.onion` conhecido.
+ *
+ * Hoje a fonte de aliases `.onion` é só `SEED_RELAY_CONFIGS` (relays
+ * adicionados pelo user vão clearnet-only até migration v8 adicionar
+ * coluna `onion` em `relays_user`).
+ */
+function applyNetworkMode(urls: string[], mode: NetworkMode): string[] {
+  if (mode === 'clearnet') return urls
+  const onionByUrl = new Map<string, string>()
+  for (const cfg of SEED_RELAY_CONFIGS) {
+    if (cfg.onion) onionByUrl.set(cfg.url, cfg.onion)
+  }
+  const out: string[] = []
+  for (const url of urls) {
+    const onion = onionByUrl.get(url)
+    if (mode === 'onion-only') {
+      if (onion) out.push(onion)
+      // sem onion → drop
+      continue
+    }
+    // mode === 'tor'
+    out.push(onion ?? url)
+  }
+  return out
+}
+
+/**
  * URLs ativas (enabled=1) — substitui o uso direto de `RELAYS` em
  * `wssTransport`. Snapshot síncrono da store.
  *
  * Inclui sempre ao menos 1 relay aleatório fora da preferência do user
  * se o conjunto user-curado for muito pequeno (<2). Manifesto §20.
+ *
+ * Fase 6.4: aplica `NetworkMode` (clearnet/tor/onion-only) antes de
+ * retornar — em `tor` prefere `.onion`, em `onion-only` filtra fora
+ * relays clearnet-only.
  */
 export function activeRelays(): string[] {
   const list = useRelaysStore.getState().list
   const active = list.filter((r) => r.enabled).map((r) => r.url)
-  if (active.length >= 2) return active
-  // Anti-eclipse: se o user só tem 0-1 relay configurado, mistura
-  // seeds que ele NÃO removeu na rotação (não viola §10 — não
-  // ressuscita removidos, só completa).
-  const knownUrls = new Set(list.map((r) => r.url))
-  const fallback = SEED_RELAYS.filter((u) => !knownUrls.has(u))
-  return [...active, ...fallback]
+  let urls: string[]
+  if (active.length >= 2) {
+    urls = active
+  } else {
+    // Anti-eclipse: se o user só tem 0-1 relay configurado, mistura
+    // seeds que ele NÃO removeu na rotação (não viola §10 — não
+    // ressuscita removidos, só completa).
+    const knownUrls = new Set(list.map((r) => r.url))
+    const fallback = SEED_RELAYS.filter((u) => !knownUrls.has(u))
+    urls = [...active, ...fallback]
+  }
+  return applyNetworkMode(urls, getPrefs().network_mode)
 }
 
 /**
@@ -258,7 +305,7 @@ export function activeWriteRelays(): string[] {
   const list = useRelaysStore.getState().list
   const active = list.filter((r) => r.enabled && r.write).map((r) => r.url)
   if (active.length === 0) return activeRelays()
-  return active
+  return applyNetworkMode(active, getPrefs().network_mode)
 }
 
 /**
@@ -268,7 +315,7 @@ export function activeReadRelays(): string[] {
   const list = useRelaysStore.getState().list
   const active = list.filter((r) => r.enabled && r.read).map((r) => r.url)
   if (active.length === 0) return activeRelays()
-  return active
+  return applyNetworkMode(active, getPrefs().network_mode)
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────

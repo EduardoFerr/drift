@@ -1,6 +1,6 @@
 # Fase 6 — Roadmap honesto
 
-**Status**: avançado. Fase 6 = "cliente nativo + transportes alternativos + capacidade técnica do §15 (anti-censura por país)". Hoje **6.1a, 6.1b, 6.2, 6.3, 6.5, 6.6, 6.7** estão entregues; resta apenas **6.4 Tor transport** pra cumprir §15 inteiro.
+**Status**: avançado. Fase 6 = "cliente nativo + transportes alternativos + capacidade técnica do §15 (anti-censura por país)". Hoje **6.1a, 6.1b, 6.2, 6.3, 6.5, 6.6, 6.7** estão entregues; **6.4 Tor transport** ganhou scaffold + stub IPC em 2026-04-29 (`[Unreleased]`) — falta integração `arti` real (sessão dedicada ~10-15h Rust) pra cumprir §15 inteiro.
 
 **Compromisso do manifesto** (§ROADMAP, linha 950):
 > "Fase 6 + Fase 7 não são 'talvez'. São 'vão acontecer'. Se em algum momento o caminho técnico mostrar que algo dessas fases é inviável como prometido, o manifesto é atualizado com bump de versão e justificativa pública. Não cala, não promete e não entrega."
@@ -52,9 +52,18 @@ Trade-off: TURN relay TCP custa banda. Default usar TURN público (Twilio, Cloud
 
 Estimativa: **1-2 sessões** (~8h). Manifesto §15 (mobile real).
 
-### ⏳ 6.4 — **Tor transport** (`tor.ts`)
+### 🟡 6.4 — **Tor transport** (`tor.ts`) — scaffold + stub shipped 2026-04-29; arti real pendente
 
-**Pré-requisito**: 6.5 (Tauri) — Tor não roda em PWA browser.
+**Status**: scaffold + stub IPC shipped em `[Unreleased]` (Ted/Marshall/Lily/Robin). Falta integração `arti` real em sessão dedicada (~10-15h Rust). Doc completo em [webrtc-6.4-plan.md](webrtc-6.4-plan.md).
+
+**Shipped hoje**:
+- `src-tauri/src/tor.rs` — 3 IPC commands (`tor_connect/disconnect/status`) retornando `TorStatus { state, circuitCount, lastError }`. `tor_connect()` é stub: retorna `state: 'error'` + `lastError: "STUB: arti integration pending"`.
+- `NetworkMode = 'clearnet' | 'tor' | 'onion-only'` em `UserPrefs.network_mode` (default `clearnet`)
+- `RelayConfig` ganha `onion?: string` opcional; `activeReadRelays/Write` consomem `network_mode` (clearnet → todos `url`; tor → prefere `onion`; onion-only → filtra fora sem `onion`)
+- `src/lib/transport/tor.ts` — consome IPC; em PWA browser lança erro "exige cliente nativo Tauri"; em Tauri retorna stub error
+- UI toggle no Header (🌐 / 🧅 / 🛡️) abre Settings → "modo de rede"
+
+**Pré-requisito**: 6.5 (Tauri) ✅ — Tor não roda em PWA browser.
 
 #### Tor toggle UX (cliente nativo Tauri)
 
@@ -89,7 +98,7 @@ Setting: `network_mode: 'clearnet' | 'tor' | 'onion-only'`
 - Setting `network_mode: 'tor'` ativa Orbot transparent-mode proxy
 - Sem fallback embedded — depende de Orbot. Documentar.
 
-Estimativa: **3-4 sessões** (~20h). Manifesto §4, §15, §28.
+Estimativa restante (arti real): **1-2 sessões** (~10-15h). Manifesto §4, §15, §28.
 
 ### ✅ 6.5 — **Tauri desktop wrapper** (scaffold shipped + validado 2026-04-29)
 
@@ -142,12 +151,12 @@ Estimativa: **1 sessão** (~6h). Manifesto §17.
 | 6.1b Nostr signaling | ✅ | ~250 | 1 | §14, §29 |
 | 6.2 Path diversity | ✅ | ~700 (peerRegistry+peerScore+orchestrator+wire) | 1 (paralelo) | §20 |
 | 6.3 TURN + reconnect | ✅ | ~250 | 1 | §15 (mobile) |
-| 6.4 Tor transport | ⏳ | ~200 + arti integ | 3-4 | §4, §15, §28 |
+| 6.4 Tor transport | 🟡 scaffold+stub shipped | ~200 (TS+Rust stub) + arti integ pendente | 1-2 restantes | §4, §15, §28 |
 | 6.5 Tauri desktop | ✅ | ~100 + Rust scaffold | 1 | §1 (capacidade §15) |
 | 6.6 Multi-transport | ✅ (incluído em 6.2) | ~150 | — | §12 |
 | 6.7 Build reproduzível | ✅ | docs + CI + Dockerfile | 1 | §17 |
 
-**Total restante**: ~3-4 sessões pra **6.4 Tor** (única sub-fase pendente).
+**Total restante**: ~1-2 sessões pra **integração `arti` real em 6.4** (scaffold + stub já shipped; última frente pendente da Fase 6).
 
 ---
 

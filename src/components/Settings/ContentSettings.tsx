@@ -12,26 +12,31 @@ import { motion } from 'framer-motion'
 import { useEffect, useRef, useState } from 'react'
 import { setPref, usePrefsStore } from '../../lib/prefs'
 import { db } from '../../lib/db'
-import type { LocationGranularity, MapView } from '../../types/drift'
+import { isTauri } from '../../lib/transport/tor'
+import type { LocationGranularity, MapView, NetworkMode } from '../../types/drift'
 
 export interface ContentSettingsProps {
   onClose: () => void
   /**
-   * Ancora opcional pra scroll-to-section ao montar. Atualmente só
-   * 'location' é reconhecido (vem do indicador 📍 no Header).
+   * Ancora opcional pra scroll-to-section ao montar. Reconhece:
+   *   - 'location' — vem do indicador 📍 no Header
+   *   - 'network'  — vem do indicador 🌐/🧅/🛡️ no Header
    */
-  scrollTo?: 'location'
+  scrollTo?: 'location' | 'network'
 }
 
 export function ContentSettings({ onClose, scrollTo }: ContentSettingsProps) {
   const prefs = usePrefsStore()
   const [rebuilding, setRebuilding] = useState(false)
   const locationSectionRef = useRef<HTMLDivElement | null>(null)
+  const networkSectionRef = useRef<HTMLDivElement | null>(null)
 
-  // Scroll-to-section quando aberto via indicador GPS no Header.
+  // Scroll-to-section quando aberto via indicador GPS / rede no Header.
   useEffect(() => {
     if (scrollTo === 'location' && locationSectionRef.current) {
       locationSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    } else if (scrollTo === 'network' && networkSectionRef.current) {
+      networkSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
     }
   }, [scrollTo])
 
@@ -142,6 +147,26 @@ export function ContentSettings({ onClose, scrollTo }: ContentSettingsProps) {
               value={prefs.map_view}
               onChange={(v) => setPref('map_view', v)}
             />
+          </div>
+
+          <div ref={networkSectionRef} className="border-t border-drift-border pt-4">
+            <div className="mb-2 text-[11px] text-slate-300">modo de rede</div>
+            <div className="mb-2 text-[10px] leading-relaxed text-slate-500">
+              Manifesto §15 — em país que bloqueia relays Nostr, Tor
+              contorna. Default <code>clearnet</code> (sem overhead).{' '}
+              <code>tor</code> rota via SOCKS5 local (latência +500ms-2s;
+              exige cliente desktop). <code>onion-only</code> = paranoia
+              máxima.
+            </div>
+            <NetworkModePicker
+              value={prefs.network_mode}
+              onChange={(v) => setPref('network_mode', v)}
+              isTauri={isTauri()}
+            />
+            <p className="mt-2 text-[10px] text-amber-500/70">
+              Status atual: scaffold/stub. Real Tor (arti) chega em release
+              futuro.
+            </p>
           </div>
 
           <div className="border-t border-drift-border pt-4">
@@ -266,6 +291,77 @@ function MapViewPicker({
                 : 'border-drift-border text-slate-500 hover:border-drift-accent/40'
             }`}
             title={opt.hint}
+          >
+            {opt.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+// Network mode (Fase 6.4). Em PWA browser, `tor` e `onion-only` ficam
+// disabled — clearnet é a única opção até o cliente nativo Tauri shippar
+// com `arti` embutido. Hint na tooltip explica o motivo.
+const NETWORK_MODE_OPTIONS: {
+  value: NetworkMode
+  label: string
+  hintTauri: string
+  hintBrowser: string
+  requiresTauri: boolean
+}[] = [
+  {
+    value: 'clearnet',
+    label: '🌐 clearnet',
+    hintTauri: 'WSS direto pros relays públicos (default)',
+    hintBrowser: 'WSS direto pros relays públicos (default)',
+    requiresTauri: false,
+  },
+  {
+    value: 'tor',
+    label: '🧅 tor',
+    hintTauri: 'WSS via SOCKS5 local (arti) — IP não vaza pro relay',
+    hintBrowser: 'Tor exige cliente desktop (Tauri)',
+    requiresTauri: true,
+  },
+  {
+    value: 'onion-only',
+    label: '🛡 onion-only',
+    hintTauri: 'só conecta a relays .onion — modo paranoia máximo',
+    hintBrowser: 'onion-only exige cliente desktop (Tauri)',
+    requiresTauri: true,
+  },
+]
+
+function NetworkModePicker({
+  value,
+  onChange,
+  isTauri,
+}: {
+  value: NetworkMode
+  onChange: (v: NetworkMode) => void
+  isTauri: boolean
+}) {
+  return (
+    <div className="grid grid-cols-3 gap-2">
+      {NETWORK_MODE_OPTIONS.map((opt) => {
+        const active = value === opt.value
+        const disabled = opt.requiresTauri && !isTauri
+        const hint = isTauri ? opt.hintTauri : opt.hintBrowser
+        return (
+          <button
+            key={opt.value}
+            onClick={() => {
+              if (disabled) return
+              onChange(opt.value)
+            }}
+            disabled={disabled}
+            className={`rounded border px-2 py-2 text-[11px] transition-colors ${
+              active
+                ? 'border-drift-accent bg-drift-accent/10 text-drift-accent'
+                : 'border-drift-border text-slate-500 hover:border-drift-accent/40'
+            } ${disabled ? 'cursor-not-allowed opacity-40 hover:border-drift-border' : ''}`}
+            title={hint}
           >
             {opt.label}
           </button>
