@@ -24,11 +24,23 @@
  *   `onopen`, `onmessage`, `onerror`, `onclose`
  * - Métodos: `send(data)` (string only — Nostr é JSON), `close(code?, reason?)`
  *
- * NÃO implementado (não necessário pra nostr-tools):
+ * NÃO implementado (não necessário pra nostr-tools/pool):
  * - `addEventListener` (preferimos `onX` callbacks)
  * - `binaryType`, `bufferedAmount`, `extensions`, `protocol` props
  * - Events tipo nativos (`MessageEvent`, `CloseEvent`) — usamos objeto
  *   plano com mesma shape
+ * - **`ping()`/`once('pong')`**: APIs do pacote `ws` (Node-only) usadas
+ *   por `nostr-tools/abstract-relay.js:waitForPingPong` quando o pool
+ *   é instanciado com `enablePing: true`. **Limitação**: NÃO usar
+ *   `enablePing: true` no SimplePool quando TorWebSocket está
+ *   instalado — quebraria com `TypeError: this.ws.ping is not a
+ *   function`. Default do nostr-tools é `enablePing: undefined`
+ *   (= false), então o caminho default está seguro. Marshall 3
+ *   (Sprint 3 do roadmap pós-auditoria). Se algum dia precisarmos
+ *   de pings (debug latência Tor, exatamente o caso onde fariam
+ *   sentido), implementar `ping()` como no-op + emitir `pong`
+ *   sintético via `setTimeout(0)` — satisfaz o contrato sem custo
+ *   real.
  *
  * Manifesto §15 (anti-censura), §17 (auditável), §28 (privacidade).
  */
@@ -59,13 +71,14 @@ interface WsLikeCloseEvent extends WsLikeEvent {
 
 /** Payload dos eventos Tauri vindos do `tor_ws.rs`. Shapes espelham
  *  exatamente os structs `WsMsgPayload`/`WsClosePayload`/`WsErrorPayload`
- *  serializados via serde com `rename_all = "camelCase"` ausente —
- *  serde default de structs simples é snake_case → camelCase via Tauri
- *  invoke já manipula. Confirmar shape se precisar tunar. */
+ *  com `#[serde(rename_all = "camelCase")]` (Sprint 3). Marshall item 1
+ *  identificou que o rename estava ausente nesses 3 structs (TorStatus
+ *  já tinha) — funcionava por coincidência (`is_binary` snake batia
+ *  com TS snake). Padronizado preventivamente. */
 interface IpcMsgPayload {
   handle: number
   data: string
-  is_binary: boolean
+  isBinary: boolean
 }
 interface IpcClosePayload {
   handle: number
@@ -136,7 +149,7 @@ export class TorWebSocket {
       // assim que `listen` resolve).
       const unMsg = await listen<IpcMsgPayload>('tor_ws::msg', (e) => {
         if (e.payload.handle !== this.handle) return
-        if (e.payload.is_binary) return // drop binary (vide tor_ws.rs)
+        if (e.payload.isBinary) return // drop binary (vide tor_ws.rs)
         this._dispatchMessage(e.payload.data)
       })
       const unClose = await listen<IpcClosePayload>('tor_ws::close', (e) => {
@@ -169,6 +182,13 @@ export class TorWebSocket {
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err)
       console.warn('[TorWebSocket] open falhou:', errMsg)
+      // Sprint 3 (Marshall 2): se _open falha antes de OPEN, qualquer
+      // send() pré-OPEN ficou enfileirado em pendingSends sem nunca
+      // ser consumido. Limpar evita leak quando alguma ref ao
+      // TorWebSocket sobreviver (ex: cache de retry no nostr-tools).
+      // Tamanho típico: 0-5 entradas; impacto real é micro, mas
+      // política limpa.
+      this.pendingSends = []
       this._dispatchError()
       this._dispatchClose(1006, errMsg, false)
     }

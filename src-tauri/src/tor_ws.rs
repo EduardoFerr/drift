@@ -88,8 +88,15 @@ fn handles() -> &'static Handles {
 }
 
 // ─── Payloads dos eventos emitidos pra TS ────────────────────────────
+//
+// Sprint 3 (Marshall item 1): `#[serde(rename_all = "camelCase")]` em
+// todos os structs. `TorStatus` em tor.rs já fazia isso; estes não, e
+// funcionavam por coincidência (`is_binary` snake batia com TS snake).
+// Padronização preventiva — quando alguém renomear no Rust ou trocar
+// pra camelCase no TS, contrato continua válido.
 
 #[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
 struct WsMsgPayload {
     handle: Handle,
     /// Payload em UTF-8 quando text frame; base64 quando binary.
@@ -99,6 +106,7 @@ struct WsMsgPayload {
 }
 
 #[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
 struct WsClosePayload {
     handle: Handle,
     /// Close code (1000-4999 por convenção WS). 1006 = abnormal closure
@@ -108,6 +116,7 @@ struct WsClosePayload {
 }
 
 #[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
 struct WsErrorPayload {
     handle: Handle,
     error: String,
