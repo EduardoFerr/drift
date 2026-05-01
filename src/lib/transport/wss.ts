@@ -1,13 +1,35 @@
 /**
- * Transporte WSS clearnet — wrapper sobre `nostr-tools/SimplePool`.
+ * Transporte WSS — wrapper sobre `nostr-tools/SimplePool`.
  *
- * É o único transporte ativo no MVP. Roda nos 4 relays seed
- * (`config/relays.ts`). Em fases futuras passamos a aceitar relays
- * adicionados pelo user (Fase 5) e descobertos via NIP-65.
+ * É o transporte primário (peso 10 no orchestrator). Roda nos relays
+ * configurados em `relays.ts:activeReadRelays/activeWriteRelays` —
+ * vem do banco SQLite (Fase 5+), não da seed list estática.
  *
  * Singleton: existe uma instância única (`wssTransport`) compartilhada
- * por `sync.ts` (subscribe global) e `protocol.ts` (publish). O
- * `SimplePool` interno reusa conexões — não abre novo WebSocket por chamada.
+ * por `sync.ts` (subscribe global), `protocol.ts` (publish) e
+ * `webrtc-signaling-nostr.ts` (publish/subscribe de DMs cifrados de
+ * signaling). O `SimplePool` interno reusa conexões — não abre novo
+ * WebSocket por chamada.
+ *
+ * ⚠ **MAGIC-AT-DISTANCE**: o `WebSocket` global usado pelo SimplePool
+ * pode ser **substituído em runtime** por `TorWebSocket` via
+ * `installTorWebSocketImpl()` em `transport/torWebSocket.ts`. Quando
+ * `bootstrap.ts` detecta `prefs.network_mode ∈ {tor, onion-only}` em
+ * Tauri+arti, instala a substituição ANTES de registrar este
+ * transport. Daí em diante, toda chamada `ws = new WebSocket(url)`
+ * abaixo (linha do `health()`) e toda conexão aberta pelo SimplePool
+ * passa por circuit Tor — sem nada nesta classe ter que mudar.
+ *
+ * Por que isto importa:
+ * - Quem dá `grep "WebSocket"` no projeto pra debuggar latência alta
+ *   pode não achar o motivo se ignorar este comentário.
+ * - Trocar `network_mode` em runtime NÃO recicla este pool — exige
+ *   `location.reload()` (forçado em `ContentSettings.tsx`). Aceitável
+ *   porque manifesto §15 ("anti-censura auditável") exige feedback
+ *   claro de que o modo mudou.
+ * - `webrtc-signaling-nostr.ts` recebe `wssTransport` como dep injection
+ *   e herda automaticamente Tor — não há vetor de signaling vazando
+ *   em modo `tor`/`onion-only`.
  */
 
 import { SimplePool } from 'nostr-tools/pool'

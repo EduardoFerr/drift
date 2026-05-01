@@ -12,6 +12,7 @@ import { motion } from 'framer-motion'
 import { useEffect, useRef, useState } from 'react'
 import { setPref, usePrefsStore } from '../../lib/prefs'
 import { db } from '../../lib/db'
+import { useBootStore } from '../../lib/bootstrap'
 import { useRelaysStore } from '../../lib/relays'
 import { isTauri } from '../../lib/transport/tor'
 import { SEED_RELAY_CONFIGS } from '../../config/relays'
@@ -30,11 +31,14 @@ export interface ContentSettingsProps {
 export function ContentSettings({ onClose, scrollTo }: ContentSettingsProps) {
   const prefs = usePrefsStore()
   const relaysList = useRelaysStore((s) => s.list)
+  const bootStep = useBootStore((s) => s.step)
   const [rebuilding, setRebuilding] = useState(false)
   const locationSectionRef = useRef<HTMLDivElement | null>(null)
   const networkSectionRef = useRef<HTMLDivElement | null>(null)
 
-  // Banner R6 (Barney): em `onion-only` sem nenhum relay com alias `.onion`
+  const tauriRuntime = isTauri()
+
+  // Banner R6 (original): em `onion-only` sem nenhum relay com alias `.onion`
   // disponível, `activeRelays()` retorna lista vazia → app fica isolado
   // silenciosamente. Avisa o user na própria UI antes que ele descubra
   // pelo "feed parou de carregar". Manifesto §15 (anti-censura precisa
@@ -50,6 +54,26 @@ export function ContentSettings({ onClose, scrollTo }: ContentSettingsProps) {
     // `relays_user` chega na migration v8.)
     return relaysList.some((r) => r.enabled && onionByUrl.has(r.url))
   })()
+
+  // Sprint 2 (privacidade leak): detecta "user em PWA selecionou tor/
+  // onion-only via console (gate UI bypassed)". Em PWA, Tor é técnicamente
+  // impossível — sem essa transparência, user pode achar que está em Tor
+  // e estar em clearnet (manifesto §15: anti-censura PRECISA ser
+  // auditável pelo user).
+  const torSelectedInPwa =
+    !tauriRuntime &&
+    (prefs.network_mode === 'tor' || prefs.network_mode === 'onion-only')
+
+  // Sprint 2: detecta "boot terminou ready mas estamos em modo Tor em
+  // Tauri" — proxy heurístico pra "Tor configurado mas talvez não
+  // conectou". Sprint 6 (BootState.degradedReasons) vai melhorar isso
+  // com sinal direto. Hoje: se estamos em ready + Tauri + modo tor, NÃO
+  // mostramos alerta (assumimos sucesso); se modo tor e ainda em
+  // 'isolation'/'error', alertamos. Conservador.
+  const torConfiguredButBootError =
+    tauriRuntime &&
+    (prefs.network_mode === 'tor' || prefs.network_mode === 'onion-only') &&
+    bootStep === 'error'
 
   // Scroll-to-section quando aberto via indicador GPS / rede no Header.
   useEffect(() => {
@@ -180,13 +204,67 @@ export function ContentSettings({ onClose, scrollTo }: ContentSettingsProps) {
             </div>
             <NetworkModePicker
               value={prefs.network_mode}
-              onChange={(v) => setPref('network_mode', v)}
+              onChange={async (v) => {
+                if (v === prefs.network_mode) return
+                // Sprint 2: trocar network_mode em runtime NÃO reseta o
+                // SimplePool global do nostr-tools (que pode ter sido
+                // monkey-patched com TorWebSocket no boot). Sem reload,
+                // user pensa que está em Tor mas continua em clearnet —
+                // privacidade leak silenciosa. Manifesto §15 exige UX
+                // que comunique o estado real. Forçamos confirm + reload.
+                const next = v === 'tor' || v === 'onion-only' ? 'Tor' : 'clearnet'
+                const ok = window.confirm(
+                  `Trocar para ${next} exige recarregar a aba para aplicar.\n\n` +
+                    'Recarregar agora? (cancelar = manter modo atual)',
+                )
+                if (!ok) return
+                await setPref('network_mode', v)
+                window.location.reload()
+              }}
               isTauri={isTauri()}
             />
             <p className="mt-2 text-[10px] text-amber-500/70">
-              Status atual: scaffold/stub. Real Tor (arti) chega em release
-              futuro.
+              Status atual: scaffold/stub em PWA. Tor real funciona em build
+              Tauri com <code>--features arti</code>. Trocar de modo exige
+              reload (limitação do <code>SimplePool</code> global).
             </p>
+            {torSelectedInPwa && (
+              <div
+                role="alert"
+                className="mt-3 rounded border border-red-700/60 bg-red-950/30 px-3 py-2 text-[10px] leading-relaxed text-red-300"
+              >
+                <strong className="block text-red-200">
+                  ⚠ modo {prefs.network_mode === 'tor' ? 'tor' : 'onion-only'}{' '}
+                  selecionado em PWA — IP do user vaza pros relays
+                </strong>
+                <span className="mt-1 block text-red-300/80">
+                  PWA browser não tem como rotear via Tor (webview ignora
+                  SOCKS5 programático). Sua conexão continua{' '}
+                  <strong>clearnet</strong> apesar do modo escolhido — o
+                  IP é visível pros relays. Pra Tor de verdade: build
+                  Tauri desktop com <code>cargo tauri build --features
+                  arti</code>. Volte pra <code>clearnet</code> aqui ou
+                  abra o cliente nativo.
+                </span>
+              </div>
+            )}
+            {torConfiguredButBootError && (
+              <div
+                role="alert"
+                className="mt-3 rounded border border-red-700/60 bg-red-950/30 px-3 py-2 text-[10px] leading-relaxed text-red-300"
+              >
+                <strong className="block text-red-200">
+                  ⚠ Tor configurado mas boot terminou em erro
+                </strong>
+                <span className="mt-1 block text-red-300/80">
+                  Modo <code>{prefs.network_mode}</code> ativo mas o boot
+                  não completou. Verifique o console pra mensagem de erro
+                  específica. Considere voltar pra <code>clearnet</code>{' '}
+                  até o problema ser diagnosticado, OU recarregar pra
+                  retry.
+                </span>
+              </div>
+            )}
             {!onionAvailable && (
               <div
                 role="alert"
