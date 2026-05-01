@@ -23,6 +23,35 @@ tauri-plugin-shell = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
+# ─── Tor (Fase 6.4 — arti integration, opt-in via feature flag) ──────
+#
+# Mantemos opcional pra build padrão (PWA-only / Tauri sem Tor) seguir
+# leve. Quando feature `arti` está ativa, arrastamos:
+#   - arti-client      cliente Tor puro Rust, expõe TorClient
+#   - tor-rtcompat     ponte de runtime (tokio); arti usa esta abstração
+#   - tokio            runtime async (full features pra net + IO + time)
+#   - anyhow           propagar erros de bootstrap sem mapping verboso
+#
+# Estratégia de versionamento: arti workspace publica em lockstep, então
+# arti-client e tor-rtcompat compartilham major/minor. Pinamos `1` pra
+# pegar o último estável, `default-features = false` pra evitar puxar
+# nativetls/openssl (preferimos rustls — mais portável e build determi-
+# nístico). Tokio entra em `full` porque arti precisa net+time+rt.
+arti-client = { version = "0.41", optional = true, default-features = false, features = ["tokio", "rustls", "onion-service-client"] }
+tor-rtcompat = { version = "0.41", optional = true, default-features = false, features = ["tokio", "rustls"] }
+tokio = { version = "1", optional = true, features = ["full"] }
+anyhow = { version = "1", optional = true }
+
 [features]
 # This feature is used for production builds or when a dev server is not specified, DO NOT REMOVE!!
 custom-protocol = ["tauri/custom-protocol"]
+
+# Fase 6.4 — Tor via arti. OFF por padrão.
+#  - cargo check                  → build atual (stub IPC, sem arti)
+#  - cargo check --features arti  → pull arti workspace (~30+ crates,
+#                                   primeira build ~5min)
+#  - cargo build --release --features arti
+#       → produz binário Tauri com Tor real embarcado
+# Wire-up: tor.rs usa #[cfg(feature = "arti")] pra trocar stub→real.
+# Documentação: Docs/webrtc-6.4-plan.md §"arti integration".
+arti = ["dep:arti-client", "dep:tor-rtcompat", "dep:tokio", "dep:anyhow"]
