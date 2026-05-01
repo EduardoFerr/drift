@@ -18,7 +18,7 @@ Submeter Drift (`com.driftnet.client`) ao F-Droid: catálogo de apps Android OSS
 
 ## 2. Conflitos identificados
 
-- **`VITE_PHOTODNA_KEY` em `.env.example`** — não é usado em `src/` (manifesto v2.2 §25 proíbe scan automático embutido). Remover do `.env.example` antes da submissão pra não confundir reviewers.
+- ~~`VITE_PHOTODNA_KEY` em `.env.example`~~ — ✅ resolvido. Variável removida do `.env.example` real (verificado 2026-05-01). Manifesto v2.2 §25 proíbe scan automático embutido; `.env.example` atual contém apenas `VITE_APP_VERSION`, `VITE_USE_NOSTR_SIGNALING`, `VITE_TURN_SERVERS`.
 - **Mapbox** — ✅ migrado pra MapLibre + tiles CARTO/OSM (v0.5.2). Sem token. OK.
 - **Vercel host** referenciado em `twa-manifest.json` — TWA carrega PWA hospedado em SaaS proprietário. F-Droid vai exigir AntiFeature `NonFreeNet`. Honesto declarar — protocolo Nostr é OSS, mas a *hospedagem* atual é Vercel.
   - **Mitigação de longo prazo**: hospedar build estático em GitLab Pages / Netlify / IPFS + domínio próprio (ainda assim NonFreeNet enquanto for SaaS, mas reduz lock-in).

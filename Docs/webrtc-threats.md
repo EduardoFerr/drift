@@ -1,6 +1,7 @@
 # Threat Model — WebRTC Transport (Fases 6.1-6.3 + 7.1)
 
-**Autor**: Barney (threat-modeler) · **Versão**: 1.0 · **Data**: 2026-04-28
+**Atribuição original**: papel de revisão de segurança · **Versão**: 1.0 · **Data**: 2026-04-28
+**Atualização parcial**: 2026-05-01 — status pós-6.2/6.3 sintetizado abaixo.
 
 Análise rigorosa dos ataques específicos contra a arquitetura WebRTC do Drift,
 focada em **6.1a** (esqueleto + signaling mock), **6.1b** (signaling NIP-44 real),
@@ -12,8 +13,29 @@ Complementa — **não duplica** — o threat model geral em
 e relay; este cobre **adversários no plano P2P direto** (DataChannel +
 ICE + signaling cifrado).
 
-Referências: `Docs/webrtc-seeding.md`, `Docs/webrtc-6.1a-plan.md`,
+Referências: `Docs/webrtc-seeding.md`, `Docs/archive/webrtc-6.1a-plan.md`,
 `Docs/manifesto.md` §15/§17/§20/§28, invariantes #2/#5/#14 do `CLAUDE.md`.
+
+> ⚠ **Status pós-6.2/6.3 (atualizado 2026-05-01)** — sub-fases 6.2
+> (peer registry + path diversity + cross-proto threshold) e 6.3
+> (TURN env var + reconnect backoff + health ping/pong) foram entregues.
+> Várias ameaças listadas como "Aberto / mitigação 6.2" abaixo
+> **estão mitigadas em código** mas a tabela resumo + descrições
+> individuais ainda não foram re-classificadas linha-a-linha. Síntese:
+>
+> - **T-WRTC-006 / T-WRTC-009 / T-WRTC-010 / T-WRTC-014 / T-WRTC-017**:
+>   mitigações 6.2 implementadas (peerRegistry com blacklist, MAX_PEERS=32,
+>   cross-proto threshold=50, path diversity scoring em `peerScore.ts`,
+>   random walk timer 30min). Status real: **mitigado parcialmente**;
+>   campo "Status" deveria ser "Mitigado em 6.2 — auditoria de fit pendente"
+>   em vez de "Crítico/Aberto".
+> - **T-WRTC-002 / T-WRTC-005**: mitigação parcial via TURN opt-in (6.3 —
+>   `VITE_TURN_SERVERS`). Status: **opt-in shipado**; user precisa configurar.
+> - **T-WRTC-018**: probe estendido NÃO foi implementado em 6.2 — segue Aberto.
+>
+> Re-classificação linha-a-linha é follow-up de doc-hygiene
+> (sprint pós-Fase 6.4 inteira). Por hora, leia status individual com
+> ressalva "datado de 2026-04-28".
 
 ---
 

@@ -18,7 +18,22 @@ ARG DEBIAN_VERSION=bookworm-slim
 # reusar ${DEBIAN_VERSION}.
 ARG RUST_DEBIAN_VARIANT=slim-bookworm
 ARG SOURCE_DATE_EPOCH=1735689600
-# 2025-01-01 UTC — fixed reference epoch pra builds reproduziveis
+# Fixed reference epoch = 2025-01-01T00:00:00Z (Unix timestamp 1735689600).
+# Escolha arbitrária mas estavel: usar uma data passada *fixa* faz com que
+# qualquer auditor que rode este Dockerfile produza o mesmo binario,
+# independente do dia em que esta auditando. Manifesto §17.
+#
+# Por que NAO `git log -1 --format=%ct`: timestamps de commit variam por
+# rebase/cherry-pick mesmo sem mudar conteudo, quebrando reprodutibilidade
+# entre branches que tem mesmo source. Fixo elimina esse vetor.
+#
+# Por que NAO o timestamp da tag de release: cada release teria seu epoch,
+# entao re-build de release antiga pra audit precisaria adivinhar qual
+# usar. Fixo significa "sempre o mesmo" sem coordenacao.
+#
+# Trade-off aceito: timestamps internos dos artifacts (manifest, sourcemap)
+# todos congelam em 2025-01-01. Bug de telemetria de "release feito quando?"
+# eh respondido pela tag git (`git tag`), nao pelo timestamp do binario.
 
 # ─── Stage 1: Vite/PWA build ───────────────────────────────────────
 FROM node:${NODE_VERSION}-${DEBIAN_VERSION} AS pwa-builder

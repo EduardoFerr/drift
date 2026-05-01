@@ -346,10 +346,25 @@ load do mapa.
 
 ## Resolvido
 
-(vazio — adicionar aqui ao destravar item, com data + link pra commit/PR)
+- **R3** (NIP-44 estável em `nostr-tools` v2.7+) — ✅ resolvido (2026-04-29).
+  `nostr-tools` 2.7.0 exporta `nip44` com `getConversationKey/encrypt/
+  decrypt`. Usado em `src/lib/webrtc-signaling-nostr.ts` (Fase 6.1b,
+  shipado em `0.6.0-alpha.1`). Zero deps novas.
+- **R5** (privacidade NIP-44 + gift wrap mínimo) — ✅ resolvido em 6.1b
+  (2026-04-29). Gift wrap kind 1059 minimal sem NIP-17 seal — decisão
+  documentada em `Docs/archive/webrtc-6.1b-plan.md`.
+- **R11** (arti bindings Tauri 2026) — ✅ resolvido (2026-05-01). Crates
+  `arti-client = 0.41` + `tor-rtcompat = 0.41` + `tokio` (full features)
+  + rustls compilam clean junto com Tauri 2.11. Ver `Docs/webrtc-6.4-plan.md
+  §4.1` e commit `22d3e11`.
+- **R21** (`@sqlite.org/sqlite-wasm` saiu de pre-release?) — 🟡 parcial
+  (2026-05-01). Continua em pre-release upstream; `package.json` mantém
+  pin exato `3.51.2-build9` (sem `^`). Tema persistente mas operacionalmente
+  ok — sem incidente atribuído ao pin desde Fase 1. Re-checar quando o
+  upstream estabilizar minor.
 
 ---
 
-*Documento mantido pela Robin. Última atualização: 2026-04-28.*
-*Itens: 25. Distribuição: 6.1a (2) · 6.1b (3) · 6.2 (1) · 6.3 (3) ·
-6 Tauri (2) · 7.1 TWA (2) · 7.2 F-Droid (2) · 7.3+ (4) · cross (6).*
+*Documento mantido (atribuição original: papel de research/curadoria).
+Última atualização: 2026-05-01.*
+*Itens originais: 25. Resolvidos até 2026-05-01: 4 (R3, R5, R11, R21 parcial).*

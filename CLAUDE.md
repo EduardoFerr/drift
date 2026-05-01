@@ -4,12 +4,38 @@ Bem-vindo. Este projeto é uma rede social descentralizada. Antes de
 escrever qualquer linha, leia este arquivo inteiro. Em casos de dúvida,
 consulte:
 
-- **`Docs/manifesto.md`** — contrato (32 princípios + roadmap de
+- **`Docs/manifesto.md`** — contrato (34 princípios + roadmap de
   compromissos). **Cada princípio aqui vai ser entregue.** Não é
   aspiração; é compromisso público. Quando arquitetura conflita com
   manifesto, manifesto vence.
 - **`Docs/drift-arquitetura-v4.md`** — fonte da verdade arquitetural
 - **`Docs/drift-fluxograma-v4.html`** — fluxos visuais
+
+## Método de desenvolvimento — personas LLM (Ted/Marshall/Barney/Lily/Robin)
+
+Este projeto usa **personas LLM** como ferramenta estruturada de
+revisão crítica. Em sessões com agentes, o desenvolvedor principal
+("o Arquiteto") assume papéis distintos pra forçar perspectivas
+complementares e evitar viés de confirmação:
+
+- **Ted** — arquitetura, padrões, camadas, abstrações, Rust + CI
+- **Barney** — peer review crítico, threat modeling, security, ceticismo
+- **Marshall** — schema, types, conformance entre camadas, tests
+- **Lily** — core code, runtime, fluxos de dados, manutenibilidade
+- **Robin** — research, curadoria, gaps cross-cutting, docs
+
+**Personas não são pessoas reais.** Documentos de plano que
+referenciam "peer review do Barney" ou "Ted aprovou" significam que o
+plano passou por análise crítica estruturada naquele papel — não por
+um humano externo. Em planos novos, prefira atribuir por **tipo de
+revisão** (`[revisão: segurança]`, `[revisão: conformance]`) em vez do
+nome da persona — mantém o rastro analítico sem sugerir equipe que
+não existe.
+
+Documentos de plano de fases concluídas vivem em `Docs/archive/`;
+artefatos de sessão (auditoria pontual, conformance check de uma data
+específica) vivem em `Docs/sessions/`. Raiz de `Docs/` reservada pra
+documentação ativa.
 
 ---
 
@@ -323,7 +349,7 @@ src/
 - ✅ **Manifesto v2.2** — 34 princípios + roadmap vinculante
 - ✅ **Fase 3** — Swipes Framer Motion, upload imagens (sem scan automático), tag `content-warning` + filtros locais, location off-default, transport abstrato
 - ✅ **Fase 4** — Mapa, peso de perfil, moderação threshold dinâmico, eviction respeita spreads, onboarding, denúncia autoridades
-- ✅ **Fase 5** — PWA polish, NIP-65, NIP-02, NIP-06 (BIP39 opt-in), Passkey opt-in, multi-identidade, probe anti-eclipse, re-broadcast oportunista, pinning UI, block/mute, feed tabs (Global/Seguindo/Trending), Profile, kvvfs fallback, 99 tests Vitest
+- ✅ **Fase 5** — PWA polish, NIP-65, NIP-02, NIP-06 (BIP39 opt-in), Passkey opt-in, multi-identidade, probe anti-eclipse, re-broadcast oportunista, pinning UI, block/mute, feed tabs (Global/Seguindo/Trending), Profile, kvvfs fallback, 399 tests Vitest
 - ✅ **Fase 5.x (operacional)** — versionamento + CHANGELOG, CI GitHub Actions (tsc + tests + build), PWA polish (manifest enriched + shortcuts + meta description + ?action= URL handling), deploy Vercel + GitHub integration, release automation (tag v* → GitHub Release com dist.zip + SHA256SUMS)
 - ⏳ **Fase 6** — Cliente nativo Tauri (Tor via arti, WebRTC P2P, multi-transport orchestration), build reproduzível. **Capacidade técnica** de §15 (anti-censura por país)
 - ⏳ **Fase 7** — Distribuição do cliente E do protocolo: TWA Android (✅ antecipada — Bubblewrap CI), Capacitor (alternativa), F-Droid manifest, Play Store opcional, IPFS pin via helia, run-your-own-relay, sneakernet bundle. **Garantia política** de §16 (disponibilidade distribuída) e §17 (sem chave mestra na distribuição)
@@ -425,20 +451,20 @@ Aceitar warning de cert auto-assinado uma vez. Cel:
 
 ## Filosofia (resumo — fonte completa em `Docs/manifesto.md`)
 
-> *"Se eu quero uma rede livre de censura, eu também não deveria
-> ser capaz de censurá-la."* — Manifesto
+> *"Se eu quero uma rede livre de censura, eu também devo
+> ser incapaz de censurá-la."* — Manifesto
 
-**Garantias do Drift (compromissos, não aspirações):**
+**Compromissos do Drift (não aspirações; alguns ainda em construção — ver status real abaixo):**
 
-- Identidade auto-soberana e portável (§2-3)
-- Anonimato por design — sem KYC, multi-identidade, Tor opcional (§4)
-- Eventos imutáveis assinados (§5-9)
-- Múltiplos transportes contra censura (WSS / Tor / WebRTC) (§12, §15)
-- Disponibilidade distribuída (re-broadcast + IPFS pin + WebRTC seed) (§16)
-- Sem chave mestra, build reproduzível (§17)
-- Bury não pune (§23)
-- Score determinístico, sem afinidade, sem bolha (§22, §24)
-- Compatibilidade com ecossistema Nostr (§28-30)
+- ✅ Identidade auto-soberana e portável (§2-3)
+- 🟡 Anonimato por design — sem KYC, multi-identidade ✅; Tor opcional só em Tauri+arti (Fase 6.4) (§4)
+- ✅ Eventos imutáveis assinados (§5-9)
+- 🟡 Múltiplos transportes contra censura — WSS ✅; WebRTC ✅ (Fase 6.1-6.3); Tor 🟡 só em build Tauri com `--features arti` (§12, §15)
+- 🟡 Disponibilidade distribuída — re-broadcast oportunista ✅; PoI WebRTC seed ✅ (Fase 7.1a); IPFS pin ⛔ (Fase 7+) (§16)
+- 🟡 Sem chave mestra ✅; build reproduzível ✅ Linux (Fase 6.7); Windows/macOS pendente (§17)
+- ✅ Bury não pune (§23)
+- ✅ Score determinístico, sem afinidade, sem bolha (§22, §24)
+- ✅ Compatibilidade com ecossistema Nostr (§28-30)
 
 Quando dúvida sobre uma feature nova, abre o manifesto antes do
 código. Especialmente Fase 6 — várias features aparentemente
@@ -446,4 +472,4 @@ código. Especialmente Fase 6 — várias features aparentemente
 
 ---
 
-*Última atualização: Abril 2026 · Manifesto v2.2 · Arquitetura v5.3 · 34 princípios · 99 tests Vitest · Fase 5 + 5.x fechadas · roadmap vinculante até Fase 7*
+*Última atualização: Maio 2026 · Manifesto v2.2 · Arquitetura v5.3 · 34 princípios · 399 tests Vitest · Fase 5 + 5.x fechadas; Fase 6 em curso (6.4 etapas 1-4 shipped pra source-builders) · roadmap vinculante até Fase 7*

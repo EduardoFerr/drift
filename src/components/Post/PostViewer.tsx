@@ -55,7 +55,7 @@ export interface PostViewerProps {
   /**
    * Última ação confirmada do user neste post (lida do SQLite). Usado pra
    * destacar o botão correspondente (semântica "última ação vale" —
-   * Docs/conversa-29-04-analise.md §2). User PODE clicar na ação oposta
+   * Docs/sessions/conversa-29-04-analise.md §2). User PODE clicar na ação oposta
    * pra reverter; clicar na mesma é no-op silencioso (App.tsx).
    */
   myAction?: 'spread' | 'bury' | null

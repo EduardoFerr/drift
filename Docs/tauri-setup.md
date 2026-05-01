@@ -1,6 +1,6 @@
 # Tauri desktop — setup (Fase 6.5)
 
-> last-updated: 2026-05-01 · status: scaffold inicial · próximo: 6.4 (Tor) e 6.7 (build reproduzível)
+> last-updated: 2026-05-01 · status: scaffold + Tor real funcional via `--features arti` (smoke e2e pendente)
 
 Fase 6.5 do roadmap entrega o **shell desktop** que habilita as fases
 seguintes — em particular **§15 anti-censura** (Tor via `arti`, 6.4)
@@ -130,13 +130,24 @@ Diferenças vs PWA browser:
 
 ---
 
-## Limitações conhecidas (scaffold 6.5)
+## Status (atualizado 2026-05-01)
 
-- **Sem Tor** — vem em 6.4 via `arti` Rust crate + comando IPC `tor.connect/disconnect/status`. Setting `network_mode` aparece desabilitada no webview até lá.
-- **Sem code signing** — vem em 6.7 (keys em GitHub Secrets, workflow assina e publica). Builds locais são unsigned (Windows mostra SmartScreen warning, macOS pede Gatekeeper override).
-- **Sem auto-update** — vem em 6.7 (Tauri updater + manifest hospedado).
-- **Sem CI multi-plataforma** — workflow `tauri-release.yml` chega em 6.7.
-- **Ícones não commitados** — gerar via `npx tauri icon public/pwa-512x512.png` antes do primeiro build (ver `src-tauri/icons/README.md`).
+**O que está funcional:**
+- ✅ Build default (`cargo tauri build`) gera binário desktop com PWA embarcado
+- ✅ Build com `--features arti` adiciona Tor real (arti-client 0.41 + listener SOCKS5 próprio + bridge WS via IPC). Quando `prefs.network_mode ∈ {tor, onion-only}`, `bootstrap.ts` bootstrapa o circuit e injeta `TorWebSocket` no `nostr-tools/pool` — `wssTransport` passa a rotear via Tor sem mudança no transport layer
+- ✅ `cargo check` (default e `--features arti`) compila clean
+
+**O que ainda não está:**
+- 🟡 **Tor smoke test e2e** — código compila e roteia, mas não há teste com `tcpdump`/Wireshark confirmando que tráfego sai via guards Tor e nada vaza pra relay clearnet. Sprint pendente no roadmap pós-6.4.
+- 🟡 **Trocar `network_mode` em runtime sem reload** — `installTorWebSocketImpl` é global no SimplePool; user precisa recarregar a aba pra trocar de modo. Sprint UX fix pendente.
+- ⛔ **Code signing** — release Tauri formal. Builds locais são unsigned (Windows: SmartScreen warning; macOS: Gatekeeper override).
+- ⛔ **Auto-update** — Tauri updater + manifest hospedado, sem timeline.
+- ⛔ **CI multi-plataforma binary release** — `cargo check` será coberto pelo Sprint 1 do roadmap atual; build matrix Linux/macOS/Windows pra release ainda não existe.
+- 🟡 **Ícones não commitados** — gerar via `npx tauri icon public/pwa-512x512.png` antes do primeiro build (ver `src-tauri/icons/README.md`).
+
+## Limitações herdadas
+
+- **Build reproduzível só Linux** — `Dockerfile.reproducible` produz binário PWA + Tauri Linux bit-identical. Windows/macOS Tauri não têm garantia de reprodutibilidade hoje (toolchain MSVC e Apple SDK introduzem variação). Manifesto §17 promete "build reproduzível" — escopo atual = Linux.
 
 ---
 

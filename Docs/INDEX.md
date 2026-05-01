@@ -14,7 +14,7 @@ ou **Por persona** pra pular direto.
 2. **[manifesto.md](manifesto.md)** — 34 princípios, contrato público (vence sobre arquitetura)
 3. **[drift-arquitetura-v4.md](drift-arquitetura-v4.md)** — fonte da verdade técnica
 4. **[../CLAUDE.md](../CLAUDE.md)** — invariantes operacionais (relevante mesmo sem usar Claude Code)
-5. **[conformance-conversa-29-04.md](conformance-conversa-29-04.md)** — última verificação ampla de conformance (abril 2026), útil pra calibrar o que é compromisso vs aspiração
+5. **[sessions/conformance-conversa-29-04.md](sessions/conformance-conversa-29-04.md)** — última verificação ampla de conformance (abril 2026), útil pra calibrar o que é compromisso vs aspiração — **artefato de sessão, não doc normativa**
 
 ---
 
@@ -30,12 +30,12 @@ ou **Por persona** pra pular direto.
 
 ### Fase 6 (cliente nativo + transports)
 - **[webrtc-seeding.md](webrtc-seeding.md)** — visão geral WebRTC + Proof of Interest (TBD)
-- **[webrtc-6.1a-plan.md](webrtc-6.1a-plan.md)** — esqueleto `transport/webrtc.ts` + signaling mock (entregue; 6.1a-C core shipped 2026-04-29)
-- **[webrtc-6.1a-c-checklist.md](webrtc-6.1a-c-checklist.md)** — checklist de aceite 6.1a-C (Barney, 2026-04-29) — peer review + smoke test e2e
-- **[webrtc-6.1b-plan.md](webrtc-6.1b-plan.md)** ✅ — signaling real via Nostr DM (NIP-44 + kind 1059) — shipped `0.6.0-alpha.1`
-- **[webrtc-6.2-plan.md](webrtc-6.2-plan.md)** — peer registry SQLite + path diversity scoring + orchestrator multi-transport (em planejamento)
-- **[webrtc-6.4-plan.md](webrtc-6.4-plan.md)** 🟡 — Tor transport: scaffold + stub IPC shipped em `[Unreleased]` (2026-04-29); integração `arti` real pendente em sessão dedicada. Manifesto §4/§15/§28.
-- **[webrtc-threats.md](webrtc-threats.md)** — threat model WebRTC, 23+ ameaças classificadas (v1.0, 2026-04-28)
+- **[archive/webrtc-6.1a-plan.md](archive/webrtc-6.1a-plan.md)** ✅ — plano de execução do esqueleto `transport/webrtc.ts` + signaling mock (entregue em `0.6.0-alpha.0` · arquivado)
+- **[archive/webrtc-6.1b-plan.md](archive/webrtc-6.1b-plan.md)** ✅ — signaling real via Nostr DM (NIP-44 + kind 1059) — entregue `0.6.0-alpha.1` · arquivado
+- **[webrtc-6.2-plan.md](webrtc-6.2-plan.md)** ✅ — peer registry SQLite + path diversity scoring + orchestrator multi-transport (entregue `0.6.0-alpha.1`)
+- **[webrtc-6.3-plan.md](webrtc-6.3-plan.md)** ✅ — TURN servers + reconnect backoff + health ping/pong (entregue `[Unreleased]`)
+- **[webrtc-6.4-plan.md](webrtc-6.4-plan.md)** 🟡 — Tor transport: etapas 1-4 shipadas pra source-builders (`cargo tauri build --features arti`) — smoke test e2e + binary release pendentes. Manifesto §4/§15/§28.
+- **[webrtc-threats.md](webrtc-threats.md)** — threat model WebRTC, 23+ ameaças classificadas (v1.0, 2026-04-28). **Status pós-6.2 desatualizado** (follow-up sprint)
 
 ### Fase 7 (distribuição)
 - **Fase 7.1a** ✅ shipped — PoI auto-discovery via SpreadMap (Lily). `src/lib/seeder.ts:seedFromSpreaders(postId)` consumido por `useSpreadMap`. Manifesto §16 (espalhar = seedear). Detalhes em [../CHANGELOG.md](../CHANGELOG.md) `[Unreleased]` e [webrtc-seeding.md](webrtc-seeding.md) §"Fase 7.1".
@@ -50,12 +50,17 @@ ou **Por persona** pra pular direto.
 - **[build-reproducible.md](build-reproducible.md)** ✅ — Fase 6.7. Como verificar binário publicado vs source público. Docker + SHA256 + `Dockerfile.reproducible`. Linux PWA + Tauri bit-identical. Manifesto §17 (build reproduzível).
 - **[deploy.md](deploy.md)** — Vercel + GitHub Releases + Cloudflare Tunnel + F-Droid/Play
 - **[vercel-protection.md](vercel-protection.md)** — histórico do Deployment Protection (2026-04-29: mudou pra `preview-only`, justificativa + reversão)
-- **[../CHANGELOG.md](../CHANGELOG.md)** — histórico de versões (último: v0.6.0-alpha.2, 2026-04-29)
+- **[../CHANGELOG.md](../CHANGELOG.md)** — histórico de versões (último: v0.6.0-alpha.2, 2026-05-01)
 - **[../LICENSE](../LICENSE)** — licença do projeto
 
 ### Pesquisa / análise
 - **[research-backlog.md](research-backlog.md)** — itens externos pendentes enquanto WebFetch está bloqueado
-- **[conversa-29-04-analise.md](conversa-29-04-analise.md)** — análise da conversa Gemini/ChatGPT do dia (Ted, 2026-04-29)- **[conformance-conversa-29-04.md](conformance-conversa-29-04.md)** — validação de conformance derivada da mesma conversa (Marshall, 2026-04-29)
+
+### Histórico (referência, não-normativo)
+- **[archive/](archive/)** — planos executados de fases concluídas (não modificar)
+- **[sessions/](sessions/)** — artefatos de sessões pontuais de auditoria/análise
+  - **[sessions/conversa-29-04-analise.md](sessions/conversa-29-04-analise.md)** — análise da conversa Gemini/ChatGPT (papel: Ted, 2026-04-29)
+  - **[sessions/conformance-conversa-29-04.md](sessions/conformance-conversa-29-04.md)** — validação de conformance derivada (papel: Marshall, 2026-04-29)
 
 ---
 
@@ -68,19 +73,19 @@ ou **Por persona** pra pular direto.
 [../README.md](../README.md) → [manifesto.md](manifesto.md) → [../CLAUDE.md](../CLAUDE.md) → [drift-arquitetura-v4.md](drift-arquitetura-v4.md)
 
 ### Sou um auditor de segurança
-[manifesto.md](manifesto.md) §17 + §25 → [../CLAUDE.md](../CLAUDE.md) (invariantes #7, #8, #12) → [webrtc-threats.md](webrtc-threats.md) → [drift-arquitetura-v4.md](drift-arquitetura-v4.md) §36 (threat model geral) → [conformance-conversa-29-04.md](conformance-conversa-29-04.md)
+[manifesto.md](manifesto.md) §17 + §25 → [../CLAUDE.md](../CLAUDE.md) (invariantes #7, #8, #12) → [webrtc-threats.md](webrtc-threats.md) → [drift-arquitetura-v4.md](drift-arquitetura-v4.md) §36 (threat model geral) → [sessions/conformance-conversa-29-04.md](sessions/conformance-conversa-29-04.md)
 
 ### Quero rodar Drift no meu servidor
 [deploy.md](deploy.md) → [../CHANGELOG.md](../CHANGELOG.md) (versões testadas) → release artifacts (`dist.zip` + `SHA256SUMS` em GitHub Releases)
 
 ### Quero contribuir pra Fase 6 (WebRTC)
-[webrtc-seeding.md](webrtc-seeding.md) → [webrtc-6.1a-plan.md](webrtc-6.1a-plan.md) → [webrtc-6.1b-plan.md](webrtc-6.1b-plan.md) → [webrtc-6.2-plan.md](webrtc-6.2-plan.md) → [webrtc-threats.md](webrtc-threats.md)
+[webrtc-seeding.md](webrtc-seeding.md) → [archive/webrtc-6.1a-plan.md](archive/webrtc-6.1a-plan.md) → [archive/webrtc-6.1b-plan.md](archive/webrtc-6.1b-plan.md) → [webrtc-6.2-plan.md](webrtc-6.2-plan.md) → [webrtc-threats.md](webrtc-threats.md)
 
 ### Quero empacotar Drift pra Android / F-Droid
 [twa.md](twa.md) → [fdroid.md](fdroid.md) → [deploy.md](deploy.md) §4
 
 ### Sou pesquisador / quero atacar dúvidas externas
-[research-backlog.md](research-backlog.md) → [conversa-29-04-analise.md](conversa-29-04-analise.md)
+[research-backlog.md](research-backlog.md) → [sessions/conversa-29-04-analise.md](sessions/conversa-29-04-analise.md)
 
 ---
 
@@ -90,14 +95,14 @@ ou **Por persona** pra pular direto.
 |-----------|----------------|
 | §2-3 identidade portável | [../CLAUDE.md](../CLAUDE.md) invariantes #8, #9, #15; `src/lib/identity.ts`, `lib/identities.ts` |
 | §4 anonimato (não-mixnet) | [drift-arquitetura-v4.md](drift-arquitetura-v4.md) §36 threat model |
-| §6 verdade por eventos | [conformance-conversa-29-04.md](conformance-conversa-29-04.md) §1 (spread+bury simultâneo) |
+| §6 verdade por eventos | [sessions/conformance-conversa-29-04.md](sessions/conformance-conversa-29-04.md) §1 (spread+bury simultâneo) |
 | §7 determinismo | [../CLAUDE.md](../CLAUDE.md) invariantes #3, #16 (Vitest tests) |
-| §12 múltiplos transportes | [webrtc-seeding.md](webrtc-seeding.md), [webrtc-6.1a-plan.md](webrtc-6.1a-plan.md), [webrtc-6.2-plan.md](webrtc-6.2-plan.md), `src/lib/transport/` |
+| §12 múltiplos transportes | [webrtc-seeding.md](webrtc-seeding.md), [archive/webrtc-6.1a-plan.md](archive/webrtc-6.1a-plan.md), [webrtc-6.2-plan.md](webrtc-6.2-plan.md), `src/lib/transport/` |
 | §15 anti-censura por país | [webrtc-seeding.md](webrtc-seeding.md), [webrtc-6.4-plan.md](webrtc-6.4-plan.md) (Tor transport: scaffold shipped, arti real pendente) |
 | §16 disponibilidade distribuída | [webrtc-seeding.md](webrtc-seeding.md) (PoI seeder), [fdroid.md](fdroid.md), `lib/rebroadcast.ts` |
 | §17 sem chave mestra + build reproduzível | [fdroid.md](fdroid.md), [../CLAUDE.md](../CLAUDE.md) invariante #12 |
 | §20 resistência a isolamento | `lib/probe.ts` (probe anti-eclipse), [webrtc-threats.md](webrtc-threats.md), [webrtc-6.2-plan.md](webrtc-6.2-plan.md) (path diversity scoring) |
-| §22, §24 score sem afinidade | [../CLAUDE.md](../CLAUDE.md) invariante #11; `src/lib/scoring.ts`; [conformance-conversa-29-04.md](conformance-conversa-29-04.md) (rejeição EigenTrust) |
+| §22, §24 score sem afinidade | [../CLAUDE.md](../CLAUDE.md) invariante #11; `src/lib/scoring.ts`; [sessions/conformance-conversa-29-04.md](sessions/conformance-conversa-29-04.md) (rejeição EigenTrust) |
 | §23 bury não pune | `src/lib/scoring.ts` (peso simétrico) |
 | §25 sem scan automático | [../CLAUDE.md](../CLAUDE.md) invariante #7 |
 | §26 moderação reativa | `src/lib/moderation.ts` (threshold dinâmico) |
@@ -121,14 +126,14 @@ ou **Por persona** pra pular direto.
 | [twa.md](twa.md) | Sub-fase 7.1, ✅ implementada. Embrulha PWA Vercel num APK Android via Bubblewrap. ~3MB, atualização instantânea via deploy do site. Inclui keystore setup + assetlinks SHA256. Comparação com Capacitor. |
 | [fdroid.md](fdroid.md) | Sub-fase 7.2, pendente. Submissão ao catálogo F-Droid OSS. Lista pré-requisitos, conflitos identificados (`VITE_PHOTODNA_KEY` no `.env.example`, host Vercel = AntiFeature `NonFreeNet`), esboço `metadata/com.driftnet.client.yml`. Bloqueador atual: repo precisa ser público. |
 | [webrtc-seeding.md](webrtc-seeding.md) | Visão geral: dispositivos Drift como relays Nostr efêmeros via WebRTC, ativados por interesse contextual (abrir mapa de spread → vira seeder). Compatibilidade com manifesto detalhada (fortalece §12/§16/§15/§20; tensões com invariante #14 e como resolver via NIP-65 estendido + DM NIP-44). |
-| [webrtc-6.1a-plan.md](webrtc-6.1a-plan.md) | Plano da sub-fase 6.1a: especificação `Transport`, esqueleto `webrtc.ts`, BroadcastChannel mock signaling, armadilhas de teste. Status: entregue (matchFilter + signaling-mock shipped 2026-04-28). |
-| [webrtc-6.1b-plan.md](webrtc-6.1b-plan.md) | Sub-fase 6.1b ✅ entregue em `0.6.0-alpha.1`: signaling via Nostr DM cifrado (NIP-44 v2 + kind 1059 gift wrap minimal, sem NIP-17 seal). Zero deps novas (nostr-tools 2.7.0 já tem `nip44`). Discovery PoI-only. Doc mantido como referência histórica do plano executado. |
+| [archive/webrtc-6.1a-plan.md](archive/webrtc-6.1a-plan.md) | Plano da sub-fase 6.1a: especificação `Transport`, esqueleto `webrtc.ts`, BroadcastChannel mock signaling, armadilhas de teste. Status: entregue (matchFilter + signaling-mock shipped 2026-04-28). |
+| [archive/webrtc-6.1b-plan.md](archive/webrtc-6.1b-plan.md) | Sub-fase 6.1b ✅ entregue em `0.6.0-alpha.1`: signaling via Nostr DM cifrado (NIP-44 v2 + kind 1059 gift wrap minimal, sem NIP-17 seal). Zero deps novas (nostr-tools 2.7.0 já tem `nip44`). Discovery PoI-only. Doc mantido como referência histórica do plano executado. |
 | [webrtc-6.2-plan.md](webrtc-6.2-plan.md) | Plano sub-fase 6.2 (Ted, 2026-04-28): `peers_known` SQLite (migration v7) + `scorePeer()` puro (latência+fail+ASN/country diversity) + `transport/orchestrator.ts` que substitui chamadas diretas a `wssTransport` em `sync.ts` + caps (MAX_PEERS=32, 1 conn/pubkey, 100 msg/s). Endereça T-WRTC-006/007/008/010/017. |
 | [webrtc-6.4-plan.md](webrtc-6.4-plan.md) | Plano sub-fase 6.4 (Robin, 2026-04-29): Tor transport. Scaffold + stub IPC shipped — `tor.rs` (3 commands `tor_connect/disconnect/status` retornando `TorStatus`), `NetworkMode = 'clearnet' \| 'tor' \| 'onion-only'` em UserPrefs, `RelayConfig.onion?` opcional, `transport/tor.ts` consumindo IPC, UI toggle Header. Integração `arti` real (Rust crate Tor) fica pra sessão dedicada (~10-15h). §15 só fica cumprido inteiro com arti real. |
 | [webrtc-threats.md](webrtc-threats.md) | Threat model dedicado WebRTC v1.0 (Barney, 2026-04-28). 23+ ameaças classificadas em 5 categorias (Peer / Rede / Signaling / Discovery / Recursos), cada uma com probabilidade, mitigação por fase, status (Aceito / Aberto / Crítico). Complementa §36 da arquitetura. |
 | [research-backlog.md](research-backlog.md) | Itens externos pendentes enquanto WebFetch está bloqueado. Cada item: pergunta + por quê bloqueia + workaround interim + fonte ideal. Mantida pela Robin. ~25 itens organizados por fase. |
-| [conversa-29-04-analise.md](conversa-29-04-analise.md) | Análise técnica da conversa do dia com Gemini/ChatGPT — propostas de defesa Sybil, EigenTrust, debate sobre afinidade no feed, decisões registradas (Ted, 2026-04-29). |
-| [conformance-conversa-29-04.md](conformance-conversa-29-04.md) | Validação por Marshall (2026-04-29) de tudo que apareceu na conversa do dia contra invariantes do CLAUDE.md e princípios do manifesto. Identifica bug "spread+bury simultâneo do mesmo user" (UI não bloqueia), valida rejeição de EigenTrust como afinidade implícita (§24), confirma conformance dos planos 6.2. |
+| [sessions/conversa-29-04-analise.md](sessions/conversa-29-04-analise.md) | Análise técnica da conversa do dia com Gemini/ChatGPT — propostas de defesa Sybil, EigenTrust, debate sobre afinidade no feed, decisões registradas (Ted, 2026-04-29). |
+| [sessions/conformance-conversa-29-04.md](sessions/conformance-conversa-29-04.md) | Validação por Marshall (2026-04-29) de tudo que apareceu na conversa do dia contra invariantes do CLAUDE.md e princípios do manifesto. Identifica bug "spread+bury simultâneo do mesmo user" (UI não bloqueia), valida rejeição de EigenTrust como afinidade implícita (§24), confirma conformance dos planos 6.2. |
 
 ---
 
@@ -144,8 +149,8 @@ ou **Por persona** pra pular direto.
 - fix GPS warm-up + indicador (captura antes de `createPost`/`spreadPost`)
 
 ### 2026-04-29 — Análise conversa Gemini/ChatGPT + scoring weighted + Fase 6.1a-C
-- [conversa-29-04-analise.md](conversa-29-04-analise.md) (Ted) — síntese das propostas externas
-- [conformance-conversa-29-04.md](conformance-conversa-29-04.md) (Marshall) — validação contra invariantes/manifesto
+- [sessions/conversa-29-04-analise.md](sessions/conversa-29-04-analise.md) (Ted) — síntese das propostas externas
+- [sessions/conformance-conversa-29-04.md](sessions/conformance-conversa-29-04.md) (Marshall) — validação contra invariantes/manifesto
 - fix sync entre devices (Barney) — janela 24h→7d em `sync.ts` (commit 6062422)
 - fix mapa não abre (Lily) — migration `spreads.location` (commit 6062422)
 - scoring "última ação vale" (spread+bury simultâneo do mesmo user resolve pelo `created_at` mais recente) + scoring weighted Σ`weight` em vez de COUNT (anti-Sybil, manifesto §22/§24) + UX `myActions` em `ProfileModal` (commit 3cdd211)
@@ -155,7 +160,7 @@ ou **Por persona** pra pular direto.
 - **GpsErrorBanner** (Lily) — `src/components/UI/GpsErrorBanner.tsx` + `GpsHelpModal` interno; `geolocation.ts` ganhou `lastFailureReason` + getter; `App.tsx` integra banner gated por `granularity != 'off'` + janela <60s + não-dismissed; +7 tests
 - **Badge weight tier no ProfileModal** (Marshall) — integra `getWeightTier`, remove número exato (gaming-resistant), 3 tiers (🏆 estabelecido / ⭐ ativo / 🌱 novo) com tooltip §22
 - **`transport/webrtc.ts` core** (Ted, Fase 6.1a-C) — 432 LOC publish/subscribe/health + RTCPeerConnection; pipeline §5 com kind check pré-verify; `pagehide` cleanup; outboundQueue reset em failed/closed; DEV bridge `window.driftWebRTC` em `src/main.tsx`
-- **Checklist 6.1a-C** (Barney) — [webrtc-6.1a-c-checklist.md](webrtc-6.1a-c-checklist.md) peer review + smoke test e2e
+- **Checklist 6.1a-C** (papel: revisão de segurança) — referenciado em commits da fase, não há documento separado vivo
 - atualização do INDEX + CHANGELOG (Robin)
 
 ---

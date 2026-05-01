@@ -30,10 +30,10 @@ sniff é frágil e `process.env` não existe no browser.
 | OPFS (SQLite WASM)             | ✅¹           | ✅              | `db.worker.ts` |
 | kvvfs fallback                 | ✅            | ✅              | `db.worker.ts` |
 | Passkey (WebAuthn)             | ✅            | ❓²            | `lib/passkey.ts` |
-| **Tor via arti (SOCKS5)**      | ❌            | 🟡³            | `transport/tor.ts` |
-| **`.onion` relays nativos**    | ❌            | 🟡³            | `transport/tor.ts` |
-| **`network_mode: 'tor'`**      | ❌            | 🟡³            | `ContentSettings` UI gating |
-| **`network_mode: 'onion-only'`**| ❌           | 🟡³            | `ContentSettings` UI gating |
+| **Tor via arti (SOCKS5)**      | ❌            | 🟡³            | `transport/tor.ts` + `src-tauri/src/socks5_proxy.rs` |
+| **`.onion` relays nativos**    | ❌            | 🟡³            | `transport/tor.ts` + `transport/torWebSocket.ts` |
+| **`network_mode: 'tor'`**      | ❌            | 🟡³            | `ContentSettings` UI gating + `bootstrap.ts` wire-up |
+| **`network_mode: 'onion-only'`**| ❌           | 🟡³            | `ContentSettings` UI gating + banner R6 |
 | Background sync workers        | ✅            | ✅              | `service-worker.ts` |
 | Push notifications             | ✅            | ✅              | (Fase 7+) |
 | Filesystem direct write        | ❌            | ✅              | `@tauri-apps/api/fs` |
@@ -42,7 +42,7 @@ sniff é frágil e `process.env` não existe no browser.
 
 ¹ PWA precisa COOP/COEP corretos pra OPFS funcionar. Ver `vite.config.ts`.
 ² WebAuthn em Tauri 2.x é viável via plugin oficial; não testado ainda.
-³ Stub atual — `tor_connect()` retorna `error: STUB`. Real arti pendente.
+³ **Status atualizado (2026-05-01)**: Tor real com arti está shippado em código quando o build é feito com `cargo tauri build --features arti` — listener SOCKS5 próprio (`socks5_proxy.rs`), bridge IPC WS (`tor_ws.rs` ↔ `torWebSocket.ts`), wire-up condicional em `bootstrap.ts`. **Smoke test e2e** com binário rodando e `tcpdump` confirmando rota Tor ainda **não foi executado** — por isso 🟡 e não ✅. Sem `--features arti`, é stub IPC com `lastError: "STUB: arti integration pending"`.
 
 ## Pontos de gating no código
 
@@ -75,19 +75,37 @@ async function torInvoke<T>(cmd: string): Promise<T> {
 Dynamic import de `@tauri-apps/api/core` — em PWA, módulo não é carregado
 (sem custo de bundle pra usuários browser).
 
-### 3. Bootstrap não registra `torTransport` (`bootstrap.ts`)
+### 3. Bootstrap wire-up Tor via `installTorWebSocketImpl` (`bootstrap.ts`)
+
+**Atualização (2026-05-01)**: a arquitetura final NÃO registra
+`torTransport` separado no orchestrator (seria duplicação ruidosa).
+Em vez disso, quando `isTauri()` e `network_mode ∈ {'tor', 'onion-only'}`,
+o bootstrap chama `torConnect()` e `installTorWebSocketImpl()`. Esse
+último injeta uma classe `TorWebSocket` como implementação global do
+`nostr-tools/pool` via `useWebSocketImplementation()` — com isso, o
+`wssTransport` existente (já registrado) passa a rotear via Tor sem
+mudar uma linha. `kind: 'wss'` segue honesto: **é** WSS, só por baixo
+passa pelo circuit Tor.
 
 ```ts
-// TODO(Fase 6.4 — arti integration):
-//   const mode = getPrefs().network_mode
-//   if (mode === 'tor' || mode === 'onion-only') {
-//     await torConnect()
-//     registerTransport(torTransport, { weight: 8 })
-//   }
+// src/lib/bootstrap.ts (resumido)
+const networkMode = getPrefs().network_mode
+if (isTauri() && (networkMode === 'tor' || networkMode === 'onion-only')) {
+  try {
+    const torStatus = await torConnect()
+    if (torStatus.state === 'connected') {
+      await installTorWebSocketImpl()
+    }
+  } catch (err) { /* degrada pra clearnet com warn */ }
+}
+registerTransport(wssTransport, { weight: 10 })
+registerTransport(webrtcTransport, { weight: 5 })
 ```
 
-Hoje **nunca** registra. Mesmo em Tauri, o stub faria orchestrator
-acumular `failed: 1` permanente. Wire-up correto vem com arti real.
+Em sucesso: WSS roteia via Tor pra todos os relays. Em falha (timeout,
+listener falhou, feature `arti` off): degrada pra clearnet com console
+warn — sem bloquear o boot. UX honesta exige reload se user trocar
+`network_mode` em runtime (limitação conhecida — sprint pendente).
 
 ### 4. Banner em `onion-only` sem onion (`ContentSettings.tsx`, R6 Barney)
 

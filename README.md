@@ -1,6 +1,6 @@
 # Drift
 
-> *"Se eu quero uma rede livre de censura, eu também não deveria ser capaz de censurá-la."*
+> *"Se eu quero uma rede livre de censura, eu também devo ser incapaz de censurá-la."*
 > — [Manifesto](Docs/manifesto.md)
 
 Rede social descentralizada construída sobre [Nostr](https://github.com/nostr-protocol/nostr). Eventos imutáveis na rede; estado materializado localmente em SQLite WASM; UI React reativa via stores Zustand. Sem servidor proprietário, sem chave mestra, sem algoritmo de feed personalizado.
@@ -33,17 +33,19 @@ OTIMISMO: UI ← React useState (descartado quando SQLite confirma)
 
 Regular events imutáveis (faixa 1–9999). Drift roda em qualquer relay Nostr padrão. Identidades Drift funcionam em Damus/Snort/Coracle/Iris.
 
-## Garantias (não aspirações)
+## Compromissos (não aspirações — mas com status honesto)
 
-- **Identidade auto-soberana e portável** (§2-3) — nsec1; trocar de device perde estado local mas nunca identidade
-- **Anonimato por design** — sem KYC, multi-identidade, Tor opcional (§4)
-- **Eventos imutáveis assinados** (§5-9) — Schnorr secp256k1
-- **Múltiplos transportes contra censura** (§12, §15) — WSS / Tor / WebRTC (Fase 6)
-- **Disponibilidade distribuída** — re-broadcast oportunista + IPFS pin + WebRTC seed (§16)
-- **Sem chave mestra, sem scan automático embutido**, build reproduzível (§17, §25)
-- **Score determinístico**, sem afinidade, sem bolha (§22, §24)
-- **Bury não pune** o autor (§23) — diferença filosófica central
-- **Compatível com ecossistema Nostr** (§28-30) — sem extensões obrigatórias
+✅ = entregue · 🟡 = parcial · ⛔ = roadmap
+
+- ✅ **Identidade auto-soberana e portável** (§2-3) — nsec1; trocar de device perde estado local mas nunca identidade
+- 🟡 **Anonimato por design** (§4) — sem KYC ✅, multi-identidade ✅, Tor opcional 🟡 (só em Tauri build com `--features arti`)
+- ✅ **Eventos imutáveis assinados** (§5-9) — Schnorr secp256k1
+- 🟡 **Múltiplos transportes contra censura** (§12, §15) — WSS ✅, WebRTC ✅ (Fase 6.1-6.3), Tor 🟡 (Fase 6.4 etapas 1-4 shipadas pra source-builders; smoke e2e pendente)
+- 🟡 **Disponibilidade distribuída** (§16) — re-broadcast oportunista ✅, WebRTC PoI seed ✅ (Fase 7.1a), IPFS pin ⛔ (Fase 7+), sneakernet ⛔ (Fase 7+)
+- 🟡 **Sem chave mestra, sem scan automático embutido**, build reproduzível (§17, §25) — chave mestra ✅; sem scan ✅; build reproduzível ✅ Linux Docker, Windows/macOS pendente
+- ✅ **Score determinístico**, sem afinidade, sem bolha (§22, §24)
+- ✅ **Bury não pune** o autor (§23) — diferença filosófica central
+- ✅ **Compatível com ecossistema Nostr** (§28-30) — sem extensões obrigatórias
 
 Especificação completa: [`Docs/manifesto.md`](Docs/manifesto.md) (34 princípios + roadmap vinculante até Fase 7).
 
@@ -75,7 +77,7 @@ Ver [`Docs/deploy.md`](Docs/deploy.md) — Vercel (recomendado), GitHub Releases
 
 ```bash
 npm run lint             # tsc -b --noEmit (typecheck strict, sem emitir)
-npm run test             # 99 tests Vitest — funções puras (scoring, weight, moderation, NIP-65, NIP-06, schema check)
+npm run test             # 399 tests Vitest — funções puras (scoring, weight, moderation, NIP-65, NIP-06, schema check, transport, peer registry, etc.)
 npm run build            # vite build + tsc strict
 ```
 
@@ -122,11 +124,11 @@ src/
 - ✅ **Manifesto v2.2** — 34 princípios + roadmap vinculante
 - ✅ **Fase 3** — Swipes Framer Motion, upload, content-warning, location off-default
 - ✅ **Fase 4** — Mapa, peso de perfil, moderação threshold dinâmico, eviction respeita spreads
-- ✅ **Fase 5** — PWA polish, NIP-65, NIP-02, NIP-06, Passkey, multi-identidade, probe, re-broadcast, pinning, block/mute, feed tabs, kvvfs fallback, **99 tests Vitest**
+- ✅ **Fase 5** — PWA polish, NIP-65, NIP-02, NIP-06, Passkey, multi-identidade, probe, re-broadcast, pinning, block/mute, feed tabs, kvvfs fallback, **399 tests Vitest**
 - ✅ **Fase 5.x** — versionamento, CI, PWA polish, deploy Vercel, release automation
-- ✅ **Fase 7.1 antecipada** — TWA Android (Bubblewrap CI, infra completa; primeiro APK assinado pendente em sessão dedicada com Java local)
-- ⏳ **Fase 6** — Cliente nativo Tauri (Tor + WebRTC), build reproduzível
-- ⏳ **Fase 7** — Distribuição: TWA (✅ antecipada), Capacitor, F-Droid, Play Store, IPFS pin, run-your-own-relay, sneakernet bundle
+- 🟡 **Fase 7.1a antecipada** — TWA Android (Bubblewrap CI, infra completa; primeiro APK assinado pendente). **Caveat**: TWA carrega o PWA via Vercel — IP do user visível pra hosting; cliente nativo Tauri (Fase 6) é a via pra §28 completo
+- 🟡 **Fase 6 em curso** — WebRTC ✅ (6.1-6.3); Tauri scaffold ✅ (6.5); build reproduzível ✅ Linux Docker (6.7); Tor 🟡 (6.4 etapas 1-4 shipped pra source-builders, smoke e2e + binary release pendentes)
+- ⛔ **Fase 7** — Distribuição: TWA 🟡 antecipada, F-Droid (bloqueado em repo público), IPFS pin, sneakernet bundle, run-your-own-relay
 
 Fase 6 entrega a **capacidade técnica** (§15 — múltiplos transportes); Fase 7 entrega a **garantia política** (§16-§17 — disponibilidade distribuída + sem chave mestra na distribuição). Ambas são compromissos do manifesto.
 

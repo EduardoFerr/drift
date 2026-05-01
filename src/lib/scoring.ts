@@ -21,15 +21,15 @@
  *
  * **Mudança 2026-04-29** (pré-Fase-6): score deixou de contar EVENTOS
  * (`COUNT(*) FROM spreads`) e passou a somar PESOS dos spreaders/buriers.
- * Justificativa em `Docs/conformance-conversa-29-04.md` §"Recomendação
- * central" (Marshall). Mitiga Sybil engagement (1000 npubs novos
- * auto-espalhando = peso quase zero).
+ * Justificativa em `Docs/sessions/conformance-conversa-29-04.md`
+ * §"Recomendação central" (papel: revisão de conformance). Mitiga
+ * Sybil engagement (1000 npubs novos auto-espalhando = peso ~0).
  *
  * **Mudança "última ação vale"**: cada (post_id, user_pub) contribui
  * com APENAS sua ação líquida — última cronologicamente entre seus
  * spreads e buries. Implementado em `events.ts:recalculateScore`.
  * Manifesto §23 (mudança de opinião). Detalhes em
- * `Docs/conversa-29-04-analise.md` §Seção 2.
+ * `Docs/sessions/conversa-29-04-analise.md` §Seção 2.
  */
 
 export interface ScoreInput {

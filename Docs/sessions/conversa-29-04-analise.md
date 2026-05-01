@@ -1,6 +1,12 @@
 # Análise da conversa 29-04-2026 (Gemini + ChatGPT)
 
-Análise arquitetural da conversa do user com Gemini/ChatGPT sobre Drift, salva em `conversa29-04-2026.txt`. Entregue por Ted; revisada por Marshall (conformance separadamente em `conformance-conversa-29-04.md`).
+> ⚠ **ARTEFATO DE SESSÃO** — registro pontual gerado em 2026-04-29.
+> Não é documentação normativa. Personas LLM citadas (Ted, Marshall)
+> são papéis assumidos pelo Arquiteto — ver `CLAUDE.md` § "Método de
+> desenvolvimento". Conformance complementar em
+> [`conformance-conversa-29-04.md`](conformance-conversa-29-04.md).
+
+Análise arquitetural da conversa do user com Gemini/ChatGPT sobre Drift, salva em `conversa29-04-2026.txt`. Atribuição original: produzida no papel de "Ted" (arquitetura); revisada no papel de "Marshall" (conformance) — ambos no documento companion citado acima.
 
 ## Seção 1 — Síntese da Parte 1 (PoI, bootstrap, manifesto)
 

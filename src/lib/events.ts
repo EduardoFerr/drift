@@ -321,17 +321,18 @@ interface UserAggRow {
 /**
  * Recalcula score de um post agregando ações líquidas com pesos.
  *
- * **Semântica "última ação vale"** (manifesto §23, Docs/conversa-29-04-
- * analise.md §Seção 2): cada (post_id, user_pub) contribui com APENAS
- * sua ação cronologicamente mais recente entre seus spreads e buries.
- * Pessoas mudam de opinião — eventos imutáveis preservam histórico,
- * mas o score líquido só conta a última.
+ * **Semântica "última ação vale"** (manifesto §23, `Docs/sessions/
+ * conversa-29-04-analise.md` §Seção 2): cada (post_id, user_pub)
+ * contribui com APENAS sua ação cronologicamente mais recente entre
+ * seus spreads e buries. Pessoas mudam de opinião — eventos imutáveis
+ * preservam histórico, mas o score líquido só conta a última.
  *
- * **Score weighted by spreader weight** (Docs/conformance-conversa-29-
- * 04.md §Recomendação central, Marshall): cada ação contribui com o
- * `weight` da identidade Drift do user (0..100). Sybil novo tem
- * weight ~0 → spread vale ~0. Determinístico, função pura — preserva
- * §22 (sem reputação subjetiva) e §11 (sem afinidade no feed).
+ * **Score weighted by spreader weight** (`Docs/sessions/conformance-
+ * conversa-29-04.md` §Recomendação central, papel: revisão de
+ * conformance): cada ação contribui com o `weight` da identidade Drift
+ * do user (0..100). Sybil novo tem weight ~0 → spread vale ~0.
+ * Determinístico, função pura — preserva §22 (sem reputação subjetiva)
+ * e §11 (sem afinidade no feed).
  *
  * Pipeline:
  *   1. Buscar created_at do post.

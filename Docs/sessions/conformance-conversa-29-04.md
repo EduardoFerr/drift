@@ -1,6 +1,12 @@
 # Conformance Review — conversa 29-04-2026
 
-**Autor**: Marshall (validador) · **Versão**: 1.0
+> ⚠ **ARTEFATO DE SESSÃO** — registro pontual de auditoria, gerado em
+> 2026-04-29. Não é documentação normativa. Decisões derivadas estão
+> no `CHANGELOG.md`, `Docs/manifesto.md` e `Docs/drift-arquitetura-v4.md`.
+> Personas LLM citadas (Marshall etc.) são papéis assumidos pelo
+> Arquiteto — ver `CLAUDE.md` § "Método de desenvolvimento".
+
+**Atribuição original**: validação realizada no papel de "Marshall" (conformance) · **Versão**: 1.0
 **Escopo**: validar discussão Gemini/ChatGPT contra invariantes do `CLAUDE.md` e
 princípios do `Docs/manifesto.md`. Foco: bug "spread+bury simultâneo", EigenTrust,
 ataques Sybil e conformance arquitetural.

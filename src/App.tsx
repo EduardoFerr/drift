@@ -54,7 +54,7 @@ function App() {
   const [publishing, setPublishing] = useState(false)
   const [pending, setPending] = useState<Record<string, 'spread' | 'bury'>>({})
   // Última ação confirmada do user atual por post — semântica "última ação
-  // vale" (Docs/conversa-29-04-analise.md §2). Populado a partir do SQLite
+  // vale" (Docs/sessions/conversa-29-04-analise.md §2). Populado a partir do SQLite
   // sempre que `posts` ou identity mudam. UI usa pra:
   //   1. Destacar o botão correspondente (verde forte / vermelho forte)
   //   2. No-op silencioso se user clicar na ação que já fez (evita duplicar

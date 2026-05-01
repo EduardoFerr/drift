@@ -4,6 +4,20 @@ All notable changes to the Drift client. Uses [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+> **Convenção de release** (a partir de 2026-05-01): este projeto distribui
+> múltiplas variantes de cliente — PWA via Vercel + GitHub Release `dist.zip`,
+> Tauri desktop via build local (`cargo tauri build`), TWA Android via
+> Bubblewrap/CI. Algumas features só ficam disponíveis em build específico
+> (ex: Tor real exige `--features arti` no Tauri build). Por isso o
+> `[Unreleased]` é dividido nas duas categorias abaixo. Tag `v*` produz
+> `dist.zip` PWA pública; binários Tauri seguem fluxo separado.
+
+### Shipped (PWA + source-builders — entra no próximo `dist.zip`)
+
+_Vazio nesta janela — Sprint 0 de saneamento documental em curso._
+
+### Shipped (apenas source-builders com `cargo tauri build --features arti`)
+
 ### Added (Fase 6.4 — Tor real funcional, etapas 1-4)
 
 🟢 **Sessão dedicada arti shipped** — sai do scaffold pra Tor funcional

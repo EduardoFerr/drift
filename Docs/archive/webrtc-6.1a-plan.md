@@ -1,8 +1,12 @@
 # Fase 6.1a — Plano Executável de Implementação
 
-Drafts concretos pra `transport/webrtc.ts` esqueleto + mock signaling. Complementa [`webrtc-seeding.md`](webrtc-seeding.md) (visão arquitetural). Este doc é o **plano de execução pra esta sessão de coding**.
+> ⚠ **PLANO HISTÓRICO** — Fase 6.1a foi entregue em `0.6.0-alpha.0`.
+> Documento mantido em `Docs/archive/` como referência histórica.
+> **Não é documentação ativa.** Status atual em `Docs/fase-6-roadmap.md`.
 
-Status: aprovado pelo Ted, em peer review pelo Barney.
+Drafts concretos pra `transport/webrtc.ts` esqueleto + mock signaling. Complementa [`../webrtc-seeding.md`](../webrtc-seeding.md) (visão arquitetural). Este doc descreve o **plano de execução** que foi seguido na sessão de implementação correspondente.
+
+Status original: aprovado em revisão arquitetural, em peer review de segurança (ver `CLAUDE.md` § "Método de desenvolvimento" pra entender as personas citadas).
 
 ## 1. Especificação completa da interface Transport
 
