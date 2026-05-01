@@ -61,6 +61,7 @@ import type {
 export type PeerStatus =
   | 'connecting'
   | 'open'
+  | 'degraded'
   | 'closing'
   | 'closed'
   | 'failed'
@@ -71,7 +72,12 @@ interface PeerState {
   dc: RTCDataChannel | null
   status: PeerStatus
   createdAt: number
+  /** RTT do último ping/pong em ms. `null` se nunca pingou (Fase 6.3-C). */
   lastPingMs: number | null
+  /** Timestamp ms do último ping enviado. Usado pra detectar peer stale. */
+  lastPingSentAt: number | null
+  /** Timestamp ms do último pong recebido. Usado pra detectar peer stale. */
+  lastPongAt: number | null
   /** Buffer pra publishes antes de dc.readyState === 'open'.
    *  Em transição → failed/closed, RESETAR pra evitar leak (Barney #4). */
   outboundQueue: string[]
@@ -106,10 +112,186 @@ let signalingUnsub: SignalingUnsubscribe | null = null
 let _myPeerId: string | null = null
 let pagehideRegistered = false
 
-const ICE_SERVERS: RTCIceServer[] = [
+// ─── ICE Servers (Fase 6.3-A — STUN + TURN opcional) ─────────────────
+// STUN é livre (Google público). TURN é opt-in via env var pra preservar
+// privacidade — TURN provider vê IP do user. Default sem TURN (manifesto §28).
+//
+// Formato VITE_TURN_SERVERS: comma-separated URLs com query params opcionais
+//   turn:host:port (sem auth)
+//   turn:host:port?username=foo&credential=bar
+//   turn:host:port?username=foo&credential=bar,turn:host2:port?...
+//
+// User configura em .env.local pra ativar mobile real (4G CGN, symmetric NAT).
+const STUN_SERVERS: RTCIceServer[] = [
   { urls: 'stun:stun.l.google.com:19302' },
 ]
+
+/** Test-only export: parser de env var pra RTCIceServer[]. */
+export function _parseTurnServers(envValue: string | undefined): RTCIceServer[] {
+  if (!envValue) return []
+  const out: RTCIceServer[] = []
+  for (const raw of envValue.split(',')) {
+    const trimmed = raw.trim()
+    if (!trimmed) continue
+    if (!trimmed.startsWith('turn:') && !trimmed.startsWith('turns:')) continue
+    const [urlPart, queryPart] = trimmed.split('?', 2)
+    const server: RTCIceServer = { urls: urlPart! }
+    if (queryPart) {
+      const params = new URLSearchParams(queryPart)
+      const username = params.get('username')
+      const credential = params.get('credential')
+      if (username) server.username = username
+      if (credential) server.credential = credential
+    }
+    out.push(server)
+  }
+  return out
+}
+
+function getICEServers(): RTCIceServer[] {
+  // Lê env var só uma vez por boot (Vite resolve em build-time, mas
+  // mantemos lazy pra testes poderem injetar via mock).
+  const turn = _parseTurnServers(import.meta.env.VITE_TURN_SERVERS as string | undefined)
+  return [...STUN_SERVERS, ...turn]
+}
+
 const SEEN_IDS_CAP = 1000
+
+// ─── Reconnect com backoff exponencial (Fase 6.3-B) ──────────────────
+export const _RECONNECT_CONSTANTS = {
+  BASE_MS: 1000,
+  MAX_MS: 30_000,
+  MAX_ATTEMPTS: 5,
+} as const
+
+/** Calcula delay do próximo reconnect. attempt=0→1s, 1→2s, ..., cap em MAX_MS. */
+export function _computeBackoffDelay(attempt: number): number {
+  const { BASE_MS, MAX_MS } = _RECONNECT_CONSTANTS
+  const exp = BASE_MS * Math.pow(2, attempt)
+  return Math.min(exp, MAX_MS)
+}
+
+/** Counter de tentativas de reconexão por peer. Reset em sucesso. */
+const reconnectAttempts = new Map<string, number>()
+/** Timer pendente por peer (cancela em sucesso ou close). */
+const reconnectTimers = new Map<string, ReturnType<typeof setTimeout>>()
+
+/** Test-only: limpa state de reconnect. */
+export function _resetReconnectCounter(peerId: string): void {
+  reconnectAttempts.delete(peerId)
+  const t = reconnectTimers.get(peerId)
+  if (t) {
+    clearTimeout(t)
+    reconnectTimers.delete(peerId)
+  }
+}
+
+/**
+ * Schedule reconexão com backoff. Retorna delay aplicado em ms, ou null
+ * se MAX_ATTEMPTS atingido (giveup).
+ *
+ * Função pura de side-effect — caller decide se chamar (em modo mock,
+ * peer.id é UUID per-tab que nunca volta; gating fica no caller).
+ */
+export function _scheduleReconnect(peerId: string): number | null {
+  const attempt = reconnectAttempts.get(peerId) ?? 0
+  if (attempt >= _RECONNECT_CONSTANTS.MAX_ATTEMPTS) {
+    console.warn('[webrtc] reconnect cap atingido pra', peerId.slice(0, 8))
+    reconnectAttempts.delete(peerId)
+    return null
+  }
+
+  const delay = _computeBackoffDelay(attempt)
+  reconnectAttempts.set(peerId, attempt + 1)
+
+  // Cancela timer pendente (caso scheduleReconnect seja chamado 2× rápido).
+  const existing = reconnectTimers.get(peerId)
+  if (existing) clearTimeout(existing)
+
+  const timer = setTimeout(() => {
+    reconnectTimers.delete(peerId)
+    console.info(
+      '[webrtc] reconnect attempt',
+      attempt + 1,
+      'pra',
+      peerId.slice(0, 8),
+    )
+    void connectTo(peerId).catch(() => {
+      /* falha já vai re-trigger reconnect via onconnectionstatechange */
+    })
+  }, delay)
+  reconnectTimers.set(peerId, timer)
+  return delay
+}
+
+// ─── Health check ping/pong (Fase 6.3-C) ─────────────────────────────
+const HEALTH_PING_INTERVAL_MS = 15_000
+/** Latência acima disso → degraded. */
+const HEALTH_LATENCY_DEGRADED_MS = 5_000
+/** Sem ping enviado/respondido nesta janela → degraded. */
+const HEALTH_STALE_MS = 30_000
+/** Pings enviados mas pong stale ignorado (proteção contra replay tardio). */
+const HEALTH_PONG_MAX_AGE_MS = 5 * 60_000
+/** ID prefix dos ping messages no DataChannel — evita colisão com SignedEvent. */
+const PING_PREFIX = '__drift-ping__:'
+const PONG_PREFIX = '__drift-pong__:'
+
+let healthTimer: ReturnType<typeof setInterval> | null = null
+
+/** Test-only: registra que enviamos ping. */
+export function _markPing(peer: PeerState, now: number): void {
+  peer.lastPingSentAt = now
+}
+
+/** Test-only: processa pong recebido, atualiza RTT. */
+export function _handlePong(peer: PeerState, pingTs: number, now: number): void {
+  // Drop pong stale (>5min) — defesa contra replay
+  if (now - pingTs > HEALTH_PONG_MAX_AGE_MS) return
+  if (pingTs > now) return // pong com timestamp futuro — drop
+  // Barney R1: drop pong sem ping correspondente (atacante manda pong
+  // fake pra fingir saudável e atrasar transição pra degraded). Tolera
+  // 1s de skew pra lidar com pings em flight quando lastPingSentAt
+  // acabou de ser atualizado.
+  if (peer.lastPingSentAt === null || pingTs < peer.lastPingSentAt - 1000) return
+  peer.lastPingMs = now - pingTs
+  peer.lastPongAt = now
+}
+
+/** Test-only: peer está degraded? (sem ping recente OU latência alta) */
+export function _isPeerDegraded(peer: PeerState, now: number): boolean {
+  // Latência alta
+  if (peer.lastPingMs !== null && peer.lastPingMs > HEALTH_LATENCY_DEGRADED_MS) {
+    return true
+  }
+  // Sem ping enviado há 30s+ (timer parou ou peer não responde)
+  if (peer.lastPingSentAt !== null && now - peer.lastPingSentAt > HEALTH_STALE_MS) {
+    return true
+  }
+  return false
+}
+
+function startHealthCheckTimer(): void {
+  if (healthTimer) return
+  healthTimer = setInterval(() => {
+    const now = Date.now()
+    for (const peer of peers.values()) {
+      if (peer.status !== 'open' || !peer.dc || peer.dc.readyState !== 'open') continue
+      try {
+        peer.dc.send(`${PING_PREFIX}${now}`)
+        _markPing(peer, now)
+      } catch {
+        /* dc pode ter fechado — ignora */
+      }
+    }
+  }, HEALTH_PING_INTERVAL_MS)
+}
+
+function stopHealthCheckTimer(): void {
+  if (healthTimer) {
+    clearInterval(healthTimer)
+    healthTimer = null
+  }
+}
 
 // ─── Caps + thresholds (Fase 6.2-C, plano §5/§7) ─────────────────────
 // Mantém todos os limits em UM lugar pra orchestrator/peerRegistry/
@@ -203,6 +385,8 @@ async function ensureSignalingAsync(): Promise<SignalingChannel> {
       signalingUnsub = ch.onMessage(handleSignalingMessage)
       registerPagehideOnce()
       startRandomWalkTimer()
+      // Fase 6.3-C: health checks ping/pong (15s interval).
+      startHealthCheckTimer()
       // Sem hello broadcast em modo Nostr — discovery é PoI-only
       // (caller chama connectTo(peerNpub) sabendo o alvo).
       return ch
@@ -213,6 +397,7 @@ async function ensureSignalingAsync(): Promise<SignalingChannel> {
     signalingUnsub = ch.onMessage(handleSignalingMessage)
     registerPagehideOnce()
     startRandomWalkTimer()
+    startHealthCheckTimer()
     // Mock: anuncia presença ao boot.
     void ch.send({
       type: 'hello',
@@ -273,7 +458,7 @@ function getOrCreatePeer(remoteId: string): PeerState | null {
     return null
   }
 
-  const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS })
+  const pc = new RTCPeerConnection({ iceServers: getICEServers() })
   const peer: PeerState = {
     id: remoteId,
     pc,
@@ -281,6 +466,8 @@ function getOrCreatePeer(remoteId: string): PeerState | null {
     status: 'connecting',
     createdAt: Date.now(),
     lastPingMs: null,
+    lastPingSentAt: null,
+    lastPongAt: null,
     outboundQueue: [],
     rateBudget: RATE_BURST,
     lastRefillTs: Date.now(),
@@ -307,15 +494,29 @@ function getOrCreatePeer(remoteId: string): PeerState | null {
       peer.status = 'failed'
       peer.outboundQueue.length = 0 // Barney #4 — sem leak.
       // Fase 6.2 integration: registry pra alimentar scoring futuro.
-      // Em modo mock, peer.id é UUID que nunca aparece de novo — registry
-      // acumula entries inertes mas inofensivas. Em modo Nostr, peer.id é
-      // npub estável — registry acumula sinal útil pro scorePeer.
       void registryFailure(peer.id, 'ice').catch(() => {
-        /* registry pode falhar em SSR/test; OK swallow */
+        /* swallow */
       })
+      // Fase 6.3-B: reconnect com backoff. Só roda em modo Nostr
+      // (peer.id estável). Mock UUID seria reconectar a UUID antigo
+      // que nunca volta — gating aqui pra função em si ser pura.
+      if (useNostrSignaling()) _scheduleReconnect(peer.id)
     } else if (s === 'closed' || s === 'disconnected') {
       if (peer.status !== 'failed') peer.status = 'closed'
       peer.outboundQueue.length = 0
+      // Barney R2: WebRTC oscila connected↔disconnected em redes flakey
+      // (Wi-Fi handover, 4G→5G). Sem grace period, cap=5 atinge em ~31s
+      // de oscilação real. Espera 5s antes de schedulear; se voltou pra
+      // connected antes, cancela. Closed = manual close, sem reconnect.
+      if (s === 'disconnected' && useNostrSignaling()) {
+        setTimeout(() => {
+          // Se peer voltou pra connected (status='open'), cancela.
+          if (peer.status === 'open') return
+          // Se peer foi limpo (cleanupPeer), também não reconectar.
+          if (!peers.has(peer.id)) return
+          _scheduleReconnect(peer.id)
+        }, 5_000)
+      }
     }
   }
 
@@ -341,10 +542,11 @@ function attachDataChannel(peer: PeerState, dc: RTCDataChannel): void {
   peer.dc = dc
   dc.onopen = () => {
     peer.status = 'open'
+    // Fase 6.3-B: reset reconnect counter em sucesso.
+    _resetReconnectCounter(peer.id)
     // Fase 6.2 integration: registra handshake bem-sucedido no peerRegistry
     // pra alimentar scoring (manifesto §20). ASN/country ficam null em
-    // 6.2 — preencher exigiria resolver IP local do peer (ICE candidate),
-    // que vem em 6.3 junto com TURN.
+    // 6.2 — preencher exigiria resolver IP local do peer (ICE candidate).
     void registryHandshake(peer.id).catch(() => {
       /* swallow — registry é best-effort, hot path DC não bloqueia */
     })
@@ -561,6 +763,24 @@ function handleDataChannelMessage(peer: PeerState, raw: string): void {
   // 0. Rate limit cheap-first (Barney #3) — antes mesmo do JSON.parse.
   //    Invariante #5 preservada: continua cheap → caro.
   if (!consumeRateBudget(peer, Date.now())) return
+
+  // 0.5. Health ping/pong (Fase 6.3-C). Strings curtas com prefixo
+  //      identificável; não passam por verify Schnorr (não são eventos
+  //      Nostr). Tratamento isolado pra não poluir filtros.
+  if (raw.startsWith(PING_PREFIX)) {
+    const ts = raw.slice(PING_PREFIX.length)
+    try {
+      peer.dc?.send(`${PONG_PREFIX}${ts}`)
+    } catch {
+      /* dc fechou */
+    }
+    return
+  }
+  if (raw.startsWith(PONG_PREFIX)) {
+    const ts = Number(raw.slice(PONG_PREFIX.length))
+    if (Number.isFinite(ts)) _handlePong(peer, ts, Date.now())
+    return
+  }
 
   // 1. Parse defensivo
   let parsed: unknown
@@ -802,9 +1022,17 @@ function subscribe(filter: Filter, handlers: SubscribeHandlers): Unsubscribe {
 }
 
 async function health(_timeoutMs?: number): Promise<TransportHealth[]> {
-  // Placeholder pra 6.1a — ping/pong real fica em 6.2.
+  // Fase 6.3-C: lastPingMs agora é RTT real (não placeholder). Peer
+  // `degraded` aparece como `ok: false` mas com latência (sinal pra UI
+  // mostrar "instável"). Peer `failed`/`closed` aparece sem latência.
+  const now = Date.now()
   const out: TransportHealth[] = []
   for (const peer of peers.values()) {
+    let degraded = false
+    if (peer.status === 'open') {
+      degraded = _isPeerDegraded(peer, now)
+      if (degraded && peer.status === 'open') peer.status = 'degraded'
+    }
     out.push({
       url: peer.id,
       ok: peer.status === 'open',
@@ -835,6 +1063,8 @@ export function _createPeerStateForTest(id: string, now0?: number): PeerState {
     status: 'connecting',
     createdAt: t,
     lastPingMs: null,
+    lastPingSentAt: null,
+    lastPongAt: null,
     outboundQueue: [],
     rateBudget: RATE_BURST,
     lastRefillTs: t,
@@ -899,7 +1129,11 @@ export function getPeers(): ReadonlyArray<{
 /** Cleanup completo — fecha todos os peers, desliga signaling, limpa subs. */
 export async function closeAll(): Promise<void> {
   stopRandomWalkTimer()
+  // Fase 6.3-C: para health checks. Reconnect timers cancelam via cleanupPeer
+  // → _resetReconnectCounter abaixo (cada peer cleanup zera seu timer).
+  stopHealthCheckTimer()
   for (const peerId of Array.from(peers.keys())) {
+    _resetReconnectCounter(peerId)
     cleanupPeer(peerId)
   }
   subscriptions.clear()

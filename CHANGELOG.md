@@ -4,6 +4,26 @@ All notable changes to the Drift client. Uses [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+### Added (Fase 6.3 — TURN + Reconnect + Health checks)
+
+3 frentes em `webrtc.ts` + paralelo (Robin docs / Marshall tests / Barney review):
+
+- **TURN servers via env var** (`VITE_TURN_SERVERS`, `webrtc.ts:_parseTurnServers + getICEServers`): cobre mobile real (4G CGN, symmetric NAT) que STUN-only não atravessa. Default vazio (manifesto §28 — TURN provider vê IP do user; opt-in consciente). Aceita formato `turn:host:port?username=foo&credential=bar`, comma-separated. **Aviso crítico**: Vite embute `VITE_*` no bundle público; credentials Twilio/Cloudflare paid **NÃO** devem ir aqui (ephemeral creds via REST API). OK pra TURN gratuito (numb.viagenie.ca) ou self-hosted coturn.
+
+- **Reconnect com backoff exponencial** (`webrtc.ts:_scheduleReconnect`): peer com `pc.connectionState === 'failed'` agenda reconexão automática 1s → 2s → 4s → 8s → 16s → 30s (cap), `MAX_ATTEMPTS=5` antes de giveup. Reset counter em `dc.onopen` (sucesso). **Grace period 5s** em `disconnected` antes de schedulear (Barney R2 — evita storm em Wi-Fi handover / 4G↔5G oscillation). Só roda em modo Nostr (peer.id estável; mock UUID per-tab não persiste).
+
+- **Health check ping/pong** (`webrtc.ts:startHealthCheckTimer`): cada peer envia `__drift-ping__:<ts>` via DataChannel a cada 15s; outro lado responde `__drift-pong__:<ts>`. RTT atualiza `peer.lastPingMs` (era placeholder). Peer fica `degraded` se latência > 5s OU sem ping enviado há > 30s. **Anti-pong-injection** (Barney R1): `_handlePong` valida `pingTs >= peer.lastPingSentAt - 1s` — atacante não pode fingir saudável com pong fake.
+
+- **`getPeers()` retorna `lastPingMs` real**: era placeholder `null` em 6.1a; agora reflete RTT medido pelo health timer.
+
+- **`Docs/webrtc-6.3-plan.md`** (Robin): doc completo (TURN mecânica, reconnect backoff, health, tests, smoke e2e, limites, manifesto coverage).
+
+- **`tests/webrtc-reconnect.test.ts`** (13 tests) + **`tests/webrtc-health.test.ts`** (16 tests): backoff puro, counter, ping/pong RTT, degraded detection, TURN parser. **381/381 verdes** total (era 351, +29 novos).
+
+- **`.env.example` + `vite-env.d.ts`**: `VITE_TURN_SERVERS` documentado com warning sobre VITE_ embedding no bundle.
+
+**Manifesto §15** (anti-censura mobile): WebRTC viável em 4G real com TURN. **§28** preservado: TURN opt-in, default sem leak.
+
 ### Added (Fase 6.7 — Build reproduzível)
 
 Coordenado por 4 frentes paralelas (Ted/Marshall/Robin + integração):
