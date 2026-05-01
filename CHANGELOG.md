@@ -4,6 +4,45 @@ All notable changes to the Drift client. Uses [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+## [0.6.0-alpha.1] — 2026-04-29
+
+Phase 6.1b — **signaling real via Nostr DM cifrado (NIP-44 + kind 1059)**. Mock BroadcastChannel deixa de ser o único caminho — peers em redes diferentes agora se conectam usando relays Nostr existentes como rendezvous, sem inventar diretório paralelo (manifesto §14, invariante #14).
+
+Habilitado via flag `VITE_USE_NOSTR_SIGNALING=1`. Default continua mock pra dev rápido com 2 abas locais — produção real via Nostr é opt-in até validação completa em campo (NAT real, relays diversos).
+
+### Added
+
+- **NIP-44 v2 facade** (`src/lib/nostr.ts` — `encryptDM`, `decryptDM`, Robin/6.1b-A): wrappers finos sobre `nostr-tools.nip44.encrypt/decrypt` com `getConversationKey` derivado por chamada (cache fica pra 6.2). 11 tests em `tests/nip44-facade.test.ts` cobrem round-trip Alice/Bob, UTF-8/JSON 5KB, decrypt com chave errada (throws), payload corrompido (throws), cross-check byte-a-byte com `nip44.encrypt/decrypt` cru. Manifesto §29 (privacidade opcional pra conteúdo).
+
+- **`nostrSignalingChannel`** (`src/lib/transport/webrtc-signaling-nostr.ts`, Barney/6.1b-C): impl `SignalingChannel` via Nostr DM cifrado. Subscribe `{ kinds:[1059], '#p':[myNpub], since: now-60s }`; cada msg de signaling vira evento kind 1059 cifrado NIP-44 v2 com tag `['p', peerNpub]`. Defesas em camadas:
+  - Replay window 60s + LRU dedup por `event.id` (TTL 5min, cap 5000) — cobre T-012
+  - Rate limit token bucket por sender pubkey (10 msgs/60s) — cobre T-006
+  - Anti-spoof: `msg.from` (interno cifrado) deve `=== event.pubkey` (público assinado)
+  - Drop silencioso em decrypt fail / JSON malformado / shape inválido
+  - `bye`/`hello` viram no-op (Nostr não tem broadcast — peer detecta close via `dc.onclose`; PoI substitui hello)
+
+  12 tests em `tests/signaling-nostr.test.ts` cobrindo round-trip Alice→Bob, ICE forwarding, drop em decrypt fail, anti-spoof, replay window, dedup, rate limit, send drop em bye/hello, sanitização de `from`, close idempotente. 303 tests verdes total.
+
+### Changed
+
+- **`webrtc.ts` ganhou DI de SignalingChannel** (Marshall/6.1b-D): `ensureSignaling` síncrono virou `ensureSignalingAsync()` com promise singleton anti-race. Em modo Nostr, dynamic-import de `getOrCreateIdentity` + `wssTransport` + `nostrSignalingChannel`; `_myPeerId` é setado pro `id.npub` antes do channel ser exposto, tie-break lex compare continua funcionando. Modo mock (default) mantém comportamento 6.1a sem mudança.
+
+- **`.env.example`** ganha `VITE_USE_NOSTR_SIGNALING=` (off por default), `vite-env.d.ts` declara o tipo.
+
+- **`window.driftWebRTC.signalingMode`** (DEV bridge em `main.tsx`): expõe modo atual ('mock' | 'nostr') pra debug em console.
+
+### Architecture
+
+- `webrtc-signaling-mock.ts` continua intacto — `SignalingChannel` interface em `signaling.ts` permite trocar implementações sem mudar resto do transport (manifesto §11 — rede como meio).
+- Discovery PoI-only no modo Nostr: caller chama `transport.connectTo(peerNpub)` com npub conhecido via SQLite local (ex: `spreader_pub` de spreads conhecidos). Sem heartbeat global, sem broadcast (invariante #14).
+- Threats cobertas: T-004/T-005 (linkability/mapping social — preparado pra nsec efêmero em 6.2 conforme `webrtc-6.1b-plan.md` §1), T-006 (Sybil signaling), T-008 (DC flooding já em 6.1a + reforço aqui), T-011 (MITM via NIP-44 v2 AEAD + Schnorr verify), T-012 (replay), T-013 (kind injection já em 6.1a), T-023 (decrypt timing constant). T-001 (IP leak ICE), T-007 (eclipse) e T-017 (path diversity) ficam pra 6.2/6.3.
+
+### Limites conhecidos
+
+- **Sem TURN**: symmetric NAT em 4G carrier-grade pode bloquear conexão entre peers móveis em redes diferentes. Smoke test e2e validado entre PCs em LANs residenciais; mobile real fica pra 6.3.
+- **Discovery manual**: `connectTo(npub)` exposto em DEV bridge; integração automática com `useSpreadMap` (PoI-driven seeding) é Phase 7.1a.
+- **Default mock**: produção opt-in via flag até validação em campo. Próximo passo natural: setar default `VITE_USE_NOSTR_SIGNALING=1` quando smoke real consolidado.
+
 ## [0.6.0-alpha.0] — 2026-04-29
 
 Phase 6.1a-C closes — WebRTC core + mock signaling shipped. Manifesto v2.2 (34 princípios, sem mudança).
@@ -193,7 +232,8 @@ First public release. Closes Phase 5 of the architecture roadmap. Manifesto v2.2
 - **Phase 5.x** — APK distribution (TWA/Capacitor), F-Droid, CI GitHub Releases, hospedagem PWA
 - **Phase 6** — Cliente nativo Tauri (Tor via arti, WebRTC P2P, IPFS pin via helia, run-your-own-relay), build reproduzível, sneakernet bundle. Compromisso de manifesto §15-§17.
 
-[Unreleased]: https://github.com/EduardoFerr/drift/compare/v0.6.0-alpha.0...HEAD
+[Unreleased]: https://github.com/EduardoFerr/drift/compare/v0.6.0-alpha.1...HEAD
+[0.6.0-alpha.1]: https://github.com/EduardoFerr/drift/compare/v0.6.0-alpha.0...v0.6.0-alpha.1
 [0.6.0-alpha.0]: https://github.com/EduardoFerr/drift/compare/v0.5.4...v0.6.0-alpha.0
 [0.5.4]: https://github.com/EduardoFerr/drift/releases/tag/v0.5.4
 [0.5.3]: https://github.com/EduardoFerr/drift/releases/tag/v0.5.3

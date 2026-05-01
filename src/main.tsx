@@ -14,6 +14,8 @@ if (import.meta.env.DEV) {
       closeAll: m.closeAll,
       connectTo: m.connectTo,
       getMyPeerId: m.getMyPeerId,
+      signalingMode:
+        import.meta.env.VITE_USE_NOSTR_SIGNALING === '1' ? 'nostr' : 'mock',
     }
   })
 }

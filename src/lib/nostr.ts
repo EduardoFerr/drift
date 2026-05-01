@@ -12,6 +12,7 @@
  */
 
 import { finalizeEvent, verifyEvent } from 'nostr-tools/pure'
+import { nip44 } from 'nostr-tools'
 import type { Event as NostrEvent, EventTemplate } from 'nostr-tools'
 import { getOrCreateIdentity, nsecHexToBytes } from './identity'
 import { wssTransport, pool } from './transport/wss'
@@ -94,6 +95,47 @@ export function getTags(event: NostrEvent, name: string): string[] {
     if (tag[0] === name && typeof tag[1] === 'string') out.push(tag[1])
   }
   return out
+}
+
+// ─── NIP-44 v2 facade ────────────────────────────────────────────────
+
+/**
+ * Cifra plaintext via NIP-44 v2 pro pubkey do peer destinatário.
+ *
+ * Usa `nip44.getConversationKey(senderNsecBytes, recipientNpubHex)` pra
+ * derivar a chave HKDF/ECDH compartilhada e `nip44.encrypt` pra produzir
+ * o payload base64 (versioned, AEAD, padded). Usado em
+ * `webrtc-signaling-nostr.ts` (Fase 6.1b) pra signaling de WebRTC via
+ * DM Nostr cifrado, e em qualquer feature futura que precise DM
+ * (Manifesto §29).
+ *
+ * @param plain JSON ou texto a cifrar
+ * @param peerNpubHex pubkey do destinatário (hex 64-char)
+ * @param senderNsecBytes private key Uint8Array 32 bytes
+ * @returns payload NIP-44 v2 base64 pronto pra `event.content`
+ */
+export function encryptDM(
+  plain: string,
+  peerNpubHex: string,
+  senderNsecBytes: Uint8Array,
+): string {
+  const key = nip44.getConversationKey(senderNsecBytes, peerNpubHex)
+  return nip44.encrypt(plain, key)
+}
+
+/**
+ * Decifra payload NIP-44 v2 vindo de `event.content`.
+ *
+ * Lança se cifra inválida — caller deve catchar e dar drop silencioso
+ * (manifesto §11 — eventos inválidos são ruído, não exceção).
+ */
+export function decryptDM(
+  payload: string,
+  peerNpubHex: string,
+  recipientNsecBytes: Uint8Array,
+): string {
+  const key = nip44.getConversationKey(recipientNsecBytes, peerNpubHex)
+  return nip44.decrypt(payload, key)
 }
 
 // ─── Diagnóstico ─────────────────────────────────────────────────────

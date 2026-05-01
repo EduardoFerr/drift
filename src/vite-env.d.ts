@@ -3,6 +3,7 @@
 
 interface ImportMetaEnv {
   readonly VITE_APP_VERSION: string
+  readonly VITE_USE_NOSTR_SIGNALING?: '1'
 }
 
 interface ImportMeta {

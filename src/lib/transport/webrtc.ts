@@ -127,20 +127,63 @@ function myPeerId(): string {
 
 // ─── Lazy boot do signaling ──────────────────────────────────────────
 
-function ensureSignaling(): SignalingChannel {
+/** Retorna `true` se o flag `VITE_USE_NOSTR_SIGNALING === '1'`.
+ *  Default off — mock BroadcastChannel same-origin pra dev/PoC. */
+function useNostrSignaling(): boolean {
+  return import.meta.env.VITE_USE_NOSTR_SIGNALING === '1'
+}
+
+/** Promise singleton do boot — evita race quando publish/subscribe/connectTo
+ *  são chamados em paralelo durante o boot async (modo Nostr precisa await
+ *  identity). */
+let signalingBootPromise: Promise<SignalingChannel> | null = null
+
+async function ensureSignalingAsync(): Promise<SignalingChannel> {
   if (signalingChannel) return signalingChannel
-  const ch = createMockSignalingChannel(myPeerId())
-  signalingChannel = ch
-  signalingUnsub = ch.onMessage(handleSignalingMessage)
-  registerPagehideOnce()
-  // Anuncia presença ao boot.
-  void ch.send({
-    type: 'hello',
-    from: ch.peerId,
-    ts: Date.now(),
-    drift: { capabilities: ['datachannel-v1'] },
-  })
-  return ch
+  if (signalingBootPromise) return signalingBootPromise
+  signalingBootPromise = (async (): Promise<SignalingChannel> => {
+    if (useNostrSignaling()) {
+      const { getOrCreateIdentity, nsecHexToBytes } = await import('../identity')
+      const { wssTransport } = await import('./wss')
+      const { nostrSignalingChannel } = await import('./webrtc-signaling-nostr')
+      const id = await getOrCreateIdentity()
+      // Em modo Nostr, peerId local = npub (lex compare em
+      // shouldInitiateOffer continua válido).
+      _myPeerId = id.npub
+      const ch = nostrSignalingChannel({
+        myNpub: id.npub,
+        myNsecBytes: nsecHexToBytes(id.nsec),
+        transport: wssTransport,
+      })
+      signalingChannel = ch
+      signalingUnsub = ch.onMessage(handleSignalingMessage)
+      registerPagehideOnce()
+      // Sem hello broadcast em modo Nostr — discovery é PoI-only
+      // (caller chama connectTo(peerNpub) sabendo o alvo).
+      return ch
+    }
+    // Mock fallback (default em DEV).
+    const ch = createMockSignalingChannel(myPeerId())
+    signalingChannel = ch
+    signalingUnsub = ch.onMessage(handleSignalingMessage)
+    registerPagehideOnce()
+    // Mock: anuncia presença ao boot.
+    void ch.send({
+      type: 'hello',
+      from: ch.peerId,
+      ts: Date.now(),
+      drift: { capabilities: ['datachannel-v1'] },
+    })
+    return ch
+  })()
+  try {
+    return await signalingBootPromise
+  } catch (err) {
+    // Em caso de falha (ex.: identity decrypt explode), descarta a promise
+    // pra tentativas futuras poderem re-bootar.
+    signalingBootPromise = null
+    throw err
+  }
 }
 
 function registerPagehideOnce(): void {
@@ -497,7 +540,7 @@ function isPlausibleSignedEvent(x: unknown): x is SignedEvent {
 // ─── Transport API ───────────────────────────────────────────────────
 
 async function publish(event: SignedEvent): Promise<PublishResult> {
-  ensureSignaling()
+  await ensureSignalingAsync()
   const raw = JSON.stringify(event)
   const perRelay: PublishResult['perRelay'] = []
   let ok = 0
@@ -530,7 +573,12 @@ async function publish(event: SignedEvent): Promise<PublishResult> {
 }
 
 function subscribe(filter: Filter, handlers: SubscribeHandlers): Unsubscribe {
-  ensureSignaling()
+  // Fire-and-forget — boot do signaling pode ser async (modo Nostr).
+  // Subscribe shape externa permanece síncrona; falhas async são logadas
+  // pelo caller via onevent que nunca dispara, ou pelo console aqui.
+  void ensureSignalingAsync().catch((err) =>
+    console.error('[webrtc] signaling boot falhou:', err),
+  )
   const id =
     typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
       ? crypto.randomUUID()
@@ -645,6 +693,7 @@ export async function closeAll(): Promise<void> {
     }
     signalingChannel = null
   }
+  signalingBootPromise = null
 }
 
 /**
@@ -653,14 +702,16 @@ export async function closeAll(): Promise<void> {
  * NIP-44 DM (Fase 6.1b).
  */
 export async function connectTo(remotePeerId: string): Promise<void> {
-  ensureSignaling()
+  const ch = await ensureSignalingAsync()
   if (remotePeerId === myPeerId()) return
   const peer = getOrCreatePeer(remotePeerId)
   if (shouldInitiateOffer(myPeerId(), remotePeerId)) {
     await initiateOffer(peer)
   } else {
     // Fora do tie-break: re-anunciar hello pra forçar o outro a iniciar.
-    await signalingChannel?.send({
+    // Em modo Nostr, hello é silenciosamente droppado pelo channel —
+    // discovery PoI-only depende do peer remoto também chamar connectTo.
+    await ch.send({
       type: 'hello',
       from: myPeerId(),
       ts: Date.now(),
