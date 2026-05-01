@@ -4,6 +4,19 @@ All notable changes to the Drift client. Uses [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+## [0.6.0-alpha.0] — 2026-04-29
+
+Phase 6.1a-C closes — WebRTC core + mock signaling shipped. Manifesto v2.2 (34 princípios, sem mudança).
+
+Marca o início da Fase 6 (cliente nativo + transportes alternativos). `alpha.0` sinaliza PoC funcional via mock signaling local (BroadcastChannel between same-origin tabs); signaling real via Nostr DM NIP-44 vem em `0.6.x` (Fase 6.1b). Manifesto v2.2 contract version inalterado.
+
+Highlights:
+- **WebRTC P2P transport** com pipeline §5 (kind/schema/Schnorr/filter), peer review fixes (ICE timeout, glare collision rollback, rate limit token bucket), DEV bridge `window.driftWebRTC` pra smoke test e2e
+- **Spread map evolução visual**: ArcLayer radial → HeatmapLayer (densidade) — alinhado ao manifesto §6/§28 (mostra fato sem inventar relação; k-anonymity emergente)
+- **OPFS multi-tab graceful**: modal educativo quando 2 abas competem pelo mesmo banco local
+- **Vercel Deployment Protection** ajustada pra `preview-only` — production hostnames públicos, manifest fetch funciona em todos
+- **Settings de mapa** (`fit-bounds` / `open`) + 5 tests novos
+
 ### Changed (mapa)
 
 - **Visualização de spread: ArcLayer (radial) → HeatmapLayer (densidade)** (`SpreadMap.tsx`, Barney). Após debate de cascata explícita (tag `via`) vs heurística greedy vs radial, escolhido **heatmap** como solução alinhada ao manifesto: mostra densidade geográfica (fato observável) sem inventar relações nem rastrear vínculos de propagação. Bonus: k-anonymity emergente em áreas densas (manifesto §28). Layers: HeatmapLayer (gradiente azul→amarelo→vermelho) + ScatterplotLayer da origem (amber, raio 8, destaque do autor) + ScatterplotLayer dos destinos (verde alpha 140, raio 3). Adicionada dep `@deck.gl/aggregation-layers@^9.0.0`. `_buildArcs` e campo `arcs` marcados `@deprecated` por 1 release pra retrocompat.
@@ -180,7 +193,8 @@ First public release. Closes Phase 5 of the architecture roadmap. Manifesto v2.2
 - **Phase 5.x** — APK distribution (TWA/Capacitor), F-Droid, CI GitHub Releases, hospedagem PWA
 - **Phase 6** — Cliente nativo Tauri (Tor via arti, WebRTC P2P, IPFS pin via helia, run-your-own-relay), build reproduzível, sneakernet bundle. Compromisso de manifesto §15-§17.
 
-[Unreleased]: https://github.com/EduardoFerr/drift/compare/v0.5.4...HEAD
+[Unreleased]: https://github.com/EduardoFerr/drift/compare/v0.6.0-alpha.0...HEAD
+[0.6.0-alpha.0]: https://github.com/EduardoFerr/drift/compare/v0.5.4...v0.6.0-alpha.0
 [0.5.4]: https://github.com/EduardoFerr/drift/releases/tag/v0.5.4
 [0.5.3]: https://github.com/EduardoFerr/drift/releases/tag/v0.5.3
 [0.5.2]: https://github.com/EduardoFerr/drift/releases/tag/v0.5.2
