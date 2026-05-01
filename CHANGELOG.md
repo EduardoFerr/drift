@@ -4,6 +4,18 @@ All notable changes to the Drift client. Uses [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+### Added (Fase 6.2 — wire-up final dos TODOs)
+
+Fecha integração runtime dos 3 TODOs deixados em `webrtc.ts` (commit anterior):
+
+- **Random walk runtime** (`webrtc.ts:performRandomWalk`): substitui o stub por implementação real. Lê peers conhecidos via `peerRegistry.getKnownPeers({ excludeBlacklisted: true })`, faz Fisher-Yates sample (25% slots aleatórios — manifesto §20), `peerScore.scorePeer` nos demais (75%), top-N por score, dispara `connectTo(npub)` paralelo best-effort. Gating: só roda em modo Nostr (peer.id = npub estável); em mock, skip silencioso porque UUID não persiste no registry. Skip se `MAX_PEERS` cap atingido.
+
+- **Blacklist cross-proto persistido** (`webrtc.ts:handleDataChannelMessage`): quando `crossProtoCount >= 50`, além de matar o peer em memória, chama `peerRegistry.blacklist(peer.id, BLACKLIST_TTL_MS)` pra persistir TTL 1h no SQLite. Próxima sessão também rejeita o npub via `getKnownPeers({ excludeBlacklisted: true })`.
+
+- **Registry handshake/failure no DC lifecycle**: `dc.onopen` chama `peerRegistry.recordHandshake(peer.id)` (alimenta `connCount` + `last_seen`); `pc.onconnectionstatechange === 'failed'` chama `peerRegistry.recordFailure(peer.id, 'ice')` (alimenta `fail_count` sem tocar `last_seen`). Ambos best-effort com swallow — registry é alimentação de scoring, não bloqueia hot path DC.
+
+**Manifesto §20 ativo**: peers conhecidos são amostrados, scored e reconectados periodicamente; bots dependem de cluster controlado, random walk corrói estatisticamente. **Em modo mock**, sem mudança operacional (gating skip).
+
 ### Added (Fase 6.2 — Peer Registry + Path Diversity + Multi-Transport)
 
 5 sub-fases coordenadas por 4 agentes em paralelo + integração:

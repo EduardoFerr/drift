@@ -34,6 +34,13 @@ import { verifyDriftEvent } from '../nostr'
 import type { SignedEvent } from '../../types/nostr'
 import { matchFilter } from './matchFilter'
 import { shouldInitiateOffer } from './signaling'
+import {
+  blacklist as registryBlacklist,
+  getKnownPeers,
+  recordFailure as registryFailure,
+  recordHandshake as registryHandshake,
+} from '../peerRegistry'
+import { sampleWithoutReplacement, scorePeer } from '../peerScore'
 import type {
   SignalingChannel,
   SignalingMessage,
@@ -299,6 +306,13 @@ function getOrCreatePeer(remoteId: string): PeerState | null {
     } else if (s === 'failed') {
       peer.status = 'failed'
       peer.outboundQueue.length = 0 // Barney #4 — sem leak.
+      // Fase 6.2 integration: registry pra alimentar scoring futuro.
+      // Em modo mock, peer.id é UUID que nunca aparece de novo — registry
+      // acumula entries inertes mas inofensivas. Em modo Nostr, peer.id é
+      // npub estável — registry acumula sinal útil pro scorePeer.
+      void registryFailure(peer.id, 'ice').catch(() => {
+        /* registry pode falhar em SSR/test; OK swallow */
+      })
     } else if (s === 'closed' || s === 'disconnected') {
       if (peer.status !== 'failed') peer.status = 'closed'
       peer.outboundQueue.length = 0
@@ -327,6 +341,13 @@ function attachDataChannel(peer: PeerState, dc: RTCDataChannel): void {
   peer.dc = dc
   dc.onopen = () => {
     peer.status = 'open'
+    // Fase 6.2 integration: registra handshake bem-sucedido no peerRegistry
+    // pra alimentar scoring (manifesto §20). ASN/country ficam null em
+    // 6.2 — preencher exigiria resolver IP local do peer (ICE candidate),
+    // que vem em 6.3 junto com TURN.
+    void registryHandshake(peer.id).catch(() => {
+      /* swallow — registry é best-effort, hot path DC não bloqueia */
+    })
     // Drain do outbound queue.
     if (peer.outboundQueue.length > 0) {
       const queued = peer.outboundQueue.splice(0, peer.outboundQueue.length)
@@ -570,8 +591,11 @@ function handleDataChannelMessage(peer: PeerState, raw: string): void {
       )
       peer.status = 'failed'
       cleanupPeer(peer.id)
-      // TODO 6.2-A integration: chamar peerRegistry.blacklist(peer.id, WEBRTC_LIMITS.BLACKLIST_TTL_MS)
-      // Marshall está criando peerRegistry em paralelo — quando merge, descomenta.
+      // Fase 6.2 integration: persiste blacklist no SQLite pra próxima
+      // sessão também rejeitar este npub. TTL 1h (WEBRTC_LIMITS).
+      void registryBlacklist(peer.id, WEBRTC_LIMITS.BLACKLIST_TTL_MS).catch(() => {
+        /* swallow — blacklist em memória já protegeu; persist é bonus */
+      })
     }
     return
   }
@@ -616,23 +640,80 @@ function isPlausibleSignedEvent(x: unknown): x is SignedEvent {
 
 // ─── Random walk anti-eclipse (Fase 6.2-C, plano §5) ────────────────
 
+/** Quantos slots o random walk tenta encher por tick. */
+const RANDOM_WALK_TARGET = 8
+/** Razão de slots aleatórios vs scored (manifesto §20 — 25% random). */
+const RANDOM_WALK_RANDOM_RATIO = 0.25
+
 /**
- * Random walk anti-eclipse (manifesto §20). 25% das slots ativas vão
- * pra peers escolhidos aleatoriamente — não scored. Bots dependem de
- * cluster controlado; random walk corrói estatisticamente.
+ * Random walk anti-eclipse (manifesto §20). Conecta com peers conhecidos
+ * (do `peerRegistry`) pra reduzir probabilidade de captura local. 25% dos
+ * slots vão pra peers aleatórios (corrosão estatística contra clusters de
+ * bots); 75% vão pros scored top.
  *
- * Em 6.2-C MVP: stub que loga. Implementação completa quando peerRegistry
- * (Marshall, 6.2-A) e peerScore (Robin, 6.2-B) mergeiarem — vira commit
- * de integração (6.2-D ou 6.2-E ou novo).
+ * Só faz sentido em **modo Nostr** — peer.id é npub estável. Em modo mock,
+ * peer.id é UUID por aba (não persiste); registry acumula entries inertes
+ * que nunca conectam, gerando ruído. Por isso gating early.
  *
- * TODO 6.2-D/E:
- *   const candidates = await pickCandidates(8, { excludeNpubs: peers.keys() })
- *   for (const c of candidates) await connectTo(c.npub)
+ * Skip se já estiver no/acima do hard cap (`MAX_PEERS`). Não bloqueia se
+ * `connectTo` falhar — random walk é best-effort.
  */
 async function performRandomWalk(): Promise<void> {
-  console.warn(
-    '[webrtc] random walk stub — implementation pending peerRegistry + peerScore',
+  // Gating: só roda em modo Nostr (peer.id = npub). Em mock, peer.id é
+  // UUID que não persiste — registry vira lixo e connectTo a UUIDs antigos
+  // sempre falha. Skip silencioso, não-erro.
+  if (!useNostrSignaling()) return
+
+  // Skip se hard cap atingido.
+  if (peers.size >= WEBRTC_LIMITS.MAX_PEERS) return
+
+  let known
+  try {
+    known = await getKnownPeers({ excludeBlacklisted: true, limit: 200 })
+  } catch (err) {
+    console.warn('[webrtc] random walk: getKnownPeers falhou', err)
+    return
+  }
+
+  // Exclude peers já conectados (não reconecta a quem já está aí).
+  const connectedIds = new Set(peers.keys())
+  const pool = known.filter((p) => !connectedIds.has(p.npub))
+  if (pool.length === 0) return
+
+  const slotsAvailable = WEBRTC_LIMITS.MAX_PEERS - peers.size
+  const targetSlots = Math.min(RANDOM_WALK_TARGET, slotsAvailable)
+  const randomCount = Math.ceil(targetSlots * RANDOM_WALK_RANDOM_RATIO)
+  const scoredCount = targetSlots - randomCount
+
+  // Random slots — Fisher-Yates sample sem reposição.
+  const random = sampleWithoutReplacement(pool, randomCount)
+  const remaining = pool.filter((p) => !random.includes(p))
+
+  // Scored slots — calcula score, ordena desc, top N.
+  const now = Date.now()
+  const currentlyConnected: Parameters<typeof scorePeer>[0]['currentlyConnected'] = []
+  const scored = remaining
+    .map((p) => ({ p, s: scorePeer({ candidate: p, currentlyConnected, now }) }))
+    .sort((a, b) => b.s - a.s)
+    .slice(0, scoredCount)
+    .map((x) => x.p)
+
+  const candidates = [...random, ...scored]
+  if (candidates.length === 0) return
+
+  console.info(
+    '[webrtc] random walk:',
+    candidates.length,
+    `candidates (${random.length} random + ${scored.length} scored)`,
   )
+
+  // Dispatch connectTo em paralelo. Best-effort — não awaitamos sucesso.
+  // Cada connectTo já trata cap/duplicate internamente via getOrCreatePeer.
+  for (const cand of candidates) {
+    void connectTo(cand.npub).catch(() => {
+      /* swallow — failure já é registrado via registryFailure */
+    })
+  }
 }
 
 function startRandomWalkTimer(): void {
