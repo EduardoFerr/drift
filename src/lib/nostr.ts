@@ -16,6 +16,7 @@ import { nip44 } from 'nostr-tools'
 import type { Event as NostrEvent, EventTemplate } from 'nostr-tools'
 import { getOrCreateIdentity, nsecHexToBytes } from './identity'
 import { wssTransport, pool } from './transport/wss'
+import { orchestrator } from './transport/orchestrator'
 import type { PublishResult, TransportHealth } from './transport'
 
 // Re-export para chamadores legados que importavam `pool` de `nostr.ts`.
@@ -70,12 +71,15 @@ export function verifyDriftEvent(event: NostrEvent): boolean {
 /**
  * Publica um evento já assinado nos transportes ativos.
  *
- * Hoje: só WSS clearnet. Quando Tor / WebRTC entrarem (Fase 6),
- * iteramos sobre `[wssTransport, torTransport, webrtcTransport]` e
- * agregamos o resultado. Manifesto §12.
+ * Fase 6.2-E: delega ao `orchestrator` que multiplexa todos os
+ * transportes registrados (`wssTransport`, `webrtcTransport`, futuros
+ * `torTransport`). Bootstrap registra os transports ativos. Manifesto §12.
+ *
+ * Comportamento idêntico ao publish-direto-WSS quando só WSS está
+ * registrado — orchestrator é compatível por design.
  */
 export async function publishToRelays(event: NostrEvent): Promise<PublishResult> {
-  return wssTransport.publish(event)
+  return orchestrator.publish(event)
 }
 
 // ─── Helpers de tag ──────────────────────────────────────────────────

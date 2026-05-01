@@ -341,13 +341,40 @@ function applyMigrations(schema: string) {
       rebuildDomainSchema(schema)
     }
 
+    // schema_v=7 (Fase 6.2): peers_known para Peer Registry WebRTC.
+    // CREATE TABLE IF NOT EXISTS — não-destrutivo, idempotente.
+    // Manifesto §20 (anti-eclipse via path diversity).
+    if (current < 7) {
+      log(`schema_v=${current} < 7 — criando peers_known (Fase 6.2)`)
+      try {
+        db.exec(`
+          CREATE TABLE IF NOT EXISTS peers_known (
+            npub               TEXT PRIMARY KEY,
+            last_seen          INTEGER NOT NULL,
+            conn_count         INTEGER NOT NULL DEFAULT 0,
+            fail_count         INTEGER NOT NULL DEFAULT 0,
+            latency_ms         INTEGER,
+            asn                INTEGER,
+            country            TEXT,
+            blacklisted_until  INTEGER NOT NULL DEFAULT 0,
+            cross_proto_count  INTEGER NOT NULL DEFAULT 0
+          );
+          CREATE INDEX IF NOT EXISTS idx_peers_last_seen    ON peers_known(last_seen DESC);
+          CREATE INDEX IF NOT EXISTS idx_peers_score_inputs ON peers_known(latency_ms, fail_count);
+        `)
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        log(`migração peers_known FALHOU (continuando): ${msg}`)
+      }
+    }
+
     db.exec({
-      sql: `INSERT INTO user_prefs (key, value) VALUES ('schema_v', '6')
+      sql: `INSERT INTO user_prefs (key, value) VALUES ('schema_v', '7')
             ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
     })
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    log(`migração schema_v=6 FALHOU (continuando): ${msg}`)
+    log(`migração schema_v=7 FALHOU (continuando): ${msg}`)
   }
 
   // Auto-recuperação: se alguma migração falhou, rebuild do schema de

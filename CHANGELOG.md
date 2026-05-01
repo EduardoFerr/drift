@@ -4,6 +4,34 @@ All notable changes to the Drift client. Uses [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+### Added (Fase 6.2 — Peer Registry + Path Diversity + Multi-Transport)
+
+5 sub-fases coordenadas por 4 agentes em paralelo + integração:
+
+- **6.2-A — `peerRegistry.ts`** (Marshall): persistência SQLite de peers conhecidos. Migration `peers_known` v7 (idempotente, não-destrutiva). API: `recordHandshake`, `recordFailure`, `recordLatency` (EWMA α=0.3 via SQL CASE), `recordCrossProto` (auto-blacklist em 50 violações), `blacklist`, `getKnownPeers`. Zero cache em memória — toda call bate SQLite. 15 tests em `tests/peerRegistry.test.ts`. Manifesto §20.
+
+- **6.2-B — `peerScore.ts`** (Robin): função pura de scoring + path diversity (manifesto §7, §11, §20). `scorePeer(inputs)` combina reliability (35%), latency (25%), recency 7d-decay (15%), diversity bonus ASN/country (25%). `pathDiversityScore(connected)` retorna entropy Shannon normalizada da distribuição de ASNs. `sampleWithoutReplacement` Fisher-Yates pra random walk. **Manifesto §11**: nenhum input vem de afinidade de conteúdo. 18 tests.
+
+- **6.2-C — Caps + cross-proto threshold em `webrtc.ts`** (Barney): `WEBRTC_LIMITS` exportado (MAX_PEERS=32, MAX_PEERS_PER_PUBKEY=1, RATE_LIMIT_MSG_PER_SEC=100, CROSS_PROTO_THRESHOLD=50, BLACKLIST_TTL_MS=1h). `getOrCreatePeer` retorna `PeerState | null` quando hard cap atinge — call sites tratam (`handleRemoteOffer`, `hello`, `connectTo`). `handleDataChannelMessage` incrementa `crossProtoCount` em kind fora de `DRIFT_KIND_SET`; mata peer ao atingir 50. `performRandomWalk()` stub (logs `pending peerRegistry+peerScore`); timer 30min via `startRandomWalkTimer()`/`stopRandomWalkTimer()`, integração runtime fica pra commit futuro. 8 tests novos em `tests/webrtcCaps.test.ts`. Manifesto §15, §20.
+
+- **6.2-D — `orchestrator.ts`** (eu): multiplexer de transportes implementando `Transport`. `publish` agrega resultados de todos os transports registrados; `subscribe` faz fan-out + dedup cross-transport via LRU(1000) por `event.id`; `health` concat com prefixo (`wss:relay.url`, `webrtc:peer-id`). `registerTransport(t, opts)` é idempotente. **Comportamentalmente equivalente** ao wssTransport direto quando só ele está registrado. 14 tests em `tests/orchestrator.test.ts`. Manifesto §12.
+
+- **6.2-E — Wire `sync.ts` + `nostr.ts` → orchestrator** (eu): `sync.ts:startSync` migra de `pool.subscribeMany` direto pra `orchestrator.subscribe` (subscription type muda de `{close: () => void}` pra `Unsubscribe = () => void`). `nostr.ts:publishToRelays` migra de `wssTransport.publish` pra `orchestrator.publish`. `bootstrap.ts` registra `wssTransport` (weight 10) + `webrtcTransport` (weight 5) antes de `startSync`. **Eventos via WebRTC agora chegam no SQLite via pipeline normal** (`onNostrEvent` continua única porta — invariante #1). Comportamentalmente idêntico em modo mock (sem peers WebRTC = só WSS); ativa P2P real quando `VITE_USE_NOSTR_SIGNALING=1` + `connectTo(npub)`.
+
+**Tests delta**: 296 → 351 verdes (+55 novos). Sem regressão.
+
+### Added (Fase 6.5 — Tauri desktop scaffold)
+
+- **`src-tauri/`** (Ted): scaffold Tauri v2 estável. `Cargo.toml` (tauri 2.x + tauri-plugin-shell), `main.rs` + `lib.rs`, `tauri.conf.json` (janela 1280x800, identifier `com.driftnet.client`, devUrl `https://localhost:5173`, frontendDist `../dist`, CSP espelhando `vercel.json` COOP/COEP), `capabilities/default.json` (permissões mínimas — `core:default`, `shell:allow-open`; SEM fs/dialog/notification/clipboard, manifesto §28).
+
+- **`Docs/tauri-setup.md`** (Ted): onboarding completo (pré-reqs Rust toolchain, `npm run tauri:dev/build`, ícones via `npx tauri icon`, limitações conhecidas — sem Tor até 6.4, sem code signing até 6.7, sem CI multi-plataforma até 6.7).
+
+- **`package.json`**: scripts `tauri`/`tauri:dev`/`tauri:build`. Deps `@tauri-apps/api ^2` (runtime) + `@tauri-apps/cli ^2` (dev).
+
+- **`.gitignore`**: ignora `src-tauri/target/` e `gen/schemas/`. **`Cargo.lock` versionado** (manifesto §17 — build reproduzível).
+
+**Status**: scaffold pronto, **não testado** (não foi rodado `cargo check` — user precisa instalar Rust toolchain). Próximos passos documentados em `Docs/tauri-setup.md`.
+
 ### Removed (limpeza de débito técnico)
 
 - **`_buildArcs` e `SpreadMapData.arcs`** (código zumbi pós-heatmap): após a migração pro `HeatmapLayer` em `0.6.0-alpha.0`, o campo `arcs` continuava sendo populado em `useSpreadMap.ts` mas nenhum consumidor usava (`grep data.arcs` zero matches). Marcados `@deprecated` com promessa de "manter 1 release pra retrocompat", mas a auditoria mostrou que ninguém depende — então **removidos imediatamente**: `arcs` field em `SpreadMapData`, função `_buildArcs`, tipo `SpreadArc`. Tests órfãos (9) removidos de `tests/spread-map.test.ts`; mantidos os 5 de `_computeBounds`. 305 → 296 tests verdes (sem perda de cobertura real). Git histórico cobre quem precisar do código removido.

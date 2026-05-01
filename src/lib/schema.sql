@@ -183,3 +183,27 @@ CREATE TABLE IF NOT EXISTS user_prefs (
   key   TEXT PRIMARY KEY,
   value TEXT NOT NULL
 );
+
+-- ── Peer Registry WebRTC (Fase 6.2 — manifesto §20 anti-eclipse) ──
+-- Persistência de peers conhecidos para path diversity scoring +
+-- random walk. Hot path de DC permanece em memória em
+-- transport/webrtc.ts (Map<peerId, PeerState>); esta tabela é o
+-- estado durável que sobrevive reload e alimenta scoring.
+--
+-- `latency_ms` é EWMA (alpha=0.3) sobre RTT do data channel.
+-- `cross_proto_count` rastreia tentativas de injetar kinds não-Drift
+-- via WebRTC (anti-T-WRTC-007); ao atingir 50, peer é blacklisted 1h.
+-- ASN/country: best-effort lookup local (pode ser null).
+CREATE TABLE IF NOT EXISTS peers_known (
+  npub               TEXT PRIMARY KEY,
+  last_seen          INTEGER NOT NULL,
+  conn_count         INTEGER NOT NULL DEFAULT 0,
+  fail_count         INTEGER NOT NULL DEFAULT 0,
+  latency_ms         INTEGER,
+  asn                INTEGER,
+  country            TEXT,
+  blacklisted_until  INTEGER NOT NULL DEFAULT 0,
+  cross_proto_count  INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_peers_last_seen    ON peers_known(last_seen DESC);
+CREATE INDEX IF NOT EXISTS idx_peers_score_inputs ON peers_known(latency_ms, fail_count);

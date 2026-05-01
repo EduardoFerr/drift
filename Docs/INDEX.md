@@ -43,6 +43,7 @@ ou **Por persona** pra pular direto.
 - *(futuro: `ipfs-pin.md`, `sneakernet.md`, `run-your-own-relay.md`)*
 
 ### Operacional
+- **[tauri-setup.md](tauri-setup.md)** — setup do shell desktop Tauri (Fase 6.5, scaffold inicial). Pré-requisitos Rust, `npm run tauri:dev/build`, permissões mínimas (manifesto §17), limitações conhecidas (sem Tor até 6.4, sem code signing até 6.7)
 - **[deploy.md](deploy.md)** — Vercel + GitHub Releases + Cloudflare Tunnel + F-Droid/Play
 - **[vercel-protection.md](vercel-protection.md)** — histórico do Deployment Protection (2026-04-29: mudou pra `preview-only`, justificativa + reversão)
 - **[../CHANGELOG.md](../CHANGELOG.md)** — histórico de versões (último: v0.6.0-alpha.1, 2026-04-29)

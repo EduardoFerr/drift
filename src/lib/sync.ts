@@ -22,6 +22,8 @@ import { onNostrEvent } from './events'
 import { db } from './db'
 import { DRIFT_KIND } from '../config/constants'
 import { activeReadRelays } from './relays'
+import { orchestrator } from './transport/orchestrator'
+import type { Unsubscribe } from './transport'
 import type { SignedEvent } from '../types/nostr'
 
 const NAMESPACE = 'global'
@@ -95,7 +97,12 @@ function setStatus(updater: (s: SyncStatus) => SyncStatus): void {
 
 // ─── Subscription global ──────────────────────────────────────────────
 
-let subscription: { close: () => void } | null = null
+/**
+ * Unsubscribe handle do `orchestrator.subscribe` (Fase 6.2-E).
+ * Antes era `{ close: () => void }` do `pool.subscribeMany` direto;
+ * agora é função simples retornada pelo orchestrator.
+ */
+let subscription: Unsubscribe | null = null
 let flushTimer: ReturnType<typeof setInterval> | null = null
 
 export async function startSync(): Promise<SyncStatus> {
@@ -113,8 +120,13 @@ export async function startSync(): Promise<SyncStatus> {
 
   setStatus((s) => ({ ...s, active: true, cursor: since }))
 
-  subscription = pool.subscribeMany(
-    activeReadRelays(),
+  // Fase 6.2-E: subscribe via orchestrator em vez de pool.subscribeMany
+  // direto. Eventos podem chegar via WSS (atual) OU via WebRTC (peers
+  // conectados). Dedup cross-transport via LRU dentro do orchestrator;
+  // dedup adicional natural no SQLite via INSERT OR IGNORE em onNostrEvent.
+  // Manifesto §12 (múltiplos transportes), invariante #1 (onNostrEvent
+  // continua única porta de escrita pra tabelas de domínio).
+  subscription = orchestrator.subscribe(
     {
       kinds: [
         DRIFT_KIND.POST,
@@ -155,7 +167,8 @@ export async function startSync(): Promise<SyncStatus> {
 
 export async function stopSync(): Promise<void> {
   if (subscription) {
-    subscription.close()
+    // Subscription é função `Unsubscribe` do orchestrator — invoca direto.
+    subscription()
     subscription = null
   }
   if (flushTimer) {

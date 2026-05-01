@@ -1,0 +1,13 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Capabilities mínimas do shell Drift desktop. Manifesto §17: superfície de ataque mínima — sem fs, dialog, notification, clipboard. Apenas core (janela) e shell.open (links externos do feed).",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "core:window:default",
+    "core:webview:default",
+    "core:event:default",
+    "shell:allow-open"
+  ]
+}

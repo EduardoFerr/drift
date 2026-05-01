@@ -28,6 +28,9 @@ import { loadModLocal } from './moderation-local'
 import { isPasskeyEnabled, verifyPasskey } from './passkey'
 import { startProbe } from './probe'
 import { evictOldPosts } from './cache'
+import { wssTransport } from './transport/wss'
+import { webrtcTransport } from './transport/webrtc'
+import { registerTransport } from './transport/orchestrator'
 
 /** A cada 6h corremos eviction. Manifesto §16: cache local respeita
  *  spreads/pinned. Eviction é decisão local de gestão de espaço, não
@@ -164,6 +167,14 @@ async function doBootstrap(): Promise<void> {
     await loadFollows()
 
     setBoot((p) => ({ ...p, step: 'sync' }))
+    // Fase 6.2-E: registra transportes ativos no orchestrator antes do
+    // startSync. WSS é o transporte primário; WebRTC ativa peer-to-peer
+    // quando há peers conectados (default mock signaling = só entre abas
+    // mesma origin; Nostr signaling via flag `VITE_USE_NOSTR_SIGNALING=1`
+    // pra peers em redes diferentes). Manifesto §12 (múltiplos transportes).
+    registerTransport(wssTransport, { weight: 10 })
+    registerTransport(webrtcTransport, { weight: 5 })
+
     await startSync()
 
     setBoot((p) => ({ ...p, step: 'relays' }))

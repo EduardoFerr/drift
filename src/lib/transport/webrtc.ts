@@ -75,6 +75,10 @@ interface PeerState {
   /** Timestamps recentes (ms) de violação de rate limit, capped em
    *  RATE_VIOLATION_CAP. 3 violações em RATE_VIOLATION_WINDOW_MS → kill. */
   rateViolations: number[]
+  /** Contador de eventos de kind fora de DRIFT_KIND_SET — Fase 6.2-C
+   *  cross-protocol injection threshold. Após CROSS_PROTO_THRESHOLD,
+   *  peer é killed e (futuramente) blacklisted via peerRegistry. */
+  crossProtoCount?: number
 }
 
 interface SubscriptionRecord {
@@ -99,6 +103,31 @@ const ICE_SERVERS: RTCIceServer[] = [
   { urls: 'stun:stun.l.google.com:19302' },
 ]
 const SEEN_IDS_CAP = 1000
+
+// ─── Caps + thresholds (Fase 6.2-C, plano §5/§7) ─────────────────────
+// Mantém todos os limits em UM lugar pra orchestrator/peerRegistry/
+// peerScore (commits 6.2-A/B/D) referenciarem sem duplicar magic numbers.
+// Manifesto §15 (DoS resistance) + §20 (anti-eclipse).
+export const WEBRTC_LIMITS = {
+  /** Hard cap de peers conectados simultaneamente. */
+  MAX_PEERS: 32,
+  /** Em modo Nostr, remoteId é npub: Map dedupe garante 1 conn/pubkey.
+   *  Em modo mock, UUID é aleatório por aba — proteção não aplica (OK).
+   *  Documental — não há check runtime explícito; ver getOrCreatePeer. */
+  MAX_PEERS_PER_PUBKEY: 1,
+  /** Sustained rate por peer (já implementado em RATE_REFILL_PER_SEC). */
+  RATE_LIMIT_MSG_PER_SEC: 100,
+  /** Burst rate por peer (já implementado em RATE_BURST). */
+  RATE_LIMIT_BURST: 200,
+  /** Após N eventos de kind fora de DRIFT_KIND_SET, peer é killed. */
+  CROSS_PROTO_THRESHOLD: 50,
+  /** TTL de blacklist quando peer cruza um threshold. */
+  BLACKLIST_TTL_MS: 60 * 60 * 1000,
+} as const
+
+/** Intervalo do random walk (manifesto §20). 30min alinha com probe.ts. */
+const RANDOM_WALK_INTERVAL_MS = 30 * 60 * 1000
+let randomWalkTimer: ReturnType<typeof setInterval> | null = null
 /** Timeout pra peer stuck em 'connecting' (Barney audit #1, HIGH).
  *  Sem isso, ICE travado em firewall vira zombie peer + RAM leak linear. */
 const ICE_CONNECT_TIMEOUT_MS = 30_000
@@ -166,6 +195,7 @@ async function ensureSignalingAsync(): Promise<SignalingChannel> {
       signalingChannel = ch
       signalingUnsub = ch.onMessage(handleSignalingMessage)
       registerPagehideOnce()
+      startRandomWalkTimer()
       // Sem hello broadcast em modo Nostr — discovery é PoI-only
       // (caller chama connectTo(peerNpub) sabendo o alvo).
       return ch
@@ -175,6 +205,7 @@ async function ensureSignalingAsync(): Promise<SignalingChannel> {
     signalingChannel = ch
     signalingUnsub = ch.onMessage(handleSignalingMessage)
     registerPagehideOnce()
+    startRandomWalkTimer()
     // Mock: anuncia presença ao boot.
     void ch.send({
       type: 'hello',
@@ -214,9 +245,26 @@ function registerPagehideOnce(): void {
 
 // ─── Peer lifecycle ──────────────────────────────────────────────────
 
-function getOrCreatePeer(remoteId: string): PeerState {
+function getOrCreatePeer(remoteId: string): PeerState | null {
   const existing = peers.get(remoteId)
   if (existing) return existing
+
+  // Hard cap MAX_PEERS — Fase 6.2-C (manifesto §15 DoS, §20 anti-eclipse).
+  // Em modo Nostr, remoteId === npub, então `peers.has(npub)` (acima) já
+  // garante MAX_PEERS_PER_PUBKEY=1. Em modo mock, remoteId é UUID aleatório
+  // por aba — sem proteção por pubkey, mas o cap absoluto continua valendo.
+  // TODO 6.2-F: ejection inteligente (eject pior peer se candidate score > P50).
+  if (peers.size >= WEBRTC_LIMITS.MAX_PEERS) {
+    console.warn(
+      '[webrtc] peer cap reached (',
+      peers.size,
+      '/',
+      WEBRTC_LIMITS.MAX_PEERS,
+      ') — rejecting',
+      remoteId.slice(0, 8),
+    )
+    return null
+  }
 
   const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS })
   const peer: PeerState = {
@@ -323,6 +371,7 @@ async function initiateOffer(peer: PeerState): Promise<void> {
 
 async function handleRemoteOffer(remoteId: string, sdp: string): Promise<void> {
   const peer = getOrCreatePeer(remoteId)
+  if (!peer) return // cap atingido — drop offer silently (caller terá ICE timeout)
   // Glare collision — Barney audit #2 (CRITICAL). Se nosso lado já criou
   // offer (signalingState === 'have-local-offer'), aplicar setRemoteDescription
   // direto explode com DOMException. Padrão "perfect negotiation": o lado
@@ -409,9 +458,10 @@ function handleSignalingMessage(msg: SignalingMessage): void {
   switch (msg.type) {
     case 'hello': {
       // Cria peer entry preventivamente (mesmo se a gente não inicia).
-      getOrCreatePeer(msg.from)
+      const peer = getOrCreatePeer(msg.from)
+      if (!peer) return // cap atingido — ignora hello
       if (shouldInitiateOffer(me, msg.from)) {
-        void initiateOffer(peers.get(msg.from)!)
+        void initiateOffer(peer)
       }
       return
     }
@@ -505,7 +555,26 @@ function handleDataChannelMessage(peer: PeerState, raw: string): void {
   const event = parsed as SignedEvent
 
   // 2.5. KIND CHECK pré-verify (Barney peer review #1, invariantes #5/#14)
-  if (!DRIFT_KIND_SET.has(event.kind)) return
+  if (!DRIFT_KIND_SET.has(event.kind)) {
+    // Cross-protocol injection threshold (Fase 6.2-C, plano §7).
+    // Bot tentando empurrar kinds não-Drift (e.g., kind:1, 30023) é um
+    // tell forte de probe/abuse. Após CROSS_PROTO_THRESHOLD eventos,
+    // mata o peer. Manifesto §15.
+    peer.crossProtoCount = (peer.crossProtoCount ?? 0) + 1
+    if (peer.crossProtoCount >= WEBRTC_LIMITS.CROSS_PROTO_THRESHOLD) {
+      console.warn(
+        '[webrtc] cross-proto threshold (',
+        peer.crossProtoCount,
+        ') — blacklist',
+        peer.id.slice(0, 8),
+      )
+      peer.status = 'failed'
+      cleanupPeer(peer.id)
+      // TODO 6.2-A integration: chamar peerRegistry.blacklist(peer.id, WEBRTC_LIMITS.BLACKLIST_TTL_MS)
+      // Marshall está criando peerRegistry em paralelo — quando merge, descomenta.
+    }
+    return
+  }
 
   // 3. Schnorr verify
   if (!verifyDriftEvent(event)) {
@@ -543,6 +612,43 @@ function isPlausibleSignedEvent(x: unknown): x is SignedEvent {
     typeof e.content === 'string' &&
     Array.isArray(e.tags)
   )
+}
+
+// ─── Random walk anti-eclipse (Fase 6.2-C, plano §5) ────────────────
+
+/**
+ * Random walk anti-eclipse (manifesto §20). 25% das slots ativas vão
+ * pra peers escolhidos aleatoriamente — não scored. Bots dependem de
+ * cluster controlado; random walk corrói estatisticamente.
+ *
+ * Em 6.2-C MVP: stub que loga. Implementação completa quando peerRegistry
+ * (Marshall, 6.2-A) e peerScore (Robin, 6.2-B) mergeiarem — vira commit
+ * de integração (6.2-D ou 6.2-E ou novo).
+ *
+ * TODO 6.2-D/E:
+ *   const candidates = await pickCandidates(8, { excludeNpubs: peers.keys() })
+ *   for (const c of candidates) await connectTo(c.npub)
+ */
+async function performRandomWalk(): Promise<void> {
+  console.warn(
+    '[webrtc] random walk stub — implementation pending peerRegistry + peerScore',
+  )
+}
+
+function startRandomWalkTimer(): void {
+  if (randomWalkTimer) return
+  // Trigger inicial on-boot + intervalo 30min.
+  void performRandomWalk()
+  randomWalkTimer = setInterval(() => {
+    void performRandomWalk()
+  }, RANDOM_WALK_INTERVAL_MS)
+}
+
+function stopRandomWalkTimer(): void {
+  if (randomWalkTimer) {
+    clearInterval(randomWalkTimer)
+    randomWalkTimer = null
+  }
 }
 
 // ─── Transport API ───────────────────────────────────────────────────
@@ -664,6 +770,36 @@ export const _RATE_LIMIT_CONSTANTS = {
 
 export { consumeRateBudget as _consumeRateBudget }
 
+// ─── Test-only exports (caps + cross-proto, Fase 6.2-C) ──────────────
+
+/** Test-only: injeta um PeerState no Map de peers (sem RTCPeerConnection
+ *  real). Permite testar MAX_PEERS sem precisar abrir 32 PeerConnections. */
+export function _injectPeerForTest(peer: PeerState): void {
+  peers.set(peer.id, peer)
+}
+
+/** Test-only: exposta pra exercitar o cap em getOrCreatePeer.
+ *  Em runtime, callers são internos. */
+export function _getOrCreatePeerForTest(remoteId: string): PeerState | null {
+  return getOrCreatePeer(remoteId)
+}
+
+/** Test-only: simula a porta de entrada de eventos cross-proto sem
+ *  precisar de RTCDataChannel real. Recebe um SignedEvent-like e
+ *  incrementa o contador / kill se threshold. */
+export function _simulateCrossProtoForTest(peer: PeerState): void {
+  peer.crossProtoCount = (peer.crossProtoCount ?? 0) + 1
+  if (peer.crossProtoCount >= WEBRTC_LIMITS.CROSS_PROTO_THRESHOLD) {
+    peer.status = 'failed'
+    cleanupPeer(peer.id)
+  }
+}
+
+/** Test-only: limpa o Map de peers entre tests. */
+export function _resetPeersForTest(): void {
+  for (const id of Array.from(peers.keys())) peers.delete(id)
+}
+
 // ─── DEV / teardown helpers ──────────────────────────────────────────
 
 /** Snapshot readonly dos peers — DEV only. */
@@ -681,6 +817,7 @@ export function getPeers(): ReadonlyArray<{
 
 /** Cleanup completo — fecha todos os peers, desliga signaling, limpa subs. */
 export async function closeAll(): Promise<void> {
+  stopRandomWalkTimer()
   for (const peerId of Array.from(peers.keys())) {
     cleanupPeer(peerId)
   }
@@ -713,6 +850,10 @@ export async function connectTo(remotePeerId: string): Promise<void> {
   const ch = await ensureSignalingAsync()
   if (remotePeerId === myPeerId()) return
   const peer = getOrCreatePeer(remotePeerId)
+  if (!peer) {
+    console.warn('[webrtc] connectTo rejected — peer cap reached')
+    return
+  }
   if (shouldInitiateOffer(myPeerId(), remotePeerId)) {
     await initiateOffer(peer)
   } else {

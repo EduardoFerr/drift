@@ -73,3 +73,8 @@ memory/
 
 
 *.keystore
+
+# tauri (Fase 6.5) — build artifacts Rust ficam local; Cargo.lock NÃO é ignorado
+# (versionado pra build reproduzível, manifesto §17 / Fase 6.7)
+src-tauri/target/
+src-tauri/gen/schemas/
