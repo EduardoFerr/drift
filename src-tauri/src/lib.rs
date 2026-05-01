@@ -13,6 +13,9 @@ use tauri::Manager;
 
 mod tor;
 
+#[cfg(feature = "arti")]
+mod socks5_proxy;
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()

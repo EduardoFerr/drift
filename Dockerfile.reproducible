@@ -10,6 +10,13 @@
 ARG NODE_VERSION=20.18.1
 ARG RUST_VERSION=1.83.0
 ARG DEBIAN_VERSION=bookworm-slim
+# Rust e node usam ordens distintas pro slim+distro no Docker Hub:
+#   node:VERSION-bookworm-slim          (variant primeiro)
+#   rust:VERSION-slim-bookworm          (slim primeiro)
+#   debian:bookworm-slim                (variant primeiro)
+# Por isso o tag rust eh montado com flip explicito em vez de
+# reusar ${DEBIAN_VERSION}.
+ARG RUST_DEBIAN_VARIANT=slim-bookworm
 ARG SOURCE_DATE_EPOCH=1735689600
 # 2025-01-01 UTC — fixed reference epoch pra builds reproduziveis
 
@@ -40,7 +47,7 @@ RUN npm run build
 # Output: dist/
 
 # ─── Stage 2: Tauri Linux build ──────────────────────────────────────
-FROM rust:${RUST_VERSION}-${DEBIAN_VERSION} AS tauri-builder
+FROM rust:${RUST_VERSION}-${RUST_DEBIAN_VARIANT} AS tauri-builder
 ARG SOURCE_DATE_EPOCH
 ENV SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH} \
     LC_ALL=C.UTF-8 \

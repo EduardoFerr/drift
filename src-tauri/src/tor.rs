@@ -54,6 +54,10 @@ pub struct TorStatus {
     pub circuit_count: u32,
     /// Mensagem de erro mais recente, se algum.
     pub last_error: Option<String>,
+    /// Endereço do listener SOCKS5 local (`127.0.0.1:<porta>`) quando
+    /// `state == 'connected'`. `None` em qualquer outro estado. TS-side
+    /// usa pra abrir streams via Tor (etapa 3 — bridge WSS).
+    pub proxy_addr: Option<String>,
 }
 
 impl Default for TorStatus {
@@ -62,6 +66,7 @@ impl Default for TorStatus {
             state: "disconnected".to_string(),
             circuit_count: 0,
             last_error: None,
+            proxy_addr: None,
         }
     }
 }
@@ -153,22 +158,43 @@ pub async fn tor_connect(state: tauri::State<'_, TorState>) -> Result<TorStatus,
         .create_bootstrapped()
         .await;
 
-    let mut s = state.status.lock().map_err(|e| e.to_string())?;
-    match result {
-        Ok(client) => {
-            // Armazena cliente pra reuse nos commands seguintes.
-            let mut c = state.client.lock().map_err(|e| e.to_string())?;
-            *c = Some(Arc::new(client));
-            s.state = "connected".to_string();
-            s.circuit_count = 1; // placeholder — circmgr live count é follow-up
-            s.last_error = None;
-        }
+    let client_arc = match result {
+        Ok(client) => Arc::new(client),
         Err(err) => {
+            let mut s = state.status.lock().map_err(|e| e.to_string())?;
             s.state = "error".to_string();
             s.circuit_count = 0;
             s.last_error = Some(format!("arti bootstrap falhou: {}", err));
+            return Ok(s.clone());
         }
+    };
+
+    // Sobe o SOCKS5 listener (etapa 1) usando o client recém-bootado.
+    // Failure aqui é fatal pra `connect` — sem listener, transport TS
+    // não tem onde se ligar. Mas mantemos o client armazenado pra o
+    // próximo retry de tor_connect reusar (idempotência via "connected"
+    // check no topo).
+    let proxy_addr = match crate::socks5_proxy::start_socks5_listener(client_arc.clone()).await {
+        Ok(addr) => addr,
+        Err(err) => {
+            let mut s = state.status.lock().map_err(|e| e.to_string())?;
+            s.state = "error".to_string();
+            s.circuit_count = 0;
+            s.last_error = Some(format!("socks5 listener falhou: {}", err));
+            return Ok(s.clone());
+        }
+    };
+
+    // Sucesso completo: arti bootstrapped + listener escutando.
+    {
+        let mut c = state.client.lock().map_err(|e| e.to_string())?;
+        *c = Some(client_arc);
     }
+    let mut s = state.status.lock().map_err(|e| e.to_string())?;
+    s.state = "connected".to_string();
+    s.circuit_count = 1;
+    s.last_error = None;
+    s.proxy_addr = Some(proxy_addr.to_string());
     Ok(s.clone())
 }
 
