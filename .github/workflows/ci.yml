@@ -88,7 +88,7 @@ jobs:
         #   25235877663 quebrou em 1.85 (darling/icu MSRV)
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: '1.88.0'
+          toolchain: '1.89.0'
 
       - name: Cache cargo registry + git
         uses: actions/cache@v4

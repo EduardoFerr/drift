@@ -8,7 +8,7 @@
 # Locale C + TZ UTC eliminam locale-dependent ordering.
 
 ARG NODE_VERSION=20.18.1
-ARG RUST_VERSION=1.88.0
+ARG RUST_VERSION=1.89.0
 # Bump 1.83 → 1.88 (2026-05-01) — escalada de MSRV das deps transitivas:
 #   - 1.83 → 1.85: edition2024 (serde_spanned 1.1+, toml 0.9+)
 #   - 1.85 → 1.86: icu_collections/locale/normalizer/properties 2.2+
