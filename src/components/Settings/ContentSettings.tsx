@@ -14,7 +14,7 @@ import { setPref, usePrefsStore } from '../../lib/prefs'
 import { db } from '../../lib/db'
 import { useBootStore } from '../../lib/bootstrap'
 import { useRelaysStore } from '../../lib/relays'
-import { isTauri } from '../../lib/transport/tor'
+import { isTauri } from '../../lib/runtime'
 import { SEED_RELAY_CONFIGS } from '../../config/relays'
 import type { LocationGranularity, MapView, NetworkMode } from '../../types/drift'
 

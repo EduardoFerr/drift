@@ -1,43 +1,39 @@
 /**
- * Tor transport (Fase 6.4) — WSS via SOCKS5 local proxy do `arti`.
+ * Tor IPC bridge — wrappers TS pros 3 commands Tauri (`tor_connect`,
+ * `tor_disconnect`, `tor_status`) implementados em
+ * `src-tauri/src/tor.rs` e `src-tauri/src/socks5_proxy.rs`.
  *
- * Status atual: **scaffold + stub**. As 3 commands Tauri abaixo
- * (`tor_connect`, `tor_disconnect`, `tor_status`) são implementadas em
- * `src-tauri/src/tor.rs` (Ted) e hoje retornam erro
- * `"STUB: arti integration pending"`. Quando o crate `arti-client`
- * for embutido no shell Rust, a internals desta camada muda sem
- * quebrar callers — `Transport.publish/subscribe/health` mantêm o
- * shape.
+ * **Não é um `Transport`** no sentido do `transport/index.ts:Transport`.
+ * Versões anteriores (até `0e7d0c0`) exportavam um `torTransport` com
+ * `publish/subscribe/health` placeholders, mas a arquitetura final NÃO
+ * registra esse transport no orchestrator (seria duplicação ruidosa).
+ * Em vez disso, `bootstrap.ts` chama `torConnect()` + instala
+ * `TorWebSocket` como impl global do `nostr-tools/pool` via
+ * `installTorWebSocketImpl()` (em `transport/torWebSocket.ts`). O
+ * `wssTransport` existente passa a rotear via Tor sem mudança.
  *
- * Manifesto §15 (anti-censura por país — em país que bloqueia
- * relays Nostr, Tor contorna), §28 (privacidade pelo mínimo, IP do
- * user não vaza pro relay), §4 (anonimato em modo paranoia).
+ * Por isso este módulo só expõe as 3 IPC functions + helper. Sem
+ * Transport API morta. Mantido em `transport/` por proximidade
+ * conceitual com `transport/torWebSocket.ts` (peer mais próximo).
  *
- * **PWA browser**: throws `"Tor exige cliente nativo Tauri"` em qualquer
- * uso real. UI deve gating disabled antes de chamar.
+ * **PWA browser**: `torInvoke` lança "Tor exige cliente nativo Tauri".
+ * UI deve gating disabled antes de chamar.
  *
- * **Tauri**: invoca IPC commands via `@tauri-apps/api/core`. Real arti
- * em sessão futura — quando chegar, `publish/subscribe` vão delegar pra
- * `wssTransport` configurado com SOCKS5 agent apontando pro proxy local
- * que arti expõe (porta dinâmica retornada por `tor_connect`).
+ * **Tauri sem `--features arti`**: stub Rust retorna
+ * `state: 'error', lastError: "STUB: arti integration pending"`.
  *
- * NÃO registrar este transport no `bootstrap.ts:registerTransport` ainda
- * — stub gera `failed: 1` permanente em modo tor. Wire-up correto vem
- * junto com a integração arti real (ver TODO em bootstrap.ts).
+ * **Tauri com `--features arti`**: Tor real bootstrap + listener SOCKS5
+ * local + IPC bridge WS funcional.
+ *
+ * Manifesto §15 (anti-censura por país), §28 (privacidade pelo mínimo,
+ * IP do user não vaza pro relay), §4 (anonimato em modo paranoia).
  */
 
-import type {
-  Filter,
-  PublishResult,
-  SubscribeHandlers,
-  Transport,
-  TransportHealth,
-  Unsubscribe,
-} from './index'
-import type { SignedEvent } from '../../types/nostr'
+export { isTauri } from '../runtime'
 
 /** Shape do `TorStatus` retornado por todos os 3 IPC commands.
- *  Espelha exatamente `src-tauri/src/tor.rs::TorStatus` (Ted). */
+ *  Espelha exatamente `src-tauri/src/tor.rs::TorStatus` com
+ *  `#[serde(rename_all = "camelCase")]`. */
 export interface TorStatusIPC {
   state: 'disconnected' | 'connecting' | 'connected' | 'error'
   /** Quantos circuitos Tor ativos. 0 enquanto não conectado. */
@@ -46,32 +42,26 @@ export interface TorStatusIPC {
   lastError: string | null
   /** Endereço do listener SOCKS5 local (`127.0.0.1:<porta>`) quando
    *  state === 'connected'. `null` em qualquer outro estado.
-   *  Etapa 1 da Fase 6.4 (commit 7f0bad0). Bridge WSS (etapa 3)
-   *  abre TCP nesse endereço pra rotear via Tor. */
+   *  Bridge WS interna (`tor_ws.rs` + `torWebSocket.ts`) usa este
+   *  endpoint pra rotear frames via Tor. */
   proxyAddr: string | null
 }
 
 /** Helper de conveniência: retorna o `proxyAddr` se Tor está conectado,
- *  `null` caso contrário (qualquer outro state). Útil pra callers que
- *  só querem saber "o proxy está pronto?" sem decompor o status inteiro.
- *
- *  Em PWA browser: throws via `torStatus()` antes de chegar aqui. */
+ *  `null` caso contrário (qualquer outro state). Em PWA browser:
+ *  throws via `torStatus()` antes de chegar aqui. */
 export async function getTorProxyAddr(): Promise<string | null> {
   const s = await torStatus()
   return s.state === 'connected' ? s.proxyAddr : null
-}
-
-/** Detecta runtime Tauri vs browser puro.
- *  Tauri injeta `__TAURI_INTERNALS__` no objeto `window` durante o boot
- *  do webview. Em PWA/browser puro o símbolo não existe. */
-export function isTauri(): boolean {
-  return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
 }
 
 /** Wrapper genérico de `invoke` com gating de runtime + dynamic import.
  *  Dynamic import evita bundle-cost em PWA puro — `@tauri-apps/api`
  *  só é resolvido quando rodando dentro do shell Tauri. */
 async function torInvoke<T>(cmd: string): Promise<T> {
+  // Local import pra evitar circular: runtime → tor → torWebSocket →
+  // ContentSettings → runtime. Re-export acima já cobre callers TS.
+  const { isTauri } = await import('../runtime')
   if (!isTauri()) {
     throw new Error('Tor exige cliente nativo Tauri — não disponível no PWA browser')
   }
@@ -79,9 +69,9 @@ async function torInvoke<T>(cmd: string): Promise<T> {
   return invoke<T>(cmd)
 }
 
-/** Inicia o daemon Tor (arti) e retorna status.
- *  Hoje (stub): retorna `state: 'error', lastError: 'STUB: arti integration pending'`.
- *  Real: bootstraps directory consensus, abre circuitos, expõe SOCKS5 local. */
+/** Inicia o daemon Tor (arti). Em build com `--features arti`:
+ *  bootstraps directory consensus, abre circuit, sobe listener SOCKS5
+ *  local. Em build default: stub retorna `state: 'error'`. */
 export async function torConnect(): Promise<TorStatusIPC> {
   return torInvoke<TorStatusIPC>('tor_connect')
 }
@@ -91,60 +81,7 @@ export async function torDisconnect(): Promise<TorStatusIPC> {
   return torInvoke<TorStatusIPC>('tor_disconnect')
 }
 
-/** Snapshot do status atual sem efeito colateral. UI consulta isto pra
- *  desenhar o ícone 🧅/🛡️ no Header. */
+/** Snapshot do status atual sem efeito colateral. */
 export async function torStatus(): Promise<TorStatusIPC> {
   return torInvoke<TorStatusIPC>('tor_status')
-}
-
-// ─── Transport API ───────────────────────────────────────────────────
-//
-// Implementação placeholder até arti real chegar. Mantém shape idêntico
-// ao `wssTransport` pra orchestrator poder iterar sem `if (kind === ...)`.
-
-async function publish(_event: SignedEvent): Promise<PublishResult> {
-  // TODO(arti): quando arti expor SOCKS5 local, instanciar um
-  // wssTransport-like aqui que abre WebSocket via proxy
-  // (ver `src-tauri/src/tor.rs::tor_connect` retorno).
-  // Por enquanto, marca tudo como falha pra orchestrator pular.
-  return {
-    ok: 0,
-    failed: 1,
-    perRelay: [{ url: 'tor:stub', ok: false, error: 'arti integration pending' }],
-  }
-}
-
-function subscribe(_filter: Filter, handlers: SubscribeHandlers): Unsubscribe {
-  // TODO(arti): delega pra wssTransport configurado com SOCKS5 agent
-  // depois que `tor_connect` retornar `state === 'connected'`.
-  // Por enquanto, sinaliza EOSE imediato pra caller não ficar pendurado.
-  if (handlers.oneose) queueMicrotask(() => handlers.oneose?.())
-  return () => {
-    /* noop — não há subscription real a cancelar */
-  }
-}
-
-async function health(_timeoutMs?: number): Promise<TransportHealth[]> {
-  if (!isTauri()) {
-    return [{ url: 'tor:browser-not-supported', ok: false, latencyMs: null }]
-  }
-  try {
-    const status = await torStatus()
-    return [
-      {
-        url: `tor:${status.state}`,
-        ok: status.state === 'connected',
-        latencyMs: null,
-      },
-    ]
-  } catch {
-    return [{ url: 'tor:error', ok: false, latencyMs: null }]
-  }
-}
-
-export const torTransport: Transport = {
-  kind: 'tor',
-  publish,
-  subscribe,
-  health,
 }

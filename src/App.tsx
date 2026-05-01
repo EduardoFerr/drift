@@ -17,7 +17,7 @@ import {
   type BootState,
 } from './lib/bootstrap'
 import { getPrefs, usePrefsStore } from './lib/prefs'
-import { isTauri } from './lib/transport/tor'
+import { isTauri } from './lib/runtime'
 import { useUserWeight } from './hooks/useUserWeight'
 import { useInstallPrompt } from './hooks/useInstallPrompt'
 import { IdentityPanel } from './components/Identity/IdentityPanel'

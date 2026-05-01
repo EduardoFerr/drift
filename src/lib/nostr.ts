@@ -72,8 +72,13 @@ export function verifyDriftEvent(event: NostrEvent): boolean {
  * Publica um evento já assinado nos transportes ativos.
  *
  * Fase 6.2-E: delega ao `orchestrator` que multiplexa todos os
- * transportes registrados (`wssTransport`, `webrtcTransport`, futuros
- * `torTransport`). Bootstrap registra os transports ativos. Manifesto §12.
+ * transportes registrados (`wssTransport`, `webrtcTransport`, futuro
+ * IPFS-pin). Manifesto §12. Bootstrap registra os transports ativos
+ * — Tor NÃO é registrado como transport separado: em vez disso,
+ * `bootstrap.ts` instala `TorWebSocket` como impl global do
+ * `nostr-tools/pool` quando `network_mode ∈ {tor, onion-only}` em
+ * Tauri+arti, e o `wssTransport` existente passa a rotear via Tor
+ * sem mudança. Detalhes em `Docs/transport-paths.md`.
  *
  * Comportamento idêntico ao publish-direto-WSS quando só WSS está
  * registrado — orchestrator é compatível por design.

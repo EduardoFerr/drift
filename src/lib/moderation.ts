@@ -43,6 +43,7 @@
  */
 
 import { db } from './db'
+import { invalidateFeed } from './feed'
 import type { ReportReason } from '../types/drift'
 import { MS_PER_DAY_30 } from '../config/constants'
 
@@ -164,6 +165,12 @@ export async function maybeModerate(postId: string, now: number): Promise<void> 
     const t = getReportThreshold(activeUsers, reason)
     if (byReason[reason] >= t) {
       await db.run(`UPDATE posts SET score = -999 WHERE id = ?`, [postId])
+      // Invariante #1 (CLAUDE.md): UPDATE em domínio fora de
+      // `events.ts:onNostrEvent` é exceção autorizada (eviction +
+      // moderação), MAS exige `invalidateFeed()` pra que UI reflita.
+      // Sem isso, post fica `score: -999` no banco mas o store
+      // `useFeedStore` só atualiza quando próximo evento chegar.
+      invalidateFeed()
       return
     }
   }
@@ -172,5 +179,6 @@ export async function maybeModerate(postId: string, now: number): Promise<void> 
   const combinedThreshold = getReportThreshold(activeUsers, 'spam')
   if (totalWeight >= combinedThreshold) {
     await db.run(`UPDATE posts SET score = -999 WHERE id = ?`, [postId])
+    invalidateFeed()
   }
 }

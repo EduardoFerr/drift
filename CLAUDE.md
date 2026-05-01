@@ -64,15 +64,29 @@ adiciona Tor, WebRTC e IPFS pin pra entregar o manifesto inteiro.
 
 ## Invariantes — quebrar isso quebra o sistema
 
-### 1. `onNostrEvent()` é a ÚNICA porta de escrita
+### 1. `onNostrEvent()` é a ÚNICA porta de **INSERT** em domínio
 
-Tabelas de domínio (`posts`, `spreads`, `buries`, `reports`) são
-escritas exclusivamente por `src/lib/events.ts` → `onNostrEvent()`.
-Após persistir, ele chama `invalidateFeed()` (debounced) — único
-caminho que dispara re-query do SQLite pra atualizar a store React.
+Tabelas de domínio (`posts`, `spreads`, `buries`, `reports`) recebem
+`INSERT` exclusivamente por `src/lib/events.ts` → `onNostrEvent()`.
+Após persistir, ele chama `invalidateFeed()` (debounced) — caminho
+canônico que dispara re-query do SQLite pra atualizar a store React.
+
+**Exceções autorizadas (UPDATE/DELETE locais)** — manutenção do cache,
+não criação de estado novo:
+
+- `cache.ts:evictOldPosts` — `DELETE FROM posts/buries` quando
+  contagem ultrapassa SOFT_LIMIT. Manifesto §16 (cache local respeita
+  spreads + pinned). Eviction é gestão de espaço, não censura.
+- `moderation.ts:maybeModerate` — `UPDATE posts SET score = -999`
+  quando reports atingem threshold dinâmico. Manifesto §26. Score
+  -999 esconde do feed; cliente alternativo pode exibir mesmo assim.
+
+**Regra dura pra todo UPDATE/DELETE em domínio**: chamar
+`invalidateFeed()` após o write. Sem isso, `useFeedStore` fica stale
+até próximo evento entrar via `onNostrEvent`. Validar nos PRs.
 
 Exceções operacionais locais (não-domínio): `identity`, `sync_log`,
-`user_prefs`, e tabelas de relay management (Fase 5).
+`user_prefs`, e tabelas de relay management (Fase 5+).
 
 ### 2. Optimistic UI nunca alimenta o SQLite
 
