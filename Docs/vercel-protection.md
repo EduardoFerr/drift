@@ -1,7 +1,7 @@
 # Vercel Deployment Protection — histórico
 
 **Data da decisão**: 2026-04-29
-**Autor**: Eduardo + Claude Code (sessão coordenada)
+**Autor**: Arquiteto
 **Estado atual**: `ssoProtection.deploymentType = "preview"` (Only Preview Deployments)
 
 ## Por que existe esta doc

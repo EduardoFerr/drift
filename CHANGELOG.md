@@ -6,7 +6,7 @@ All notable changes to the Drift client. Uses [Keep a Changelog](https://keepach
 
 ### Added (Fase 6.3 — TURN + Reconnect + Health checks)
 
-3 frentes em `webrtc.ts` + paralelo (Robin docs / Marshall tests / Barney review):
+Coordenado por 4 personas (Lily core / Robin docs / Marshall tests / Barney review):
 
 - **TURN servers via env var** (`VITE_TURN_SERVERS`, `webrtc.ts:_parseTurnServers + getICEServers`): cobre mobile real (4G CGN, symmetric NAT) que STUN-only não atravessa. Default vazio (manifesto §28 — TURN provider vê IP do user; opt-in consciente). Aceita formato `turn:host:port?username=foo&credential=bar`, comma-separated. **Aviso crítico**: Vite embute `VITE_*` no bundle público; credentials Twilio/Cloudflare paid **NÃO** devem ir aqui (ephemeral creds via REST API). OK pra TURN gratuito (numb.viagenie.ca) ou self-hosted coturn.
 
@@ -62,9 +62,9 @@ Fecha integração runtime dos 3 TODOs deixados em `webrtc.ts` (commit anterior)
 
 - **6.2-C — Caps + cross-proto threshold em `webrtc.ts`** (Barney): `WEBRTC_LIMITS` exportado (MAX_PEERS=32, MAX_PEERS_PER_PUBKEY=1, RATE_LIMIT_MSG_PER_SEC=100, CROSS_PROTO_THRESHOLD=50, BLACKLIST_TTL_MS=1h). `getOrCreatePeer` retorna `PeerState | null` quando hard cap atinge — call sites tratam (`handleRemoteOffer`, `hello`, `connectTo`). `handleDataChannelMessage` incrementa `crossProtoCount` em kind fora de `DRIFT_KIND_SET`; mata peer ao atingir 50. `performRandomWalk()` stub (logs `pending peerRegistry+peerScore`); timer 30min via `startRandomWalkTimer()`/`stopRandomWalkTimer()`, integração runtime fica pra commit futuro. 8 tests novos em `tests/webrtcCaps.test.ts`. Manifesto §15, §20.
 
-- **6.2-D — `orchestrator.ts`** (eu): multiplexer de transportes implementando `Transport`. `publish` agrega resultados de todos os transports registrados; `subscribe` faz fan-out + dedup cross-transport via LRU(1000) por `event.id`; `health` concat com prefixo (`wss:relay.url`, `webrtc:peer-id`). `registerTransport(t, opts)` é idempotente. **Comportamentalmente equivalente** ao wssTransport direto quando só ele está registrado. 14 tests em `tests/orchestrator.test.ts`. Manifesto §12.
+- **6.2-D — `orchestrator.ts`** (Lily): multiplexer de transportes implementando `Transport`. `publish` agrega resultados de todos os transports registrados; `subscribe` faz fan-out + dedup cross-transport via LRU(1000) por `event.id`; `health` concat com prefixo (`wss:relay.url`, `webrtc:peer-id`). `registerTransport(t, opts)` é idempotente. **Comportamentalmente equivalente** ao wssTransport direto quando só ele está registrado. 14 tests em `tests/orchestrator.test.ts`. Manifesto §12.
 
-- **6.2-E — Wire `sync.ts` + `nostr.ts` → orchestrator** (eu): `sync.ts:startSync` migra de `pool.subscribeMany` direto pra `orchestrator.subscribe` (subscription type muda de `{close: () => void}` pra `Unsubscribe = () => void`). `nostr.ts:publishToRelays` migra de `wssTransport.publish` pra `orchestrator.publish`. `bootstrap.ts` registra `wssTransport` (weight 10) + `webrtcTransport` (weight 5) antes de `startSync`. **Eventos via WebRTC agora chegam no SQLite via pipeline normal** (`onNostrEvent` continua única porta — invariante #1). Comportamentalmente idêntico em modo mock (sem peers WebRTC = só WSS); ativa P2P real quando `VITE_USE_NOSTR_SIGNALING=1` + `connectTo(npub)`.
+- **6.2-E — Wire `sync.ts` + `nostr.ts` → orchestrator** (Lily): `sync.ts:startSync` migra de `pool.subscribeMany` direto pra `orchestrator.subscribe` (subscription type muda de `{close: () => void}` pra `Unsubscribe = () => void`). `nostr.ts:publishToRelays` migra de `wssTransport.publish` pra `orchestrator.publish`. `bootstrap.ts` registra `wssTransport` (weight 10) + `webrtcTransport` (weight 5) antes de `startSync`. **Eventos via WebRTC agora chegam no SQLite via pipeline normal** (`onNostrEvent` continua única porta — invariante #1). Comportamentalmente idêntico em modo mock (sem peers WebRTC = só WSS); ativa P2P real quando `VITE_USE_NOSTR_SIGNALING=1` + `connectTo(npub)`.
 
 **Tests delta**: 296 → 351 verdes (+55 novos). Sem regressão.
 
