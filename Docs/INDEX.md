@@ -48,6 +48,7 @@ ou **Por persona** pra pular direto.
 - **[tauri-setup.md](tauri-setup.md)** — setup do shell desktop Tauri (Fase 6.5 ✅ validado 2026-04-29). Pré-requisitos Rust, `npm run tauri:dev/build`, permissões mínimas (manifesto §17).
 - **[runtime-pwa-vs-tauri.md](runtime-pwa-vs-tauri.md)** — matriz cross-runtime: o que funciona em PWA vs Tauri, onde o código discrimina, quando duplicar vs gating. Follow-up Barney 6.4 R7 (2026-05-01).
 - **[transport-paths.md](transport-paths.md)** — 1-pager mapeando os 3 caminhos publish/subscribe do projeto (orchestrator, wssTransport direto, pool direto) e quando usar cada. Sprint 5 do roadmap pós-auditoria (2026-05-01).
+- **[sprint7-manual.md](sprint7-manual.md)** — guia passo a passo do smoke test e2e do Tor real (Sprint 7 do roadmap pós-auditoria). Manual; exige Rust toolchain + Wireshark + Tauri build local. Critério de aceite: manifesto §15 verified.
 - **[build-reproducible.md](build-reproducible.md)** ✅ — Fase 6.7. Como verificar binário publicado vs source público. Docker + SHA256 + `Dockerfile.reproducible`. Linux PWA + Tauri bit-identical. Manifesto §17 (build reproduzível).
 - **[deploy.md](deploy.md)** — Vercel + GitHub Releases + Cloudflare Tunnel + F-Droid/Play
 - **[sessions/vercel-protection.md](sessions/vercel-protection.md)** — histórico do Deployment Protection (2026-04-29: mudou pra `preview-only`, justificativa + reversão)
