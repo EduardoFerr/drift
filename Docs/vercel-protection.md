@@ -144,6 +144,8 @@ noindex` em hostnames não-canônicos via `vercel.json`:
 }
 ```
 
+**Decisão (2026-04-29):** Não implementar agora. Drift é descoberto via npub/Nostr/sneakernet (manifesto §16/§17), não SEO orgânico. Hardening trivial sem ROI observado hoje. **Trigger pra revisitar**: SEO fragmentado afetar ranking real (Google indexar duplicatas e impactar discovery).
+
 Não foi aplicado — sem urgência. O custo de SEO fragmentado é negligível pra um app
 que é descoberto via npub/Nostr, não via Google.
 

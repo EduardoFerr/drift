@@ -127,13 +127,12 @@ interface MaplibreMap {
   once(event: string, callback: () => void): void
 }
 
-interface ArcLayerProps {
-  origin: [number, number]
-  destination: [number, number]
-}
-
 interface PointLayerProps {
   position: [number, number]
+}
+
+interface HeatmapPointProps {
+  point: { lng: number; lat: number }
 }
 
 export function SpreadMap({
@@ -164,16 +163,18 @@ export function SpreadMap({
     // nem importamos.
     void (async () => {
       try {
-        const [maplibreModule, deckMapbox, layersModule] = await Promise.all([
-          import('maplibre-gl'),
-          // `MapboxOverlay` mora em `@deck.gl/mapbox`, NÃO em `@deck.gl/core`.
-          // Antes importávamos de `core` e o cast `as unknown` silenciava o
-          // erro de tipos — runtime explodia com "MapboxOverlay is not a
-          // constructor" assim que o useEffect disparava (sintoma só visível
-          // quando havia dados pra renderizar).
-          import('@deck.gl/mapbox'),
-          import('@deck.gl/layers'),
-        ])
+        const [maplibreModule, deckMapbox, layersModule, aggregationModule] =
+          await Promise.all([
+            import('maplibre-gl'),
+            // `MapboxOverlay` mora em `@deck.gl/mapbox`, NÃO em `@deck.gl/core`.
+            // Antes importávamos de `core` e o cast `as unknown` silenciava o
+            // erro de tipos — runtime explodia com "MapboxOverlay is not a
+            // constructor" assim que o useEffect disparava (sintoma só visível
+            // quando havia dados pra renderizar).
+            import('@deck.gl/mapbox'),
+            import('@deck.gl/layers'),
+            import('@deck.gl/aggregation-layers'),
+          ])
         if (cancelled) return
 
         const maplibregl = maplibreModule.default as unknown as MaplibreStatic
@@ -183,9 +184,11 @@ export function SpreadMap({
           // O nome continua "Mapbox" por razões históricas do deck.gl.
           MapboxOverlay: new (props: { layers: unknown[] }) => unknown
         }
-        const { ArcLayer, ScatterplotLayer } = layersModule as unknown as {
-          ArcLayer: new (props: Record<string, unknown>) => unknown
+        const { ScatterplotLayer } = layersModule as unknown as {
           ScatterplotLayer: new (props: Record<string, unknown>) => unknown
+        }
+        const { HeatmapLayer } = aggregationModule as unknown as {
+          HeatmapLayer: new (props: Record<string, unknown>) => unknown
         }
 
         // Centro: prefere a origem (autor do post). Se não há origem mas
@@ -244,6 +247,28 @@ export function SpreadMap({
 
         const overlay = new MapboxOverlay({
           layers: [
+            // Heatmap dos destinos (densidade de espalhamento). Renderizado
+            // PRIMEIRO pra ficar embaixo dos pontos (origem + destinos).
+            // Substitui o ArcLayer (radial) — visual mais legível pra
+            // posts virais com muitos destinos sobrepostos.
+            new HeatmapLayer({
+              id: 'spread-heat',
+              data: data.destinations,
+              getPosition: (d: HeatmapPointProps) => [d.point.lng, d.point.lat],
+              getWeight: 1,
+              radiusPixels: 40,
+              intensity: 1,
+              threshold: 0.05,
+              aggregation: 'SUM',
+              colorRange: [
+                [33, 102, 172, 0],
+                [103, 169, 207, 80],
+                [209, 229, 240, 130],
+                [253, 219, 199, 180],
+                [239, 138, 98, 220],
+                [178, 24, 43, 250],
+              ],
+            }),
             // Ponto da origem (autor do post). Amber, raio grande.
             new ScatterplotLayer({
               id: 'spread-origin',
@@ -257,26 +282,15 @@ export function SpreadMap({
               lineWidthUnits: 'pixels',
               getLineWidth: 1.5,
             }),
-            // Pontos dos destinos (espalhadores). Verde drift-spread, menor.
+            // Pontos dos destinos (espalhadores). Verde drift-spread,
+            // alpha reduzido pra integrar com o heatmap embaixo.
             new ScatterplotLayer({
               id: 'spread-destinations',
               data: destPoints,
               getPosition: (p: PointLayerProps) => p.position,
-              getFillColor: [52, 211, 153, 200], // drift-spread
-              getRadius: 5,
+              getFillColor: [52, 211, 153, 140], // drift-spread (alpha reduzido)
+              getRadius: 3,
               radiusUnits: 'pixels',
-            }),
-            // Arcos origem → destinos. Pode estar vazio (origem sem destino,
-            // ou caso degenerado sem origem nem destinos suficientes).
-            new ArcLayer({
-              id: 'spread-arcs',
-              data: data.arcs,
-              getSourcePosition: (a: ArcLayerProps) => a.origin,
-              getTargetPosition: (a: ArcLayerProps) => a.destination,
-              getSourceColor: [251, 191, 36, 220], // amber (origem)
-              getTargetColor: [52, 211, 153, 200], // verde (destino)
-              getWidth: 1.5,
-              greatCircle: true,
             }),
           ],
         })

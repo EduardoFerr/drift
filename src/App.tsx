@@ -29,6 +29,7 @@ import { LocalListsSettings } from './components/Settings/LocalListsSettings'
 import { OnboardingOverlay } from './components/Onboarding/OnboardingOverlay'
 import { ProfileModal } from './components/Profile/ProfileModal'
 import { GpsErrorBanner } from './components/UI/GpsErrorBanner'
+import { MultiTabModal } from './components/UI/MultiTabModal'
 import type {
   DriftIdentity,
   LocationGranularity,
@@ -451,6 +452,10 @@ function App() {
   }
 
   // Render ─────────────────────────────────────────────────────────────
+
+  if (boot.step === 'error' && boot.error === 'MULTI_TAB_CONFLICT') {
+    return <MultiTabModal />
+  }
 
   if (boot.step !== 'ready') {
     return <BootView state={boot} />

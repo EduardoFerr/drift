@@ -167,6 +167,8 @@ function parseLocation(raw: string | null): GeoPoint | null {
  *
  * Exportada como `_buildArcs` (prefixo underscore = test-only) pra que
  * `tests/spread-map.test.ts` possa cobrir os 5 estados sem mockar SQLite.
+ *
+ * @deprecated Use _computeBounds + HeatmapLayer instead. Will be removed in next release.
  */
 export function _buildArcs(
   origin: GeoPoint | null,

@@ -92,8 +92,21 @@ async function init(schema: string): Promise<{ hasOpfs: boolean; storage: Storag
 
   if (hasOpfs) {
     log('abrindo /drift.db via OpfsDb (persistente)…')
-    db = new sqlite3.oo1.OpfsDb('/drift.db')
-    storageMode = 'opfs'
+    try {
+      db = new sqlite3.oo1.OpfsDb('/drift.db')
+      storageMode = 'opfs'
+    } catch (err) {
+      // OPFS permite só 1 SyncAccessHandle por arquivo. Se outra aba do
+      // mesmo origin já abriu /drift.db, o handle aqui falha com
+      // NoModificationAllowedError. Propaga sinal específico pro main
+      // thread renderizar modal educativo (Opção A — pragmático). Sem
+      // esse catch, o erro genérico trava o boot em "carregando…".
+      if (err instanceof Error && err.name === 'NoModificationAllowedError') {
+        log('OPFS já em uso por outra aba — sinalizando MULTI_TAB_CONFLICT')
+        throw new Error('MULTI_TAB_CONFLICT')
+      }
+      throw err
+    }
   } else if (typeof localStorage !== 'undefined' && sqlite3.oo1.JsStorageDb) {
     // Fallback persistente: kvvfs em localStorage. ~5MB hard cap.
     // Adequado pra Safari < 17 e contextos sem OPFS.

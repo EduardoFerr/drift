@@ -393,6 +393,7 @@ function handleSignalingMessage(msg: SignalingMessage): void {
  *  empurra timestamp em rateViolations (caped). Após threshold em janela,
  *  marca peer como failed e cleanup. */
 function consumeRateBudget(peer: PeerState, now: number): boolean {
+  if (peer.status === 'failed' || peer.status === 'closed') return false
   // Refill linear desde lastRefillTs.
   const elapsedSec = (now - peer.lastRefillTs) / 1000
   if (elapsedSec > 0) {

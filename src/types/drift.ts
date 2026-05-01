@@ -171,6 +171,7 @@ export interface SpreadMapData {
    * por `_buildArcs` (ver useSpreadMap.ts). Vazio quando não dá pra
    * desenhar arco (sem origem nem >=2 destinos).
    */
+  // @deprecated — heatmap visualization replaces arcs (since 0.6.0). Mantém por 1 release pra retrocompat.
   arcs: SpreadArc[]
   totalSpreads: number
   countries: string[]

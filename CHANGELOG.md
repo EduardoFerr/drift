@@ -4,6 +4,22 @@ All notable changes to the Drift client. Uses [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+### Changed (mapa)
+
+- **Visualização de spread: ArcLayer (radial) → HeatmapLayer (densidade)** (`SpreadMap.tsx`, Barney). Após debate de cascata explícita (tag `via`) vs heurística greedy vs radial, escolhido **heatmap** como solução alinhada ao manifesto: mostra densidade geográfica (fato observável) sem inventar relações nem rastrear vínculos de propagação. Bonus: k-anonymity emergente em áreas densas (manifesto §28). Layers: HeatmapLayer (gradiente azul→amarelo→vermelho) + ScatterplotLayer da origem (amber, raio 8, destaque do autor) + ScatterplotLayer dos destinos (verde alpha 140, raio 3). Adicionada dep `@deck.gl/aggregation-layers@^9.0.0`. `_buildArcs` e campo `arcs` marcados `@deprecated` por 1 release pra retrocompat.
+
+### Added (multi-tab)
+
+- **`MultiTabModal` + catch OPFS xLock** (`db.worker.ts`, `db.ts`, `bootstrap.ts`, `App.tsx`, `components/UI/MultiTabModal.tsx`, Lily). 2ª aba do mesmo origin lançava `NoModificationAllowedError` no SQLite OPFS — app travava em "carregando…". Agora worker captura, propaga `MULTI_TAB_CONFLICT` específico, modal educativo orienta user a fechar uma das abas (botões "Fechar" / "Recarregar"). OPFS permite só 1 SyncAccessHandle por arquivo — limitação do spec, não bug do Drift; modal é fix pragmático sem multi-tab support real.
+
+### Fixed (hygiene)
+
+- **`consumeRateBudget` log spam** (`transport/webrtc.ts:395`, Robin): após `peer.status='failed'/'closed'`, função continuava logando "peer killed" e acumulando violações em loop. Test `webrtc-ratelimit > refill nunca passa de RATE_BURST` poluía stderr com ~50 linhas. Fix: 1 linha early-return no início. 8 tests verdes; stderr limpo.
+
+### Docs
+
+- **`Docs/vercel-protection.md` — decisão "não implementar X-Robots-Tag"** (Ted). Drift descoberto via npub/Nostr/sneakernet, não SEO orgânico. Hardening trivial sem ROI hoje. Trigger pra revisitar: SEO afetar ranking real.
+
 ### Operacional
 
 - **Vercel Deployment Protection: `Standard` → `Only Preview`** (2026-04-29). Hostnames auto-gerados de production (`drift-{hash}-...vercel.app`) estavam retornando 401 em `manifest.webmanifest`, quebrando PWA install. Causa: `ssoProtection.deploymentType: "all_except_custom_domains"` (default Vercel pra projetos comerciais) bloqueava todos os hostnames exceto o alias custom `drift-wheat-one.vercel.app`. Mudou pra `"preview"` via REST API — production deployments públicos, previews continuam protegidos. Justificativa + comandos de reversão em [Docs/vercel-protection.md](Docs/vercel-protection.md). Manifesto §16/§17.

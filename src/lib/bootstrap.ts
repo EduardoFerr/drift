@@ -180,6 +180,15 @@ async function doBootstrap(): Promise<void> {
     // relay realmente os entrega.
     startProbe()
   } catch (err) {
+    // Multi-aba: OPFS permite só 1 SyncAccessHandle por arquivo. Quando
+    // a 2ª aba do mesmo origin tenta abrir, db.worker propaga
+    // 'MULTI_TAB_CONFLICT'. App.tsx renderiza MultiTabModal nesse caso —
+    // user fecha aba ou recarrega. Não é "erro" no sentido fatal.
+    if (err instanceof Error && err.name === 'MULTI_TAB_CONFLICT') {
+      console.warn('[bootstrap] conflito multi-aba detectado — exibindo modal')
+      setBoot((p) => ({ ...p, step: 'error', error: 'MULTI_TAB_CONFLICT' }))
+      return
+    }
     const message = err instanceof Error ? err.message : String(err)
     console.error('[bootstrap]', err)
     setBoot((p) => ({ ...p, step: 'error', error: message }))

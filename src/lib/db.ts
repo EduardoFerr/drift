@@ -88,8 +88,18 @@ export function initDb(): Promise<InitResult> {
     const handler = pending.get(data.id)
     if (!handler) return
     pending.delete(data.id)
-    if (data.ok) handler.resolve(data.result)
-    else handler.reject(new Error(data.error ?? 'unknown worker error'))
+    if (data.ok) {
+      handler.resolve(data.result)
+    } else {
+      const err = new Error(data.error ?? 'unknown worker error')
+      // Propaga sinal de conflito multi-aba via err.name pro bootstrap
+      // detectar e renderizar modal específico. Sem isso, o erro vira
+      // genérico no BootView "erro" e o user fica perdido.
+      if (data.error?.includes('MULTI_TAB_CONFLICT')) {
+        err.name = 'MULTI_TAB_CONFLICT'
+      }
+      handler.reject(err)
+    }
   }
 
   worker.onerror = (e) => {
