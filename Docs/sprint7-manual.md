@@ -342,6 +342,13 @@ Algum crate transitivo subiu MSRV. Atualizar Rust:
 rustup update stable
 ```
 
+### Windows: `LINK : fatal error LNK1181: cannot open input file 'sqlite3.lib'`
+
+Resolvido via `libsqlite3-sys = { features = ["bundled"] }` no
+`Cargo.toml` (force-bundle SQLite from source). Se ainda aparecer:
+- `cargo clean` + rebuild
+- Confirmar `[features] arti` lista `dep:libsqlite3-sys`
+
 ### `[bootstrap] Tor não conectou (state=error, err=arti bootstrap falhou: ...)`
 
 Possíveis causas:

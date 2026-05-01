@@ -42,6 +42,17 @@ tor-rtcompat = { version = "0.41", optional = true, default-features = false, fe
 tokio = { version = "1", optional = true, features = ["full"] }
 anyhow = { version = "1", optional = true }
 
+# Força `bundled` em libsqlite3-sys (puxado por tor-dirmgr → rusqlite
+# via arti workspace). Sem isso, Windows MSVC linker falha:
+#   LINK : fatal error LNK1181: cannot open input file 'sqlite3.lib'
+# `bundled` compila SQLite from source dentro do build (~3MB extras
+# no binário final). Em Linux/macOS já funciona porque distro
+# tipicamente tem libsqlite3 instalada — mas bundled garante mesma
+# semântica cross-platform e build determinístico (Fase 6.7).
+# Cargo feature unification: declarar aqui ativa o `bundled` em
+# TODAS as instâncias de libsqlite3-sys no dep tree.
+libsqlite3-sys = { version = "0.36", optional = true, features = ["bundled"] }
+
 # Tor WS bridge (etapa 3) — webview Tauri ignora system proxy
 # programatico, entao implementamos WebSocket TS-side que invoca IPC
 # commands; estes commands usam tokio-tungstenite rodando *dentro* do
@@ -62,4 +73,4 @@ custom-protocol = ["tauri/custom-protocol"]
 #       → produz binário Tauri com Tor real embarcado
 # Wire-up: tor.rs usa #[cfg(feature = "arti")] pra trocar stub→real.
 # Documentação: Docs/webrtc-6.4-plan.md §"arti integration".
-arti = ["dep:arti-client", "dep:tor-rtcompat", "dep:tokio", "dep:anyhow", "dep:tokio-tungstenite", "dep:futures-util", "dep:url"]
+arti = ["dep:arti-client", "dep:tor-rtcompat", "dep:tokio", "dep:anyhow", "dep:tokio-tungstenite", "dep:futures-util", "dep:url", "dep:libsqlite3-sys"]
