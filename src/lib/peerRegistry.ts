@@ -181,6 +181,23 @@ export async function blacklist(npub: string, ttlMs: number): Promise<void> {
 }
 
 /**
+ * Checa se um peer está blacklisted (blacklisted_until > now).
+ * Usado por `seeder.ts` (Fase 7.1a R2 — Barney) pra evitar gastar slot
+ * MAX_PEERS conectando a peer punido por cross-protocol abuse.
+ *
+ * Custo: 1 SELECT pontual por candidato — chamado em batch antes de
+ * `connectTo`, frequência baixa (handshake-time, não hot path).
+ */
+export async function isBlacklisted(npub: string): Promise<boolean> {
+  const row = await db.get<{ blacklisted_until: number }>(
+    `SELECT blacklisted_until FROM peers_known WHERE npub = ?`,
+    [npub],
+  )
+  if (!row) return false
+  return row.blacklisted_until > now()
+}
+
+/**
  * Lista peers conhecidos ordenados por `last_seen DESC`. Filtra
  * blacklisted (where blacklisted_until > now) quando opt-in.
  *

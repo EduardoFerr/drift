@@ -11,10 +11,26 @@
  */
 
 import { db } from './db'
+import { isBlacklisted } from './peerRegistry'
 import { connectTo, getPeers, WEBRTC_LIMITS } from './transport/webrtc'
 
-// dedup: não re-seed mesmo post 2x na sessão
+/**
+ * Cap de dedup (Barney R4): sessões longas (~horas) abrindo dezenas de
+ * mapas distintos crescem o Set sem teto. 256 posts cobre uso humano
+ * realista; quando estoura, FIFO drop do mais antigo (re-seed permitido
+ * pra esses, custo: idempotente — connectTo no-op em peers já abertos).
+ */
+const SEEDED_POSTS_CAP = 256
 const SEEDED_POSTS = new Set<string>()
+
+function markSeeded(postId: string): void {
+  if (SEEDED_POSTS.size >= SEEDED_POSTS_CAP) {
+    // FIFO: Set preserva ordem de inserção; .values().next() devolve o 1º.
+    const oldest = SEEDED_POSTS.values().next().value
+    if (oldest !== undefined) SEEDED_POSTS.delete(oldest)
+  }
+  SEEDED_POSTS.add(postId)
+}
 
 interface SpreaderRow {
   spreader_pub: string
@@ -29,7 +45,7 @@ interface SpreaderRow {
  */
 export async function seedFromSpreaders(postId: string): Promise<number> {
   if (SEEDED_POSTS.has(postId)) return 0
-  SEEDED_POSTS.add(postId)
+  markSeeded(postId)
 
   // 1. pega spreaders distintos do SQLite local
   //    ORDER BY RANDOM() (Barney R1): em post viral com >MAX_PEERS spreaders,
@@ -42,12 +58,19 @@ export async function seedFromSpreaders(postId: string): Promise<number> {
   )
   if (rows.length === 0) return 0
 
-  // 2. filtra: já conectados, cap MAX_PEERS available
+  // 2. filtra: já conectados + blacklisted (Barney R2 — peers punidos por
+  //    cross-protocol abuse não devem queimar slot de MAX_PEERS).
   //    (auto-pubkey/self-connect: connectTo já no-ops via myPeerId check)
   const connectedIds = new Set(getPeers().map((p) => p.id))
-  const candidates = rows
+  const preFilter = rows
     .map((r) => r.spreader_pub)
     .filter((pub) => !connectedIds.has(pub))
+
+  // Checa blacklist em paralelo — N candidatos, N SELECTs pequenos. Em
+  // post típico (≤32 spreaders), latência é ~ms. Mantém ordem original
+  // pra preservar o random shuffle do SQL.
+  const blacklistFlags = await Promise.all(preFilter.map(isBlacklisted))
+  const candidates = preFilter.filter((_, i) => !blacklistFlags[i])
 
   const slotsAvailable = WEBRTC_LIMITS.MAX_PEERS - connectedIds.size
   const targetSlots = Math.min(candidates.length, slotsAvailable)

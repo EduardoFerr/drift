@@ -12,7 +12,9 @@ import { motion } from 'framer-motion'
 import { useEffect, useRef, useState } from 'react'
 import { setPref, usePrefsStore } from '../../lib/prefs'
 import { db } from '../../lib/db'
+import { useRelaysStore } from '../../lib/relays'
 import { isTauri } from '../../lib/transport/tor'
+import { SEED_RELAY_CONFIGS } from '../../config/relays'
 import type { LocationGranularity, MapView, NetworkMode } from '../../types/drift'
 
 export interface ContentSettingsProps {
@@ -27,9 +29,27 @@ export interface ContentSettingsProps {
 
 export function ContentSettings({ onClose, scrollTo }: ContentSettingsProps) {
   const prefs = usePrefsStore()
+  const relaysList = useRelaysStore((s) => s.list)
   const [rebuilding, setRebuilding] = useState(false)
   const locationSectionRef = useRef<HTMLDivElement | null>(null)
   const networkSectionRef = useRef<HTMLDivElement | null>(null)
+
+  // Banner R6 (Barney): em `onion-only` sem nenhum relay com alias `.onion`
+  // disponível, `activeRelays()` retorna lista vazia → app fica isolado
+  // silenciosamente. Avisa o user na própria UI antes que ele descubra
+  // pelo "feed parou de carregar". Manifesto §15 (anti-censura precisa
+  // ser auditável) + transparência sobre limites do scaffold atual.
+  const onionAvailable = (() => {
+    if (prefs.network_mode !== 'onion-only') return true
+    const onionByUrl = new Map<string, string>()
+    for (const cfg of SEED_RELAY_CONFIGS) {
+      if (cfg.onion) onionByUrl.set(cfg.url, cfg.onion)
+    }
+    // Considera relays habilitados pelo user que tenham alias onion conhecido.
+    // (Fase 6.4: relays user-added clearnet-only — coluna `onion` em
+    // `relays_user` chega na migration v8.)
+    return relaysList.some((r) => r.enabled && onionByUrl.has(r.url))
+  })()
 
   // Scroll-to-section quando aberto via indicador GPS / rede no Header.
   useEffect(() => {
@@ -167,6 +187,25 @@ export function ContentSettings({ onClose, scrollTo }: ContentSettingsProps) {
               Status atual: scaffold/stub. Real Tor (arti) chega em release
               futuro.
             </p>
+            {!onionAvailable && (
+              <div
+                role="alert"
+                className="mt-3 rounded border border-red-700/60 bg-red-950/30 px-3 py-2 text-[10px] leading-relaxed text-red-300"
+              >
+                <strong className="block text-red-200">
+                  ⚠ onion-only ativo, nenhum relay <code>.onion</code>{' '}
+                  disponível
+                </strong>
+                <span className="mt-1 block text-red-300/80">
+                  Nenhum dos seus relays habilitados publica alias{' '}
+                  <code>.onion</code>. Em modo <code>onion-only</code>, o app
+                  vai ficar isolado (feed sem novos eventos, publicação falha).
+                  Volte pra <code>tor</code> ou <code>clearnet</code>, ou
+                  adicione manualmente um relay <code>.onion</code> em
+                  Settings → relays.
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="border-t border-drift-border pt-4">
