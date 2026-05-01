@@ -16,7 +16,7 @@
  * Threshold de cross-proto auto-blacklist (50 ocorrências → 1h) está
  * codificado aqui pra simplificar callsites — `webrtc.ts` só chama
  * `recordCrossProto(npub)` e o registry decide quando blacklistar.
- * Ver `Docs/webrtc-6.2-plan.md` §3 e §7.
+ * Ver `Docs/archive/webrtc-6.2-plan.md` §3 e §7.
  */
 
 import { db } from './db'

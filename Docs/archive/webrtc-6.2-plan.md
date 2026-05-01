@@ -1,6 +1,12 @@
 # Fase 6.2 — Peer Registry + Path Diversity + Multi-Transport
 
-**Status**: depende de 6.1a-D (mock signaling shipped) e 6.1b-E (NIP-44 signaling shipped). Endereça T-WRTC-006/007/008/010/017 do `webrtc-threats.md`.
+> ⚠ **PLANO HISTÓRICO** — Fase 6.2 ✅ entregue (peerRegistry SQLite,
+> peerScore puro, MAX_PEERS cap, cross-proto threshold, orchestrator
+> multi-transport, wire-up sync→orchestrator). Documento mantido em
+> `Docs/archive/` como referência do plano executado.
+> **Não é documentação ativa.** Status agregado em `Docs/fase-6-roadmap.md`.
+
+Endereça T-WRTC-006/007/008/010/017 do `../webrtc-threats.md`.
 
 ## 1. Recap escopo
 

@@ -1,6 +1,15 @@
 # WebRTC Seeding — Proof of Interest
 
-**Fases**: 6.1-6.3 (transporte WebRTC — capacidade técnica) + 7.1 (Proof of Interest seeder — distribuição via cliente).
+> ⚠ **DOCUMENTO HISTÓRICO** — blueprint da arquitetura WebRTC + PoI
+> que foi executada em Fases 6.1-6.3 + 7.1a (todas ✅ entregues).
+> Mantido em `Docs/archive/` como referência das justificativas
+> arquiteturais. Para status atual ver `../fase-6-roadmap.md` e
+> `../drift-arquitetura-v4.md` §Transport. Para implementação ver
+> `src/lib/transport/webrtc.ts` + `src/lib/seeder.ts`.
+> **Não é documentação ativa.** Decisões críticas extraídas vivem
+> agora em manifesto + arquitetura + invariantes.
+
+**Fases**: 6.1-6.3 (transporte WebRTC — capacidade técnica) + 7.1a (Proof of Interest seeder — distribuição via cliente).
 
 Blueprint pra transformar dispositivos Drift em **relays Nostr efêmeros via WebRTC**, ativados por interesse contextual (abrir mapa de espalhamento de um post → celular vira seeder daquela árvore de eventos).
 

@@ -1,8 +1,12 @@
 # Fase 6.3 — TURN + Reconnect + Health Checks
 
-> **STATUS**: shipped em `[Unreleased]` (commit virá ao fim desta sessão).
->
-> Habilita WebRTC entre **peers móveis em redes diferentes** (4G CGN, symmetric NAT) via TURN relay TCP. Adiciona resiliência: reconnect com backoff exponencial + health checks RTT periódicos. Pré-requisito pra §15 (anti-censura por país) ser cumprido em mobile real.
+> ⚠ **PLANO HISTÓRICO** — Fase 6.3 ✅ entregue (TURN env var,
+> reconnect backoff exponencial, health ping/pong, anti-pong-injection,
+> grace period em 'disconnected'). Documento mantido em `Docs/archive/`
+> como referência do plano executado.
+> **Não é documentação ativa.** Status agregado em `Docs/fase-6-roadmap.md`.
+
+Habilita WebRTC entre **peers móveis em redes diferentes** (4G CGN, symmetric NAT) via TURN relay TCP. Adiciona resiliência: reconnect com backoff exponencial + health checks RTT periódicos. Pré-requisito pra §15 (anti-censura por país) ser cumprido em mobile real.
 
 ## 1. Mecânica TURN
 

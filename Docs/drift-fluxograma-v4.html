@@ -631,8 +631,8 @@ code {
     <div class="step"><div class="step-num">5</div><div class="step-layer"><span class="module-tag tag-fase4">F4 ✓</span></div><div class="step-action">Mapa MapLibre+Deck.gl · peso de perfil · moderação threshold dinâmico · cache eviction respeita spreads · onboarding · UX denúncia autoridades</div></div>
     <div class="step"><div class="step-num">6</div><div class="step-layer"><span class="module-tag tag-fase5">F5 ✓</span></div><div class="step-action">PWA polish · NIP-65 · NIP-02 · multi-identidade · BIP39 (NIP-06) · Passkey opt-in · probe anti-eclipse · re-broadcast oportunista · pinning local UI · block/mute · feed tabs (Global/Seguindo/Trending) · Profile · kvvfs fallback (Safari &lt;17) · 399 tests Vitest</div></div>
     <div class="step"><div class="step-num">6.5</div><div class="step-layer"><span class="module-tag tag-fase5">F5.x ✓</span></div><div class="step-action">Operacional: versionamento + CHANGELOG · CI GitHub Actions (tsc + tests + build) · PWA polish (manifest + shortcuts + ?action=) · deploy Vercel · release automation (tag v* → dist.zip + SHA256SUMS)</div></div>
-    <div class="step"><div class="step-num">7</div><div class="step-layer"><span class="module-tag tag-fase6">F6</span></div><div class="step-action">Cliente nativo Tauri · Tor (arti) · WebRTC P2P (libp2p) · multi-transport orchestration · build reproduzível. <strong>Capacidade técnica</strong> de §15 (anti-censura por país)</div></div>
-    <div class="step"><div class="step-num">8</div><div class="step-layer"><span class="module-tag tag-fase7">F7</span></div><div class="step-action">Distribuição do cliente E do protocolo: TWA Android (✅ antecipada — Bubblewrap CI) · Capacitor (alternativa) · F-Droid manifest · Play Store opcional · IPFS pin via Helia · run-your-own-relay · sneakernet bundle · WebRTC seeding (Proof of Interest) · doc anti-censura. <strong>Garantia política</strong> de §16-§17</div></div>
+    <div class="step"><div class="step-num">7</div><div class="step-layer"><span class="module-tag tag-fase6">F6 🟡</span></div><div class="step-action">Cliente nativo Tauri (✓ scaffold 6.5) · WebRTC P2P (✓ 6.1-6.3, signaling NIP-44 + TURN + reconnect + health) · Tor via arti (🟡 6.4 etapas 1-4 shipped via <code>cargo tauri build --features arti</code>; smoke e2e + binary release pendentes) · build reproduzível Linux (✓ 6.7) · multi-transport orchestration (✓ 6.2). <strong>Capacidade técnica</strong> de §15 (anti-censura por país) — quase completa pra source-builders.</div></div>
+    <div class="step"><div class="step-num">8</div><div class="step-layer"><span class="module-tag tag-fase7">F7 🟡</span></div><div class="step-action">Distribuição do cliente E do protocolo: TWA Android (🟡 7.1 antecipada — Bubblewrap CI ✓; primeiro APK assinado pendente) · WebRTC PoI seeding (✓ 7.1a) · Capacitor (alternativa) · F-Droid manifest (⛔ bloqueado em repo público + Bubblewrap não-determinístico) · Play Store opcional · IPFS pin via Helia (⛔) · run-your-own-relay (⛔) · sneakernet bundle (⛔). <strong>Garantia política</strong> de §16-§17 — só TWA + PoI seeding shipados; resto pendente.</div></div>
 
     <div class="note">
       <strong>Fase 6 + Fase 7 não são opcionais</strong>. §15 (anti-censura por país) cabe em F6 (transporte: Tor + WebRTC). §16 (disponibilidade distribuída) e §17 (sem chave mestra na distribuição) cabem em F7 (IPFS pin, sneakernet, run-your-own-relay, F-Droid build reproduzível). Sem F6+F7, esses princípios são marketing; com F6+F7, são propriedades verificáveis.
@@ -649,19 +649,19 @@ code {
     <div class="step"><div class="step-num">×</div><div class="step-layer">v5.1</div><div class="step-action">Plugin opt-in OFF-by-default <em>tolerado</em> em outros clientes ou plugins, sob restrições estritas — protocolo nunca obriga</div></div>
     <div class="step"><div class="step-num">×</div><div class="step-layer">v5.1</div><div class="step-action"><strong>Sem DDP custom</strong> — defesas anti-Sybil adaptativo (random walk, path diversity, cluster detection) vivem dentro do <code>transport/webrtc.ts</code> (F6), não como protocolo paralelo. Drift fica cidadão Nostr (manifesto §30, arquitetura §30.12)</div></div>
     <div class="step"><div class="step-num">✓</div><div class="step-layer">v5.2</div><div class="step-action"><strong>BIP39 (NIP-06) e Passkey são opt-ins</strong> — default continua nsec direto + AES-GCM auto. Compatibilidade Nostr verificada por testes contra vetores oficiais NIP-06 (arquitetura §30.13)</div></div>
-    <div class="step"><div class="step-num">✓</div><div class="step-layer">v5.2</div><div class="step-action"><strong>Tests automatizados de funções puras</strong> — Vitest, 99 testes cobrindo scoring, weight, moderation, applyContentFilters, BIP39 (vetores NIP-06), parseRelayList. Manifesto §7 (determinismo) verificável</div></div>
+    <div class="step"><div class="step-num">✓</div><div class="step-layer">v5.2</div><div class="step-action"><strong>Tests automatizados de funções puras</strong> — Vitest, 412 testes (Maio 2026) cobrindo scoring (Sybil weighted), weight, moderation, applyContentFilters, BIP39 (vetores NIP-06), parseRelayList, peerScore, orchestrator, signaling, transport, lastActionWins. Manifesto §7 (determinismo) verificável</div></div>
   </div>
 </div>
 
 <div class="legend">
   <strong>Tags de fase:</strong>
   <div class="legend-row">
-    <span><span class="module-tag tag-mvp">MVP</span> implementado, em produção</span>
-    <span><span class="module-tag tag-fase3">F3</span> Fase 3 (esta sessão)</span>
-    <span><span class="module-tag tag-fase4">F4</span> Fase 4 (próxima)</span>
-    <span><span class="module-tag tag-fase5">F5</span> Fase 5</span>
-    <span><span class="module-tag tag-fase6">F6</span> Fase 6 (cliente nativo, vinculante)</span>
-    <span><span class="module-tag tag-fase6">F7</span> Fase 7 (distribuição, vinculante)</span>
+    <span><span class="module-tag tag-mvp">MVP</span> Fase 1-2 ✓</span>
+    <span><span class="module-tag tag-fase3">F3</span> Fase 3 ✓ (swipes, upload, content-warning)</span>
+    <span><span class="module-tag tag-fase4">F4</span> Fase 4 ✓ (mapa, peso, moderação)</span>
+    <span><span class="module-tag tag-fase5">F5</span> Fase 5 ✓ + 5.x ✓ (PWA polish, NIPs, multi-id, CI)</span>
+    <span><span class="module-tag tag-fase6">F6</span> Fase 6 em curso (6.1-6.3 ✓; 6.4 etapas 1-4 ✓ source-builders; 6.5-6.7 ✓; smoke e2e Tor pendente)</span>
+    <span><span class="module-tag tag-fase6">F7</span> Fase 7 ⛔ pendente (TWA 🟡; F-Droid, IPFS, sneakernet)</span>
   </div>
 </div>
 

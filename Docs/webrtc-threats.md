@@ -13,7 +13,7 @@ Complementa — **não duplica** — o threat model geral em
 e relay; este cobre **adversários no plano P2P direto** (DataChannel +
 ICE + signaling cifrado).
 
-Referências: `Docs/webrtc-seeding.md`, `Docs/archive/webrtc-6.1a-plan.md`,
+Referências: `Docs/archive/webrtc-seeding.md`, `Docs/archive/webrtc-6.1a-plan.md`,
 `Docs/manifesto.md` §15/§17/§20/§28, invariantes #2/#5/#14 do `CLAUDE.md`.
 
 > ⚠ **Status pós-6.2/6.3 (atualizado 2026-05-01)** — sub-fases 6.2
@@ -83,7 +83,7 @@ Referências: `Docs/webrtc-seeding.md`, `Docs/archive/webrtc-6.1a-plan.md`,
 | **Vetor** | Peer hostil B aceita o `hello` de A. No handshake SDP/ICE, B coleta os ICE candidates de A: `host` (IP LAN), `srflx` (IP WAN via STUN), eventualmente `prflx`. mDNS só esconde host candidates; srflx revela IP WAN. B agora correlaciona `pubkey(A)` ↔ `IP público(A)`. |
 | **Impacto** | Confidentiality — **alto**. Quebra anonimato pseudônimo do npub. Permite geolocation grosseira, correlação ISP, vetor pra subpoena/coercion. |
 | **Probabilidade** | **Alta**. É comportamento padrão do WebRTC; qualquer peer que aceite handshake aprende o IP. Não requer "ataque" — é como o protocolo funciona. |
-| **Mitigação Fase 6** | Modo `lan-wifi-only` (default — só LAN, IP público nunca sai); modo `relay-mode` (TURN-only, IP público é o do TURN); modo `tor-mode` (mutuamente exclusivo com WebRTC — desativa). UI **deve** avisar antes de habilitar `always-on`. Doc `webrtc-seeding.md` "Modos operacionais". |
+| **Mitigação Fase 6** | Modo `lan-wifi-only` (default — só LAN, IP público nunca sai); modo `relay-mode` (TURN-only, IP público é o do TURN); modo `tor-mode` (mutuamente exclusivo com WebRTC — desativa). UI **deve** avisar antes de habilitar `always-on`. Doc `archive/webrtc-seeding.md` "Modos operacionais". |
 | **Mitigação Fase 7+** | Mandatory TURN relay para usuários em jurisdições hostis; integração com Tor onion services para signaling + datachannel via Tor (Fase 6 cliente nativo, fora do escopo do PWA). |
 | **Aceito?** | **Sim, com mitigação**. Manifesto §4 — "não somos mixnet". Default `lan-wifi-only` reduz risco; usuário que ativa `always-on` recebe aviso explícito (§28 transparência). |
 
@@ -135,7 +135,7 @@ Referências: `Docs/webrtc-seeding.md`, `Docs/archive/webrtc-6.1a-plan.md`,
 | **Vetor** | Relay maliciosamente passivo registra todos os pares (sender, recipient) de kind:4 entre clientes Drift (heurística: kind:4 + tag `drift-version`). Sobre semanas, infere "A frequentemente abre canal com B/C/D quando C postou X" → grafo social + interesse. |
 | **Impacto** | Confidentiality — médio. Quebra deniability do seeding; vincula seeders a posts específicos. |
 | **Probabilidade** | Média-alta. Relays grandes têm a visão. |
-| **Mitigação Fase 6** | Não direta em 6.1. Mitigação possível em 6.1b: spread signaling DMs por relays heterogêneos (NIP-65 outbox); cover-traffic (caro, descartado em `webrtc-seeding.md` "Riscos não-óbvios"). |
+| **Mitigação Fase 6** | Não direta em 6.1. Mitigação possível em 6.1b: spread signaling DMs por relays heterogêneos (NIP-65 outbox); cover-traffic (caro, descartado em `archive/webrtc-seeding.md` "Riscos não-óbvios"). |
 | **Mitigação Fase 7+** | Signaling via Tor (cliente nativo) suprime metadata pro relay. |
 | **Aceito?** | Sim, documentado. Manifesto §4 "não somos mixnet" cobre. |
 
@@ -290,7 +290,7 @@ Referências: `Docs/webrtc-seeding.md`, `Docs/archive/webrtc-6.1a-plan.md`,
 | **Vetor** | Atacante posta CSAM/material ilegal. Bot orquestra peers pedindo o conteúdo via DC para A. A, em modo `always-on`, serve. Logs de ISP mostram A distribuindo o material. |
 | **Impacto** | Availability + risco legal — alto pessoalmente, médio na rede. |
 | **Probabilidade** | Média. |
-| **Mitigação Fase 6** | Default `lan-wifi-only` reduz exposição. UI explícita ao habilitar `always-on` ("você está distribuindo conteúdo de terceiros"). Respeitar `content-warning` §27 (não seedear `nsfw-unmarked` sem ack). Indicador "servindo N posts a M peers" (`webrtc-seeding.md` §7.1c). |
+| **Mitigação Fase 6** | Default `lan-wifi-only` reduz exposição. UI explícita ao habilitar `always-on` ("você está distribuindo conteúdo de terceiros"). Respeitar `content-warning` §27 (não seedear `nsfw-unmarked` sem ack). Indicador "servindo N posts a M peers" (`archive/webrtc-seeding.md` §7.1c). |
 | **Mitigação Fase 7+** | Modo `tor-mode` (mutuamente exclusivo) oferece anonimato real. Documentar no onboarding que seeding tem implicações legais. |
 | **Aceito?** | Sim, com transparência radical. Manifesto §16/§17 — disponibilidade distribuída implica esse custo. Cliente NÃO seedeia by default sem opt-in. |
 

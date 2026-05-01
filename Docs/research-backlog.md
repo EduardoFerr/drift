@@ -283,7 +283,7 @@ GitHub stars/issues de cada.
 Chrome/Firefox/Safari 2026, ou foi deprecated por privacy?
 `navigator.connection.type` cobre quais browsers?
 **Por quê bloqueia**: gating de seeding (Fase 7.1) depende disso
-(`webrtc-seeding.md §"Modos operacionais"`). Se Battery API foi
+(`archive/webrtc-seeding.md §"Modos operacionais"`). Se Battery API foi
 removida, modo `lan-wifi-only` precisa heurística diferente.
 **Workaround interim**: feature-detect com fallback `'always-on'`
 explícito (user opt-in mais forte).
@@ -303,7 +303,7 @@ versions tab; `sqlite.org/wasm`.
 **Pergunta**: papers ou advisories recentes (2024-2026) sobre
 des-anonymização de WebRTC mesmo com mDNS hostnames? Novos vetores
 descobertos?
-**Por quê bloqueia**: threat model do `webrtc-seeding.md §Riscos` é
+**Por quê bloqueia**: threat model do `archive/webrtc-seeding.md §Riscos` é
 de Abril 2026. Se literatura nova mostra que mDNS já é furável,
 default `lan-wifi-only` perde valor de privacidade.
 **Workaround interim**: doc atual já marca limitação ("não somos

@@ -27,7 +27,7 @@
 
 ### ✅ 6.2 — Path diversity + peer registry persistente (entregue em `[Unreleased]`)
 
-**Plano**: `Docs/webrtc-6.2-plan.md`. Shipped via 5 sub-fases (Marshall/Robin/Barney/Lily + integração).
+**Plano**: `Docs/archive/webrtc-6.2-plan.md`. Shipped via 5 sub-fases.
 
 Escopo:
 - **Random walk obrigatório** (manifesto §20): mesmo após `CONNECTED`, cliente continua descobrindo via amostragem aleatória de peers conhecidos
@@ -193,7 +193,7 @@ Tecnicamente Fase 7 (distribuição), mas funcionalmente fecha o loop dos transp
 - Modo Nostr ativa handshake kind 1059 real; modo mock no-op.
 - Trade-off: sem TURN (6.3 — `VITE_TURN_SERVERS=`), 4G CGN pode falhar. Sem random walk runtime ainda (TODO 6.2-D follow-up), só descoberta passiva.
 
-Manifesto §16: "espalhar = seedear" agora é mecânica automática quando user abre o mapa. Detalhes em [webrtc-seeding.md](webrtc-seeding.md) §"Fase 7.1" e CHANGELOG `[Unreleased]`.
+Manifesto §16: "espalhar = seedear" agora é mecânica automática quando user abre o mapa. Detalhes em [archive/webrtc-seeding.md](archive/webrtc-seeding.md) §"Fase 7.1" e CHANGELOG.
 
 ---
 

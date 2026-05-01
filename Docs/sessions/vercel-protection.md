@@ -1,7 +1,18 @@
 # Vercel Deployment Protection — histórico
 
+> ⚠ **ARTEFATO DE SESSÃO** — registro pontual de decisão tomada em
+> 2026-04-29 sobre o setting `ssoProtection` do projeto Vercel.
+> Mora em `Docs/sessions/` por ser histórico de uma decisão única,
+> não documentação operacional contínua. Operação atual de deploy
+> em `../deploy.md`.
+>
+> **IDs do projeto Vercel sanitizados** (consolidado §8.3,
+> 2026-05-01): combinados com um token vazado seriam suficientes
+> pra acesso admin. Substituídos por placeholders. Quem precisar
+> dos valores reais consulta o dashboard Vercel ou `vercel projects ls`.
+
 **Data da decisão**: 2026-04-29
-**Autor**: Arquiteto
+**Atribuição original**: papel de Arquiteto
 **Estado atual**: `ssoProtection.deploymentType = "preview"` (Only Preview Deployments)
 
 ## Por que existe esta doc
@@ -51,8 +62,8 @@ Mudou pra `deploymentType: "preview"` via REST API:
 
 ```bash
 VTOKEN=$(node -e "console.log(JSON.parse(require('fs').readFileSync(process.env.APPDATA+'/com.vercel.cli/Data/auth.json')).token)")
-PROJ=prj_nG23izPr9ujL55C6gHqwrQJ8LOzi
-TEAM=team_qMPP8YHCvFrZdKkiWZYKlUGS
+PROJ=prj_REDACTED
+TEAM=team_REDACTED
 curl -X PATCH "https://api.vercel.com/v9/projects/$PROJ?teamId=$TEAM" \
   -H "Authorization: Bearer $VTOKEN" \
   -H "Content-Type: application/json" \
@@ -95,7 +106,7 @@ proteção de "trabalho em andamento" sem bloquear o produto final.
 
 ```bash
 VTOKEN=$(node -e "console.log(JSON.parse(require('fs').readFileSync(process.env.APPDATA+'/com.vercel.cli/Data/auth.json')).token)")
-curl -X PATCH "https://api.vercel.com/v9/projects/prj_nG23izPr9ujL55C6gHqwrQJ8LOzi?teamId=team_qMPP8YHCvFrZdKkiWZYKlUGS" \
+curl -X PATCH "https://api.vercel.com/v9/projects/prj_REDACTED?teamId=team_REDACTED" \
   -H "Authorization: Bearer $VTOKEN" \
   -H "Content-Type: application/json" \
   -d '{"ssoProtection":{"deploymentType":"all_except_custom_domains"}}'
@@ -117,7 +128,7 @@ curl -X PATCH "https://api.vercel.com/v9/projects/prj_nG23izPr9ujL55C6gHqwrQJ8LO
 
 ```bash
 VTOKEN=$(node -e "console.log(JSON.parse(require('fs').readFileSync(process.env.APPDATA+'/com.vercel.cli/Data/auth.json')).token)")
-curl -sS "https://api.vercel.com/v9/projects/prj_nG23izPr9ujL55C6gHqwrQJ8LOzi?teamId=team_qMPP8YHCvFrZdKkiWZYKlUGS" \
+curl -sS "https://api.vercel.com/v9/projects/prj_REDACTED?teamId=team_REDACTED" \
   -H "Authorization: Bearer $VTOKEN" \
   | node -e "const d=JSON.parse(require('fs').readFileSync(0));console.log(JSON.stringify(d.ssoProtection,null,2))"
 ```
