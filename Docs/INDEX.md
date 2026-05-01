@@ -50,7 +50,7 @@ ou **Por persona** pra pular direto.
 - **[build-reproducible.md](build-reproducible.md)** ✅ — Fase 6.7. Como verificar binário publicado vs source público. Docker + SHA256 + `Dockerfile.reproducible`. Linux PWA + Tauri bit-identical. Manifesto §17 (build reproduzível).
 - **[deploy.md](deploy.md)** — Vercel + GitHub Releases + Cloudflare Tunnel + F-Droid/Play
 - **[vercel-protection.md](vercel-protection.md)** — histórico do Deployment Protection (2026-04-29: mudou pra `preview-only`, justificativa + reversão)
-- **[../CHANGELOG.md](../CHANGELOG.md)** — histórico de versões (último: v0.6.0-alpha.1, 2026-04-29)
+- **[../CHANGELOG.md](../CHANGELOG.md)** — histórico de versões (último: v0.6.0-alpha.2, 2026-04-29)
 - **[../LICENSE](../LICENSE)** — licença do projeto
 
 ### Pesquisa / análise
@@ -112,7 +112,7 @@ ou **Por persona** pra pular direto.
 |-----|-------|
 | [../README.md](../README.md) | Visão de 30s. Stack, kinds 9078-9081, garantias resumidas, setup local. Aponta pra manifesto pra spec completa. |
 | [../CLAUDE.md](../CLAUDE.md) | Instruções pra Claude Code: TL;DR do sistema, 17 invariantes que se quebrados quebram o sistema, stack pinado, padrões (Zustand, SQL via worker, idempotência), tecnologias proibidas. Útil pra qualquer dev. |
-| [../CHANGELOG.md](../CHANGELOG.md) | Keep a Changelog. Última: v0.6.0-alpha.1 (Phase 6.1b: NIP-44 signaling real), v0.6.0-alpha.0 (Phase 6.1a-C: WebRTC core + heatmap + multi-tab modal), v0.5.4 (TWA bubblewrap driver). |
+| [../CHANGELOG.md](../CHANGELOG.md) | Keep a Changelog. Última: v0.6.0-alpha.2 (Phase 6.1b: NIP-44 signaling real), v0.6.0-alpha.0 (Phase 6.1a-C: WebRTC core + heatmap + multi-tab modal), v0.5.4 (TWA bubblewrap driver). |
 | [../LICENSE](../LICENSE) | Licença do repositório. |
 | [manifesto.md](manifesto.md) | Contrato técnico v2.2. 34 princípios divididos em 5 partes (Existência/Identidade, Eventos, Transporte, Score/Comunidade, Compromisso). Cada princípio tem Regras + Implementação + Fase. Vence sobre arquitetura quando conflita. |
 | [drift-arquitetura-v4.md](drift-arquitetura-v4.md) | Documento técnico completo v5.3. 36 seções incluindo modelo de dados, fluxos, schema SQLite, transport abstract, decisões registradas (§30.x), tests (§34), threat model (§36). Mudanças vs v5.2 documentadas no topo. |

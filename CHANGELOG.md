@@ -4,6 +4,36 @@ All notable changes to the Drift client. Uses [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+## [0.6.0-alpha.2] — 2026-05-01
+
+### Added (Fase 6.4 — arti dep validation + bootstrap skeleton)
+
+- **`src-tauri/Cargo.toml`** — feature flag `arti` opt-in:
+  - `arti-client = "0.41"` + `tor-rtcompat = "0.41"` + `tokio = "1"` (full) + `anyhow = "1"`. Workspace arti ainda em 0.x (chute inicial 1.x recusado pelo cargo; cargo retornou lista mostrando 0.41 como atual).
+  - `default-features = false` em ambos arti crates pra preferir `rustls` sobre `nativetls/openssl` — sem deps C, build determinístico (alinha Fase 6.7).
+  - Build atual (sem `--features arti`) intacto: ~100 crates extras só entram quando feature ligada. PWA-only / Tauri sem Tor seguem leves.
+- **`src-tauri/src/tor.rs`** — gates duplos `#[cfg(feature = "arti")]`:
+  - `TorState` shape muda de tuple struct pra struct nomeado: `{ status: Mutex<TorStatus>, client: Mutex<Option<Arc<TorClient<PreferredRuntime>>>> }`. Default trait segue válido; `lib.rs::run()` inalterado.
+  - `tor_connect`: stub default mantém erro com hint pra recompilar; com feature `arti` faz transição `disconnected → connecting`, chama `TorClient::with_runtime(PreferredRuntime::current()?).config(default).create_bootstrapped().await`, armazena `Arc<TorClient>` em `state.client`, transita pra `connected`.
+  - `tor_disconnect`: drop do `Arc<TorClient>` via `*c = None`.
+- **Validação shipped**: `cargo check` (default 2.3s incremental) + `cargo check --features arti` (4min primeira vez, 4.8s incremental). 399 tests TS verdes.
+- **Bloqueadores documentados em `Docs/webrtc-6.4-plan.md` §4.3**: SOCKS5 listener próprio (~200 LOC Rust — webview Tauri ignora system proxy programático), bridge IPC TS↔Rust pra rotear WSS frames, wire-up `bootstrap.ts`. Estimativa restante caiu de 10-15h pra **6-10h** após validação de deps.
+
+**Manifesto §15** (anti-censura por país): capability técnica avança; compromisso integral cumpre quando SOCKS5 + bridge resolvidos.
+
+### Fixed (follow-ups Barney non-blocking — peer reviews 7.1a + 6.4)
+
+- **7.1a R2 — peers blacklisted não queimam slot `MAX_PEERS`**: `peerRegistry.ts` ganha `isBlacklisted(npub): Promise<boolean>` que consulta `blacklisted_until > now()`. `seeder.ts` aplica filtro via `Promise.all` em paralelo após `connectedIds`, antes do cap. Preserva ordem do `ORDER BY RANDOM()` (invariante R1).
+- **7.1a R4 — cap FIFO no `SEEDED_POSTS`**: `Set<string>` crescia unbounded em sessões longas (~horas, dezenas de mapas abertos). Cap 256 entradas com eviction FIFO via Set iteration order. Helper `markSeeded()` centraliza lógica. Re-seed em posts evictados é idempotente (connectTo no-op em peers já abertos).
+- **6.4 R6 — banner alerta `onion-only` com lista vazia**: `ContentSettings.tsx` cruza `useRelaysStore` com `SEED_RELAY_CONFIGS` pra detectar "onion-only sem `.onion` habilitado". Renderiza `role=alert` vermelho explicando isolamento iminente + ações corretivas. Reativo via store. Manifesto §15 (anti-censura precisa ser auditável).
+- **6.4 R7 — `Docs/runtime-pwa-vs-tauri.md`** (novo, ~140 linhas): matriz de 14 capabilities × 2 runtimes, pontos de gating no código (`network_mode` picker, `torInvoke` early-throw, bootstrap TODO, banner R6), regra de quando duplicar vs gating, smoke checklist. INDEX.md linka em Operacional.
+
+---
+
+## [0.6.0-alpha.1.bundle] — 2026-04-29 a 2026-05-01
+
+> Originalmente acumulado em `[Unreleased]` enquanto múltiplas frentes paralelas convergiam. Mantido como bloco único no histórico — todas as entradas abaixo estavam no diff `0.6.0-alpha.1..0.6.0-alpha.2`.
+
 ### Added (Fase 6.4 — Tor transport scaffold + stub)
 
 🟡 **Scaffold + stub shipped**. Integração `arti` real (Rust crate Tor client) fica pra sessão dedicada (~10-15h Rust). Coordenado por 4 personas (Ted Rust IPC / Marshall types+config / Lily TS transport+UI / Robin docs):
