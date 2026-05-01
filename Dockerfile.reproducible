@@ -8,14 +8,16 @@
 # Locale C + TZ UTC eliminam locale-dependent ordering.
 
 ARG NODE_VERSION=20.18.1
-ARG RUST_VERSION=1.89.0
-# Bump 1.83 → 1.88 (2026-05-01) — escalada de MSRV das deps transitivas:
-#   - 1.83 → 1.85: edition2024 (serde_spanned 1.1+, toml 0.9+)
-#   - 1.85 → 1.86: icu_collections/locale/normalizer/properties 2.2+
-#   - 1.86 → 1.88: darling 0.23+ (darling_core, darling_macro)
-# 1.88.0 cobre toda a cadeia. CI runs 25235670136 (1.83) e 25235877663
-# (1.85) quebraram com mensagens "feature edition2024 required" e
-# "rustc X.Y is not supported by darling@0.23.0".
+ARG RUST_VERSION=1.90.0
+# Bump 1.83 → 1.90 (2026-05-01) — escalada de MSRV das deps transitivas
+# do arti workspace + tauri-build:
+#   1.83 → 1.85: edition2024 (serde_spanned 1.1+, toml 0.9+)
+#   1.85 → 1.88: icu 2.2+, darling 0.23+
+#   1.88 → 1.89: retry-error 0.12+, tor-error 0.41+
+#   1.89 → 1.90: typed-index-collections 3.5+
+# 1.90.0 cobre toda a cadeia conhecida em 2026-05-01. CI usa `stable`
+# (sempre >= 1.90 hoje) pra detectar drift de API; este Dockerfile
+# pina pra reprodutibilidade auditável.
 ARG DEBIAN_VERSION=bookworm-slim
 # Rust e node usam ordens distintas pro slim+distro no Docker Hub:
 #   node:VERSION-bookworm-slim          (variant primeiro)

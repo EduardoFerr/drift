@@ -65,7 +65,7 @@ grep drift-pwa- SHA256SUMS-published
 
 Se bater: binário publicado **é** o código que você auditou.
 Se NÃO bater: **investigar**. Pode ser:
-- Drift do compilador/toolchain (Rust 1.89.0 minor patch)
+- Drift do compilador/toolchain (Rust 1.90.0 minor patch)
 - `SOURCE_DATE_EPOCH` divergente
 - Modificação no source do release vs source público
 - Bug no Dockerfile.reproducible (reportar issue)
@@ -76,7 +76,7 @@ Se NÃO bater: **investigar**. Pode ser:
 Bit-identical reproduzível. `dist.zip` em qualquer Linux com Docker → mesmo SHA256.
 
 ### Linux Tauri build (.deb, .AppImage) (coberto)
-Bit-identical reproduzível **se** rodando o mesmo Dockerfile. Cargo + Rust 1.89.0 + glibc bookworm.
+Bit-identical reproduzível **se** rodando o mesmo Dockerfile. Cargo + Rust 1.90.0 + glibc bookworm.
 
 ### Windows Tauri build (.msi, .exe) (NÃO coberto)
 Razões:
