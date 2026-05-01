@@ -8,7 +8,7 @@
  *     Nostr DM cifrado (NIP-44 + kind 1059). Pra peers em redes
  *     diferentes. Opt-in via flag `VITE_USE_NOSTR_SIGNALING=1`.
  *
- * `webrtc.ts` recebe a impl via DI. Trocar mock ↔ nostr é flag de
+ * `webrtc/boot.ts` recebe a impl via DI. Trocar mock ↔ nostr é flag de
  * configuração; nenhuma mudança no resto do código de transport.
  *
  * Schema das mensagens é o mesmo nas duas impls — o que muda é só

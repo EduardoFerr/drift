@@ -187,7 +187,7 @@ CREATE TABLE IF NOT EXISTS user_prefs (
 -- ── Peer Registry WebRTC (Fase 6.2 — manifesto §20 anti-eclipse) ──
 -- Persistência de peers conhecidos para path diversity scoring +
 -- random walk. Hot path de DC permanece em memória em
--- transport/webrtc.ts (Map<peerId, PeerState>); esta tabela é o
+-- transport/webrtc/state.ts (Map<peerId, PeerState>); esta tabela é o
 -- estado durável que sobrevive reload e alimenta scoring.
 --
 -- `latency_ms` é EWMA (alpha=0.3) sobre RTT do data channel.

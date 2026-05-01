@@ -7,7 +7,7 @@
  *
  * Fase 6 (cliente nativo Tauri):
  *   - `tor.ts`     — WSS via .onion, bypass DNS/SNI
- *   - `webrtc.ts`  — P2P direto entre clientes Drift
+ *   - `webrtc/`    — P2P direto entre clientes Drift (pasta, 12 arquivos pós-Sprint-4)
  *   - `bundle.ts`  — export/import de eventos via JSON ou QR code
  *                    (sneakernet, último recurso anti-bloqueio total)
  *
@@ -58,7 +58,7 @@ export interface PublishResult {
 /**
  * Transporte uniforme de eventos Nostr.
  *
- * Implementadores: `wss.ts` (atual), `tor.ts` (Fase 6), `webrtc.ts` (Fase 6),
+ * Implementadores: `wss.ts` (atual), `tor.ts` (Fase 6), `webrtc/` (Fase 6, pasta),
  * `bundle.ts` (Fase 6 — sneakernet).
  */
 export interface Transport {

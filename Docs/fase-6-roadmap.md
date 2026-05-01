@@ -11,7 +11,7 @@
 
 ### ✅ 6.1a — WebRTC core + mock signaling (entregue em `0.6.0-alpha.0`)
 
-- `src/lib/transport/webrtc.ts` (RTCPeerConnection lifecycle + DataChannel pipeline §5)
+- `src/lib/transport/webrtc/` (pasta — 12 arquivos pós-Sprint-4: peer/pipeline/state/health/reconnect/discovery/boot/ice/rateLimit/config/types/index)
 - `src/lib/transport/webrtc-signaling-mock.ts` (BroadcastChannel same-origin pra dev/PoC)
 - DEV bridge `window.driftWebRTC`
 - Peer review fixes: ICE timeout 30s, glare collision rollback, rate limit token bucket

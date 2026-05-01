@@ -3,7 +3,7 @@
  *
  * Testa o algoritmo puro de exponential backoff com cap, e o counter
  * de attempts por peer. Sem RTCPeerConnection real — usa test-only
- * helpers de `webrtc.ts`:
+ * helpers de `webrtc/reconnect.ts` (via barrel `webrtc/index.ts`):
  *   - `_computeBackoffDelay(attempt)` → ms (puro)
  *   - `_scheduleReconnect(peerId, attempt)` → ms delay (incrementa counter)
  *   - `_resetReconnectCounter(peerId)`

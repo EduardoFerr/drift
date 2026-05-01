@@ -80,7 +80,7 @@ export async function seedFromSpreaders(postId: string): Promise<number> {
   const toConnect = candidates.slice(0, targetSlots)
   for (const pub of toConnect) {
     void connectTo(pub).catch(() => {
-      /* swallow — falhas registradas via peerRegistry no webrtc.ts */
+      /* swallow — falhas registradas via peerRegistry no webrtc/peer.ts */
     })
   }
   return toConnect.length

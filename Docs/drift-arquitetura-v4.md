@@ -247,7 +247,7 @@ Notion migrou e teve 20% de melhoria. Queries SQL com índices reais vs key-valu
 ┌──────────────▼──────────────────────────────────────────┐
 │            CAMADA DE TRANSPORTE (§32)                   │
 │   wss.ts (clearnet) · tor.ts (Fase 6)                  │
-│   webrtc.ts (Fase 6) · bundle.ts (export QR — Fase 6)  │
+│   webrtc/ (Fase 6, 12 arq.) · bundle.ts (Fase 6)       │
 │   → API uniforme: publish() / subscribe() / health()   │
 └──────────────┬──────────────────────────────────────────┘
                │
@@ -742,7 +742,9 @@ drift/
 │   │   │   ├── index.ts      interface Transport
 │   │   │   ├── wss.ts        WSS clearnet (atual)
 │   │   │   ├── tor.ts        WSS via Tor (Fase 6)
-│   │   │   ├── webrtc.ts     P2P direto (Fase 6)
+│   │   │   ├── webrtc/       P2P direto Fase 6 — pasta com 12 arquivos
+│   │   │   │                 (index/types/state/config/ice/peer/pipeline/
+│   │   │   │                  rateLimit/health/reconnect/discovery/boot)
 │   │   │   └── bundle.ts     export/import de eventos via QR/JSON (Fase 6)
 │   │   ├── relays.ts         gerenciamento dinâmico (Fase 5) — store + CRUD + activeRelays
 │   │   ├── rebroadcast.ts    re-broadcast oportunista (Fase 5) — manifesto §16
@@ -1348,7 +1350,9 @@ default. Manifesto §25 v2.2.
 
 **Decisão:** as defesas contra Sybil adaptativo (random walk
 obrigatório, path diversity scoring, cluster detection, limite de
-influência) vivem dentro do `lib/transport/webrtc.ts` (Fase 6). Não
+influência) vivem dentro do `lib/transport/webrtc/` (Fase 6 — pasta
+splitada em Sprint 4 do roadmap pós-auditoria; especificamente em
+`webrtc/discovery.ts` e `webrtc/peer.ts`). Não
 viram protocolo paralelo (DDP — Drift Discovery Protocol custom).
 Manifesto §20.
 
@@ -1391,7 +1395,7 @@ RFC formal. Análise mostrou:
 
 **Caminho adotado:**
 
-- `lib/transport/webrtc.ts` (Fase 6) implementa as defesas
+- `lib/transport/webrtc/` (Fase 6) implementa as defesas
   anti-Sybil adaptativo internamente, falando JSON sobre datachannel
   WebRTC. Mensagens de discovery (`DISCOVER`/`PEER_LIST`/etc.) são
   detalhe de implementação do transport, não parte do protocolo
@@ -1566,7 +1570,7 @@ publish; cache cobre leitura.
 
 ### 32.3 WebRTC P2P (Fase 6, cliente nativo)
 
-`lib/transport/webrtc.ts` — Tauri command que chama Rust com `libp2p`
+`lib/transport/webrtc/` (pasta) — RTCPeerConnection nativa do browser/webview Tauri com `libp2p` semantics
 ou implementação WebRTC direta.
 
 Sinalização: clientes anunciam disponibilidade de WebRTC via tag
@@ -1660,7 +1664,7 @@ diversidade de caminho garantem que bolhas falsas se desfazem ao
 longo do tempo.
 
 **Decisão de design:** essas defesas vivem **dentro do transport**
-(`webrtc.ts`), não como protocolo paralelo separado. Drift continua
+(`lib/transport/webrtc/`), não como protocolo paralelo separado. Drift continua
 sendo cliente Nostr; o protocolo Drift (kinds 9078..9081) não muda.
 Ver §30.12.
 

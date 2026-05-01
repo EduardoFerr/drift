@@ -499,7 +499,7 @@ code {
         <div class="module-desc"><span class="module-tag tag-fase6">F6</span> WSS via .onion — Tauri command + arti-client (Rust). Bypass DNS/SNI/DPI</div>
       </div>
       <div class="module">
-        <div class="module-name">transport/webrtc.ts</div>
+        <div class="module-name">transport/webrtc/ (12 arquivos)</div>
         <div class="module-desc"><span class="module-tag tag-fase6">F6</span> P2P direto entre clientes Drift — signaling via Nostr, libp2p. Defesas anti-Sybil adaptativo (random walk + path diversity, §32.3.1)</div>
       </div>
       <div class="module">
@@ -647,7 +647,7 @@ code {
     <div class="step"><div class="step-num">×</div><div class="step-layer">v5</div><div class="step-action"><strong>Sem chave mestra</strong> — não escrever <code>deletePost</code> / <code>banUser</code> globais (manifesto §17)</div></div>
     <div class="step"><div class="step-num">×</div><div class="step-layer">v5.1</div><div class="step-action"><strong>Sem scan automático no cliente oficial padrão</strong> — sem PhotoDNA, sem nsfwjs embutido. Auto-classificação voluntária + reports comunitários (manifesto §25 v2.2)</div></div>
     <div class="step"><div class="step-num">×</div><div class="step-layer">v5.1</div><div class="step-action">Plugin opt-in OFF-by-default <em>tolerado</em> em outros clientes ou plugins, sob restrições estritas — protocolo nunca obriga</div></div>
-    <div class="step"><div class="step-num">×</div><div class="step-layer">v5.1</div><div class="step-action"><strong>Sem DDP custom</strong> — defesas anti-Sybil adaptativo (random walk, path diversity, cluster detection) vivem dentro do <code>transport/webrtc.ts</code> (F6), não como protocolo paralelo. Drift fica cidadão Nostr (manifesto §30, arquitetura §30.12)</div></div>
+    <div class="step"><div class="step-num">×</div><div class="step-layer">v5.1</div><div class="step-action"><strong>Sem DDP custom</strong> — defesas anti-Sybil adaptativo (random walk, path diversity, cluster detection) vivem dentro do <code>transport/webrtc/</code> (F6, pasta com 12 arquivos pós-Sprint-4), não como protocolo paralelo. Drift fica cidadão Nostr (manifesto §30, arquitetura §30.12)</div></div>
     <div class="step"><div class="step-num">✓</div><div class="step-layer">v5.2</div><div class="step-action"><strong>BIP39 (NIP-06) e Passkey são opt-ins</strong> — default continua nsec direto + AES-GCM auto. Compatibilidade Nostr verificada por testes contra vetores oficiais NIP-06 (arquitetura §30.13)</div></div>
     <div class="step"><div class="step-num">✓</div><div class="step-layer">v5.2</div><div class="step-action"><strong>Tests automatizados de funções puras</strong> — Vitest, 412 testes (Maio 2026) cobrindo scoring (Sybil weighted), weight, moderation, applyContentFilters, BIP39 (vetores NIP-06), parseRelayList, peerScore, orchestrator, signaling, transport, lastActionWins. Manifesto §7 (determinismo) verificável</div></div>
   </div>

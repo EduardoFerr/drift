@@ -8,7 +8,7 @@
  *
  * Em Fase 6.1b, `webrtc-signaling-nostr.ts` substitui esta impl pra
  * peers em redes diferentes (signaling via Nostr DM cifrado NIP-44).
- * O contrato `SignalingChannel` é o mesmo nas duas — `webrtc.ts` não
+ * O contrato `SignalingChannel` é o mesmo nas duas — `webrtc/boot.ts` não
  * precisa mudar.
  *
  * Limitações intencionais:

@@ -26,7 +26,7 @@ sniff é frágil e `process.env` não existe no browser.
 | Capability                     | PWA (browser) | Tauri (desktop) | Onde discrimina |
 |--------------------------------|:-------------:|:---------------:|-----------------|
 | WSS clearnet (Nostr)           | ✅            | ✅              | `transport/wss.ts` |
-| WebRTC P2P                     | ✅            | ✅              | `transport/webrtc.ts` |
+| WebRTC P2P                     | ✅            | ✅              | `transport/webrtc/` (pasta, 12 arquivos) |
 | OPFS (SQLite WASM)             | ✅¹           | ✅              | `db.worker.ts` |
 | kvvfs fallback                 | ✅            | ✅              | `db.worker.ts` |
 | Passkey (WebAuthn)             | ✅            | ❓²            | `lib/passkey.ts` |

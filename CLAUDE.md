@@ -207,7 +207,7 @@ Drift. Identidades Drift funcionam em Damus/Snort/Coracle/Iris.
 **Não inventar protocolo de discovery próprio paralelo ao Nostr.**
 Defesas anti-Sybil adaptativo (random walk obrigatório, path
 diversity scoring, cluster detection) vivem dentro do transport
-(`lib/transport/webrtc.ts`, Fase 6), não como kinds/tags próprias
+(`lib/transport/webrtc/`, Fase 6), não como kinds/tags próprias
 no protocolo Drift público. NIP-65 cobre discovery de relays via
 Nostr padrão (Fase 5, `lib/nip65.ts`). NIP-02 cobre follows
 (`lib/follows.ts`). NIP-06 cobre BIP39→nsec opcional
@@ -333,7 +333,7 @@ src/
 │   ├── transport/         abstração de transporte (Fase 6)
 │   │   ├── wss.ts         WSS clearnet (atual)
 │   │   ├── tor.ts         WSS via Tor (Fase 6, cliente nativo)
-│   │   └── webrtc.ts      P2P direto (Fase 6, cliente nativo)
+│   │   └── webrtc/        P2P direto Fase 6 (12 arquivos: index/types/state/config/ice/peer/pipeline/rateLimit/health/reconnect/discovery/boot)
 │   ├── relays.ts          gerenciamento dinâmico de relays (Fase 5) — store + CRUD + activeRelays
 │   ├── nip65.ts           NIP-65 publish/parse de relay list (Fase 5)
 │   ├── follows.ts         NIP-02 (kind 3) follows + store (Fase 5)

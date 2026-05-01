@@ -18,6 +18,56 @@ _Vazio nesta janela — Sprint 0 de saneamento documental em curso._
 
 ### Shipped (apenas source-builders com `cargo tauri build --features arti`)
 
+### Refactored (PWA + source-builders) — Sprint 4 do roadmap pós-auditoria
+
+- **WebRTC transport split em pasta** — `src/lib/transport/webrtc.ts`
+  (1190 LOC monolíticas) → `src/lib/transport/webrtc/` com 12 arquivos
+  (`index.ts` Transport API + barrel; `types.ts`; `state.ts` Maps
+  encapsulados via API tipada; `config.ts` constantes; `ice.ts`
+  STUN/TURN; `peer.ts` lifecycle; `pipeline.ts` DC inbound; `rateLimit.ts`
+  token bucket; `health.ts` ping/pong; `reconnect.ts` backoff;
+  `discovery.ts` random walk + connectTo; `boot.ts` signaling boot +
+  closeAll). Endereça Ted item 8 + Lily item 4 da auditoria de
+  arquitetura. Barrel re-exporta os 22 símbolos públicos + test-only —
+  imports `from '.../transport/webrtc'` resolvem via Node/Vite folder
+  resolution sem mudança em call-sites (`bootstrap.ts`, `seeder.ts`,
+  `main.tsx`, 5 specs Vitest do webrtc, `seeder.test.ts`). 412/412
+  tests verdes pós-split.
+- **Fixes pós peer review**:
+  - 🔴 **Barney #2 (regressão)**: `closeAll()` em `boot.ts` voltou a
+    rodar todos os stops síncronos antes de qualquer `await`. Lazy
+    `await import('./discovery')` no início travava cleanup em
+    `pagehide` listener (browser não aguarda Promise pendente; aba
+    fechava antes do dynamic import resolver, deixando timers e peers
+    vivos até GC). Direção do lazy invertida: `boot.ts → discovery.ts`
+    agora é eager; `discovery.ts → boot.ts` é lazy (custo zero —
+    `connectTo`/`performRandomWalk` já são async).
+  - 🔴 **Barney #1 (defesa em profundidade)**: `pipeline.ts:
+    handleDataChannelMessage` ganha early guard `if (peer.status ===
+    'failed' \|\| peer.status === 'closed') return`. Antes, pong
+    fast-path (linhas 50-54) rodava antes de `consumeRateBudget` checar
+    status — peer killed entre `dc.onmessage` disparar e handler ser
+    invocado via lazy import ainda atualizava `lastPingMs` em peer
+    fantasma (microleak transitório, sem persistência mas semanticamente
+    errado).
+  - 🟢 **Barney R1 (semântica)**: `cleanupPeer` agora chama
+    `_resetReconnectCounter(remoteId)` no início pra cobrir todos call
+    sites (rate-limit kill, cross-proto kill, ICE timeout); antes só
+    `boot.closeAll` resetava counter antes do cleanup.
+  - 🟡 **Lily/Barney D4 (cargo cult)**: lazy `void import('./peer')`
+    em `rateLimit.ts:consumeRateBudget` substituído por import top-
+    level (não há ciclo real — `peer.ts` não importa `rateLimit.ts`).
+  - 🟡 **Barney D2 (vestigial)**: import `SEEN_IDS_CAP` removido de
+    `index.ts` + hack `void SEEN_IDS_CAP` apagado.
+- **Docs atualizadas pra novos paths** (Robin audit): `CLAUDE.md`,
+  `Docs/drift-arquitetura-v4.md` (5 hits), `Docs/drift-fluxograma-v4.html`
+  (2 hits), `Docs/fase-6-roadmap.md`, `Docs/runtime-pwa-vs-tauri.md`,
+  + comentários em `src/lib/schema.sql`, `src/lib/peerRegistry.ts`,
+  `src/lib/seeder.ts`, `src/lib/transport/{index,signaling,webrtc-
+  signaling-mock}.ts`, `tests/webrtc-reconnect.test.ts`. Refs em
+  `Docs/archive/*` e `CHANGELOG.md` históricas mantidas (snapshot da
+  época).
+
 ### Added (Fase 6.4 — Tor real funcional, etapas 1-4)
 
 🟢 **Sessão dedicada arti shipped** — sai do scaffold pra Tor funcional

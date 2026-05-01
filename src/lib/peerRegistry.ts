@@ -4,7 +4,7 @@
  * Persistência SQLite (tabela `peers_known`) de peers WebRTC conhecidos.
  * Substitui `Map<peerId, PeerState>` em memória do 6.1a no que toca
  * estado durável: scoring, blacklist, ASN/country diversity. O hot
- * path do data channel continua na Map em transport/webrtc.ts —
+ * path do data channel continua na Map em transport/webrtc/state.ts —
  * esta camada é low-frequency (handshake / failure / latency rolling),
  * portanto **zero cache em memória**: cada call bate SQLite.
  *
@@ -14,7 +14,7 @@
  *  - Frequência de chamada baixa (handshake é ~minutos, não ms).
  *
  * Threshold de cross-proto auto-blacklist (50 ocorrências → 1h) está
- * codificado aqui pra simplificar callsites — `webrtc.ts` só chama
+ * codificado aqui pra simplificar callsites — `webrtc/pipeline.ts` só chama
  * `recordCrossProto(npub)` e o registry decide quando blacklistar.
  * Ver `Docs/archive/webrtc-6.2-plan.md` §3 e §7.
  */
