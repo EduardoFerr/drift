@@ -305,10 +305,51 @@ interface PostRow {
   created_at: number
 }
 
-interface ActionRow {
+export interface ActionRow {
   kind: 'spread' | 'bury'
   user_pub: string
   created_at: number
+}
+
+/**
+ * Seleciona a ação líquida (cronologicamente mais recente) de cada user
+ * a partir do conjunto bruto de spreads+buries. Função pura — sem db,
+ * sem `Date.now()`. Exportada principalmente pra tests de regressão da
+ * semântica "última ação vale" (consolidado.md §4.6 + manifesto §23).
+ *
+ * **Regras**:
+ *  1. Pra cada `user_pub`, retorna a ação com maior `created_at`.
+ *  2. Empate de `created_at`: tie-break por `kind` ASC — `'bury'` < `'spread'`
+ *     em lex order, então em empate `'bury'` ganha. Determinístico.
+ *  3. Order independence: o resultado NÃO depende da ordem do array de
+ *     entrada (mesmo conjunto de ações → mesmo resultado). Tests cobrem.
+ *
+ * **Por que esta função existe**: sem ela, dois clientes Drift com
+ * mesmos eventos publicados podem chegar a scores diferentes se
+ * processarem em ordem distinta. Manifesto §7 (determinismo global)
+ * exige convergência. Esta função é a peça que garante isso pro
+ * sub-problema "user mudou de opinião N vezes".
+ */
+export function selectLatestActionByUser(
+  actions: readonly ActionRow[],
+): Map<string, 'spread' | 'bury'> {
+  const latestActionByUser = new Map<string, 'spread' | 'bury'>()
+  const latestTsByUser = new Map<string, number>()
+  for (const row of actions) {
+    const prevTs = latestTsByUser.get(row.user_pub)
+    if (prevTs === undefined || row.created_at > prevTs) {
+      latestTsByUser.set(row.user_pub, row.created_at)
+      latestActionByUser.set(row.user_pub, row.kind)
+    } else if (row.created_at === prevTs) {
+      // Tie: kind ASC (`'bury'` lex < `'spread'`). Mantém o que vem
+      // primeiro alfabeticamente — determinístico cross-cliente.
+      const prev = latestActionByUser.get(row.user_pub)!
+      if (row.kind < prev) {
+        latestActionByUser.set(row.user_pub, row.kind)
+      }
+    }
+  }
+  return latestActionByUser
 }
 
 interface UserAggRow {
@@ -363,26 +404,10 @@ async function recalculateScore(postId: string): Promise<void> {
     [postId, postId],
   )
 
-  // 3. Pra cada user, fica com ação mais recente. Em empate de
-  // created_at, kind ASC vence ('bury' < 'spread') — determinístico.
-  // Como ORDER BY ASC, sobrescritas naturais resolvem o empate
-  // ascendente; iteramos e o último update vence (que é o mais recente).
-  const latestActionByUser = new Map<string, 'spread' | 'bury'>()
-  const latestTsByUser = new Map<string, number>()
-  for (const row of actions) {
-    const prevTs = latestTsByUser.get(row.user_pub)
-    if (prevTs === undefined || row.created_at > prevTs) {
-      latestTsByUser.set(row.user_pub, row.created_at)
-      latestActionByUser.set(row.user_pub, row.kind)
-    } else if (row.created_at === prevTs) {
-      // Tie: kind ASC ('bury' lex < 'spread'). Mantém o que vem
-      // primeiro alfabeticamente.
-      const prev = latestActionByUser.get(row.user_pub)!
-      if (row.kind < prev) {
-        latestActionByUser.set(row.user_pub, row.kind)
-      }
-    }
-  }
+  // 3. Pra cada user, fica com ação mais recente. Lógica pura
+  // extraída em `selectLatestActionByUser` pra ser testável
+  // isolada sem mockar SQLite. Manifesto §7 (determinismo).
+  const latestActionByUser = selectLatestActionByUser(actions)
 
   if (latestActionByUser.size === 0) {
     // Nenhuma ação — score puro por idade.
