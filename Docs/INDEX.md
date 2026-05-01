@@ -39,6 +39,7 @@ ou **Por persona** pra pular direto.
 ### Fase 7 (distribuição)
 - **[twa.md](twa.md)** — Trusted Web Activity Android (sub-fase 7.1, ✅ antecipada)
 - **[fdroid.md](fdroid.md)** — submissão ao catálogo F-Droid (7.2, pendente)
+- **[fase-6-roadmap.md](fase-6-roadmap.md)** — roadmap honesto da Fase 6 inteira (7 sub-fases, 6.1a/6.1b ✅; 6.2/6.3/6.4/6.5/6.6/6.7 ⏳). §15 (anti-censura) ainda não cumprido até 6.4+6.5+6.6 fecharem.
 - *(futuro: `ipfs-pin.md`, `sneakernet.md`, `run-your-own-relay.md`)*
 
 ### Operacional
