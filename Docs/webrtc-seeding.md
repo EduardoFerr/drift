@@ -28,7 +28,9 @@ Outros usuários abrindo o mesmo mapa **fazem bootstrap direto do peer** em vez 
 ### Tensiona — adaptações obrigatórias
 
 - **Invariante #14 (sem discovery paralelo)** — proposta original sugere *"relay de diretório"* anunciando pubkey + endpoint, o que viraria protocolo paralelo. **Adaptação**: usar **NIP-65 estendido** (relay list anuncia que oferece WebRTC) + handshake via **DM cifrado NIP-44**. Sem kind novo. Manifesto §12 já indica esse caminho: *"signaling via Nostr (publica oferta como evento Drift, par responde via DM cifrado), conexão direta após handshake"*
-- **§28 Privacidade pelo Mínimo** + nota explícita do §16 — *"em modo paranoia, seeding é desligado por padrão"*. **Adaptação**: opt-in granular (ver §"Modos operacionais" abaixo)
+- **§28 Privacidade pelo Mínimo** + nota explícita do §16 — *"em modo paranoia, seeding é desligado por padrão"*. **Adaptação**: opt-in granular (ver §"Modos operacionais" abaixo).
+
+  **Privacy leak conhecido (7.1a)**: abrir mapa de um post = revelar interesse pros spreaders desse post. Atacante que cria post-honeypot e o espalha sabe quem abriu o mapa (peer connecting com npub revelado). Mitigação parcial: WebRTC handshake já vaza npub independente de PoI (qualquer `connectTo` revela). PoI não piora a baseline, só amplia o gatilho de quando isso acontece. Doc aqui pra leitor consciente. **Modo paranoia desliga PoI** — Barney peer review 7.1a R3
 
 ### Não tensiona
 
@@ -118,7 +120,7 @@ Gating técnico:
 
 ### Fase 7.1 — Proof of Interest seeder
 
-- **7.1a** — `seeder.ts`: liga/desliga seeding por `postId`. Hooks: `useSpreadMap` chama `startSeeding(postId)` no mount, `stopSeeding(postId)` no cleanup. Teste: count de seeds ativos
+- **7.1a** ✅ shipped em `[Unreleased]` (Lily). `seedFromSpreaders(postId)` em `src/lib/seeder.ts` lê `spreader_pub` distintos do SQLite e dispara `webrtcTransport.connectTo(npub)` paralelo. Consumido por `useSpreadMap` fire-and-forget após load. Idempotente (dedup por postId na sessão), respeita `WEBRTC_LIMITS.MAX_PEERS=32`. Modo Nostr ativa handshake real (kind 1059); modo mock é no-op. Trade-off: sem TURN (Fase 6.3 `VITE_TURN_SERVERS=`), 4G CGN pode falhar.
 - **7.1b** — Buffer policy + battery/network gating. Teste: mock Battery API < 20% → seeding pausa
 - **7.1c** — UI: indicador "você está servindo N posts a M peers" (transparência §28)
 - **7.1d** — Integração com `probe.ts`: peers WebRTC entram no probe pool

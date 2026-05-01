@@ -24,6 +24,7 @@
 
 import { useEffect, useState } from 'react'
 import { db } from '../lib/db'
+import { seedFromSpreaders } from '../lib/seeder'
 import type { GeoPoint, SpreadMapData, SpreadRecord } from '../types/drift'
 
 interface PostRow {
@@ -109,7 +110,13 @@ export function useSpreadMap(postId: string | null): {
           latestSpread: (records[records.length - 1] ?? null) as SpreadRecord | null,
         }
 
-        if (!cancelled) setState({ data, loading: false, error: null })
+        if (!cancelled) {
+          setState({ data, loading: false, error: null })
+          // Fase 7.1a: PoI auto-discovery — best-effort, fire-and-forget.
+          void seedFromSpreaders(postId).catch(() => {
+            /* falha em seed não bloqueia mapa */
+          })
+        }
       } catch (err) {
         if (!cancelled) {
           setState({

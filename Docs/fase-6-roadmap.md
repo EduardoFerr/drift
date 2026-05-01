@@ -1,6 +1,6 @@
 # Fase 6 — Roadmap honesto
 
-**Status**: parcial. Fase 6 = "cliente nativo + transportes alternativos + capacidade técnica do §15 (anti-censura por país)". Hoje só **6.1a + 6.1b** estão entregues; restam **5 sub-fases** pra fechar.
+**Status**: avançado. Fase 6 = "cliente nativo + transportes alternativos + capacidade técnica do §15 (anti-censura por país)". Hoje **6.1a, 6.1b, 6.2, 6.3, 6.5, 6.6, 6.7** estão entregues; resta apenas **6.4 Tor transport** pra cumprir §15 inteiro.
 
 **Compromisso do manifesto** (§ROADMAP, linha 950):
 > "Fase 6 + Fase 7 não são 'talvez'. São 'vão acontecer'. Se em algum momento o caminho técnico mostrar que algo dessas fases é inviável como prometido, o manifesto é atualizado com bump de versão e justificativa pública. Não cala, não promete e não entrega."
@@ -25,9 +25,9 @@
 - DI via flag `VITE_USE_NOSTR_SIGNALING`
 - 305 tests verdes
 
-### ⏳ 6.2 — Path diversity + peer registry persistente
+### ✅ 6.2 — Path diversity + peer registry persistente (entregue em `[Unreleased]`)
 
-**Plano**: `Docs/webrtc-6.2-plan.md` (existe, não-iniciado)
+**Plano**: `Docs/webrtc-6.2-plan.md`. Shipped via 5 sub-fases (Marshall/Robin/Barney/Lily + integração).
 
 Escopo:
 - **Random walk obrigatório** (manifesto §20): mesmo após `CONNECTED`, cliente continua descobrindo via amostragem aleatória de peers conhecidos
@@ -40,7 +40,7 @@ Escopo:
 
 Estimativa: **2-3 sessões coordenadas** (~12-15h). Manifesto §20.
 
-### ⏳ 6.3 — TURN + reconnect + health checks
+### ✅ 6.3 — TURN + reconnect + health checks (entregue em `[Unreleased]`)
 
 Escopo:
 - **TURN servers**: peer-to-peer falha em ~30% dos casos (symmetric NAT, 4G CGN). TURN relay TCP cobre mobile real.
@@ -91,9 +91,9 @@ Setting: `network_mode: 'clearnet' | 'tor' | 'onion-only'`
 
 Estimativa: **3-4 sessões** (~20h). Manifesto §4, §15, §28.
 
-### ⏳ 6.5 — **Tauri desktop wrapper**
+### ✅ 6.5 — **Tauri desktop wrapper** (scaffold shipped + validado 2026-04-29)
 
-**Pré-requisito**: nenhum.
+**Pré-requisito**: nenhum. Eduardo validou `npm run tauri:dev` abrindo janela com Drift.
 
 Escopo:
 - `src-tauri/` ganha Cargo.toml + main.rs com webview embarcando o build Vite
@@ -106,9 +106,9 @@ Escopo:
 
 Estimativa: **2-3 sessões** (~15h). Manifesto §1 (Tauri desktop habilita §15).
 
-### ⏳ 6.6 — Multi-transport orchestration (`sync.ts`)
+### ✅ 6.6 — Multi-transport orchestration (`sync.ts`) (entregue como parte de 6.2-D/E)
 
-**Pré-requisito**: 6.4 (Tor existir) ou pelo menos placeholder.
+**Pré-requisito**: 6.4 (Tor existir) ou pelo menos placeholder — atendido com WSS + WebRTC, Tor entra quando 6.4 fechar.
 
 Escopo:
 - Hoje `sync.ts` chama `wssTransport.subscribe(...)`. Mudar pra iterar `[wssTransport, torTransport, webrtcTransport]`
@@ -119,9 +119,9 @@ Escopo:
 
 Estimativa: **1 sessão** (~6h, se 6.4 estiver pronto). Manifesto §12 (múltiplos transportes).
 
-### ⏳ 6.7 — Build reproduzível
+### ✅ 6.7 — Build reproduzível (entregue em `[Unreleased]`)
 
-**Pré-requisito**: 6.5 (build do Tauri).
+**Pré-requisito**: 6.5 (build do Tauri) ✅.
 
 Escopo:
 - Dockerfile determinístico: pinned versões Rust, Node, system libs
@@ -140,14 +140,14 @@ Estimativa: **1 sessão** (~6h). Manifesto §17.
 |---|---|---|---|---|
 | 6.1a WebRTC core | ✅ | 432 + signaling | 3 | §12 |
 | 6.1b Nostr signaling | ✅ | ~250 | 1 | §14, §29 |
-| 6.2 Path diversity | ⏳ | ~300 | 2-3 | §20 |
-| 6.3 TURN + reconnect | ⏳ | ~150 | 1-2 | §15 (mobile) |
+| 6.2 Path diversity | ✅ | ~700 (peerRegistry+peerScore+orchestrator+wire) | 1 (paralelo) | §20 |
+| 6.3 TURN + reconnect | ✅ | ~250 | 1 | §15 (mobile) |
 | 6.4 Tor transport | ⏳ | ~200 + arti integ | 3-4 | §4, §15, §28 |
-| 6.5 Tauri desktop | ⏳ | ~100 + Rust | 2-3 | §1 (capacidade §15) |
-| 6.6 Multi-transport | ⏳ | ~80 | 1 | §12 |
-| 6.7 Build reproduzível | ⏳ | docs + CI | 1 | §17 |
+| 6.5 Tauri desktop | ✅ | ~100 + Rust scaffold | 1 | §1 (capacidade §15) |
+| 6.6 Multi-transport | ✅ (incluído em 6.2) | ~150 | — | §12 |
+| 6.7 Build reproduzível | ✅ | docs + CI + Dockerfile | 1 | §17 |
 
-**Total restante**: ~10-15 sessões coordenadas.
+**Total restante**: ~3-4 sessões pra **6.4 Tor** (única sub-fase pendente).
 
 ---
 
@@ -170,6 +170,21 @@ Estimativa: **1 sessão** (~6h). Manifesto §17.
 **Caminho mais barato em valor entregue**: 6.6 primeiro (multi-transport com WSS + WebRTC, sem Tor) — habilita parte de §12 hoje, ~6h trabalho.
 
 **Caminho mais defensivo**: 6.2 + 6.3 (path diversity + TURN) primeiro — robustece o que já tem antes de empilhar mais transports.
+
+---
+
+## Follow-up pós-Fase 6 (entregue paralelo)
+
+### ✅ 7.1a — PoI auto-discovery via SpreadMap (entregue em `[Unreleased]`)
+
+Tecnicamente Fase 7 (distribuição), mas funcionalmente fecha o loop dos transports da Fase 6:
+
+- `src/lib/seeder.ts:seedFromSpreaders(postId)` (Lily): lê `spreader_pub` do SQLite, dispara `webrtcTransport.connectTo(npub)` paralelo. Idempotente, respeita `WEBRTC_LIMITS.MAX_PEERS=32`.
+- Hook em `useSpreadMap`: fire-and-forget após load, render não bloqueia.
+- Modo Nostr ativa handshake kind 1059 real; modo mock no-op.
+- Trade-off: sem TURN (6.3 — `VITE_TURN_SERVERS=`), 4G CGN pode falhar. Sem random walk runtime ainda (TODO 6.2-D follow-up), só descoberta passiva.
+
+Manifesto §16: "espalhar = seedear" agora é mecânica automática quando user abre o mapa. Detalhes em [webrtc-seeding.md](webrtc-seeding.md) §"Fase 7.1" e CHANGELOG `[Unreleased]`.
 
 ---
 

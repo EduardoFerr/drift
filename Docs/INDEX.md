@@ -37,6 +37,7 @@ ou **Por persona** pra pular direto.
 - **[webrtc-threats.md](webrtc-threats.md)** — threat model WebRTC, 23+ ameaças classificadas (v1.0, 2026-04-28)
 
 ### Fase 7 (distribuição)
+- **Fase 7.1a** ✅ shipped — PoI auto-discovery via SpreadMap (Lily). `src/lib/seeder.ts:seedFromSpreaders(postId)` consumido por `useSpreadMap`. Manifesto §16 (espalhar = seedear). Detalhes em [../CHANGELOG.md](../CHANGELOG.md) `[Unreleased]` e [webrtc-seeding.md](webrtc-seeding.md) §"Fase 7.1".
 - **[twa.md](twa.md)** — Trusted Web Activity Android (sub-fase 7.1, ✅ antecipada)
 - **[fdroid.md](fdroid.md)** — submissão ao catálogo F-Droid (7.2, pendente)
 - **[fase-6-roadmap.md](fase-6-roadmap.md)** — roadmap honesto da Fase 6 inteira (7 sub-fases, 6.1a/6.1b ✅; 6.2/6.3/6.4/6.5/6.6/6.7 ⏳). §15 (anti-censura) ainda não cumprido até 6.4+6.5+6.6 fecharem.

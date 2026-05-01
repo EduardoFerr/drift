@@ -4,6 +4,24 @@ All notable changes to the Drift client. Uses [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+### Added (Fase 7.1a — PoI auto-discovery via SpreadMap)
+
+- **`src/lib/seeder.ts`** (Lily): nova função `seedFromSpreaders(postId)` que lê `spreader_pub` distintos do SQLite local e dispara `webrtcTransport.connectTo(npub)` paralelo pra cada um. Idempotente (dedup por postId na sessão), respeita `WEBRTC_LIMITS.MAX_PEERS=32`, best-effort (failures swallow — `peerRegistry` registra via `recordFailure` em outras camadas).
+
+- **Hook em `useSpreadMap.ts`**: após carregar dados com sucesso, dispara `void seedFromSpreaders(postId)` fire-and-forget. Render do mapa não bloqueia.
+
+**Mecânica**: abrir mapa de um post = "ato de interesse" → seed automático com peers que ja espalharam aquele conteúdo. Materializa manifesto §16 (mecânica social vira infraestrutura técnica). Em modo Nostr (`VITE_USE_NOSTR_SIGNALING=1`), peer.id é npub estável e `connectTo` dispara handshake real via signaling kind 1059. Em modo mock, `connectTo` é no-op (UUID per-tab não persiste).
+
+**Trade-offs**:
+- Sem TURN configurado, conexão pode falhar em mobile real (4G CGN). Combinar com Fase 6.3 (`VITE_TURN_SERVERS=`).
+- Sem random walk runtime ainda ativo (TODO 6.2-D follow-up), seeding cobre só descoberta passiva via spread map. Opening posts virais = exposição maior; abrindo post nicho = exposição limitada. Aceitável MVP.
+
+### Manifesto §16 covered
+
+> "Espalhar = seedear: quem espalhou um post se compromete (no cliente oficial) a republicá-lo se um par solicitar. Mecânica social vira infraestrutura técnica."
+
+7.1a fecha o loop: cliente que abre o mapa **descobre** os spreaders e **conecta** automaticamente. Sem ação manual.
+
 ### Added (Fase 6.3 — TURN + Reconnect + Health checks)
 
 Coordenado por 4 personas (Lily core / Robin docs / Marshall tests / Barney review):
