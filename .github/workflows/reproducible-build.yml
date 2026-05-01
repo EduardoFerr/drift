@@ -1,0 +1,122 @@
+name: reproducible-build
+
+# Dispara em tag (mesmo trigger que release.yml; coexistem) ou manual.
+# Output: artifacts SHA256-verified anexados ao GitHub Release existente.
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag pra reproduzir (ex: v0.6.0-alpha.1)'
+        required: true
+
+# Concurrency: 1 build por tag, cancel em re-push da mesma tag.
+concurrency:
+  group: reproducible-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write   # pra fazer upload no release existente
+
+jobs:
+  build-reproducible:
+    name: Reproducible Linux build (Docker)
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Determine tag name
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build reproducible artifacts (Docker)
+        run: |
+          docker buildx build \
+            -f Dockerfile.reproducible \
+            --target artifacts \
+            --output type=local,dest=./artifacts \
+            --build-arg SOURCE_DATE_EPOCH=1735689600 \
+            .
+          ls -la artifacts/
+          echo "--- artifacts/SHA256SUMS ---"
+          cat artifacts/SHA256SUMS
+
+      - name: Package PWA dist
+        env:
+          LC_ALL: C
+          TZ: UTC
+        run: |
+          cd artifacts/dist
+          # Determinístico: LC_ALL=C garante sort byte-a-byte (sem locale-dep);
+          # zip -X strip timestamps extras; -@ lê file list de stdin.
+          find . -type f | LC_ALL=C sort | zip -X -@ "../../drift-pwa-${{ steps.tag.outputs.tag }}.zip"
+          cd ../..
+          sha256sum drift-pwa-${{ steps.tag.outputs.tag }}.zip > drift-pwa-${{ steps.tag.outputs.tag }}.zip.sha256
+
+      - name: Package Tauri Linux artifacts (best effort)
+        env:
+          LC_ALL: C
+          TZ: UTC
+        run: |
+          if [ -d "artifacts/tauri" ]; then
+            cd artifacts/tauri
+            find . -type f | LC_ALL=C sort | zip -X -@ "../../drift-tauri-linux-${{ steps.tag.outputs.tag }}.zip"
+            cd ../..
+            sha256sum drift-tauri-linux-${{ steps.tag.outputs.tag }}.zip > drift-tauri-linux-${{ steps.tag.outputs.tag }}.zip.sha256
+          else
+            echo "Tauri artifacts NOT BUILT — skipping (Dockerfile may have skipped Tauri stage)"
+          fi
+
+      - name: Generate consolidated SHA256SUMS-reproducible
+        run: |
+          {
+            echo "# Drift ${{ steps.tag.outputs.tag }} reproducible artifacts"
+            echo "# Build: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "# Docker: $(docker version --format '{{.Server.Version}}')"
+            echo "# SOURCE_DATE_EPOCH: 1735689600"
+            echo ""
+            sha256sum drift-pwa-${{ steps.tag.outputs.tag }}.zip 2>/dev/null || true
+            sha256sum drift-tauri-linux-${{ steps.tag.outputs.tag }}.zip 2>/dev/null || true
+          } > SHA256SUMS-reproducible
+          cat SHA256SUMS-reproducible
+
+      - name: Upload artifacts to GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: github.event_name == 'push'
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          files: |
+            drift-pwa-${{ steps.tag.outputs.tag }}.zip
+            drift-pwa-${{ steps.tag.outputs.tag }}.zip.sha256
+            drift-tauri-linux-${{ steps.tag.outputs.tag }}.zip
+            drift-tauri-linux-${{ steps.tag.outputs.tag }}.zip.sha256
+            SHA256SUMS-reproducible
+          fail_on_unmatched_files: false   # Tauri pode ter falhado; não bloqueia
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload artifacts as workflow artifacts (manual disp)
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: drift-reproducible-${{ steps.tag.outputs.tag }}
+          path: |
+            drift-pwa-*.zip
+            drift-pwa-*.zip.sha256
+            drift-tauri-linux-*.zip
+            drift-tauri-linux-*.zip.sha256
+            SHA256SUMS-reproducible
+          retention-days: 30

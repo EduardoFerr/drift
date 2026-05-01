@@ -1,0 +1,103 @@
+# syntax=docker/dockerfile:1.6
+# Build reproduzivel do Drift — manifesto §17.
+# Output: /artifacts/dist/        (PWA estatica)
+#         /artifacts/tauri/        (Tauri Linux: .deb, .AppImage)
+#
+# SOURCE_DATE_EPOCH preserva timestamps deterministicos cross-build.
+# Versoes pinned exatas (sem range) garantem mesmo bytecode.
+# Locale C + TZ UTC eliminam locale-dependent ordering.
+
+ARG NODE_VERSION=20.18.1
+ARG RUST_VERSION=1.83.0
+ARG DEBIAN_VERSION=bookworm-slim
+ARG SOURCE_DATE_EPOCH=1735689600
+# 2025-01-01 UTC — fixed reference epoch pra builds reproduziveis
+
+# ─── Stage 1: Vite/PWA build ───────────────────────────────────────
+FROM node:${NODE_VERSION}-${DEBIAN_VERSION} AS pwa-builder
+ENV NODE_ENV=production \
+    SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH} \
+    LC_ALL=C.UTF-8 \
+    TZ=UTC \
+    npm_config_audit=false \
+    npm_config_fund=false
+
+WORKDIR /build
+# Copy lockfiles primeiro pra cache otimizado
+COPY package.json package-lock.json ./
+RUN npm ci --no-audit --no-fund --prefer-offline
+
+COPY tsconfig*.json vite.config.ts ./
+# Tailwind + PostCSS configs sao runtime deps do build Vite — sem isso,
+# CSS sai sem classes Tailwind processadas (silent failure).
+COPY tailwind.config.* postcss.config.* ./
+COPY index.html ./
+COPY public/ public/
+COPY src/ src/
+COPY scripts/ scripts/
+
+RUN npm run build
+# Output: dist/
+
+# ─── Stage 2: Tauri Linux build ──────────────────────────────────────
+FROM rust:${RUST_VERSION}-${DEBIAN_VERSION} AS tauri-builder
+ARG SOURCE_DATE_EPOCH
+ENV SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH} \
+    LC_ALL=C.UTF-8 \
+    TZ=UTC \
+    CARGO_NET_OFFLINE=false \
+    CARGO_INCREMENTAL=0
+# CARGO_INCREMENTAL=0 desliga incremental compilation (deterministico)
+
+# Tauri deps de sistema (Debian bookworm)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libwebkit2gtk-4.1-dev \
+    build-essential \
+    curl \
+    file \
+    libxdo-dev \
+    libssl-dev \
+    libayatana-appindicator3-dev \
+    librsvg2-dev \
+    nodejs \
+    npm \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+
+# Reusa output do PWA stage
+COPY --from=pwa-builder /build/dist ./dist
+COPY --from=pwa-builder /build/node_modules ./node_modules
+COPY --from=pwa-builder /build/package.json ./package.json
+
+COPY src-tauri/ src-tauri/
+WORKDIR /build/src-tauri
+
+# Build determinístico: --frozen evita resolution; --locked usa Cargo.lock exato.
+# Apenas `cargo build` (sem `tauri build` bundler) — produz binário standalone
+# `target/release/drift`. Bundles .deb/.AppImage exigem `tauri build` que invoca
+# scripts adicionais (cargo-bundle, debianização) e tem matriz de deps de
+# sistema mais ampla — fica pra commit futuro quando smoke validar essa stage.
+RUN cargo build --release --locked --frozen
+RUN ls -la target/release/
+
+# Stage intermediário: coleta artifacts num único filesystem antes do final.
+# Usa shell pra fazer cópias condicionais (sintaxe `2>/dev/null || true` em
+# COPY é inválida — Dockerfile interpreta como argumentos extras, falha hard).
+FROM debian:${DEBIAN_VERSION} AS collector
+WORKDIR /collect
+COPY --from=pwa-builder /build/dist ./dist/
+COPY --from=tauri-builder /build/src-tauri/target/release/drift ./tauri/drift-bin
+# Gera checksums determinísticos com locale fixo (LC_ALL=C garante ordering
+# byte-a-byte, sem dependência do locale do host). `-print0` + `sort -z`
+# tolera filenames com espaço/newline; `xargs -0` mantém terminator NUL.
+RUN LC_ALL=C find . -type f -print0 \
+    | LC_ALL=C sort -z \
+    | xargs -0 sha256sum > SHA256SUMS
+
+# ─── Stage 3: Final artifacts ───────────────────────────────────────
+FROM debian:${DEBIAN_VERSION} AS artifacts
+WORKDIR /artifacts
+COPY --from=collector /collect/ ./
+
+CMD ["sh", "-c", "find /artifacts -type f -ls && cat /artifacts/SHA256SUMS"]

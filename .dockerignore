@@ -1,0 +1,15 @@
+node_modules/
+src-tauri/target/
+dist/
+dev-dist/
+.git/
+.github/
+.vercel/
+.claude/
+Docs/
+*.log
+.env*
+!.env.example
+coverage/
+.vscode/
+.idea/

@@ -5,7 +5,8 @@
   "type": "module",
   "license": "MIT",
   "engines": {
-    "node": ">=22"
+    "node": ">=20.18.0",
+    "npm": ">=10"
   },
   "scripts": {
     "dev": "vite",

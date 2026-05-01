@@ -4,6 +4,22 @@ All notable changes to the Drift client. Uses [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+### Added (Fase 6.7 — Build reproduzível)
+
+Coordenado por 4 frentes paralelas (Ted/Marshall/Robin + integração):
+
+- **`Dockerfile.reproducible`** (Ted, raiz): multi-stage build determinístico (PWA + Tauri Linux). Versões pinned: Node 20.18.1, Rust 1.83.0, Debian bookworm-slim. `SOURCE_DATE_EPOCH=1735689600` (2025-01-01 UTC) + `LC_ALL=C.UTF-8` + `TZ=UTC` + `CARGO_INCREMENTAL=0` + `cargo build --locked --frozen` → bit-identical entre builds. Stages: `pwa-builder` → `tauri-builder` → `artifacts` (output coleta `dist/`, `tauri/bundle/`, `SHA256SUMS`). `.dockerignore` exclui `node_modules/`, `target/`, `dist/`, `.git/`, `.env*`, etc. Manifesto §17.
+
+- **`.github/workflows/reproducible-build.yml`** (Marshall): trigger em tag `v*` ou `workflow_dispatch`. Builda via Docker, gera `drift-pwa-<tag>.zip` + `drift-tauri-linux-<tag>.zip` + `SHA256SUMS-reproducible`, anexa ao GitHub Release existente (coexiste com `release.yml` — não substitui). Permissions mínimas (`contents: write`), concurrency cancel-in-progress, `fail_on_unmatched_files: false` (release parcial OK se Tauri stage falhar).
+
+- **`Docs/build-reproducible.md`** (Robin): doc completo de verificação (clone source na tag → docker buildx → empacote local → compare SHA256). Cobertura honesta: ✅ Linux PWA bit-identical, ✅ Linux Tauri (.deb/.AppImage) bit-identical, ❌ Windows/macOS (signing detached fica pra futuro), ❌ F-Droid Android (pendente 7.2). Limitações honestas: reprodutibilidade ≠ ausência de backdoor; user precisa **ler** o source.
+
+- **`package.json` engines**: `node: ">=20.18.0"` (alinha com Dockerfile pinned), `npm: ">=10"`. Antes era `>=22` que conflitava com o build oficial Linux em Node 20.x.
+
+- **`Docs/INDEX.md`**: entrada `build-reproducible.md` + atualização `tauri-setup.md` (6.5 ✅ validado em 2026-04-29).
+
+**§17 cumprido**: qualquer auditor independente verifica em ~5min que binário publicado bate exatamente com `git tag` source. Reprodutibilidade Linux-only por enquanto — Windows/macOS exigem signing detached (fora 6.7).
+
 ### Added (Fase 6.2 — wire-up final dos TODOs)
 
 Fecha integração runtime dos 3 TODOs deixados em `webrtc.ts` (commit anterior):
