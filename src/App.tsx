@@ -694,6 +694,10 @@ function Header({
   const active = useSyncStore((s) => s.active)
   const events = useSyncStore((s) => s.eventsReceived)
   const rebuilding = useSyncStore((s) => s.rebuildsInProgress.length > 0)
+  // Sprint 6: modo degradado (Tor falhou no boot, etc.) — indicador
+  // não-bloqueante no header. Click abre Settings → seção de rede,
+  // onde o banner detalhado já vive (Sprint 2).
+  const degradedCount = useBootStore((s) => s.degradedReasons.length)
 
   return (
     <header className="mb-6 flex flex-wrap items-center justify-between gap-3 border-b border-drift-border pb-4">
@@ -749,6 +753,16 @@ function Header({
         >
           {networkIcon}
         </button>
+        {degradedCount > 0 && (
+          <button
+            onClick={onOpenSettingsNetwork}
+            className="text-[12px] leading-none text-amber-300 hover:opacity-80"
+            title={`Modo degradado — ${degradedCount} feature${degradedCount > 1 ? 's' : ''} não disponível${degradedCount > 1 ? 'is' : ''}. Clique pra ver.`}
+            aria-label="Modo degradado — clique pra detalhes"
+          >
+            ⚠
+          </button>
+        )}
         <button
           onClick={onOpenProfile}
           className="rounded hover:opacity-80"

@@ -32,6 +32,7 @@ export function ContentSettings({ onClose, scrollTo }: ContentSettingsProps) {
   const prefs = usePrefsStore()
   const relaysList = useRelaysStore((s) => s.list)
   const bootStep = useBootStore((s) => s.step)
+  const degradedReasons = useBootStore((s) => s.degradedReasons)
   const [rebuilding, setRebuilding] = useState(false)
   const locationSectionRef = useRef<HTMLDivElement | null>(null)
   const networkSectionRef = useRef<HTMLDivElement | null>(null)
@@ -64,16 +65,19 @@ export function ContentSettings({ onClose, scrollTo }: ContentSettingsProps) {
     !tauriRuntime &&
     (prefs.network_mode === 'tor' || prefs.network_mode === 'onion-only')
 
-  // Sprint 2: detecta "boot terminou ready mas estamos em modo Tor em
-  // Tauri" — proxy heurístico pra "Tor configurado mas talvez não
-  // conectou". Sprint 6 (BootState.degradedReasons) vai melhorar isso
-  // com sinal direto. Hoje: se estamos em ready + Tauri + modo tor, NÃO
-  // mostramos alerta (assumimos sucesso); se modo tor e ainda em
-  // 'isolation'/'error', alertamos. Conservador.
+  // Sprint 2: boot terminou em erro fatal com modo Tor selecionado.
   const torConfiguredButBootError =
     tauriRuntime &&
     (prefs.network_mode === 'tor' || prefs.network_mode === 'onion-only') &&
     bootStep === 'error'
+
+  // Sprint 6: razão Tor-related entre as degradedReasons da BootState
+  // (sinal direto, não mais heurístico). Cobre: feature arti OFF,
+  // bootstrap arti falhou, listener falhou, etc. Boot terminou 'ready'
+  // mas Tor não está rodando — user precisa saber.
+  const torDegradedReason = degradedReasons.find(
+    (r) => r.code === 'TOR_BOOTSTRAP_FAILED' || r.code === 'TOR_FEATURE_OFF',
+  )
 
   // Scroll-to-section quando aberto via indicador GPS / rede no Header.
   useEffect(() => {
@@ -262,6 +266,26 @@ export function ContentSettings({ onClose, scrollTo }: ContentSettingsProps) {
                   específica. Considere voltar pra <code>clearnet</code>{' '}
                   até o problema ser diagnosticado, OU recarregar pra
                   retry.
+                </span>
+              </div>
+            )}
+            {torDegradedReason && (
+              <div
+                role="alert"
+                className="mt-3 rounded border border-amber-700/60 bg-amber-950/30 px-3 py-2 text-[10px] leading-relaxed text-amber-300"
+              >
+                <strong className="block text-amber-200">
+                  ⚠ Tor selecionado mas não conectou — modo degradado
+                </strong>
+                <span className="mt-1 block text-amber-300/80">
+                  {torDegradedReason.code === 'TOR_FEATURE_OFF'
+                    ? 'Build atual não tem feature arti compilada (cargo tauri build --features arti). '
+                    : 'Bootstrap do daemon Tor falhou. '}
+                  Tráfego está em clearnet. Detalhes técnicos:{' '}
+                  <code className="break-all">
+                    {torDegradedReason.message}
+                  </code>
+                  . Volte pra <code>clearnet</code> ou recarregue pra retry.
                 </span>
               </div>
             )}

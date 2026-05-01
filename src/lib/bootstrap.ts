@@ -51,6 +51,26 @@ export type BootStep =
   | 'ready'
   | 'error'
 
+/**
+ * Razão pela qual o boot terminou em estado "ready" mas DEGRADADO —
+ * uma ou mais features opcionais falharam, app continua funcional
+ * em modo reduzido. Lily 1 + Sprint 6 do roadmap pós-auditoria.
+ *
+ * `code` é estável (programático — UI pode trocar copy por idioma);
+ * `message` é human-readable pra dev/log.
+ */
+export interface DegradedReason {
+  /** Código estável e indexável. Adicionar novos valores requer
+   *  caso UI explícito; não usar como string livre. */
+  code:
+    | 'TOR_BOOTSTRAP_FAILED'
+    | 'TOR_FEATURE_OFF'
+    | 'PROBE_FAILED'
+    | 'EVICTION_NOT_SCHEDULED'
+  /** Mensagem detalhada (ex: stack do erro arti). */
+  message: string
+}
+
 export interface BootState {
   step: BootStep
   error: string | null
@@ -60,6 +80,21 @@ export interface BootState {
   storage: StorageMode | null
   identity: DriftIdentity | null
   relays: RelayHealth[] | null
+  /**
+   * Falhas non-fatal que aconteceram durante o boot mas não impediram
+   * `step === 'ready'`. UI usa pra mostrar indicador "modo degradado"
+   * sem bloquear o app. Sprint 6 do roadmap pós-auditoria.
+   *
+   * Política de erro durante doBootstrap (Lily 1):
+   *  - **Fatal** (vira `step: 'error'`): isolation, db, identity.
+   *    Sem isso, app não funciona — mostra modal/tela de erro.
+   *  - **Degradado** (acumula em `degradedReasons`, segue `step:
+   *    'ready'`): tor, probe, eviction. App funciona com feature
+   *    desligada; user precisa saber.
+   *  - **Best-effort silencioso** (só log): identidades secundárias,
+   *    follows. Background; ausência não trava UX.
+   */
+  degradedReasons: DegradedReason[]
 }
 
 const INITIAL: BootState = {
@@ -70,6 +105,7 @@ const INITIAL: BootState = {
   storage: null,
   identity: null,
   relays: null,
+  degradedReasons: [],
 }
 
 // ─── Store Zustand ────────────────────────────────────────────────────
@@ -93,6 +129,19 @@ export function subscribeBootState(
 
 function setBoot(updater: (s: BootState) => BootState): void {
   useBootStore.setState(updater)
+}
+
+/** Adiciona razão à lista de degradedReasons mantendo idempotência por
+ *  `code` — chamar 2× com mesmo código não duplica entrada. UI consome
+ *  via `useBootStore(s => s.degradedReasons)`. */
+function addDegradedReason(code: DegradedReason['code'], message: string): void {
+  setBoot((p) => {
+    if (p.degradedReasons.some((r) => r.code === code)) return p
+    return {
+      ...p,
+      degradedReasons: [...p.degradedReasons, { code, message }],
+    }
+  })
 }
 
 // ─── Promise singleton ────────────────────────────────────────────────
@@ -197,14 +246,20 @@ async function doBootstrap(): Promise<void> {
             `[bootstrap] Tor conectado · proxy=${torStatus.proxyAddr} · circuits=${torStatus.circuitCount}`,
           )
         } else {
-          console.warn(
-            `[bootstrap] Tor não conectou (state=${torStatus.state}, err=${torStatus.lastError ?? 'none'}) — degradando pra clearnet nesta sessão`,
-          )
+          // Sprint 6: registra na BootState pra UI alertar. Não trava
+          // o boot — manifesto §15 cumprido em sucesso, opção do user
+          // em falha (pode reload pra retry, ou voltar pra clearnet
+          // em Settings). Banner de Settings (Sprint 2) já cobre.
+          const msg = `Tor não conectou (state=${torStatus.state}, err=${torStatus.lastError ?? 'none'})`
+          console.warn(`[bootstrap] ${msg} — degradando pra clearnet nesta sessão`)
+          addDegradedReason('TOR_BOOTSTRAP_FAILED', msg)
         }
       } catch (err) {
         // Em modo `arti` feature OFF, `tor_connect` retorna erro stub;
-        // capturamos e seguimos em clearnet sem ruído de UX.
-        console.warn('[bootstrap] tor_connect lançou:', err)
+        // capturamos e seguimos em clearnet com sinal explícito pra UX.
+        const msg = err instanceof Error ? err.message : String(err)
+        console.warn('[bootstrap] tor_connect lançou:', msg)
+        addDegradedReason('TOR_FEATURE_OFF', msg)
       }
     }
 
