@@ -1,5 +1,9 @@
 # Fase 6.1b — Plano Executável: Signaling Real via Nostr DM (NIP-44)
 
+> **STATUS**: ✅ entregue em `0.6.0-alpha.1` (commit `57b2a14`). Pequenos ajustes (store-and-forward fix, defense in depth) em commits subsequentes — ver CHANGELOG `[Unreleased]`.
+>
+> Documento mantido como referência histórica do plano executado e justificativas de design.
+
 Substitui o BroadcastChannel mock de 6.1a por **signaling cifrado end-to-end via DM Nostr**. Permite peers em redes diferentes se conectarem usando relays Nostr existentes como rendezvous, sem inventar diretório paralelo (invariante #14).
 
 **Decisão fechada**: `nostr-tools` 2.7.0 já exporta `nip44` com `getConversationKey`, `encrypt`, `decrypt`. **Zero deps novas**. Usar direto.

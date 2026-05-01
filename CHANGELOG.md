@@ -4,6 +4,17 @@ All notable changes to the Drift client. Uses [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+### Removed (limpeza de débito técnico)
+
+- **`_buildArcs` e `SpreadMapData.arcs`** (código zumbi pós-heatmap): após a migração pro `HeatmapLayer` em `0.6.0-alpha.0`, o campo `arcs` continuava sendo populado em `useSpreadMap.ts` mas nenhum consumidor usava (`grep data.arcs` zero matches). Marcados `@deprecated` com promessa de "manter 1 release pra retrocompat", mas a auditoria mostrou que ninguém depende — então **removidos imediatamente**: `arcs` field em `SpreadMapData`, função `_buildArcs`, tipo `SpreadArc`. Tests órfãos (9) removidos de `tests/spread-map.test.ts`; mantidos os 5 de `_computeBounds`. 305 → 296 tests verdes (sem perda de cobertura real). Git histórico cobre quem precisar do código removido.
+
+### Docs (hygiene)
+
+- **`signaling.ts` JSDoc** marca 6.1b como ✅ shipped (era "Fase 6.1b, futura").
+- **`Docs/webrtc-6.1b-plan.md`** ganha header de status "✅ entregue em `0.6.0-alpha.1`" — documento mantido como referência histórica do plano executado.
+- **`Docs/webrtc-seeding.md`** linha 6.1b ganha ✅.
+- **`Docs/INDEX.md`** atualiza 3 referências a 6.1b refletindo shipped.
+
 ### Added (defense in depth — peer review pendências)
 
 - **Rate limit local no `send()` do `nostrSignalingChannel`** (`webrtc-signaling-nostr.ts`): token bucket 30 msgs/60s. Defesa contra flood self-imposto (bug em layer acima ou loop infinito em ICE trickle). Drop silencioso quando exceder; caller não deve reagir. Diferente do `RATE_LIMIT_PER_SENDER` receive-side (anti-Sybil de remetentes); este é send-side (anti-self-flood). +1 test em `tests/signaling-nostr.test.ts` (305 verdes).

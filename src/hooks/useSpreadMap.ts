@@ -24,7 +24,7 @@
 
 import { useEffect, useState } from 'react'
 import { db } from '../lib/db'
-import type { GeoPoint, SpreadArc, SpreadMapData, SpreadRecord } from '../types/drift'
+import type { GeoPoint, SpreadMapData, SpreadRecord } from '../types/drift'
 
 interface PostRow {
   location: string | null
@@ -94,8 +94,6 @@ export function useSpreadMap(postId: string | null): {
           createdAt: r.createdAt,
         }))
 
-        const arcs = _buildArcs(origin, destinations)
-
         const allCountries = new Set<string>()
         if (origin?.country) allCountries.add(origin.country)
         for (const r of records) {
@@ -105,7 +103,6 @@ export function useSpreadMap(postId: string | null): {
         const data: SpreadMapData = {
           origin,
           destinations,
-          arcs,
           totalSpreads: records.length,
           countries: Array.from(allCountries),
           firstSpread: (records[0] ?? null) as SpreadRecord | null,
@@ -148,44 +145,3 @@ function parseLocation(raw: string | null): GeoPoint | null {
   }
 }
 
-/**
- * Constrói arcos pro Deck.gl ArcLayer a partir da origem do post + destinos.
- *
- * Casos:
- *   - `origin` presente, `destinations.length >= 1` → 1 arco por destino,
- *     todos partindo de `origin` (caso comum: autor publicou com location,
- *     N pessoas espalharam com location).
- *   - `origin` presente, `destinations` vazio → `[]` (renderiza só o ponto
- *     da origem via ScatterplotLayer; sem arco).
- *   - `origin` null, `destinations.length >= 2` → **fallback legacy**: usa
- *     `destinations[0]` como origem e os demais como destinos. Cobre posts
- *     antigos (autor sem location, mas espalhadores com location).
- *   - `origin` null, `destinations.length < 2` → `[]`.
- *
- * Coords retornadas no formato `[lng, lat]` (convenção Deck.gl, invertida
- * vs `{lat, lng}`).
- *
- * Exportada como `_buildArcs` (prefixo underscore = test-only) pra que
- * `tests/spread-map.test.ts` possa cobrir os 5 estados sem mockar SQLite.
- *
- * @deprecated Use _computeBounds + HeatmapLayer instead. Will be removed in next release.
- */
-export function _buildArcs(
-  origin: GeoPoint | null,
-  destinations: { point: GeoPoint; createdAt: number }[],
-): SpreadArc[] {
-  if (origin) {
-    return destinations.map((d) => ({
-      origin: [origin.lng, origin.lat],
-      destination: [d.point.lng, d.point.lat],
-      createdAt: d.createdAt,
-    }))
-  }
-  if (destinations.length < 2) return []
-  const fallbackOrigin = destinations[0]!.point
-  return destinations.slice(1).map((d) => ({
-    origin: [fallbackOrigin.lng, fallbackOrigin.lat],
-    destination: [d.point.lng, d.point.lat],
-    createdAt: d.createdAt,
-  }))
-}

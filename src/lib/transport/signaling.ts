@@ -2,10 +2,11 @@
  * SignalingChannel — abstração de canal de signaling pro WebRTC.
  *
  * Implementações:
- *   - `webrtc-signaling-mock.ts` (Fase 6.1a) — BroadcastChannel,
+ *   - `webrtc-signaling-mock.ts` (Fase 6.1a ✅) — BroadcastChannel,
  *     same-origin only. Pra dev/PoC com 2 abas no mesmo browser.
- *   - `webrtc-signaling-nostr.ts` (Fase 6.1b, futura) — Nostr DM
- *     cifrado (NIP-44 + kind 1059). Pra peers em redes diferentes.
+ *   - `webrtc-signaling-nostr.ts` (Fase 6.1b ✅, shipped 0.6.0-alpha.1) —
+ *     Nostr DM cifrado (NIP-44 + kind 1059). Pra peers em redes
+ *     diferentes. Opt-in via flag `VITE_USE_NOSTR_SIGNALING=1`.
  *
  * `webrtc.ts` recebe a impl via DI. Trocar mock ↔ nostr é flag de
  * configuração; nenhuma mudança no resto do código de transport.

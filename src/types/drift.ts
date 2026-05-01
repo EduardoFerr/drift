@@ -150,29 +150,15 @@ export interface FeedOptions {
 
 // ─── Mapa ────────────────────────────────────────────────────────────
 
-export interface SpreadArc {
-  origin: [number, number] // [lng, lat]
-  destination: [number, number]
-  createdAt: number
-}
-
 export interface SpreadMapData {
   /**
    * Origem do post — `posts.location` do autor original. `null` se o
-   * autor não publicou com location (manifesto §28 — opt-in). Quando
-   * presente, é a fonte de todos os arcos; senão a UI faz fallback pro
-   * primeiro spread (legacy).
+   * autor não publicou com location (manifesto §28 — opt-in). Renderizada
+   * com destaque visual (ScatterplotLayer amber raio maior).
    */
   origin: GeoPoint | null
   /** Cada spread com location, em ordem cronológica de espalhamento. */
   destinations: { point: GeoPoint; createdAt: number }[]
-  /**
-   * Arcos prontos pro Deck.gl ArcLayer. Derivados de origin+destinations
-   * por `_buildArcs` (ver useSpreadMap.ts). Vazio quando não dá pra
-   * desenhar arco (sem origem nem >=2 destinos).
-   */
-  // @deprecated — heatmap visualization replaces arcs (since 0.6.0). Mantém por 1 release pra retrocompat.
-  arcs: SpreadArc[]
   totalSpreads: number
   countries: string[]
   firstSpread: SpreadRecord | null

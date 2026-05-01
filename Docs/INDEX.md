@@ -32,7 +32,7 @@ ou **Por persona** pra pular direto.
 - **[webrtc-seeding.md](webrtc-seeding.md)** — visão geral WebRTC + Proof of Interest (TBD)
 - **[webrtc-6.1a-plan.md](webrtc-6.1a-plan.md)** — esqueleto `transport/webrtc.ts` + signaling mock (entregue; 6.1a-C core shipped 2026-04-29)
 - **[webrtc-6.1a-c-checklist.md](webrtc-6.1a-c-checklist.md)** — checklist de aceite 6.1a-C (Barney, 2026-04-29) — peer review + smoke test e2e
-- **[webrtc-6.1b-plan.md](webrtc-6.1b-plan.md)** — signaling real via Nostr DM (NIP-44 + kind 1059)
+- **[webrtc-6.1b-plan.md](webrtc-6.1b-plan.md)** ✅ — signaling real via Nostr DM (NIP-44 + kind 1059) — shipped `0.6.0-alpha.1`
 - **[webrtc-6.2-plan.md](webrtc-6.2-plan.md)** — peer registry SQLite + path diversity scoring + orchestrator multi-transport (em planejamento)
 - **[webrtc-threats.md](webrtc-threats.md)** — threat model WebRTC, 23+ ameaças classificadas (v1.0, 2026-04-28)
 
@@ -117,7 +117,7 @@ ou **Por persona** pra pular direto.
 | [fdroid.md](fdroid.md) | Sub-fase 7.2, pendente. Submissão ao catálogo F-Droid OSS. Lista pré-requisitos, conflitos identificados (`VITE_PHOTODNA_KEY` no `.env.example`, host Vercel = AntiFeature `NonFreeNet`), esboço `metadata/com.driftnet.client.yml`. Bloqueador atual: repo precisa ser público. |
 | [webrtc-seeding.md](webrtc-seeding.md) | Visão geral: dispositivos Drift como relays Nostr efêmeros via WebRTC, ativados por interesse contextual (abrir mapa de spread → vira seeder). Compatibilidade com manifesto detalhada (fortalece §12/§16/§15/§20; tensões com invariante #14 e como resolver via NIP-65 estendido + DM NIP-44). |
 | [webrtc-6.1a-plan.md](webrtc-6.1a-plan.md) | Plano da sub-fase 6.1a: especificação `Transport`, esqueleto `webrtc.ts`, BroadcastChannel mock signaling, armadilhas de teste. Status: entregue (matchFilter + signaling-mock shipped 2026-04-28). |
-| [webrtc-6.1b-plan.md](webrtc-6.1b-plan.md) | Plano sub-fase 6.1b: substitui mock por signaling real via Nostr DM cifrado (NIP-44 v2 + kind 1059 gift wrap minimal, sem NIP-17 seal). Zero deps novas (nostr-tools 2.7.0 já tem `nip44`). Discovery PoI-only. Peer review concluído. |
+| [webrtc-6.1b-plan.md](webrtc-6.1b-plan.md) | Sub-fase 6.1b ✅ entregue em `0.6.0-alpha.1`: signaling via Nostr DM cifrado (NIP-44 v2 + kind 1059 gift wrap minimal, sem NIP-17 seal). Zero deps novas (nostr-tools 2.7.0 já tem `nip44`). Discovery PoI-only. Doc mantido como referência histórica do plano executado. |
 | [webrtc-6.2-plan.md](webrtc-6.2-plan.md) | Plano sub-fase 6.2 (Ted, 2026-04-28): `peers_known` SQLite (migration v7) + `scorePeer()` puro (latência+fail+ASN/country diversity) + `transport/orchestrator.ts` que substitui chamadas diretas a `wssTransport` em `sync.ts` + caps (MAX_PEERS=32, 1 conn/pubkey, 100 msg/s). Endereça T-WRTC-006/007/008/010/017. |
 | [webrtc-threats.md](webrtc-threats.md) | Threat model dedicado WebRTC v1.0 (Barney, 2026-04-28). 23+ ameaças classificadas em 5 categorias (Peer / Rede / Signaling / Discovery / Recursos), cada uma com probabilidade, mitigação por fase, status (Aceito / Aberto / Crítico). Complementa §36 da arquitetura. |
 | [research-backlog.md](research-backlog.md) | Itens externos pendentes enquanto WebFetch está bloqueado. Cada item: pergunta + por quê bloqueia + workaround interim + fonte ideal. Mantida pela Robin. ~25 itens organizados por fase. |
@@ -133,7 +133,7 @@ ou **Por persona** pra pular direto.
 - 6.1a-B `webrtc-signaling-mock` BroadcastChannel
 - threat model WebRTC ([webrtc-threats.md](webrtc-threats.md)) — 23 ameaças (Barney)
 - research backlog ([research-backlog.md](research-backlog.md))
-- peer review do plano 6.1b
+- 6.1b shipped em `0.6.0-alpha.1` (CHANGELOG)
 - plano 6.2 ([webrtc-6.2-plan.md](webrtc-6.2-plan.md)) — Ted
 - fix GPS warm-up + indicador (captura antes de `createPost`/`spreadPost`)
 
