@@ -42,6 +42,14 @@ tor-rtcompat = { version = "0.41", optional = true, default-features = false, fe
 tokio = { version = "1", optional = true, features = ["full"] }
 anyhow = { version = "1", optional = true }
 
+# Tor WS bridge (etapa 3) — webview Tauri ignora system proxy
+# programatico, entao implementamos WebSocket TS-side que invoca IPC
+# commands; estes commands usam tokio-tungstenite rodando *dentro* do
+# arti DataStream (TLS + WS frames sobre circuit Tor).
+tokio-tungstenite = { version = "0.24", optional = true, default-features = false, features = ["rustls-tls-webpki-roots", "connect"] }
+futures-util = { version = "0.3", optional = true, default-features = false, features = ["sink"] }
+url = { version = "2", optional = true }
+
 [features]
 # This feature is used for production builds or when a dev server is not specified, DO NOT REMOVE!!
 custom-protocol = ["tauri/custom-protocol"]
@@ -54,4 +62,4 @@ custom-protocol = ["tauri/custom-protocol"]
 #       → produz binário Tauri com Tor real embarcado
 # Wire-up: tor.rs usa #[cfg(feature = "arti")] pra trocar stub→real.
 # Documentação: Docs/webrtc-6.4-plan.md §"arti integration".
-arti = ["dep:arti-client", "dep:tor-rtcompat", "dep:tokio", "dep:anyhow"]
+arti = ["dep:arti-client", "dep:tor-rtcompat", "dep:tokio", "dep:anyhow", "dep:tokio-tungstenite", "dep:futures-util", "dep:url"]

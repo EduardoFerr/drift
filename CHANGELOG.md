@@ -4,6 +4,85 @@ All notable changes to the Drift client. Uses [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+### Added (Fase 6.4 — Tor real funcional, etapas 1-4)
+
+🟢 **Sessão dedicada arti shipped** — sai do scaffold pra Tor funcional
+quando `cargo tauri build --features arti` é usado. Cinco etapas
+sequenciais conforme `Docs/webrtc-6.4-plan.md §7`:
+
+- **Etapa 1 — `src-tauri/src/socks5_proxy.rs`** (commit `7f0bad0`):
+  listener SOCKS5 próprio em ~250 LOC traduzindo CONNECT requests pra
+  circuits Tor via `arti-client`. Subset RFC 1928 (NO_AUTH, ATYP DOMAIN/
+  IPv4, command CONNECT). bind `127.0.0.1:0` (porta dinâmica), bridge
+  bidirecional via `tokio::join!` de `tokio::io::copy`. Failures por
+  conexão não derrubam listener; accept errors fazem sleep 100ms anti
+  tight-loop. Resolução DNS dentro do circuit (sem leak).
+
+- **Etapa 2 — `TorStatus.proxyAddr`**: `tor_connect` agora dispara
+  `start_socks5_listener` após bootstrap arti e popula
+  `proxy_addr: Some("127.0.0.1:<porta>")`. TS-side
+  `src/lib/transport/tor.ts` ganha `getTorProxyAddr(): Promise<string|null>`.
+
+- **Etapa 3a — `src-tauri/src/tor_ws.rs`** (~280 LOC): bridge WS sobre
+  Tor via 3 IPC commands (`tor_ws_open/send/close`) usando `tokio-
+  tungstenite 0.24` rodando *dentro* do `arti DataStream`. Push
+  bidirecional via Tauri events (`tor_ws::msg`, `tor_ws::close`,
+  `tor_ws::error`). Handle u64 monotônico via `AtomicU64`, map
+  global `OnceLock<Mutex<HashMap<u64, mpsc::Sender>>>`. TLS via
+  `rustls-tls-webpki-roots` (sem deps C). Necessário porque webview
+  Tauri ignora system proxy programático — não dá pra usar SOCKS5
+  do listener via `WebSocket` nativo do JS.
+
+- **Etapa 3b — `src/lib/transport/torWebSocket.ts`** (~200 LOC):
+  classe `TorWebSocket` que mimetiza API mínima do `WebSocket` global
+  exigida por nostr-tools (constructor, `url`/`readyState`/onX
+  callbacks, send/close). Internamente invoca os IPC commands +
+  `listen()` nos eventos Tauri. Buffer de send pré-OPEN preserva
+  ordem FIFO. `installTorWebSocketImpl()` injeta via
+  `useWebSocketImplementation` do `nostr-tools/pool` — efeito global,
+  o `wssTransport` existente passa a rotear via Tor sem mudança.
+
+- **Etapa 4 — wire-up em `src/lib/bootstrap.ts`**: quando `isTauri()`
+  e `prefs.network_mode` é `'tor' | 'onion-only'`, chama `torConnect`
+  e instala TorWebSocket impl antes de registrar `wssTransport` no
+  orchestrator. Falha no bootstrap Tor degrada pra clearnet com warn
+  (não trava o boot — manifesto §15 cumprido em sucesso, opção do
+  user em falha).
+
+- **Cargo deps add**: `tokio-tungstenite 0.24` (rustls-tls-webpki-roots
+  + connect features), `futures-util 0.3` (sink), `url 2`. Todos
+  optional + listados em `[features] arti = [...]`.
+
+- **`src-tauri/src/lib.rs`**: `generate_handler!` agora cfg-gated.
+  Default mode (sem `--features arti`): 3 commands (tor_connect/
+  disconnect/status). arti mode: + 3 commands tor_ws_*.
+
+**Validação**:
+- `cargo check`                  → 11.45s (lock 5 packages novos)
+- `cargo check --features arti`  → 34.49s (compile workspace tor + ws)
+- `npx tsc --noEmit`             → exit 0
+- `npm run test`                 → 399/399 verdes (sem regressão)
+
+**Pendente** (não bloqueador): smoke test e2e exige Rust toolchain do
+user; CI `cargo check --features arti` job; live circuit count;
+graceful listener shutdown em `tor_disconnect`. Steps em
+`Docs/webrtc-6.4-plan.md §7`.
+
+### Fixed (CI)
+
+- **`Dockerfile.reproducible` Rust image tag**: `rust:1.83.0-bookworm-slim`
+  não existe no Docker Hub — convenção rust é `slim-bookworm` (slim
+  primeiro), enquanto node usa `bookworm-slim`. Quebrou release.yml
+  no CI run 25226715868. Fix: novo ARG `RUST_DEBIAN_VARIANT=slim-bookworm`
+  específico pro rust image; node e debian seguem `${DEBIAN_VERSION}=
+  bookworm-slim`.
+
+**Manifesto §15** (anti-censura por país) — **cumprido inteiro** quando
+binário built `--features arti` rodando: WSS pros relays Nostr roteia
+via circuit Tor, IP do user invisível pro relay. §17 (auditável,
+~750 LOC novos sem deps exóticas), §28 (DNS dentro do circuit, sem
+leak local).
+
 ## [0.6.0-alpha.2] — 2026-05-01
 
 ### Added (Fase 6.4 — arti dep validation + bootstrap skeleton)

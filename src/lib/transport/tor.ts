@@ -44,6 +44,21 @@ export interface TorStatusIPC {
   circuitCount: number
   /** Última mensagem de erro do daemon, se houver. */
   lastError: string | null
+  /** Endereço do listener SOCKS5 local (`127.0.0.1:<porta>`) quando
+   *  state === 'connected'. `null` em qualquer outro estado.
+   *  Etapa 1 da Fase 6.4 (commit 7f0bad0). Bridge WSS (etapa 3)
+   *  abre TCP nesse endereço pra rotear via Tor. */
+  proxyAddr: string | null
+}
+
+/** Helper de conveniência: retorna o `proxyAddr` se Tor está conectado,
+ *  `null` caso contrário (qualquer outro state). Útil pra callers que
+ *  só querem saber "o proxy está pronto?" sem decompor o status inteiro.
+ *
+ *  Em PWA browser: throws via `torStatus()` antes de chegar aqui. */
+export async function getTorProxyAddr(): Promise<string | null> {
+  const s = await torStatus()
+  return s.state === 'connected' ? s.proxyAddr : null
 }
 
 /** Detecta runtime Tauri vs browser puro.

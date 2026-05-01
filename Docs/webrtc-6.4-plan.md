@@ -216,11 +216,45 @@ Default trait segue válido — `lib.rs::run()` continua chamando
 
 ## 6. Próximos passos
 
-- [x] ~~Validar compatibilidade `arti-client` + Tauri 2 + tokio~~ (2026-05-01)
-- [x] ~~Skeleton de bootstrap real em `tor.rs` atrás de feature flag~~ (2026-05-01)
-- [ ] **SOCKS5 listener próprio (estratégia b §4.3)** — bloqueador para 6.4 cumprir manifesto §15.
-- [ ] Bridge TS-side: custom IPC pra WSS via Tor (contorna webview que ignora proxy programático)
-- [ ] Wire-up `bootstrap.ts:registerTransport(torTransport)` condicional ao `prefs.network_mode`
-- [ ] Smoke test e2e com PC + Tor real (`cargo build --release --features arti`)
-- [ ] CI: adicionar job `cargo check --features arti` pra detectar drift quando arti bumpar
+- [x] ~~Validar compatibilidade `arti-client` + Tauri 2 + tokio~~ (2026-05-01, commit 22d3e11)
+- [x] ~~Skeleton de bootstrap real em `tor.rs` atrás de feature flag~~ (2026-05-01, commit 22d3e11)
+- [x] ~~SOCKS5 listener próprio (~250 LOC `socks5_proxy.rs`)~~ (2026-05-01, commit 7f0bad0)
+- [x] ~~Bridge TS-side: custom IPC `tor_ws_open/send/close` + `TorWebSocket` injetado via `useWebSocketImplementation`~~ (2026-05-01, etapas 2-3)
+- [x] ~~Wire-up `bootstrap.ts` condicional ao `prefs.network_mode`~~ (2026-05-01, etapa 4)
+- [ ] **Smoke test e2e** — exige user com Rust toolchain executando `cargo tauri build --features arti`. Steps em §7.
+- [ ] CI: adicionar job `cargo check --features arti` pra detectar drift quando arti bumpar (~30min)
 - [ ] Capacitor/Android: integração Orbot (frente separada — nada disto cobre Android)
+- [ ] Live circuit count via `TorClient::circmgr` (hoje placeholder=1)
+- [ ] Graceful shutdown do SOCKS5 listener no `tor_disconnect` (hoje vive até processo morrer)
+- [ ] Cache `arti` em app data folder do Tauri (hoje usa `$HOME/.arti` default)
+
+## 7. Smoke test e2e — manual
+
+Pré-req: Rust toolchain instalada (`rustup`, `cargo`, MSVC build tools no Windows).
+
+```bash
+# 1. build PWA (necessário pro Tauri embarcar)
+npm run build
+
+# 2. build Tauri com feature arti (10-15min primeira vez — compila ~100 crates)
+cd src-tauri
+cargo tauri build --features arti
+
+# 3. roda binário gerado
+# Windows: src-tauri/target/release/drift.exe
+# Linux:   src-tauri/target/release/drift
+# macOS:   src-tauri/target/release/bundle/macos/Drift.app
+```
+
+Checklist em runtime:
+
+- [ ] App abre normalmente (clearnet)
+- [ ] Settings → modo de rede → seleciona `🧅 tor` (não-disabled em Tauri!)
+- [ ] Recarrega aba → boot mostra "[bootstrap] Tor conectado · proxy=127.0.0.1:XXXXX"
+  no console (DevTools auto-aberta em dev)
+- [ ] Feed carrega normalmente — eventos chegam via Tor (pode levar 5-30s primeiro frame)
+- [ ] `tcpdump` (ou Wireshark) mostra tráfego apenas pra guards Tor (ips
+      do consenso, não pros relays Nostr diretamente)
+- [ ] `torStatus()` no console retorna `state: 'connected'`, `circuitCount: 1`,
+      `proxyAddr: '127.0.0.1:XXXXX'`
+- [ ] `tor_disconnect` libera handles (reconfigurar pra clearnet + reload funciona)

@@ -16,16 +16,37 @@ mod tor;
 #[cfg(feature = "arti")]
 mod socks5_proxy;
 
+#[cfg(feature = "arti")]
+mod tor_ws;
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    // Wire de IPC commands: stub IPC tor (sempre presente) + bridge
+    // WS (apenas com feature arti). Tauri valida em compile-time que
+    // todos os symbols passados ao macro existem; usar cfg-gated
+    // generate_handler! pra alternar conjuntos.
+    let builder = tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
-        .manage(tor::TorState::default())
-        .invoke_handler(tauri::generate_handler![
-            tor::tor_connect,
-            tor::tor_disconnect,
-            tor::tor_status,
-        ])
+        .manage(tor::TorState::default());
+
+    #[cfg(not(feature = "arti"))]
+    let builder = builder.invoke_handler(tauri::generate_handler![
+        tor::tor_connect,
+        tor::tor_disconnect,
+        tor::tor_status,
+    ]);
+
+    #[cfg(feature = "arti")]
+    let builder = builder.invoke_handler(tauri::generate_handler![
+        tor::tor_connect,
+        tor::tor_disconnect,
+        tor::tor_status,
+        tor_ws::tor_ws_open,
+        tor_ws::tor_ws_send,
+        tor_ws::tor_ws_close,
+    ]);
+
+    builder
         .setup(|_app| {
             #[cfg(debug_assertions)]
             {

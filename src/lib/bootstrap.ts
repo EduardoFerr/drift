@@ -31,6 +31,9 @@ import { evictOldPosts } from './cache'
 import { wssTransport } from './transport/wss'
 import { webrtcTransport } from './transport/webrtc'
 import { registerTransport } from './transport/orchestrator'
+import { isTauri, torConnect } from './transport/tor'
+import { installTorWebSocketImpl } from './transport/torWebSocket'
+import { getPrefs } from './prefs'
 
 /** A cada 6h corremos eviction. Manifesto §16: cache local respeita
  *  spreads/pinned. Eviction é decisão local de gestão de espaço, não
@@ -167,27 +170,55 @@ async function doBootstrap(): Promise<void> {
     await loadFollows()
 
     setBoot((p) => ({ ...p, step: 'sync' }))
+
+    // ─── Modo Tor (Fase 6.4 etapa 4) ──────────────────────────────
+    //
+    // Quando user selecionou `tor` ou `onion-only` E estamos em runtime
+    // Tauri (PWA não tem arti), bootamos o cliente Tor antes de tudo
+    // que abre WebSocket. Em sucesso, instalamos `TorWebSocket` como
+    // implementação global do nostr-tools/pool — daí em diante, o
+    // `wssTransport` (que já está abaixo) abre WebSockets via IPC →
+    // tokio-tungstenite → arti circuit. Manifesto §15.
+    //
+    // Em falha (bootstrap failed, listener falhou): logamos e seguimos
+    // em modo `clearnet` degradado — feed funciona, mas IP do user vaza
+    // pro relay. UI alerta via banner R6 quando aplicável (onion-only
+    // sem onion). Decisão: NÃO bloquear o boot em modo tor com falha,
+    // pra evitar app travado em condições de rede ruins; quem queria
+    // anonimato sabe que precisa retry / reportar.
+    const networkMode = getPrefs().network_mode
+    if (isTauri() && (networkMode === 'tor' || networkMode === 'onion-only')) {
+      try {
+        const torStatus = await torConnect()
+        if (torStatus.state === 'connected') {
+          await installTorWebSocketImpl()
+          console.log(
+            `[bootstrap] Tor conectado · proxy=${torStatus.proxyAddr} · circuits=${torStatus.circuitCount}`,
+          )
+        } else {
+          console.warn(
+            `[bootstrap] Tor não conectou (state=${torStatus.state}, err=${torStatus.lastError ?? 'none'}) — degradando pra clearnet nesta sessão`,
+          )
+        }
+      } catch (err) {
+        // Em modo `arti` feature OFF, `tor_connect` retorna erro stub;
+        // capturamos e seguimos em clearnet sem ruído de UX.
+        console.warn('[bootstrap] tor_connect lançou:', err)
+      }
+    }
+
     // Fase 6.2-E: registra transportes ativos no orchestrator antes do
     // startSync. WSS é o transporte primário; WebRTC ativa peer-to-peer
     // quando há peers conectados (default mock signaling = só entre abas
     // mesma origin; Nostr signaling via flag `VITE_USE_NOSTR_SIGNALING=1`
     // pra peers em redes diferentes). Manifesto §12 (múltiplos transportes).
+    //
+    // Quando `network_mode` é tor/onion-only e arti conectou acima, o
+    // `wssTransport` abaixo automaticamente roteia via Tor (TorWebSocket
+    // já foi instalado no SimplePool global do nostr-tools). NÃO registramos
+    // `torTransport` separado — seria duplicação ruidosa pra orchestrator.
     registerTransport(wssTransport, { weight: 10 })
     registerTransport(webrtcTransport, { weight: 5 })
-    // TODO(Fase 6.4 — arti integration): quando `src-tauri/src/tor.rs::tor_connect`
-    // sair do stub e expor SOCKS5 local real, registrar `torTransport` aqui
-    // condicional ao prefs.network_mode. Esqueleto:
-    //
-    //   import { torTransport, torConnect } from './transport/tor'
-    //   const mode = getPrefs().network_mode
-    //   if (mode === 'tor' || mode === 'onion-only') {
-    //     await torConnect()
-    //     registerTransport(torTransport, { weight: 8 })
-    //   }
-    //
-    // Hoje NÃO registramos: `tor_connect()` retorna erro stub, o que faria
-    // o orchestrator acumular failures permanentes em modo tor. UI já gating
-    // o picker pra disabled em PWA browser. Manifesto §15.
 
     await startSync()
 
