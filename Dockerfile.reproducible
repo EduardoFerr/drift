@@ -8,7 +8,10 @@
 # Locale C + TZ UTC eliminam locale-dependent ordering.
 
 ARG NODE_VERSION=20.18.1
-ARG RUST_VERSION=1.83.0
+ARG RUST_VERSION=1.85.0
+# Bump 1.83 → 1.85 (2026-05-01): deps transitivas do arti workspace
+# (serde_spanned 1.1+, toml 0.9+) exigem edition2024, estabilizada em
+# Rust 1.85 (fev/2026). CI run 25235670136 quebrou em 1.83.0.
 ARG DEBIAN_VERSION=bookworm-slim
 # Rust e node usam ordens distintas pro slim+distro no Docker Hub:
 #   node:VERSION-bookworm-slim          (variant primeiro)
