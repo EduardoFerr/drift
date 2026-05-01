@@ -32,7 +32,23 @@ import type { Filter, Transport } from './index'
 import type { SignedEvent } from '../../types/nostr'
 
 const SIGNALING_KIND = 1059
-const REPLAY_WINDOW_MS = 60_000
+/**
+ * Tolerância pra eventos no FUTURO (clock skew). Eventos com `created_at`
+ * mais que isso à frente do `now` local são suspeitos (relay com clock
+ * errado ou atacante tentando ganhar prioridade) e dropados.
+ *
+ * Eventos no PASSADO NÃO são limitados aqui — manifesto §16 (store-and-forward
+ * via retention do relay). Se A publica offer enquanto B está offline, B
+ * recebe ao bootar mesmo que sejam horas depois. Anti-replay genuíno é
+ * coberto pela LRU de `event.id`.
+ */
+const FUTURE_SKEW_TOLERANCE_MS = 60_000
+/**
+ * Janela do `since` no subscribe inicial. Cobre store-and-forward —
+ * eventos publicados nas últimas 24h ainda chegam a peers que bootam tarde.
+ * 24h é meio-termo: relay típico tem retention 1-7d; relay efêmero tem ~1h.
+ */
+const SUBSCRIBE_SINCE_WINDOW_MS = 24 * 60 * 60 * 1_000
 const DEDUP_TTL_MS = 5 * 60_000
 const RATE_LIMIT_PER_SENDER = 10
 const RATE_WINDOW_MS = 60_000
@@ -75,7 +91,9 @@ export function nostrSignalingChannel(opts: NostrSignalingOpts): SignalingChanne
   const filter: Filter = {
     kinds: [SIGNALING_KIND],
     '#p': [myNpub],
-    since: Math.floor(now() / 1000) - Math.floor(REPLAY_WINDOW_MS / 1000),
+    // Pega últimas 24h pra cobrir store-and-forward — peers que estavam
+    // offline ainda recebem offers que ficaram nos relays.
+    since: Math.floor(now() / 1000) - Math.floor(SUBSCRIBE_SINCE_WINDOW_MS / 1000),
   }
 
   const unsub = opts.transport.subscribe(filter, {
@@ -91,9 +109,12 @@ export function nostrSignalingChannel(opts: NostrSignalingOpts): SignalingChanne
   function handleEvent(event: SignedEvent): void {
     const tNow = now()
 
-    // 1. Replay window — eventos muito antigos OU futuros são suspeitos.
+    // 1. Future skew — eventos com `created_at` muito à frente do `now`
+    //    local são suspeitos (clock errado ou atacante). Eventos no PASSADO
+    //    NÃO são dropados aqui (store-and-forward via retention do relay,
+    //    manifesto §16). Anti-replay genuíno é coberto pela LRU abaixo.
     const eventTsMs = event.created_at * 1000
-    if (Math.abs(tNow - eventTsMs) > REPLAY_WINDOW_MS) return
+    if (eventTsMs - tNow > FUTURE_SKEW_TOLERANCE_MS) return
 
     // 2. Dedup por event.id (LRU + TTL).
     pruneDedup(tNow)

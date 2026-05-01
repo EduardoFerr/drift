@@ -355,7 +355,10 @@ describe('nostrSignalingChannel — drops defensivos', () => {
     expect(received).toHaveLength(0)
   })
 
-  it('drop em replay window (event 2min atrás)', async () => {
+  it('store-and-forward: evento de 2h atrás é DISPATCHED (retention do relay)', async () => {
+    // Cenário real: A publica offer pra B mas B está offline; relay
+    // armazena o evento; B boota 2h depois e ainda recebe — manifesto §16.
+    // Anti-replay genuíno fica com a LRU de event.id (testada abaixo).
     const alice = pair()
     const bob = pair()
     const relay = fakeRelay()
@@ -372,13 +375,13 @@ describe('nostrSignalingChannel — drops defensivos', () => {
     const received: SignalingMessage[] = []
     chB.onMessage((m) => received.push(m))
 
-    const oldTs = Math.floor(Date.now() / 1000) - 120 // 2 min atrás
+    const oldTs = Math.floor(Date.now() / 1000) - 2 * 60 * 60 // 2h atrás
     const msg: OfferMsg = {
       type: 'offer',
       from: alice.pk,
       to: bob.pk,
       ts: oldTs * 1000,
-      sdp: 'old',
+      sdp: 'stored-offer',
     }
     const ct = encryptDM(JSON.stringify(msg), bob.pk, alice.sk)
     const ev = finalizeEvent(
@@ -387,6 +390,48 @@ describe('nostrSignalingChannel — drops defensivos', () => {
         tags: [['p', bob.pk]],
         content: ct,
         created_at: oldTs,
+      },
+      alice.sk,
+    )
+    relay.deliver(ev)
+    await flush()
+
+    expect(received).toHaveLength(1)
+    expect(received[0]).toMatchObject({ type: 'offer', sdp: 'stored-offer' })
+  })
+
+  it('drop em evento futuro (>60s à frente — clock skew suspeito)', async () => {
+    const alice = pair()
+    const bob = pair()
+    const relay = fakeRelay()
+    const tB = fakeTransport(relay)
+
+    const chB = nostrSignalingChannel({
+      myNpub: bob.pk,
+      myNsecBytes: bob.sk,
+      transport: tB,
+      signEvent: makeSigner(bob.sk),
+    })
+    channels.push(chB)
+
+    const received: SignalingMessage[] = []
+    chB.onMessage((m) => received.push(m))
+
+    const futureTs = Math.floor(Date.now() / 1000) + 5 * 60 // 5min à frente
+    const msg: OfferMsg = {
+      type: 'offer',
+      from: alice.pk,
+      to: bob.pk,
+      ts: futureTs * 1000,
+      sdp: 'from-the-future',
+    }
+    const ct = encryptDM(JSON.stringify(msg), bob.pk, alice.sk)
+    const ev = finalizeEvent(
+      {
+        kind: 1059,
+        tags: [['p', bob.pk]],
+        content: ct,
+        created_at: futureTs,
       },
       alice.sk,
     )

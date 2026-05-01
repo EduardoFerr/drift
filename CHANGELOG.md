@@ -4,6 +4,13 @@ All notable changes to the Drift client. Uses [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+### Fixed (signaling Nostr — follow-up de 0.6.0-alpha.1)
+
+- **Store-and-forward signaling não funcionava** (`webrtc-signaling-nostr.ts:78,96`, peer review do próprio release). O `replay window` usava `Math.abs(tNow - eventTsMs) > 60s` (simétrico) — droppava eventos legítimos do passado também. Combinado com `subscribe.since: now-60s`, peers que bootavam mais de 1 minuto após A publicar offer perdiam todos os signals acumulados nos relays. Quebrava o caso de uso "A publica offer enquanto B offline; B recebe ao bootar" documentado em `webrtc-6.1b-plan.md` §2 e manifesto §16. **Fix**: 
+  - `FUTURE_SKEW_TOLERANCE_MS = 60s` — só drop eventos no futuro suspeito (clock skew); passado é responsabilidade da LRU dedup (anti-replay genuíno).
+  - `SUBSCRIBE_SINCE_WINDOW_MS = 24h` — subscribe pega últimas 24h pra cobrir retention típica de relay (1-7d). 
+  - Test `'replay window 2min atrás'` invertido pra `'store-and-forward 2h atrás dispatched'`. Test novo `'drop em evento futuro >60s'` cobre clock skew real. 304 tests verdes.
+
 ## [0.6.0-alpha.1] — 2026-04-29
 
 Phase 6.1b — **signaling real via Nostr DM cifrado (NIP-44 + kind 1059)**. Mock BroadcastChannel deixa de ser o único caminho — peers em redes diferentes agora se conectam usando relays Nostr existentes como rendezvous, sem inventar diretório paralelo (manifesto §14, invariante #14).
