@@ -78,13 +78,17 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Setup Rust toolchain
-        # Rust 1.85.0 (fev/2026) é a primeira estável com edition2024.
-        # Algumas deps transitivas do arti workspace (serde_spanned 1.1+,
-        # toml 0.9+) já exigem. CI run 25235670136 quebrou em 1.83.0 com
-        # `feature edition2024 is required`.
+        # Rust pinado pra MSRV mais alto exigido pelas deps transitivas
+        # do arti workspace + tauri-build:
+        #   - 1.85: `serde_spanned 1.1+` (edition2024)
+        #   - 1.86: `icu_collections/locale/normalizer/properties 2.2+`
+        #   - 1.88: `darling 0.23+`, `darling_core 0.23+`, `darling_macro 0.23+`
+        # Bump pra 1.88.0 cobre toda a cadeia. Histórico:
+        #   25235670136 quebrou em 1.83 (edition2024)
+        #   25235877663 quebrou em 1.85 (darling/icu MSRV)
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: '1.85.0'
+          toolchain: '1.88.0'
 
       - name: Cache cargo registry + git
         uses: actions/cache@v4
