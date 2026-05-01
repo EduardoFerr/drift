@@ -56,3 +56,59 @@ jobs:
           name: dist
           path: dist
           retention-days: 7
+
+  rust-check:
+    # Sprint 1 do roadmap pós-auditoria: garantir que ninguém commita Rust
+    # quebrado em src-tauri/. O bug do Dockerfile.reproducible (run
+    # 25226715868) escapou exatamente porque CI não tocava cargo. 15 min
+    # de YAML evita classe inteira de regressões.
+    #
+    # Modo default (sem --features arti): rápido (~6s incremental, ~2min
+    # cold). Cobre lib.rs, tor.rs stub, mudanças de Tauri config.
+    #
+    # Modo --features arti: lento (4min cold compile do workspace arti),
+    # roda em job separado opt-in via push pra branch principal apenas
+    # (não em PR, não em fork) pra economizar minutos. Smoke do binário
+    # final fica como sprint manual; aqui só validamos que compila.
+    name: cargo check (default + --features arti)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.83.0'
+
+      - name: Cache cargo registry + git
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src-tauri/target
+          key: cargo-${{ runner.os }}-${{ hashFiles('src-tauri/Cargo.lock') }}
+          restore-keys: |
+            cargo-${{ runner.os }}-
+
+      - name: Install Tauri Linux deps
+        # Tauri pull GTK + WebKitGTK + soup. Necessário mesmo só pra cargo check
+        # porque os crates referenciam APIs C que precisam dos headers.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev \
+            librsvg2-dev libsoup-3.0-dev pkg-config
+
+      - name: cargo check (default — stub IPC, sem arti)
+        working-directory: src-tauri
+        run: cargo check --locked
+
+      - name: cargo check (--features arti)
+        # Roda apenas em push pra main (não em PR de fork) pra economizar
+        # minutos. Cold cache primeira vez ~4min; subsequente ~5s.
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        working-directory: src-tauri
+        run: cargo check --locked --features arti
