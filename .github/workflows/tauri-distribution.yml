@@ -190,7 +190,11 @@ jobs:
           fi
 
       - name: Upload to GitHub Release
-        if: github.event_name == 'push'
+        # Anexa em ambos: push de tag (release.yml está rodando junto) E
+        # workflow_dispatch quando tag foi fornecida (rebuild manual de
+        # release existente). Antes era só push, mas isso quebrava
+        # rebuild manual — assets ficavam só em workflow artifacts.
+        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.tag != '')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.tag.outputs.tag }}
