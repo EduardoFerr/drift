@@ -132,7 +132,21 @@ jobs:
         # ~5min na primeira build, depois cached). Cumpre §15 anti-censura
         # por país. Sem essa flag o build seria PWA-wrapper sem Tor real.
         # `npx tauri` resolve o @tauri-apps/cli local de devDependencies.
-        run: npx tauri build --features arti
+        #
+        # Windows: forçamos --bundles nsis pq MSI/WiX rejeita pre-release
+        # não-numeric (ex: "alpha.3"). Erro observado em 25256043835:
+        #   "optional pre-release identifier in app version must be
+        #    numeric-only and cannot be greater than 65535 for msi target"
+        # NSIS .exe é o instalador Windows mais comum e aceita semver
+        # completo. Quando v0.6.0 stable, podemos reabilitar MSI removendo
+        # o gate (passar all).
+        shell: bash
+        run: |
+          BUNDLES_FLAG=""
+          if [ "${{ matrix.platform }}" = "windows" ]; then
+            BUNDLES_FLAG="--bundles nsis"
+          fi
+          npx tauri build --features arti $BUNDLES_FLAG
         env:
           CI: true
           # TODO Track A.2 (code signing):
