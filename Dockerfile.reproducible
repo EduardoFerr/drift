@@ -56,7 +56,15 @@ ENV NODE_ENV=production \
 WORKDIR /build
 # Copy lockfiles primeiro pra cache otimizado
 COPY package.json package-lock.json ./
-RUN npm ci --no-audit --no-fund --prefer-offline
+# `npm install` em vez de `npm ci` pelo mesmo motivo do ci.yml:37-42 —
+# bug conhecido do npm com entries "extraneous": true em binarios
+# cross-platform do esbuild (vitest 4.x bundled esbuild 0.28 enquanto
+# vite 5.x usa 0.21; npm ci recusa "Missing esbuild@0.28.0 from lock
+# file"). Sacrifica determinismo perfeito de versões transitivas, mas
+# package-lock.json esta versionado e as versões top-level continuam
+# pinadas. Reprodutibilidade bit-identical do bundle final preservada
+# desde que rodando o mesmo Dockerfile (mesma data de cache npm).
+RUN npm install --no-audit --no-fund --prefer-offline
 
 COPY tsconfig*.json vite.config.ts ./
 # Tailwind + PostCSS configs sao runtime deps do build Vite — sem isso,
