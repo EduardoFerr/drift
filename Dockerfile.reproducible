@@ -148,8 +148,11 @@ RUN LC_ALL=C find . -type f -print0 \
     | xargs -0 sha256sum > SHA256SUMS
 
 # ─── Stage 3: Final artifacts ───────────────────────────────────────
-FROM debian:${DEBIAN_VERSION} AS artifacts
-WORKDIR /artifacts
-COPY --from=collector /collect/ ./
-
-CMD ["sh", "-c", "find /artifacts -type f -ls && cat /artifacts/SHA256SUMS"]
+# `scratch` (imagem vazia) garante que `--output type=local,dest=./X`
+# extraia APENAS os arquivos coletados — sem `/bin`, `/etc`, `/usr` do
+# Debian. Antes (FROM debian + WORKDIR /artifacts), o output local
+# exportava o filesystem inteiro do Debian, com /artifacts/SHA256SUMS
+# aparecendo como `./X/artifacts/SHA256SUMS` no host (path errado pro
+# workflow). Com scratch, fica direto `./X/SHA256SUMS`.
+FROM scratch AS artifacts
+COPY --from=collector /collect/ /
