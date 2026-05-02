@@ -14,7 +14,8 @@ ou **Por persona** pra pular direto.
 2. **[manifesto.md](manifesto.md)** — 34 princípios, contrato público (vence sobre arquitetura)
 3. **[drift-arquitetura-v4.md](drift-arquitetura-v4.md)** — fonte da verdade técnica
 4. **[../CLAUDE.md](../CLAUDE.md)** — invariantes operacionais (relevante mesmo sem usar Claude Code)
-5. **[sessions/conformance-conversa-29-04.md](sessions/conformance-conversa-29-04.md)** — última verificação ampla de conformance (abril 2026), útil pra calibrar o que é compromisso vs aspiração — **artefato de sessão, não doc normativa**
+5. **[roadmap-v060.md](roadmap-v060.md)** — roteiro ativo até `v0.6.0` stable (3 tracks A/B/C, vetos firmes do dbdp.txt)
+6. **[sessions/conformance-conversa-29-04.md](sessions/conformance-conversa-29-04.md)** — última verificação ampla de conformance (abril 2026), útil pra calibrar o que é compromisso vs aspiração — **artefato de sessão, não doc normativa**
 
 ---
 
@@ -22,6 +23,7 @@ ou **Por persona** pra pular direto.
 
 ### Manifesto / contrato
 - **[manifesto.md](manifesto.md)** — 34 princípios + roadmap vinculante (v2.2, abril 2026)
+- **[roadmap-v060.md](roadmap-v060.md)** — roteiro ativo `v0.6.0-alpha.3` → `v0.6.0` stable (~37-44h, 3 tracks A/B/C, decisões firmes pós-personas HIMYM sobre `conversa.txt`/`dbdp.txt`)
 
 ### Arquitetura
 - **[drift-arquitetura-v4.md](drift-arquitetura-v4.md)** — modelo, fluxos, decisões técnicas (v5.3, abril 2026)
@@ -38,11 +40,12 @@ ou **Por persona** pra pular direto.
 - **[webrtc-threats.md](webrtc-threats.md)** — threat model WebRTC, 23+ ameaças classificadas (v1.0, 2026-04-28). **Status pós-6.2 desatualizado** (follow-up sprint)
 
 ### Fase 7 (distribuição)
+- **[roadmap-v060.md](roadmap-v060.md)** — Track A.1 (CI matrix Tauri cross-platform, em curso), Track B (Helia + NIP-94 disponibilidade distribuída), Track C (polish pré-stable)
 - **Fase 7.1a** ✅ shipped — PoI auto-discovery via SpreadMap (Lily). `src/lib/seeder.ts:seedFromSpreaders(postId)` consumido por `useSpreadMap`. Manifesto §16 (espalhar = seedear). Detalhes em [../CHANGELOG.md](../CHANGELOG.md) `[Unreleased]` e [archive/webrtc-seeding.md](archive/webrtc-seeding.md) §"Fase 7.1".
 - **[twa.md](twa.md)** — Trusted Web Activity Android (sub-fase 7.1, ✅ antecipada)
 - **[fdroid.md](fdroid.md)** — submissão ao catálogo F-Droid (7.2, pendente)
 - **[fase-6-roadmap.md](fase-6-roadmap.md)** — roadmap honesto da Fase 6 inteira (7 sub-fases, 6.1a/6.1b ✅; 6.2/6.3/6.4/6.5/6.6/6.7 ⏳). §15 (anti-censura) ainda não cumprido até 6.4+6.5+6.6 fecharem.
-- *(futuro: `ipfs-pin.md`, `sneakernet.md`, `run-your-own-relay.md`)*
+- *(futuro: `ipfs-pin.md`, `sneakernet.md`, `run-your-own-relay.md`, `blob-distribution.md` Track B.0)*
 
 ### Operacional
 - **[tauri-setup.md](tauri-setup.md)** — setup do shell desktop Tauri (Fase 6.5 ✅ validado 2026-04-29). Pré-requisitos Rust, `npm run tauri:dev/build`, permissões mínimas (manifesto §17).
