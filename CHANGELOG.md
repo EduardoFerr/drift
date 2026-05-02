@@ -4,19 +4,74 @@ All notable changes to the Drift client. Uses [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+## [0.6.0-alpha.3] — 2026-05-01
+
+**Manifesto §15 (anti-censura por país) deixou de ser asserted e virou
+VERIFIED.** 10 sprints sequenciais do roadmap pós-auditoria, executados
+com 5 personas LLM em paralelo onde fez sentido + Sprint 7 manual com
+captura Wireshark + cross-check Tor onionoo registry.
+
+Highlights:
+- **Sprint 7 — Tor §15 VERIFIED** (smoke e2e): captura confirmou zero
+  TLS direto a relay Nostr em modo `onion-only`, 7 guards Tor
+  publicamente registrados em 7 países distintos (LU/SE/CA/HU/PL/NL/FR),
+  porta 9001 ORPort canônica. Registro em
+  `Docs/sessions/sprint7-smoke-2026-05-01.md`.
+- **Sprint 4 — webrtc.ts split**: 1190 LOC monolíticas → 12 arquivos
+  sob `src/lib/transport/webrtc/`. Coordenado por Ted (arquitetura)
+  + Marshall (contratos) + Lily (manutenibilidade) + Barney (peer review
+  achou 1 regressão real corrigida) + Robin (docs).
+- **Sprint 8 — tests Sybil/spread+bury**: 13 novos testes de regressão
+  pra "última ação vale" + Sybil weighted (descobriram que fix já
+  estava em código desde 2026-04-29; consolidado.md errou ao
+  classificar como pendente).
+- **Sprints 0/0.1 — saneamento docs**: 18 .md raiz → 14 + reorg
+  archive/sessions; persona convention CLAUDE.md; truth-up 99→412 tests,
+  32→34 princípios, epígrafe sincronizada.
+- **Sprint 1 — CI cargo check**: novo job rust-check em `ci.yml`. Cascata
+  MSRV resolvida switch pra `stable` (Dockerfile mantém pin 1.90.0).
+- **Sprint 2 — privacidade leak**: modal reload em troca de
+  `network_mode` + 2 banners novos + docstring magic-at-distance em
+  `wss.ts`.
+- **Sprint 3 — Tor IPC contract**: `#[serde(rename_all = "camelCase")]`
+  nos payloads `tor_ws::*`, drain `pendingSends` no path de erro,
+  warning enablePing.
+- **Sprint 5 — limpeza estrutural**: deletado `torTransport` dead code,
+  `isTauri` movido pra `lib/runtime.ts`, invariante #1 do CLAUDE.md
+  atualizado, doc `Docs/transport-paths.md` novo.
+- **Sprint 6 — `BootState.degradedReasons[]`**: indicador UI ⚠ no
+  Header + banner amber em ContentSettings.
+- **Fix bundled SQLite** (Windows MSVC LNK1181): `libsqlite3-sys` com
+  feature `bundled` compila SQLite from source, evita dep do sistema.
+
+10 commits desde v0.6.0-alpha.2: 0e7d0c0, 2aa2430, fd5f8ef, 3af4ed0,
+9c2f9c2, 276410f, ed940e5, da49d98, 0686420, 0cd2362 + os 5 commits de
+fix CI MSRV (d35240d, eac6acd, b78fd81, f34116d) + smoke test
+(9ea1a6e). 412/412 tests verdes; cargo check stable + Dockerfile 1.90.0
+verdes.
+
 > **Convenção de release** (a partir de 2026-05-01): este projeto distribui
 > múltiplas variantes de cliente — PWA via Vercel + GitHub Release `dist.zip`,
 > Tauri desktop via build local (`cargo tauri build`), TWA Android via
 > Bubblewrap/CI. Algumas features só ficam disponíveis em build específico
-> (ex: Tor real exige `--features arti` no Tauri build). Por isso o
-> `[Unreleased]` é dividido nas duas categorias abaixo. Tag `v*` produz
-> `dist.zip` PWA pública; binários Tauri seguem fluxo separado.
+> (ex: Tor real exige `--features arti` no Tauri build). Por isso este
+> bloco é dividido nas duas categorias abaixo. Tag `v*` produz `dist.zip`
+> PWA pública; binários Tauri seguem fluxo separado (CI matrix multi-OS
+> em build pendente — sub-fase 6.7-extended).
 
-### Shipped (PWA + source-builders — entra no próximo `dist.zip`)
+### Shipped (PWA + source-builders — entra no `dist.zip`)
 
-_Vazio nesta janela — Sprint 0 de saneamento documental em curso._
+Saneamento docs (Sprint 0/0.1), CI cargo check (Sprint 1), tests Sybil
+regressão (Sprint 8), privacidade leak network_mode (Sprint 2), limpeza
+estrutural (Sprint 5), BootState degradedReasons (Sprint 6), webrtc/
+split (Sprint 4) — todos cobertos pelos commits do bloco acima.
 
 ### Shipped (apenas source-builders com `cargo tauri build --features arti`)
+
+Tor real funcional + smoke e2e VERIFIED — Sprints 0.4 etapas 1-4
+(scaffold + bridge IPC) já em alpha.2; Sprint 3 (IPC contract) +
+Sprint 7 (smoke) novos neste release. Bundled SQLite (libsqlite3-sys
+feature) fix LNK1181 Windows.
 
 ### Refactored (PWA + source-builders) — Sprint 4 do roadmap pós-auditoria
 
