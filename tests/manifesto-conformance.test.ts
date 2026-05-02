@@ -191,10 +191,30 @@ describe('Vercel headers (PRIVACY/SECURITY claims operacionais)', () => {
     expect(map.get('cross-origin-embedder-policy')).toBe('require-corp')
   })
 
-  // TODO Barney: vercel.json atualmente NÃO define Content-Security-Policy.
-  // Recomendação está no doc `barney-code-hardening-2026-05-02.md` §e.
-  // Test marcado como todo pra não bloquear CI até decisão humana.
-  it.todo('vercel.json define Content-Security-Policy restritiva')
+  it('vercel.json define Content-Security-Policy restritiva', () => {
+    // Promovido de it.todo após decisão de adicionar CSP (sessão 2026-05-02).
+    // Espelha o test do Tauri (linhas seguintes) — paridade de modelo de
+    // segurança entre runtimes PWA/Vercel e Tauri/WebView.
+    const vercelJson = JSON.parse(readFileSync(join(ROOT, 'vercel.json'), 'utf8')) as {
+      headers?: Array<{ source: string; headers: Array<{ key: string; value: string }> }>
+    }
+    const all = (vercelJson.headers ?? [])
+      .filter((h) => h.source === '/(.*)')
+      .flatMap((h) => h.headers)
+    const csp = all.find((h) => h.key.toLowerCase() === 'content-security-policy')?.value ?? ''
+    expect(csp, 'CSP must be defined for /(.*)').toBeTruthy()
+    expect(csp, "CSP deve ter frame-ancestors 'none' (defesa em profundidade vs X-Frame-Options)").toMatch(
+      /frame-ancestors\s+'none'/,
+    )
+    expect(csp, 'CSP deve definir worker-src (SQLite WASM worker)').toMatch(/worker-src/)
+    expect(csp, "CSP deve definir object-src 'none' (bloqueia plugins legados)").toMatch(/object-src\s+'none'/)
+    expect(csp, "CSP deve definir base-uri 'self' (bloqueia base injection)").toMatch(/base-uri\s+'self'/)
+    // Permitir 'wasm-unsafe-eval' (necessário pra SQLite WASM); proibir 'unsafe-eval' cru.
+    const tokens = csp.split(/\s+/)
+    expect(tokens, "CSP não pode conter 'unsafe-eval' (somente 'wasm-unsafe-eval' é permitido)").not.toContain(
+      "'unsafe-eval'",
+    )
+  })
 })
 
 describe('Tauri CSP (cliente nativo Fase 6)', () => {
