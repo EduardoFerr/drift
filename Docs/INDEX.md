@@ -47,6 +47,13 @@ ou **Por persona** pra pular direto.
 - **[fase-6-roadmap.md](fase-6-roadmap.md)** — roadmap honesto da Fase 6 inteira (7 sub-fases, 6.1a/6.1b ✅; 6.2/6.3/6.4/6.5/6.6/6.7 ⏳). §15 (anti-censura) ainda não cumprido até 6.4+6.5+6.6 fecharem.
 - *(futuro: `ipfs-pin.md`, `sneakernet.md`, `run-your-own-relay.md`, `blob-distribution.md` Track B.0)*
 
+### Postura legal & continuidade (Track C.5)
+- **[../SECURITY.md](../SECURITY.md)** — escopo de vulnerabilidades (código deste repo), sem SLA, patches via PR
+- **[../PRIVACY.md](../PRIVACY.md)** — framing software-not-service; lista terceiros (Vercel, nostr.build, CARTO, relays); LGPD/GDPR/Marco Civil informativo
+- **[../CONTRIBUTING.md](../CONTRIBUTING.md)** — DCO sign-off obrigatório, sem CLA; multi-maintainer como objetivo
+- **[continuity.md](continuity.md)** — reprodução de release sem cooperação de nenhum contributor; mirrors; cenário "repositório derrubado"
+- **[protocol-spec.md](protocol-spec.md)** — kinds 9078–9081 standalone (CC0); protocolo sobrevive ao cliente
+
 ### Operacional
 - **[tauri-setup.md](tauri-setup.md)** — setup do shell desktop Tauri (Fase 6.5 ✅ validado 2026-04-29). Pré-requisitos Rust, `npm run tauri:dev/build`, permissões mínimas (manifesto §17).
 - **[runtime-pwa-vs-tauri.md](runtime-pwa-vs-tauri.md)** — matriz cross-runtime: o que funciona em PWA vs Tauri, onde o código discrimina, quando duplicar vs gating. Follow-up Barney 6.4 R7 (2026-05-01).

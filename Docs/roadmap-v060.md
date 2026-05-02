@@ -79,7 +79,7 @@ quem servir. Ordem natural é A→B.
 | B.3 — UI "servindo N blobs a M peers" (Lily Fase 7.1c) | ⛔ | ~4h |
 | B.4 — Integração PoI seeder + Helia | ⛔ | ~2-4h |
 
-### Track C — Polish pré-stable (~10-13h, prioridade 3)
+### Track C — Polish pré-stable (~17-23h, prioridade 3)
 
 **Por quê terceiro:** features completas; resta hardening + docs.
 
@@ -89,6 +89,36 @@ quem servir. Ordem natural é A→B.
 | C.2 — TWA keystore production setup | ⛔ | manual user (~30min) |
 | C.3 — Backup/restore identidade UI flow | ⛔ | ~4h |
 | C.4 — Lily debt cleanup (10 sprints acumuladas) | ⛔ | ~3-6h |
+| C.5 — Legal hardening (postura "named contributor com papel limitado") | 🟡 parcial | ~7h |
+
+**C.5 entregue (2026-05-02):** README opener "sem dono"; SECURITY.md
+narrow scope; PRIVACY.md framing software-not-service; CONTRIBUTING.md
+com DCO sem CLA; `Docs/continuity.md` (reprodução sem cooperação do
+autor); `Docs/protocol-spec.md` (kinds 9078–9081 standalone — protocolo
+sobrevive ao cliente); manifesto declarado CC0.
+
+**C.5 pendente (gatilho-baseado, não preventivo):**
+
+- Tags GPG-assinadas + pubkey publicada (~30min) — após primeiro
+  co-maintainer ativo
+- Tests executáveis de invariantes #7/#8/#12 do CLAUDE.md (~3h) —
+  oportuno quando próximo refactor tocar `moderation.ts` ou `events.ts`
+- DMCA agent registrado no US Copyright Office ($6) — só após
+  documentar scope ("agente pra código no repositório, não conteúdo
+  na rede")
+- Mirrors automatizados (IPFS pin do source, gitea backup) — após
+  primeiro relato de DMCA/Art.21 ou primeira tentativa de takedown
+- Multi-sig 2-de-3 em tags — após 3+ contributors com merges
+  substantivos
+- SLU brasileira ou estrutura jurídica formal — após primeiro de:
+  10k MAU / primeira notificação extrajudicial / doação recebida
+  >R$5k
+
+**Diferença vs. postura "Mastodon gGmbH" tradicional:** todos os docs
+acima escopam papel, não criam plataforma. Não há ToS (contrato implica
+operador); não há transparency report preventivo (não há dados pra ser
+transparente sobre); não há DPO designado (argumenta-se NÃO ser
+controlador LGPD por arquitetura local-first).
 
 ### Track D — Diferido (sem deadline)
 

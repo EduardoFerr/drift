@@ -3,6 +3,9 @@
 > *"Se eu quero uma rede livre de censura, eu também devo ser incapaz de censurá-la."*
 > — [Manifesto](Docs/manifesto.md)
 
+**Drift é um protocolo + cliente de referência. MIT. Sem dono.**
+Use, modifique, redistribua, hospede, force. O protocolo é o contrato; o cliente é uma de muitas implementações possíveis. Esta distribuição não é canônica — qualquer fork verificável é igualmente legítimo. Se este repositório desaparecer, o protocolo persiste em qualquer cliente Nostr que respeite os kinds 9078–9081.
+
 Rede social descentralizada construída sobre [Nostr](https://github.com/nostr-protocol/nostr). Eventos imutáveis na rede; estado materializado localmente em SQLite WASM; UI React reativa via stores Zustand. Sem servidor proprietário, sem chave mestra, sem algoritmo de feed personalizado.
 
 A interação core são **swipes**: ↑ espalha · ↓ enterra · ← → navega subposts. PostViewer funciona como fila estilo Tinder — espalhar/enterrar avança automaticamente pro próximo post.

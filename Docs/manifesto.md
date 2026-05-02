@@ -2,6 +2,10 @@
 **Versão:** 2.2
 **Data:** Abril 2026
 **Status:** Contrato. O que está aqui o Drift cumpre — em MVP, em V1, ou em V2 conforme indicado, mas cumpre. Não é aspiração; é roadmap vinculante.
+**Licença:** CC0 1.0 Universal (domínio público). Este documento pode ser
+adotado, modificado, redistribuído ou substituído por qualquer fork sem
+permissão. O contrato técnico do Drift não tem dono; é descrição de uma
+intenção compartilhável. Código continua sob MIT (ver [LICENSE](../LICENSE)).
 
 ---
 
