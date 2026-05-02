@@ -160,6 +160,14 @@ ou **Por persona** pra pular direto.
 - plano 6.2 ([archive/webrtc-6.2-plan.md](archive/webrtc-6.2-plan.md)) — Ted
 - fix GPS warm-up + indicador (captura antes de `createPost`/`spreadPost`)
 
+### 2026-05-02 — Análise jurídica Marshall + follow-up código Robin/Barney + Track A.1 shipped
+- **[sessions/legal-analysis-marshall-2026-05-02.md](sessions/legal-analysis-marshall-2026-05-02.md)** (Marshall, 5115 palavras) — análise jurídica profunda 4-layer (protocolo/cliente/distribuição/mantenedor), 7 cenários de stress, roteiro 4-tier; constraint central: "penalidade do Eduardo ≠ morte do Drift"
+- **[sessions/robin-code-followup-2026-05-02.md](sessions/robin-code-followup-2026-05-02.md)** (Robin, 4081 palavras) — mirrors automatizados (script + workflow), DMS criptográfico (tlock+OpenTimestamps), `Docs/maintainership.md` esboçado, watchlist regulatório PL 2630/RG digital, comparativo entidades jurídicas
+- **[sessions/barney-code-hardening-2026-05-02.md](sessions/barney-code-hardening-2026-05-02.md)** (Barney, ~3.6k palavras) — audit claims públicas vs realidade; 3 vulnerabilidades top: SW autoUpdate (chave mestra disfarçada), CSP ausente em vercel.json, nostr.build/CARTO hardcoded
+- `scripts/dms-refresh.sh` (Robin, 188 linhas) — dead-man's switch refresh tlock+OTS, dry-run mode
+- `tests/no-telemetry.test.ts` + `tests/no-master-key.test.ts` + `tests/manifesto-conformance.test.ts` (Barney, 704 linhas, +37 tests passing) — claims públicas viram prova executável; 8 `it.todo` reservados pra refactors propostos
+- Track A.1 ✅ shipped — 9 assets cross-platform (.deb/.AppImage/.dmg/.exe + SHA256SUMS) anexados ao release `v0.6.0-alpha.3` via novo workflow `tauri-distribution.yml`. 3 cascade fixes (cargo cache, --bundles nsis pra Windows, upload condition pra workflow_dispatch)
+
 ### 2026-04-29 — Análise conversa Gemini/ChatGPT + scoring weighted + Fase 6.1a-C
 - [sessions/conversa-29-04-analise.md](sessions/conversa-29-04-analise.md) (Ted) — síntese das propostas externas
 - [sessions/conformance-conversa-29-04.md](sessions/conformance-conversa-29-04.md) (Marshall) — validação contra invariantes/manifesto
