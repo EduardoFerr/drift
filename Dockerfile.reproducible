@@ -46,8 +46,12 @@ ARG SOURCE_DATE_EPOCH=1735689600
 
 # ─── Stage 1: Vite/PWA build ───────────────────────────────────────
 FROM node:${NODE_VERSION}-${DEBIAN_VERSION} AS pwa-builder
-ENV NODE_ENV=production \
-    SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH} \
+# IMPORTANTE: NODE_ENV=production fica fora do ENV inicial — quando
+# definido, npm install IGNORA devDependencies. Como `npm run build`
+# (= tsc + vite build) precisa de TUDO em devDependencies (vite,
+# @vitejs/plugin-react, @types/node, @types/qrcode, vite-plugin-pwa,
+# typescript), setamos NODE_ENV apenas APÓS o build, pra runtime.
+ENV SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH} \
     LC_ALL=C.UTF-8 \
     TZ=UTC \
     npm_config_audit=false \
@@ -64,7 +68,9 @@ COPY package.json package-lock.json ./
 # package-lock.json esta versionado e as versões top-level continuam
 # pinadas. Reprodutibilidade bit-identical do bundle final preservada
 # desde que rodando o mesmo Dockerfile (mesma data de cache npm).
-RUN npm install --no-audit --no-fund --prefer-offline
+# `--include=dev` explicito por garantia (em alguns Node defaults isso
+# muda baseado em outras envs).
+RUN npm install --no-audit --no-fund --prefer-offline --include=dev
 
 COPY tsconfig*.json vite.config.ts ./
 # Tailwind + PostCSS configs sao runtime deps do build Vite — sem isso,
