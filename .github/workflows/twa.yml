@@ -26,6 +26,13 @@ jobs:
       # Necessário pra Bubblewrap
       JAVA_VERSION: '17'
       NODE_VERSION: '22'
+      # Bubblewrap CLI estoura heap default do Node (~1.7GB) ao
+      # processar manifest + gerar Android project. CI run 25254768921
+      # falhou com:
+      #   FATAL ERROR: Reached heap limit Allocation failed -
+      #   JavaScript heap out of memory
+      # 4GB cobre com folga; ubuntu-latest runner tem ~7GB RAM.
+      NODE_OPTIONS: '--max-old-space-size=4096'
 
     steps:
       - uses: actions/checkout@v4
