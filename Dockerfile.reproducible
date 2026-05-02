@@ -118,12 +118,19 @@ COPY --from=pwa-builder /build/package.json ./package.json
 COPY src-tauri/ src-tauri/
 WORKDIR /build/src-tauri
 
-# Build determinístico: --frozen evita resolution; --locked usa Cargo.lock exato.
-# Apenas `cargo build` (sem `tauri build` bundler) — produz binário standalone
-# `target/release/drift`. Bundles .deb/.AppImage exigem `tauri build` que invoca
-# scripts adicionais (cargo-bundle, debianização) e tem matriz de deps de
-# sistema mais ampla — fica pra commit futuro quando smoke validar essa stage.
-RUN cargo build --release --locked --frozen
+# Build determinístico: `--locked` garante uso EXATO das versões pinadas
+# em Cargo.lock (qualquer dessync com Cargo.toml falha o build).
+# `--frozen` foi REMOVIDO — proibe rede E cargo cache no Docker está
+# vazio na primeira execução, falhando com "no matching package named
+# arti-client" (apesar do package estar no lock, source não está em
+# cache local). Determinismo via `--locked` é suficiente — versões
+# fixas; só permitir download é diferente de permitir resolution.
+# Apenas `cargo build` (sem `tauri build` bundler) — produz binário
+# standalone `target/release/drift`. Bundles .deb/.AppImage exigem
+# `tauri build` que invoca scripts adicionais (cargo-bundle,
+# debianização) e tem matriz de deps de sistema mais ampla — fica
+# pra commit futuro quando smoke validar essa stage.
+RUN cargo build --release --locked
 RUN ls -la target/release/
 
 # Stage intermediário: coleta artifacts num único filesystem antes do final.
