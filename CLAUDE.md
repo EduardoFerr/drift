@@ -473,7 +473,7 @@ Aceitar warning de cert auto-assinado uma vez. Cel:
 - ✅ Identidade auto-soberana e portável (§2-3)
 - 🟡 Anonimato por design — sem KYC, multi-identidade ✅; Tor opcional só em Tauri+arti (Fase 6.4) (§4)
 - ✅ Eventos imutáveis assinados (§5-9)
-- 🟡 Múltiplos transportes contra censura — WSS ✅; WebRTC ✅ (Fase 6.1-6.3); Tor 🟡 só em build Tauri com `--features arti` (§12, §15)
+- 🟡 Múltiplos transportes contra censura — WSS ✅; WebRTC ✅ (Fase 6.1-6.3); Tor ✅ em build Tauri com `--features arti` (smoke e2e VERIFIED 2026-05-01, §15) (§12, §15)
 - 🟡 Disponibilidade distribuída — re-broadcast oportunista ✅; PoI WebRTC seed ✅ (Fase 7.1a); IPFS pin ⛔ (Fase 7+) (§16)
 - 🟡 Sem chave mestra ✅; build reproduzível ✅ Linux (Fase 6.7); Windows/macOS pendente (§17)
 - ✅ Bury não pune (§23)

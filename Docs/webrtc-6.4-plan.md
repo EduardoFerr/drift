@@ -221,7 +221,7 @@ Default trait segue válido — `lib.rs::run()` continua chamando
 - [x] ~~SOCKS5 listener próprio (~250 LOC `socks5_proxy.rs`)~~ (2026-05-01, commit 7f0bad0)
 - [x] ~~Bridge TS-side: custom IPC `tor_ws_open/send/close` + `TorWebSocket` injetado via `useWebSocketImplementation`~~ (2026-05-01, etapas 2-3)
 - [x] ~~Wire-up `bootstrap.ts` condicional ao `prefs.network_mode`~~ (2026-05-01, etapa 4)
-- [ ] **Smoke test e2e** — exige user com Rust toolchain executando `cargo tauri build --features arti`. Steps em §7.
+- [x] ~~Smoke test e2e~~ — ✅ **VERIFIED em 2026-05-01** com `cargo tauri build --features arti` no Windows. Captura Wireshark confirmou: zero TLS direto a relay Nostr em modo `onion-only`, 7 guards Tor publicamente registrados (LU/SE/CA/HU/PL/NL/FR), porta 9001 ORPort canônica. Registro em [`../sessions/sprint7-smoke-2026-05-01.md`](../sessions/sprint7-smoke-2026-05-01.md). Manifesto §15 deixou de ser asserted e virou **verified**.
 - [ ] CI: adicionar job `cargo check --features arti` pra detectar drift quando arti bumpar (~30min)
 - [ ] Capacitor/Android: integração Orbot (frente separada — nada disto cobre Android)
 - [ ] Live circuit count via `TorClient::circmgr` (hoje placeholder=1)

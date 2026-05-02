@@ -40,7 +40,7 @@ Regular events imutáveis (faixa 1–9999). Drift roda em qualquer relay Nostr p
 - ✅ **Identidade auto-soberana e portável** (§2-3) — nsec1; trocar de device perde estado local mas nunca identidade
 - 🟡 **Anonimato por design** (§4) — sem KYC ✅, multi-identidade ✅, Tor opcional 🟡 (só em Tauri build com `--features arti`)
 - ✅ **Eventos imutáveis assinados** (§5-9) — Schnorr secp256k1
-- 🟡 **Múltiplos transportes contra censura** (§12, §15) — WSS ✅, WebRTC ✅ (Fase 6.1-6.3), Tor 🟡 (Fase 6.4 etapas 1-4 shipadas pra source-builders; smoke e2e pendente)
+- 🟡 **Múltiplos transportes contra censura** (§12, §15) — WSS ✅, WebRTC ✅ (Fase 6.1-6.3), Tor ✅ em build Tauri com `cargo tauri build --features arti` (smoke e2e **VERIFIED** 2026-05-01: 7 guards Tor confirmados em 7 países, zero TLS direto a relay Nostr); 🟡 binary release CI matrix Linux/macOS/Windows ainda pendente
 - 🟡 **Disponibilidade distribuída** (§16) — re-broadcast oportunista ✅, WebRTC PoI seed ✅ (Fase 7.1a), IPFS pin ⛔ (Fase 7+), sneakernet ⛔ (Fase 7+)
 - 🟡 **Sem chave mestra, sem scan automático embutido**, build reproduzível (§17, §25) — chave mestra ✅; sem scan ✅; build reproduzível ✅ Linux Docker, Windows/macOS pendente
 - ✅ **Score determinístico**, sem afinidade, sem bolha (§22, §24)

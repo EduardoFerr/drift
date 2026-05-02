@@ -30,10 +30,10 @@ sniff é frágil e `process.env` não existe no browser.
 | OPFS (SQLite WASM)             | ✅¹           | ✅              | `db.worker.ts` |
 | kvvfs fallback                 | ✅            | ✅              | `db.worker.ts` |
 | Passkey (WebAuthn)             | ✅            | ❓²            | `lib/passkey.ts` |
-| **Tor via arti (SOCKS5)**      | ❌            | 🟡³            | `transport/tor.ts` + `src-tauri/src/socks5_proxy.rs` |
-| **`.onion` relays nativos**    | ❌            | 🟡³            | `transport/tor.ts` + `transport/torWebSocket.ts` |
-| **`network_mode: 'tor'`**      | ❌            | 🟡³            | `ContentSettings` UI gating + `bootstrap.ts` wire-up |
-| **`network_mode: 'onion-only'`**| ❌           | 🟡³            | `ContentSettings` UI gating + banner R6 |
+| **Tor via arti (SOCKS5)**      | ❌            | ✅³            | `transport/tor.ts` + `src-tauri/src/socks5_proxy.rs` |
+| **`.onion` relays nativos**    | ❌            | ✅³            | `transport/tor.ts` + `transport/torWebSocket.ts` |
+| **`network_mode: 'tor'`**      | ❌            | ✅³            | `ContentSettings` UI gating + `bootstrap.ts` wire-up |
+| **`network_mode: 'onion-only'`**| ❌           | ✅³            | `ContentSettings` UI gating + banner R6 |
 | Background sync workers        | ✅            | ✅              | `service-worker.ts` |
 | Push notifications             | ✅            | ✅              | (Fase 7+) |
 | Filesystem direct write        | ❌            | ✅              | `@tauri-apps/api/fs` |
@@ -42,7 +42,7 @@ sniff é frágil e `process.env` não existe no browser.
 
 ¹ PWA precisa COOP/COEP corretos pra OPFS funcionar. Ver `vite.config.ts`.
 ² WebAuthn em Tauri 2.x é viável via plugin oficial; não testado ainda.
-³ **Status atualizado (2026-05-01)**: Tor real com arti está shippado em código quando o build é feito com `cargo tauri build --features arti` — listener SOCKS5 próprio (`socks5_proxy.rs`), bridge IPC WS (`tor_ws.rs` ↔ `torWebSocket.ts`), wire-up condicional em `bootstrap.ts`. **Smoke test e2e** com binário rodando e `tcpdump` confirmando rota Tor ainda **não foi executado** — por isso 🟡 e não ✅. Sem `--features arti`, é stub IPC com `lastError: "STUB: arti integration pending"`.
+³ **Status atualizado (2026-05-01)**: Tor real com arti está shippado em código com `cargo tauri build --features arti` — listener SOCKS5 próprio (`socks5_proxy.rs`), bridge IPC WS (`tor_ws.rs` ↔ `torWebSocket.ts`), wire-up condicional em `bootstrap.ts`. **Smoke test e2e VERIFIED em 2026-05-01** (Sprint 7 do roadmap pós-auditoria — registro em `Docs/sessions/sprint7-smoke-2026-05-01.md`): captura Wireshark confirmou ZERO TLS direto a relay Nostr em modo `onion-only`, 7 guards Tor publicamente registrados em 7 países distintos, porta 9001 ORPort canônica. Sem `--features arti`, é stub IPC com `lastError: "STUB: arti integration pending"`.
 
 ## Pontos de gating no código
 
