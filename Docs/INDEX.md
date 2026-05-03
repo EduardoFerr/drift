@@ -60,7 +60,7 @@ ou **Por persona** pra pular direto.
 - **[sessions/sprint7-manual-2026-05-01.md](sessions/sprint7-manual-2026-05-01.md)** — guia passo a passo do smoke test e2e do Tor real. Manual; exige Rust toolchain + Wireshark + Tauri build local. Critério de aceite: manifesto §15 verified. Pareado com `sessions/sprint7-smoke-2026-05-01.md` (resultado da execução).
 - **[build-reproducible.md](build-reproducible.md)** ✅ — Fase 6.7. Como verificar binário publicado vs source público. Docker + SHA256 + `Dockerfile.reproducible`. Linux PWA + Tauri bit-identical. Manifesto §17 (build reproduzível).
 - **[deploy.md](deploy.md)** — Vercel + GitHub Releases + Cloudflare Tunnel + F-Droid/Play
-- **[sessions/vercel-protection.md](sessions/vercel-protection.md)** — histórico do Deployment Protection (2026-04-29: mudou pra `preview-only`, justificativa + reversão)
+- **[sessions/deploy-vercel-protection-2026-04-29.md](sessions/deploy-vercel-protection-2026-04-29.md)** — histórico do Deployment Protection (2026-04-29: mudou pra `preview-only`, justificativa + reversão)
 - **[../CHANGELOG.md](../CHANGELOG.md)** — histórico de versões (último: v0.6.0-alpha.3, 2026-05-01 — manifesto §15 VERIFIED)
 - **[../LICENSE](../LICENSE)** — licença do projeto
 
@@ -141,40 +141,6 @@ ou **Por persona** pra pular direto.
 | [webrtc-6.4-plan.md](webrtc-6.4-plan.md) | Plano sub-fase 6.4: Tor transport. arti real shipped + smoke test e2e VERIFIED 2026-05-01 (Wireshark baseline vs onion-only). `tor.rs` IPC commands, `NetworkMode = 'clearnet' \| 'tor' \| 'onion-only'` em UserPrefs, `RelayConfig.onion?`, UI toggle Header. Distribuição binária cross-platform shipped via Track A.1. 5 follow-ups menores pendentes (§6 do plan); migra pra `archive/` quando fecharem. |
 | [webrtc-threats.md](webrtc-threats.md) | Threat model dedicado WebRTC v1.0 (Barney, 2026-04-28). 23+ ameaças classificadas em 5 categorias (Peer / Rede / Signaling / Discovery / Recursos), cada uma com probabilidade, mitigação por fase, status (Aceito / Aberto / Crítico). Complementa §36 da arquitetura. |
 | [research-backlog.md](research-backlog.md) | Itens externos pendentes enquanto WebFetch está bloqueado. Cada item: pergunta + por quê bloqueia + workaround interim + fonte ideal. Mantida pela Robin. ~25 itens organizados por fase. |
-
----
-
-## Por sessão (histórico recente)
-
-### 2026-04-28 — Fase 6.1a-A/B + cleanup
-- 6.1a-A `matchFilter` NIP-01 + cobertura pré-6.1a (5 agentes paralelos)
-- 6.1a-B `webrtc-signaling-mock` BroadcastChannel
-- threat model WebRTC ([webrtc-threats.md](webrtc-threats.md)) — 23 ameaças (Barney)
-- research backlog ([research-backlog.md](research-backlog.md))
-- 6.1b shipped em `0.6.0-alpha.1` (CHANGELOG)
-- plano 6.2 ([archive/webrtc-6.2-plan.md](archive/webrtc-6.2-plan.md)) — Ted
-- fix GPS warm-up + indicador (captura antes de `createPost`/`spreadPost`)
-
-### 2026-05-02 — Track A.1 shipped + legal hardening Tier 1 + audit técnica
-- **Track A.1** ✅ — 9 assets cross-platform (.deb/.AppImage/.dmg/.exe + SHA256SUMS) anexados ao release `v0.6.0-alpha.3` via `tauri-distribution.yml`. 3 cascade fixes (cargo cache, `--bundles nsis` pra Windows, upload condition pra workflow_dispatch)
-- **Tier 1 legal hardening** ✅ — postura "named contributor com papel limitado" materializada: [../SECURITY.md](../SECURITY.md), [../PRIVACY.md](../PRIVACY.md), [../CONTRIBUTING.md](../CONTRIBUTING.md), [continuity.md](continuity.md), [protocol-spec.md](protocol-spec.md) (CC0); manifesto declarado CC0
-- **Barney gap #2** ✅ — CSP restritiva em [../vercel.json](../vercel.json), paridade com Tauri config; teste `it.todo` promovido pra `it()` ativo (`tests/manifesto-conformance.test.ts`)
-- **Audit técnica + reorg Docs** — análises pessoais (jurídica + threat model + transcripts) movidas pra `local/` (gitignored, fora do remoto). Catalog incremental de PII pra refator manual case-by-case fica em `local/legal-todo.md`. Sem mass replace — postura conservadora. Tests passing 437.
-- **Tests adicionados (Barney)**: `tests/no-telemetry.test.ts`, `tests/no-master-key.test.ts`, `tests/manifesto-conformance.test.ts` — claims públicas viram prova executável; 7 `it.todo` reservados pra refactors propostos
-- **Script (Robin)**: `scripts/dms-refresh.sh` — dead-man's switch refresh tlock+OTS, dry-run mode
-
-### 2026-04-29 — Scoring weighted + Fase 6.1a-C
-- fix sync entre devices (Barney) — janela 24h→7d em `sync.ts` (commit 6062422)
-- fix mapa não abre (Lily) — migration `spreads.location` (commit 6062422)
-- scoring "última ação vale" (spread+bury simultâneo do mesmo user resolve pelo `created_at` mais recente) + scoring weighted Σ`weight` em vez de COUNT (anti-Sybil, manifesto §22/§24) + UX `myActions` em `ProfileModal` (commit 3cdd211)
-- chunking 500-by-500 em `recalculateScore` (mitiga estouro `IN(?)` em posts virais) + `getWeightTier` função pura (sinal social, manifesto §22)
-- manifesto §23 estendido com seções "Mudança de opinião" e "Score weighted"; §24 fórmula atualizada
-- fix hints enganosos em `location_granularity` (manifesto §28) — commit 9240064
-- **GpsErrorBanner** (Lily) — `src/components/UI/GpsErrorBanner.tsx` + `GpsHelpModal` interno; `geolocation.ts` ganhou `lastFailureReason` + getter; `App.tsx` integra banner gated por `granularity != 'off'` + janela <60s + não-dismissed; +7 tests
-- **Badge weight tier no ProfileModal** (Marshall) — integra `getWeightTier`, remove número exato (gaming-resistant), 3 tiers (🏆 estabelecido / ⭐ ativo / 🌱 novo) com tooltip §22
-- **`transport/webrtc.ts` core** (Ted, Fase 6.1a-C) — 432 LOC publish/subscribe/health + RTCPeerConnection; pipeline §5 com kind check pré-verify; `pagehide` cleanup; outboundQueue reset em failed/closed; DEV bridge `window.driftWebRTC` em `src/main.tsx`
-- **Checklist 6.1a-C** (papel: revisão de segurança) — referenciado em commits da fase, não há documento separado vivo
-- atualização do INDEX + CHANGELOG (Robin)
 
 ---
 

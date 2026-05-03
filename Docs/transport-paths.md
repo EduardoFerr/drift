@@ -1,11 +1,10 @@
 # Drift — caminhos de publish/subscribe
 
-> Sprint 5 do roadmap pós-auditoria · 2026-05-01
-> Atende Ted item 7: "3 caminhos pra subscribe e 2 pra publish — confunde
-> quem adiciona feature na camada errada".
+> Doc normativo · matriz de decisão pra dev escolhendo onde plugar feature.
 
-Este doc mapeia onde cada caminho de publish/subscribe vive, quando usar
-qual, e por que coexistem (intencional, não inércia).
+Drift tem 3 caminhos pra subscribe e 2 pra publish, intencionalmente —
+não inércia. Este doc mapeia onde cada caminho vive, quando usar qual, e
+o porquê de coexistirem.
 
 ## TL;DR — escolha rápida
 

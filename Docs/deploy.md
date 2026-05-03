@@ -9,13 +9,12 @@ Caminhos públicos pra rodar Drift:
 
 ## 1. Vercel (recomendado pra PWA)
 
-`vercel.json` já está commitado com:
+`vercel.json` já está commitado — **fonte de verdade dos headers e config Vercel**. Pra detalhes exatos (CSP restritiva, COOP/COEP, X-Content-Type-Options, X-Frame-Options DENY, Referrer-Policy, Permissions-Policy, cache rules), ler [`../vercel.json`](../vercel.json) direto. Resumo:
 
-- `framework: vite`, `buildCommand: npm run build`, `outputDirectory: dist`
-- COOP/COEP headers em todas as rotas (obrigatórios pra OPFS + crossOriginIsolated)
-- Cache imutável em `/assets/*` (Vite já hasheia nomes)
-- `sw.js` e `manifest.webmanifest` com `must-revalidate` (atualizações de SW funcionam)
-- Hardening: X-Content-Type-Options, X-Frame-Options DENY, Referrer-Policy no-referrer, Permissions-Policy restritiva (só geolocation=self pra tag de location opt-in)
+- Build: `framework: vite`, `outputDirectory: dist`
+- COOP/COEP em todas as rotas (obrigatórios pra OPFS + `crossOriginIsolated`)
+- CSP restritiva alinhada com `tauri.conf.json` (paridade testada em `tests/manifesto-conformance.test.ts`)
+- Cache imutável em `/assets/*`; `sw.js` e `manifest.webmanifest` `must-revalidate`
 
 ### Setup (uma vez)
 
@@ -101,12 +100,12 @@ URL `*.trycloudflare.com` tem cert válido — PWA instala em desktop e mobile s
 
 Setup pendente (uma vez): gerar keystore, capturar SHA256, popular `assetlinks.json` + secrets no GitHub. Ver `twa.md`.
 
-## Hardening adicional (quando virar produção)
+## Hardening adicional
 
-- **CSP** — não habilitado por padrão porque WASM precisa `'wasm-unsafe-eval'` e isso requer testes cuidadosos. Adicionar em uma sessão dedicada
+- **CSP** — ✅ shipado em `vercel.json` (commit `4402acc`, 2026-05-02). Restritiva, `'wasm-unsafe-eval'` permitido pra SQLite WASM, `unsafe-eval` cru proibido. Paridade com `tauri.conf.json` validada em `tests/manifesto-conformance.test.ts`.
 - **HSTS** — Vercel adiciona automaticamente em domínios verificados
-- **Subresource Integrity (SRI)** — Vite não gera SRI por padrão; trabalho de Fase 6 ou 7
-- **Build reproduzível** — compromisso de manifesto §17, foco da Fase 7 (F-Droid build reproduzível)
+- **Subresource Integrity (SRI)** — Vite não gera SRI por padrão; trabalho de Fase 7
+- **Build reproduzível** — ✅ shipado pra Linux (`Dockerfile.reproducible`, manifesto §17). macOS/Windows ainda pendentes (Fase 7 follow-up).
 
 ## Troubleshooting
 
