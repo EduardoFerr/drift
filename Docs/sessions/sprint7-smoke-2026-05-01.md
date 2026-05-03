@@ -8,9 +8,8 @@
 **Executado em**: 2026-05-01
 **Atribuição original**: Arquiteto (execução manual em Windows)
 **Versão testada**: commit `0cd2362` (`main` pós-Sprint 4 + bundled SQLite fix)
-**Plataforma**: Windows 10 (host) · `cargo tauri build --features arti` local
-**Captura**: Wireshark — `drift-teste-1.pcapng` (baseline clearnet) +
-`drift-test 2 trade to onion.pcapng` (após trocar pra onion-only)
+**Plataforma**: host OS local (verificável via captura de pacote em interface real) · `cargo tauri build --features arti`
+**Captura**: Wireshark — `<DOCS_LOCAIS>/drift-baseline.pcapng` (clearnet) + `<DOCS_LOCAIS>/drift-tor.pcapng` (após trocar pra onion-only)
 
 ## Resultado
 
@@ -133,10 +132,10 @@ matrix Linux/macOS/Windows pra tag `v0.6.0-alpha.3` (ainda pendente).
 
 ## Captura de pacotes (referência)
 
-Arquivos `.pcapng` originais:
-- `C:\Users\Eduardo\Documents\drift-teste-1.pcapng` (baseline)
-- `C:\Users\Eduardo\Documents\drift-test 2 trade to onion.pcapng`
+Arquivos `.pcapng` originais ficam em diretório local do executor:
+- baseline (clearnet)
+- modo onion-only (Tor)
 
-**Não commitados** no repo (artefatos pessoais do Arquiteto; podem
-conter metadados de rede do host). Reproduzir requer rodar Sprint 7
-manual conforme `Docs/sprint7-manual.md`.
+**Não commitados** no repo (artefatos pessoais; podem conter metadados
+de rede do host). Reproduzir requer rodar Sprint 7 manual conforme
+[`../sprint7-manual.md`](../sprint7-manual.md).
