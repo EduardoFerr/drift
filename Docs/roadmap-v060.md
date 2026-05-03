@@ -73,7 +73,7 @@ quem servir. Ordem natural é A→B.
 
 | Item | Status | Esforço |
 |------|--------|---------|
-| B.0 — RFC `Docs/blob-distribution.md` + revisão personas | ⛔ | ~3h |
+| B.0 — RFC [`Docs/blob-distribution.md`](blob-distribution.md) v0.1 draft | 🟡 | drafted 2026-05-03; pendente revisão personas |
 | B.1 — Helia spike (POC IPFS no PWA, mede bundle) | ⛔ | ~4h |
 | B.2 — NIP-94 `imeta` + auto-pin no favorito | ⛔ | ~6h |
 | B.3 — UI "servindo N blobs a M peers" (Lily Fase 7.1c) | ⛔ | ~4h |
