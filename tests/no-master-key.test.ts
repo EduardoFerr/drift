@@ -1,8 +1,9 @@
 /**
  * No-master-key conformance test.
  *
- * Persona: Barney (peer review crítico) — sessão 2026-05-02.
- * Companion doc: `Docs/sessions/barney-code-hardening-2026-05-02.md`.
+ * Origem: revisão adversarial 2026-05-02.
+ * Claims testadas: manifesto §17 (sem chave mestra), invariantes
+ * CLAUDE.md #1 (onNostrEvent única porta INSERT), #12, #13, #14.
  *
  * **Premissa:** Manifesto §17 + CLAUDE.md invariante #12 + invariante #13:
  *  - Não escrever `deletePost()`, `banUser()`, `flagAsSpam()` global, ou

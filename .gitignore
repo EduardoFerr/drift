@@ -78,3 +78,6 @@ memory/
 # (versionado pra build reproduzível, manifesto §17 / Fase 6.7)
 src-tauri/target/
 src-tauri/gen/schemas/
+# notas privadas — análise jurídica, threat models pessoais, conversation transcripts
+# (saíram do remoto em 2026-05-02 pra reduzir surface de exposição pessoal)
+/local/

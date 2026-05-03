@@ -15,7 +15,6 @@ ou **Por persona** pra pular direto.
 3. **[drift-arquitetura-v4.md](drift-arquitetura-v4.md)** — fonte da verdade técnica
 4. **[../CLAUDE.md](../CLAUDE.md)** — invariantes operacionais (relevante mesmo sem usar Claude Code)
 5. **[roadmap-v060.md](roadmap-v060.md)** — roteiro ativo até `v0.6.0` stable (3 tracks A/B/C, vetos firmes do dbdp.txt)
-6. **[sessions/conformance-conversa-29-04.md](sessions/conformance-conversa-29-04.md)** — última verificação ampla de conformance (abril 2026), útil pra calibrar o que é compromisso vs aspiração — **artefato de sessão, não doc normativa**
 
 ---
 
@@ -70,9 +69,7 @@ ou **Por persona** pra pular direto.
 
 ### Histórico (referência, não-normativo)
 - **[archive/](archive/)** — planos executados de fases concluídas (não modificar)
-- **[sessions/](sessions/)** — artefatos de sessões pontuais de auditoria/análise
-  - **[sessions/conversa-29-04-analise.md](sessions/conversa-29-04-analise.md)** — análise da conversa Gemini/ChatGPT (papel: Ted, 2026-04-29)
-  - **[sessions/conformance-conversa-29-04.md](sessions/conformance-conversa-29-04.md)** — validação de conformance derivada (papel: Marshall, 2026-04-29)
+- **[sessions/](sessions/)** — artefatos de sessões pontuais públicas (operacional, smoke-tests). Notas pessoais (análise jurídica, threat models personais, transcripts) ficam em `local/` (gitignored, não vão pro remoto — manifesto §17 + postura "named contributor com papel limitado")
 
 ---
 
@@ -85,7 +82,7 @@ ou **Por persona** pra pular direto.
 [../README.md](../README.md) → [manifesto.md](manifesto.md) → [../CLAUDE.md](../CLAUDE.md) → [drift-arquitetura-v4.md](drift-arquitetura-v4.md)
 
 ### Sou um auditor de segurança
-[manifesto.md](manifesto.md) §17 + §25 → [../CLAUDE.md](../CLAUDE.md) (invariantes #7, #8, #12) → [webrtc-threats.md](webrtc-threats.md) → [drift-arquitetura-v4.md](drift-arquitetura-v4.md) §36 (threat model geral) → [sessions/conformance-conversa-29-04.md](sessions/conformance-conversa-29-04.md)
+[manifesto.md](manifesto.md) §17 + §25 → [../CLAUDE.md](../CLAUDE.md) (invariantes #7, #8, #12) → [webrtc-threats.md](webrtc-threats.md) → [drift-arquitetura-v4.md](drift-arquitetura-v4.md) §36 (threat model geral) → [../SECURITY.md](../SECURITY.md) (escopo e canal de report)
 
 ### Quero rodar Drift no meu servidor
 [deploy.md](deploy.md) → [../CHANGELOG.md](../CHANGELOG.md) (versões testadas) → release artifacts (`dist.zip` + `SHA256SUMS` em GitHub Releases)
@@ -97,7 +94,7 @@ ou **Por persona** pra pular direto.
 [twa.md](twa.md) → [fdroid.md](fdroid.md) → [deploy.md](deploy.md) §4
 
 ### Sou pesquisador / quero atacar dúvidas externas
-[research-backlog.md](research-backlog.md) → [sessions/conversa-29-04-analise.md](sessions/conversa-29-04-analise.md)
+[research-backlog.md](research-backlog.md)
 
 ---
 
@@ -107,14 +104,14 @@ ou **Por persona** pra pular direto.
 |-----------|----------------|
 | §2-3 identidade portável | [../CLAUDE.md](../CLAUDE.md) invariantes #8, #9, #15; `src/lib/identity.ts`, `lib/identities.ts` |
 | §4 anonimato (não-mixnet) | [drift-arquitetura-v4.md](drift-arquitetura-v4.md) §36 threat model |
-| §6 verdade por eventos | [sessions/conformance-conversa-29-04.md](sessions/conformance-conversa-29-04.md) §1 (spread+bury simultâneo) |
+| §6 verdade por eventos | `src/lib/scoring.ts` `selectLatestActionByUser` (resolve spread+bury simultâneo por created_at) |
 | §7 determinismo | [../CLAUDE.md](../CLAUDE.md) invariantes #3, #16 (Vitest tests) |
 | §12 múltiplos transportes | [archive/webrtc-seeding.md](archive/webrtc-seeding.md), [archive/webrtc-6.1a-plan.md](archive/webrtc-6.1a-plan.md), [archive/webrtc-6.2-plan.md](archive/webrtc-6.2-plan.md), `src/lib/transport/` |
 | §15 anti-censura por país | [archive/webrtc-seeding.md](archive/webrtc-seeding.md), [webrtc-6.4-plan.md](webrtc-6.4-plan.md) (Tor transport: scaffold shipped, arti real pendente) |
 | §16 disponibilidade distribuída | [archive/webrtc-seeding.md](archive/webrtc-seeding.md) (PoI seeder), [fdroid.md](fdroid.md), `lib/rebroadcast.ts` |
 | §17 sem chave mestra + build reproduzível | [fdroid.md](fdroid.md), [../CLAUDE.md](../CLAUDE.md) invariante #12 |
 | §20 resistência a isolamento | `lib/probe.ts` (probe anti-eclipse), [webrtc-threats.md](webrtc-threats.md), [archive/webrtc-6.2-plan.md](archive/webrtc-6.2-plan.md) (path diversity scoring) |
-| §22, §24 score sem afinidade | [../CLAUDE.md](../CLAUDE.md) invariante #11; `src/lib/scoring.ts`; [sessions/conformance-conversa-29-04.md](sessions/conformance-conversa-29-04.md) (rejeição EigenTrust) |
+| §22, §24 score sem afinidade | [../CLAUDE.md](../CLAUDE.md) invariante #11; `src/lib/scoring.ts` (puro, sem afinidade) |
 | §23 bury não pune | `src/lib/scoring.ts` (peso simétrico) |
 | §25 sem scan automático | [../CLAUDE.md](../CLAUDE.md) invariante #7 |
 | §26 moderação reativa | `src/lib/moderation.ts` (threshold dinâmico) |
@@ -144,8 +141,6 @@ ou **Por persona** pra pular direto.
 | [webrtc-6.4-plan.md](webrtc-6.4-plan.md) | Plano sub-fase 6.4 (Robin, 2026-04-29): Tor transport. Scaffold + stub IPC shipped — `tor.rs` (3 commands `tor_connect/disconnect/status` retornando `TorStatus`), `NetworkMode = 'clearnet' \| 'tor' \| 'onion-only'` em UserPrefs, `RelayConfig.onion?` opcional, `transport/tor.ts` consumindo IPC, UI toggle Header. Integração `arti` real (Rust crate Tor) fica pra sessão dedicada (~10-15h). §15 só fica cumprido inteiro com arti real. |
 | [webrtc-threats.md](webrtc-threats.md) | Threat model dedicado WebRTC v1.0 (Barney, 2026-04-28). 23+ ameaças classificadas em 5 categorias (Peer / Rede / Signaling / Discovery / Recursos), cada uma com probabilidade, mitigação por fase, status (Aceito / Aberto / Crítico). Complementa §36 da arquitetura. |
 | [research-backlog.md](research-backlog.md) | Itens externos pendentes enquanto WebFetch está bloqueado. Cada item: pergunta + por quê bloqueia + workaround interim + fonte ideal. Mantida pela Robin. ~25 itens organizados por fase. |
-| [sessions/conversa-29-04-analise.md](sessions/conversa-29-04-analise.md) | Análise técnica da conversa do dia com Gemini/ChatGPT — propostas de defesa Sybil, EigenTrust, debate sobre afinidade no feed, decisões registradas (Ted, 2026-04-29). |
-| [sessions/conformance-conversa-29-04.md](sessions/conformance-conversa-29-04.md) | Validação por Marshall (2026-04-29) de tudo que apareceu na conversa do dia contra invariantes do CLAUDE.md e princípios do manifesto. Identifica bug "spread+bury simultâneo do mesmo user" (UI não bloqueia), valida rejeição de EigenTrust como afinidade implícita (§24), confirma conformance dos planos 6.2. |
 
 ---
 
@@ -160,17 +155,15 @@ ou **Por persona** pra pular direto.
 - plano 6.2 ([archive/webrtc-6.2-plan.md](archive/webrtc-6.2-plan.md)) — Ted
 - fix GPS warm-up + indicador (captura antes de `createPost`/`spreadPost`)
 
-### 2026-05-02 — Análise jurídica Marshall + follow-up código Robin/Barney + Track A.1 shipped
-- **[sessions/legal-analysis-marshall-2026-05-02.md](sessions/legal-analysis-marshall-2026-05-02.md)** (Marshall, 5115 palavras) — análise jurídica profunda 4-layer (protocolo/cliente/distribuição/mantenedor), 7 cenários de stress, roteiro 4-tier; constraint central: "penalidade do Eduardo ≠ morte do Drift"
-- **[sessions/robin-code-followup-2026-05-02.md](sessions/robin-code-followup-2026-05-02.md)** (Robin, 4081 palavras) — mirrors automatizados (script + workflow), DMS criptográfico (tlock+OpenTimestamps), `Docs/maintainership.md` esboçado, watchlist regulatório PL 2630/RG digital, comparativo entidades jurídicas
-- **[sessions/barney-code-hardening-2026-05-02.md](sessions/barney-code-hardening-2026-05-02.md)** (Barney, ~3.6k palavras) — audit claims públicas vs realidade; 3 vulnerabilidades top: SW autoUpdate (chave mestra disfarçada), CSP ausente em vercel.json, nostr.build/CARTO hardcoded
-- `scripts/dms-refresh.sh` (Robin, 188 linhas) — dead-man's switch refresh tlock+OTS, dry-run mode
-- `tests/no-telemetry.test.ts` + `tests/no-master-key.test.ts` + `tests/manifesto-conformance.test.ts` (Barney, 704 linhas, +37 tests passing) — claims públicas viram prova executável; 8 `it.todo` reservados pra refactors propostos
-- Track A.1 ✅ shipped — 9 assets cross-platform (.deb/.AppImage/.dmg/.exe + SHA256SUMS) anexados ao release `v0.6.0-alpha.3` via novo workflow `tauri-distribution.yml`. 3 cascade fixes (cargo cache, --bundles nsis pra Windows, upload condition pra workflow_dispatch)
+### 2026-05-02 — Track A.1 shipped + legal hardening Tier 1 + audit técnica
+- **Track A.1** ✅ — 9 assets cross-platform (.deb/.AppImage/.dmg/.exe + SHA256SUMS) anexados ao release `v0.6.0-alpha.3` via `tauri-distribution.yml`. 3 cascade fixes (cargo cache, `--bundles nsis` pra Windows, upload condition pra workflow_dispatch)
+- **Tier 1 legal hardening** ✅ — postura "named contributor com papel limitado" materializada: [../SECURITY.md](../SECURITY.md), [../PRIVACY.md](../PRIVACY.md), [../CONTRIBUTING.md](../CONTRIBUTING.md), [continuity.md](continuity.md), [protocol-spec.md](protocol-spec.md) (CC0); manifesto declarado CC0
+- **Barney gap #2** ✅ — CSP restritiva em [../vercel.json](../vercel.json), paridade com Tauri config; teste `it.todo` promovido pra `it()` ativo (`tests/manifesto-conformance.test.ts`)
+- **Audit técnica + reorg Docs** — análises pessoais (jurídica + threat model + transcripts) movidas pra `local/` (gitignored, fora do remoto). Catalog incremental de PII pra refator manual case-by-case fica em `local/legal-todo.md`. Sem mass replace — postura conservadora. Tests passing 437.
+- **Tests adicionados (Barney)**: `tests/no-telemetry.test.ts`, `tests/no-master-key.test.ts`, `tests/manifesto-conformance.test.ts` — claims públicas viram prova executável; 7 `it.todo` reservados pra refactors propostos
+- **Script (Robin)**: `scripts/dms-refresh.sh` — dead-man's switch refresh tlock+OTS, dry-run mode
 
-### 2026-04-29 — Análise conversa Gemini/ChatGPT + scoring weighted + Fase 6.1a-C
-- [sessions/conversa-29-04-analise.md](sessions/conversa-29-04-analise.md) (Ted) — síntese das propostas externas
-- [sessions/conformance-conversa-29-04.md](sessions/conformance-conversa-29-04.md) (Marshall) — validação contra invariantes/manifesto
+### 2026-04-29 — Scoring weighted + Fase 6.1a-C
 - fix sync entre devices (Barney) — janela 24h→7d em `sync.ts` (commit 6062422)
 - fix mapa não abre (Lily) — migration `spreads.location` (commit 6062422)
 - scoring "última ação vale" (spread+bury simultâneo do mesmo user resolve pelo `created_at` mais recente) + scoring weighted Σ`weight` em vez de COUNT (anti-Sybil, manifesto §22/§24) + UX `myActions` em `ProfileModal` (commit 3cdd211)

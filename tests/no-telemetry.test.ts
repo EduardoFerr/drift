@@ -1,8 +1,9 @@
 /**
  * No-telemetry / no-fingerprinting conformance test.
  *
- * Persona: Barney (peer review crítico) — sessão 2026-05-02.
- * Companion doc: `Docs/sessions/barney-code-hardening-2026-05-02.md`.
+ * Origem: revisão adversarial 2026-05-02.
+ * Claims testadas: PRIVACY.md ("sem telemetria"/"sem fingerprinting"),
+ * manifesto §25 (sem scan automático), invariante CLAUDE.md #7.
  *
  * **Premissa:** PRIVACY.md afirma "Sem telemetria. Sem analytics. Sem
  * reports automáticos de erro. (`grep` no repositório confirma)" e "Sem

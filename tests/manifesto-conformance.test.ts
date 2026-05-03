@@ -2,8 +2,10 @@
  * Manifesto conformance test — invariantes de pureza, determinismo,
  * e config consistente com claims públicas.
  *
- * Persona: Barney (peer review crítico) — sessão 2026-05-02.
- * Companion doc: `Docs/sessions/barney-code-hardening-2026-05-02.md`.
+ * Origem: revisão adversarial 2026-05-02.
+ * Claims testadas: manifesto §7 (determinismo), §22 (score puro),
+ * §23 (bury não pune), §17 (CSP/headers como prova de "sem chave
+ * mestra disfarçada via deploy").
  *
  * **Premissa:** vários invariantes do CLAUDE.md são "função pura X não
  * deve usar Date.now()" ou "constante Y deve permanecer N". Tests de
