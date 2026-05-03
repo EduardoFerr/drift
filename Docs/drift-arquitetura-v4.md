@@ -387,37 +387,27 @@ export const DRIFT_KIND = {
 Os 4 kinds são **regular events** (faixa 1..9999): imutáveis no relay,
 sem dedup por d-tag. Para o porquê, ver §30.6.
 
-### PostEvent (kind: 9078)
-```typescript
-{
-  kind: 9078,
-  tags: [
-    ['d', postId],
-    ['drift-version', '1'],              // obrigatória
-    ['client', 'drift-official'],        // informativa, não privilegiada
-    ['category', categoria]?,
-    ['location', lat, lng, city, country]?,  // off-default na Fase 3
-  ],
-  content: JSON.stringify({ subposts: Subpost[] }),
-}
-```
+### Schemas canônicos
 
-### SpreadEvent (kind: 9079)
-```typescript
-{ kind: 9079, tags: [['e', postId], ['p', authorNpub], ['location', ...]?], content: '' }
-```
+**Spec dos 4 kinds (tags obrigatórias/opcionais, formato `content`,
+exemplos JSON completos): [`protocol-spec.md`](protocol-spec.md)** —
+documento CC0, single source of truth. Implementadores externos
+(Damus/Snort/outros forks) consultam protocol-spec.md, não esta
+arquitetura. Em caso de divergência entre §6 e protocol-spec.md,
+**protocol-spec.md vence** (manifesto §28 — compat Nostr).
 
-### BuryEvent (kind: 9080)
-```typescript
-{ kind: 9080, tags: [['e', postId]], content: '' }
-// sem 'p' — enterro é silencioso, não notifica o autor
-// sem 'reason' — não precisa justificar
-```
+Esta §6 mantém apenas o enum TypeScript local (`DRIFT_KIND` acima)
+e a materialização SQLite (§7-§9 abaixo). Detalhes de schema vivem
+em protocol-spec.md.
 
-### ReportEvent (kind: 9081)
-```typescript
-{ kind: 9081, tags: [['e', postId], ['p', authorNpub], ['reason', 'illegal'|'spam'|'harassment']], content: '' }
-```
+**Resumo navegacional** (escopo dos 4 kinds — detalhe em spec):
+
+| Kind | Função | Tags-chave (não-exaustivo) |
+|---|---|---|
+| 9078 POST   | conteúdo com subposts | `d`, `drift-version`, `client`, `category?`, `location?`, `content-warning?` |
+| 9079 SPREAD | sinalização positiva (espalha) | `e`, `p`, `location?` |
+| 9080 BURY   | sinalização negativa (sem 'p', sem 'reason') | `e` |
+| 9081 REPORT | reporte de moderação | `e`, `p`, `reason` |
 
 ---
 
@@ -633,22 +623,15 @@ leitor filtra.
 
 ### 14.1 Tag `content-warning` (autor declara)
 
-```typescript
-// kind: 9078 (POST) — tag opcional
-// valores enumerados: 'nsfw' | 'violence' | 'spoiler' | 'ad'
-//                  ou string livre (cliente oficial só renderiza os 4 acima)
-{
-  kind: 9078,
-  tags: [
-    ['d', postId],
-    ['drift-version', '1'],
-    ['client', 'drift-official'],
-    ['content-warning', 'nsfw'],   // opcional
-    // ...outras tags
-  ],
-  content: JSON.stringify({ subposts }),
-}
-```
+Tag opcional no kind 9078. Valores enumerados pelo cliente oficial:
+`'nsfw' | 'violence' | 'spoiler' | 'ad'` (ou string livre — cliente
+oficial só renderiza filtros pros 4 acima; outros valores degradam
+graceful, são tratados como sem warning específico).
+
+Schema completo do kind 9078 com posicionamento da tag em
+[`protocol-spec.md`](protocol-spec.md). Resumo aqui: tag `content-warning`
+é orthogonal a `d`/`drift-version`/`client`; presença não afeta
+validação NIP-01 nem dedup local.
 
 UI de criação (`SubpostEditor`): checkboxes "marcar como NSFW",
 "marcar como spoiler", "violência", "anúncio". Persistência da

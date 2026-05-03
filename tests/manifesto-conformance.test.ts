@@ -259,3 +259,144 @@ describe('Service Worker integrity (Barney §d — chave mestra disfarçada)', (
 
   it.todo('Workflow CI valida que SHA256 de dist/sw.js é reproduzível entre builds clean')
 })
+
+// ─── HIMYM Round 2 (2026-05-02) — extensões propostas por Marshall ───
+// Origem: peer review HIMYM round 2 sobre auditoria de Docs/. Marshall
+// identificou 3 superfícies de drift entre fonte canônica e docs/configs
+// satélites. Cada teste fixa invariante específico — falha = drift novo.
+
+describe('Stack pin sqlite-wasm cross-doc (Marshall LOCK_VIA_TEST)', () => {
+  // Fonte canônica: package.json devDependencies/dependencies pin.
+  // Replicado em CLAUDE.md (stack section) e README.md (stack section).
+  // Drift = upgrade silencioso onde docs ficam stale.
+  it('versão de @sqlite.org/sqlite-wasm em package.json bate com CLAUDE.md e README.md', () => {
+    const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')) as {
+      dependencies?: Record<string, string>
+      devDependencies?: Record<string, string>
+    }
+    const pinnedVersion =
+      pkg.dependencies?.['@sqlite.org/sqlite-wasm'] ?? pkg.devDependencies?.['@sqlite.org/sqlite-wasm']
+    expect(pinnedVersion, 'package.json deve pinnar @sqlite.org/sqlite-wasm').toBeTruthy()
+    // Pin exato (sem `^`/`~`) — manifesto §17 quer build determinístico.
+    expect(pinnedVersion!, 'sqlite-wasm precisa pin exato (sem ^/~)').toMatch(/^[\d.]+(?:-[\w.]+)?$/)
+
+    const claudeMd = readFileSync(join(ROOT, 'CLAUDE.md'), 'utf8')
+    const readmeMd = readFileSync(join(ROOT, 'README.md'), 'utf8')
+    expect(
+      claudeMd,
+      `CLAUDE.md deve mencionar a versão pinada (${pinnedVersion}) — drift entre package.json e CLAUDE.md`,
+    ).toContain(pinnedVersion!)
+    expect(
+      readmeMd,
+      `README.md deve mencionar a versão pinada (${pinnedVersion}) — drift entre package.json e README.md`,
+    ).toContain(pinnedVersion!)
+  })
+})
+
+describe('Schema kind 9078 tag `d` presente em fachadas públicas (Marshall risco #1)', () => {
+  // Spec canônica: protocol-spec.md exige tag `d` obrigatória no kind 9078
+  // (NIP-33-style addressable param). README.md e CLAUDE.md são entry
+  // points públicos — implementador externo lê ambos primeiro. Se
+  // omitirem `d`, evento criado é inválido.
+  it('README.md tabela de kinds inclui tag `d` no row 9078', () => {
+    const readmeMd = readFileSync(join(ROOT, 'README.md'), 'utf8')
+    // Encontra linha da tabela com 9078
+    const row9078 = readmeMd.split('\n').find((l) => l.includes('9078') && l.includes('|'))
+    expect(row9078, 'README.md deve ter linha de tabela com 9078').toBeTruthy()
+    expect(
+      row9078!,
+      'row 9078 do README.md deve listar tag `d` (obrigatória, parametrizada per protocol-spec.md)',
+    ).toMatch(/\bd\b/)
+  })
+
+  it('CLAUDE.md menciona tag `d` no contexto de POST/9078', () => {
+    const claudeMd = readFileSync(join(ROOT, 'CLAUDE.md'), 'utf8')
+    // Procura por tabela ou bloco que referencie 9078 + d
+    const has9078 = claudeMd.includes('9078')
+    expect(has9078, 'CLAUDE.md deve referenciar kind 9078').toBe(true)
+    // Heurística: na seção de kinds, tag `d` deve aparecer próxima.
+    // CLAUDE.md tem "tags: [d, drift-version, client, ...]" no bloco kinds.
+    expect(claudeMd, 'CLAUDE.md deve mencionar tag `d` no contexto de kinds').toMatch(/\bd,\s*drift-version/)
+  })
+})
+
+describe('CSP paridade Tauri ↔ Vercel (Marshall risco #3)', () => {
+  // Marshall apontou que vercel.json CSP tem `font-src`, `manifest-src`,
+  // `form-action` que tauri.conf.json não tem. Paridade chave-a-chave
+  // garante que mudança em um runtime é replicada no outro — modelo de
+  // segurança consistente cross-runtime.
+  function parseCspDirectives(csp: string): Map<string, string[]> {
+    const map = new Map<string, string[]>()
+    for (const directive of csp.split(';').map((d) => d.trim()).filter(Boolean)) {
+      const [name, ...sources] = directive.split(/\s+/)
+      map.set(name, sources)
+    }
+    return map
+  }
+
+  function loadVercelCsp(): string {
+    const vercelJson = JSON.parse(readFileSync(join(ROOT, 'vercel.json'), 'utf8')) as {
+      headers?: Array<{ source: string; headers: Array<{ key: string; value: string }> }>
+    }
+    const all = (vercelJson.headers ?? [])
+      .filter((h) => h.source === '/(.*)')
+      .flatMap((h) => h.headers)
+    return all.find((h) => h.key.toLowerCase() === 'content-security-policy')?.value ?? ''
+  }
+
+  function loadTauriCsp(): string {
+    const tauri = JSON.parse(readFileSync(join(ROOT, 'src-tauri', 'tauri.conf.json'), 'utf8')) as {
+      app?: { security?: { csp?: string } }
+    }
+    return tauri.app?.security?.csp ?? ''
+  }
+
+  // Diretivas que DEVEM existir em ambos runtimes — modelo de segurança
+  // não pode divergir nestes pontos. Whitelist de divergência aceita
+  // só onde semantica do runtime é genuinamente diferente.
+  const REQUIRED_PARITY = [
+    'default-src',
+    'script-src',
+    'style-src',
+    'img-src',
+    'connect-src',
+    'worker-src',
+    'frame-ancestors',
+  ]
+
+  it('vercel + tauri têm as mesmas diretivas core de CSP', () => {
+    const vercelDirectives = parseCspDirectives(loadVercelCsp())
+    const tauriDirectives = parseCspDirectives(loadTauriCsp())
+    for (const directive of REQUIRED_PARITY) {
+      expect(
+        vercelDirectives.has(directive),
+        `vercel.json CSP deve definir ${directive}`,
+      ).toBe(true)
+      expect(
+        tauriDirectives.has(directive),
+        `tauri.conf.json CSP deve definir ${directive} (paridade com vercel)`,
+      ).toBe(true)
+    }
+  })
+
+  it('vercel CSP define diretivas extras de browser (font-src, manifest-src, form-action, base-uri, object-src)', () => {
+    // Estas só fazem sentido em browser context — Tauri WebView não
+    // serve manifest, fonts vêm bundled, etc. Whitelist legítima de
+    // divergência. Mas vercel deve ter todas pra não regredir.
+    const vercelDirectives = parseCspDirectives(loadVercelCsp())
+    const browserOnly = ['font-src', 'manifest-src', 'form-action', 'base-uri', 'object-src']
+    for (const directive of browserOnly) {
+      expect(
+        vercelDirectives.has(directive),
+        `vercel.json CSP deve ter ${directive} (browser hardening específico)`,
+      ).toBe(true)
+    }
+  })
+
+  it("nenhum dos CSPs permite 'unsafe-eval' cru (só 'wasm-unsafe-eval' aceito)", () => {
+    const vercelTokens = loadVercelCsp().split(/\s+/)
+    const tauriTokens = loadTauriCsp().split(/\s+/)
+    expect(vercelTokens, "vercel CSP não pode conter 'unsafe-eval'").not.toContain("'unsafe-eval'")
+    expect(tauriTokens, "tauri CSP não pode conter 'unsafe-eval'").not.toContain("'unsafe-eval'")
+  })
+})
