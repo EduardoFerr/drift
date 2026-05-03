@@ -35,7 +35,7 @@ ou **Por persona** pra pular direto.
 - **[archive/webrtc-6.1b-plan.md](archive/webrtc-6.1b-plan.md)** ✅ — signaling real via Nostr DM (NIP-44 + kind 1059) — entregue `0.6.0-alpha.1` · arquivado
 - **[archive/webrtc-6.2-plan.md](archive/webrtc-6.2-plan.md)** ✅ — peer registry SQLite + path diversity scoring + orchestrator multi-transport (entregue `0.6.0-alpha.1`)
 - **[archive/webrtc-6.3-plan.md](archive/webrtc-6.3-plan.md)** ✅ — TURN servers + reconnect backoff + health ping/pong (entregue `[Unreleased]`)
-- **[webrtc-6.4-plan.md](webrtc-6.4-plan.md)** 🟡 — Tor transport: etapas 1-4 shipadas pra source-builders (`cargo tauri build --features arti`) — smoke test e2e + binary release pendentes. Manifesto §4/§15/§28.
+- **[webrtc-6.4-plan.md](webrtc-6.4-plan.md)** 🟢 — Tor transport: arti real shipped + smoke test e2e VERIFIED 2026-05-01. Binários cross-platform (`.deb`/`.AppImage`/`.dmg`/`.exe`) em release `v0.6.0-alpha.3`. 5 follow-ups menores pendentes (§6 do plan) antes de migrar pra `archive/`. Manifesto §4/§15/§28.
 - **[webrtc-threats.md](webrtc-threats.md)** — threat model WebRTC, 23+ ameaças classificadas (v1.0, 2026-04-28). **Status pós-6.2 desatualizado** (follow-up sprint)
 
 ### Fase 7 (distribuição)
@@ -107,7 +107,7 @@ ou **Por persona** pra pular direto.
 | §6 verdade por eventos | `src/lib/scoring.ts` `selectLatestActionByUser` (resolve spread+bury simultâneo por created_at) |
 | §7 determinismo | [../CLAUDE.md](../CLAUDE.md) invariantes #3, #16 (Vitest tests) |
 | §12 múltiplos transportes | [archive/webrtc-seeding.md](archive/webrtc-seeding.md), [archive/webrtc-6.1a-plan.md](archive/webrtc-6.1a-plan.md), [archive/webrtc-6.2-plan.md](archive/webrtc-6.2-plan.md), `src/lib/transport/` |
-| §15 anti-censura por país | [archive/webrtc-seeding.md](archive/webrtc-seeding.md), [webrtc-6.4-plan.md](webrtc-6.4-plan.md) (Tor transport: scaffold shipped, arti real pendente) |
+| §15 anti-censura por país | [archive/webrtc-seeding.md](archive/webrtc-seeding.md), [webrtc-6.4-plan.md](webrtc-6.4-plan.md) (Tor transport: arti real shipped + smoke verified 2026-05-01) |
 | §16 disponibilidade distribuída | [archive/webrtc-seeding.md](archive/webrtc-seeding.md) (PoI seeder), [fdroid.md](fdroid.md), `lib/rebroadcast.ts` |
 | §17 sem chave mestra + build reproduzível | [fdroid.md](fdroid.md), [../CLAUDE.md](../CLAUDE.md) invariante #12 |
 | §20 resistência a isolamento | `lib/probe.ts` (probe anti-eclipse), [webrtc-threats.md](webrtc-threats.md), [archive/webrtc-6.2-plan.md](archive/webrtc-6.2-plan.md) (path diversity scoring) |
@@ -138,7 +138,7 @@ ou **Por persona** pra pular direto.
 | [archive/webrtc-6.1a-plan.md](archive/webrtc-6.1a-plan.md) | Plano da sub-fase 6.1a: especificação `Transport`, esqueleto `webrtc.ts`, BroadcastChannel mock signaling, armadilhas de teste. Status: entregue (matchFilter + signaling-mock shipped 2026-04-28). |
 | [archive/webrtc-6.1b-plan.md](archive/webrtc-6.1b-plan.md) | Sub-fase 6.1b ✅ entregue em `0.6.0-alpha.1`: signaling via Nostr DM cifrado (NIP-44 v2 + kind 1059 gift wrap minimal, sem NIP-17 seal). Zero deps novas (nostr-tools 2.7.0 já tem `nip44`). Discovery PoI-only. Doc mantido como referência histórica do plano executado. |
 | [archive/webrtc-6.2-plan.md](archive/webrtc-6.2-plan.md) | Plano sub-fase 6.2 (Ted, 2026-04-28): `peers_known` SQLite (migration v7) + `scorePeer()` puro (latência+fail+ASN/country diversity) + `transport/orchestrator.ts` que substitui chamadas diretas a `wssTransport` em `sync.ts` + caps (MAX_PEERS=32, 1 conn/pubkey, 100 msg/s). Endereça T-WRTC-006/007/008/010/017. |
-| [webrtc-6.4-plan.md](webrtc-6.4-plan.md) | Plano sub-fase 6.4 (Robin, 2026-04-29): Tor transport. Scaffold + stub IPC shipped — `tor.rs` (3 commands `tor_connect/disconnect/status` retornando `TorStatus`), `NetworkMode = 'clearnet' \| 'tor' \| 'onion-only'` em UserPrefs, `RelayConfig.onion?` opcional, `transport/tor.ts` consumindo IPC, UI toggle Header. Integração `arti` real (Rust crate Tor) fica pra sessão dedicada (~10-15h). §15 só fica cumprido inteiro com arti real. |
+| [webrtc-6.4-plan.md](webrtc-6.4-plan.md) | Plano sub-fase 6.4: Tor transport. arti real shipped + smoke test e2e VERIFIED 2026-05-01 (Wireshark baseline vs onion-only). `tor.rs` IPC commands, `NetworkMode = 'clearnet' \| 'tor' \| 'onion-only'` em UserPrefs, `RelayConfig.onion?`, UI toggle Header. Distribuição binária cross-platform shipped via Track A.1. 5 follow-ups menores pendentes (§6 do plan); migra pra `archive/` quando fecharem. |
 | [webrtc-threats.md](webrtc-threats.md) | Threat model dedicado WebRTC v1.0 (Barney, 2026-04-28). 23+ ameaças classificadas em 5 categorias (Peer / Rede / Signaling / Discovery / Recursos), cada uma com probabilidade, mitigação por fase, status (Aceito / Aberto / Crítico). Complementa §36 da arquitetura. |
 | [research-backlog.md](research-backlog.md) | Itens externos pendentes enquanto WebFetch está bloqueado. Cada item: pergunta + por quê bloqueia + workaround interim + fonte ideal. Mantida pela Robin. ~25 itens organizados por fase. |
 
@@ -180,7 +180,7 @@ ou **Por persona** pra pular direto.
 
 ## Buracos conhecidos
 
-- Docs prometidos pelas Fases 6/7 ainda não criados: `ipfs-pin.md` (Fase 7), `sneakernet.md` (Fase 7), `run-your-own-relay.md` (Fase 7), `capacitor.md` (alternativa TWA). (`webrtc-6.4-plan.md` cobre Tor — scaffold shipped 2026-04-29, arti real pendente).
+- Docs prometidos pelas Fases 6/7 ainda não criados: `ipfs-pin.md` (Fase 7), `sneakernet.md` (Fase 7), `run-your-own-relay.md` (Fase 7), `capacitor.md` (alternativa TWA). (`webrtc-6.4-plan.md` cobre Tor — arti real + smoke verified 2026-05-01).
 - Nenhum doc tem campo formal `last-updated:` no frontmatter — datas inferidas via versão (manifesto v2.2, arquitetura v5.3) ou cabeçalho (`webrtc-threats.md` 2026-04-28, `webrtc-6.2-plan.md` 2026-04-28).
 - `Docs/icones-oquesao-cada um.PNG` é asset órfão (sem doc explicando o que documenta).
 - ~~`getWeightTier` ainda não aplicada na UI~~ — resolvido em 2026-04-29 (badge tier no `ProfileModal`, Marshall).

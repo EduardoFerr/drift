@@ -52,9 +52,11 @@ Trade-off: TURN relay TCP custa banda. Default usar TURN público (Twilio, Cloud
 
 Estimativa: **1-2 sessões** (~8h). Manifesto §15 (mobile real).
 
-### 🟡 6.4 — **Tor transport** (`tor.ts`) — scaffold + stub shipped 2026-04-29; arti real pendente
+### 🟢 6.4 — **Tor transport** (`tor.ts`) — arti real shipped + smoke test e2e VERIFIED 2026-05-01; follow-ups menores pendentes
 
-**Status**: scaffold + stub IPC shipped em `[Unreleased]` (Ted/Marshall/Lily/Robin). Falta integração `arti` real em sessão dedicada (~10-15h Rust). Doc completo em [webrtc-6.4-plan.md](webrtc-6.4-plan.md).
+**Status atualizado 2026-05-02**: arti real (não-stub) shipped via `cargo tauri build --features arti`. Smoke test e2e (Wireshark, baseline clearnet vs onion-only) **VERIFIED 2026-05-01** — manifesto §15 deixa de ser *asserted* e vira *verified* pra source-builders. Distribuição binária cross-platform shipped em `v0.6.0-alpha.3` (Track A.1: `.deb`/`.AppImage`/`.dmg`/`.exe` com `--features arti`). **Plano técnico detalhado e checklist de follow-ups em [webrtc-6.4-plan.md](webrtc-6.4-plan.md)** — mantido como doc separado por convenção (ver `archive/README.md`); migra pra `archive/` quando follow-ups §6.4 do plan fecharem.
+
+**Follow-ups pendentes (de [webrtc-6.4-plan.md §6](webrtc-6.4-plan.md))**: CI job `cargo check --features arti`, Capacitor/Android via Orbot, live circuit count em UI, graceful shutdown, cache dir local. Não-bloqueantes pra §15 verificado em build Tauri; bloqueiam fechamento ✅ formal de 6.4.
 
 **Shipped hoje**:
 - `src-tauri/src/tor.rs` — 3 IPC commands (`tor_connect/disconnect/status`) retornando `TorStatus { state, circuitCount, lastError }`. `tor_connect()` é stub: retorna `state: 'error'` + `lastError: "STUB: arti integration pending"`.
@@ -151,12 +153,12 @@ Estimativa: **1 sessão** (~6h). Manifesto §17.
 | 6.1b Nostr signaling | ✅ | ~250 | 1 | §14, §29 |
 | 6.2 Path diversity | ✅ | ~700 (peerRegistry+peerScore+orchestrator+wire) | 1 (paralelo) | §20 |
 | 6.3 TURN + reconnect | ✅ | ~250 | 1 | §15 (mobile) |
-| 6.4 Tor transport | 🟡 scaffold+stub shipped | ~200 (TS+Rust stub) + arti integ pendente | 1-2 restantes | §4, §15, §28 |
+| 6.4 Tor transport | 🟢 arti real + smoke VERIFIED | ~200 (TS+Rust) + arti workspace | 5 follow-ups menores | §4, §15, §28 |
 | 6.5 Tauri desktop | ✅ | ~100 + Rust scaffold | 1 | §1 (capacidade §15) |
 | 6.6 Multi-transport | ✅ (incluído em 6.2) | ~150 | — | §12 |
 | 6.7 Build reproduzível | ✅ | docs + CI + Dockerfile | 1 | §17 |
 
-**Total restante**: ~1-2 sessões pra **integração `arti` real em 6.4** (scaffold + stub já shipped; última frente pendente da Fase 6).
+**Total restante**: arti real shipped + §15 verified em 2026-05-01. **Fase 6 essencialmente fechada** modulo 5 follow-ups menores em 6.4 ([plan §6](webrtc-6.4-plan.md)) que não bloqueiam funcionalidade. Quando todos `[ ]` do §6 do plan virarem `[x]`, 6.4 fecha ✅ e plan migra pra `archive/`.
 
 ---
 
