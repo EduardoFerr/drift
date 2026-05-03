@@ -31,6 +31,7 @@ import { OnboardingOverlay } from './components/Onboarding/OnboardingOverlay'
 import { ProfileModal } from './components/Profile/ProfileModal'
 import { GpsErrorBanner } from './components/UI/GpsErrorBanner'
 import { MultiTabModal } from './components/UI/MultiTabModal'
+import { UpdatePrompt } from './components/UI/UpdatePrompt'
 import type {
   DriftIdentity,
   LocationGranularity,
@@ -518,6 +519,8 @@ function App() {
             />
           )
         })()}
+
+        <UpdatePrompt />
 
         {showDiagnostic && <DiagnosticPanel boot={boot} />}
 

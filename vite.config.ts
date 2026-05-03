@@ -26,9 +26,18 @@ export default defineConfig({
     // não é necessário e na verdade quebra o tunnel.
     ...(useHttp ? [] : [basicSsl()]),
     VitePWA({
-      registerType: 'autoUpdate',
-      // Auto-injeta o script de registro do SW no index.html — requisito
-      // pra `beforeinstallprompt` disparar.
+      // 'prompt' (não 'autoUpdate'): manifesto §17 (sem chave mestra)
+      // implica que update silencioso é "chave mestra disfarçada" — quem
+      // controla o deploy poderia pushar JS arbitrário sem o user
+      // perceber. Com 'prompt', `useRegisterSW` (em UpdatePrompt.tsx)
+      // emite evento `needRefresh` quando há SW novo; UI mostra banner
+      // "Nova versão disponível, atualizar?" e user decide. Trade-off
+      // aceito: latência maior pra adoção de fix; defesa-em-profundidade
+      // contra ator que comprometa Vercel/CI.
+      registerType: 'prompt',
+      // 'auto' inject + componente React (UpdatePrompt) usa hook
+      // `useRegisterSW` de `virtual:pwa-register/react` pra controle
+      // explícito do refresh. Hook funciona com inject auto.
       injectRegister: 'auto',
       // SW também roda em dev — sem isso, Chrome não considera o app
       // instalável e o evento de install nunca fira em desenvolvimento.

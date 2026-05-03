@@ -18,11 +18,10 @@
  * cliente "não decide nada por trás". Quebra silenciosa = perda de
  * defesa "cliente é browser determinístico, não plataforma editorial".
  *
- * **TODO humano:**
- * - Decidir entre `registerType: 'autoUpdate'` (atual) ou `'prompt'`
- *   (recomendação Barney). Se manter autoUpdate, garantir hash
- *   publicado em release notes (ver doc Barney §d).
- * - Adicionar CSP no `vercel.json` (atualmente ausente).
+ * **Decisões aplicadas (histórico):**
+ * - 2026-05-02: CSP restritiva em `vercel.json` (Barney gap #2).
+ * - 2026-05-03: `registerType: 'prompt'` em `vite.config.ts` +
+ *   `UpdatePrompt.tsx` mediando consentimento (Barney gap #1).
  */
 
 import { describe, expect, it } from 'vitest'
@@ -253,9 +252,17 @@ describe('Service Worker integrity (Barney §d — chave mestra disfarçada)', (
     expect(cfg, 'VitePWA registerType deve ser explícito').toMatch(/registerType\s*:\s*['"](?:autoUpdate|prompt)['"]/)
   })
 
-  it.todo(
-    'vite.config.ts usa registerType: "prompt" (recomendação Barney) — OU CI publica SHA256 do sw.js em release notes',
-  )
+  it('vite.config.ts usa registerType: "prompt" (manifesto §17 — sem update silencioso)', () => {
+    // Promovido de it.todo após decisão de adotar 'prompt' (sessão 2026-05-03).
+    // Implementação: src/components/UI/UpdatePrompt.tsx via useRegisterSW
+    // hook do virtual:pwa-register/react. Banner pede consentimento;
+    // user decide se atualiza. Manifesto §17 (sem chave mestra disfarçada
+    // via deploy comprometido).
+    const cfg = readFileSync(join(ROOT, 'vite.config.ts'), 'utf8')
+    expect(cfg, "registerType deve ser 'prompt' pra fechar gap autoUpdate (Barney §d)").toMatch(
+      /registerType\s*:\s*['"]prompt['"]/,
+    )
+  })
 
   it.todo('Workflow CI valida que SHA256 de dist/sw.js é reproduzível entre builds clean')
 })
