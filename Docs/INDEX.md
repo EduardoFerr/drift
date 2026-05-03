@@ -43,7 +43,7 @@ ou **Por persona** pra pular direto.
 - **Fase 7.1a** ✅ shipped — PoI auto-discovery via SpreadMap (Lily). `src/lib/seeder.ts:seedFromSpreaders(postId)` consumido por `useSpreadMap`. Manifesto §16 (espalhar = seedear). Detalhes em [../CHANGELOG.md](../CHANGELOG.md) `[Unreleased]` e [archive/webrtc-seeding.md](archive/webrtc-seeding.md) §"Fase 7.1".
 - **[twa.md](twa.md)** — Trusted Web Activity Android (sub-fase 7.1, ✅ antecipada)
 - **[fdroid.md](fdroid.md)** — submissão ao catálogo F-Droid (7.2, pendente)
-- **[fase-6-roadmap.md](fase-6-roadmap.md)** — roadmap honesto da Fase 6 inteira (7 sub-fases, 6.1a/6.1b ✅; 6.2/6.3/6.4/6.5/6.6/6.7 ⏳). §15 (anti-censura) ainda não cumprido até 6.4+6.5+6.6 fecharem.
+- **[fase-6-roadmap.md](fase-6-roadmap.md)** — roadmap honesto da Fase 6 inteira (7 sub-fases). 6.1a/6.1b/6.2/6.3/6.4/6.5/6.6/6.7 ✅ funcionalmente; 6.4 com 5 follow-ups menores antes de fechar formal. §15 (anti-censura) **VERIFIED 2026-05-01** via build Tauri+arti.
 - *(futuro: `ipfs-pin.md`, `sneakernet.md`, `run-your-own-relay.md`, `blob-distribution.md` Track B.0)*
 
 ### Postura legal & continuidade (Track C.5)
@@ -57,7 +57,7 @@ ou **Por persona** pra pular direto.
 - **[tauri-setup.md](tauri-setup.md)** — setup do shell desktop Tauri (Fase 6.5 ✅ validado 2026-04-29). Pré-requisitos Rust, `npm run tauri:dev/build`, permissões mínimas (manifesto §17).
 - **[runtime-pwa-vs-tauri.md](runtime-pwa-vs-tauri.md)** — matriz cross-runtime: o que funciona em PWA vs Tauri, onde o código discrimina, quando duplicar vs gating. Follow-up Barney 6.4 R7 (2026-05-01).
 - **[transport-paths.md](transport-paths.md)** — 1-pager mapeando os 3 caminhos publish/subscribe do projeto (orchestrator, wssTransport direto, pool direto) e quando usar cada. Sprint 5 do roadmap pós-auditoria (2026-05-01).
-- **[sprint7-manual.md](sprint7-manual.md)** — guia passo a passo do smoke test e2e do Tor real (Sprint 7 do roadmap pós-auditoria). Manual; exige Rust toolchain + Wireshark + Tauri build local. Critério de aceite: manifesto §15 verified.
+- **[sessions/sprint7-manual-2026-05-01.md](sessions/sprint7-manual-2026-05-01.md)** — guia passo a passo do smoke test e2e do Tor real. Manual; exige Rust toolchain + Wireshark + Tauri build local. Critério de aceite: manifesto §15 verified. Pareado com `sessions/sprint7-smoke-2026-05-01.md` (resultado da execução).
 - **[build-reproducible.md](build-reproducible.md)** ✅ — Fase 6.7. Como verificar binário publicado vs source público. Docker + SHA256 + `Dockerfile.reproducible`. Linux PWA + Tauri bit-identical. Manifesto §17 (build reproduzível).
 - **[deploy.md](deploy.md)** — Vercel + GitHub Releases + Cloudflare Tunnel + F-Droid/Play
 - **[sessions/vercel-protection.md](sessions/vercel-protection.md)** — histórico do Deployment Protection (2026-04-29: mudou pra `preview-only`, justificativa + reversão)

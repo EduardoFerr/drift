@@ -1,6 +1,6 @@
 # Fase 6 — Roadmap honesto
 
-**Status**: avançado. Fase 6 = "cliente nativo + transportes alternativos + capacidade técnica do §15 (anti-censura por país)". Hoje **6.1a, 6.1b, 6.2, 6.3, 6.5, 6.6, 6.7** estão entregues; **6.4 Tor transport** ganhou scaffold + stub IPC em 2026-04-29 (`[Unreleased]`) — falta integração `arti` real (sessão dedicada ~10-15h Rust) pra cumprir §15 inteiro.
+**Status (2026-05-02)**: Fase 6 essencialmente fechada. Fase 6 = "cliente nativo + transportes alternativos + capacidade técnica do §15 (anti-censura por país)". **6.1a, 6.1b, 6.2, 6.3, 6.5, 6.6, 6.7** entregues; **6.4 Tor transport** com `arti` real shipped + smoke test e2e **VERIFIED 2026-05-01** (manifesto §15 cumprido pra source-builders + binários cross-platform via Track A.1 em `v0.6.0-alpha.3`). Restam 5 follow-ups menores em 6.4 ([§6 do plan](webrtc-6.4-plan.md)) antes de migrar pra `archive/`.
 
 **Compromisso do manifesto** (§ROADMAP, linha 950):
 > "Fase 6 + Fase 7 não são 'talvez'. São 'vão acontecer'. Se em algum momento o caminho técnico mostrar que algo dessas fases é inviável como prometido, o manifesto é atualizado com bump de versão e justificativa pública. Não cala, não promete e não entrega."

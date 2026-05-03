@@ -29,7 +29,7 @@ OTIMISMO: UI ← React useState (descartado quando SQLite confirma)
 
 | Kind | Nome   | Carga |
 |------|--------|-------|
-| 9078 | POST   | `tags: [drift-version, client, category?, location?, content-warning?]`, content = `JSON({subposts})` |
+| 9078 | POST   | `tags: [d, drift-version, client, category?, location?, content-warning?]`, content = `JSON({subposts})` |
 | 9079 | SPREAD | `tags: [e, p, location?]`, content = `''` |
 | 9080 | BURY   | `tags: [e]`, content = `''` |
 | 9081 | REPORT | `tags: [e, p, reason]`, content = `''` |

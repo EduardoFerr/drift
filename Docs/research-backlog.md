@@ -56,19 +56,6 @@ prefix, inline.
 **Fonte ideal**: `github.com/nbd-wtf/nostr-tools` releases + README;
 `github.com/nostr-protocol/nips/blob/master/44.md` pra spec.
 
-### R4 — NIP-44 v2 vs NIP-04 deprecation status
-**Pergunta**: NIP-44 v2 foi adotado universalmente pelos clientes
-majoritários (Damus, Amethyst, Snort, Coracle) em 2026, ou ainda
-existe parcela significativa só em NIP-04?
-**Por quê bloqueia**: signaling DM precisa chegar. Se 30% dos clientes
-ainda só decodificam NIP-04, peer remoto pode não conseguir parsear
-nossa oferta WebRTC. Decisão: só NIP-44 (puro), ou dual (encrypt em
-ambos com fallback).
-**Workaround interim**: só NIP-44 — Drift signaling é peer-Drift, não
-cross-client. Drift só fala com Drift via DM; outros clientes ignoram.
-**Fonte ideal**: `nips.nostr.com`, threads em `github.com/nostr-protocol/nips`
-issues; observar releases de Damus/Amethyst.
-
 ### R5 — Privacidade NIP-44 (gift wrap NIP-59)
 **Pergunta**: pra signaling WebRTC vazar mínimo de metadata
 (quem-fala-com-quem), faz sentido envolver os DMs em gift wrap
@@ -172,17 +159,6 @@ crates.io `arti-client`.
 ---
 
 ## Fase 7.1 (TWA — antecipada, em manutenção)
-
-### R12 — Bubblewrap CLI quirks 2025-2026
-**Pergunta**: workarounds atuais pra `bubblewrap init` e `update`
-em CI não-interativo? O `yes ""` pipe (atual) e `expect` (no
-F-Droid YAML) ainda funcionam, ou houve mudança que quebra?
-**Por quê bloqueia**: TWA build pode regredir silenciosamente em
-update. Sem clareza, retomar TWA = horas de debug.
-**Workaround interim**: pin Bubblewrap em versão conhecida-boa no
-workflow; testar update local antes de bumpar CI.
-**Fonte ideal**: `github.com/GoogleChromeLabs/bubblewrap` issues +
-releases; commit history de `app/twa/twa-manifest.json` interno.
 
 ### R13 — Digital Asset Links / Chrome 2026
 **Pergunta**: requisitos do Asset Links API mudaram pós-Chrome 130?
@@ -311,17 +287,6 @@ mixnet"). Honesto.
 **Fonte ideal**: USENIX Security, IEEE S&P proceedings 2024-2026;
 `webrtc-security.github.io` issues recentes.
 
-### R23 — Vercel COOP/COEP em 2026 + alternativas
-**Pergunta**: Vercel ainda permite headers COOP/COEP custom em free
-tier 2026 (necessário pra `crossOriginIsolated === true`)? Cloudflare
-Pages como alternativa se Vercel mudar política?
-**Por quê bloqueia**: SQLite WASM via OPFS exige `crossOriginIsolated`.
-Se Vercel mexer, app quebra silenciosamente em prod.
-**Workaround interim**: monitor manual no DevTools; alertar se
-`!crossOriginIsolated` no boot (já existe? verificar).
-**Fonte ideal**: `vercel.com/docs/edge-network/headers`,
-`developer.mozilla.org/.../crossOriginIsolated`.
-
 ### R24 — `vite-plugin-pwa` + Workbox v8 status
 **Pergunta**: Workbox v8 saiu? `vite-plugin-pwa@^0.20` em
 `package.json` está em latest, ou existe upgrade significativo
@@ -331,16 +296,6 @@ recorrente. Versão nova pode resolver.
 **Workaround interim**: aceitar tamanho atual; medir com Lighthouse.
 **Fonte ideal**: `github.com/vite-pwa/vite-plugin-pwa` releases;
 `developer.chrome.com/docs/workbox` blog.
-
-### R25 — MapLibre vs Mapbox bundle size 2026 (sanity check)
-**Pergunta**: já migramos pra MapLibre + CARTO tiles em v0.5.2.
-Confirmar que MapLibre 5.24 não regrediu em bundle size; novas alts
-(deck.gl-only sem MapLibre) viáveis?
-**Por quê bloqueia**: baixa prioridade. Reabrir só se UX queixar de
-load do mapa.
-**Workaround interim**: estado atual é aceitável.
-**Fonte ideal**: `bundlephobia.com/package/maplibre-gl`,
-`github.com/maplibre/maplibre-gl-js` releases.
 
 ---
 
@@ -362,9 +317,25 @@ load do mapa.
   pin exato `3.51.2-build9` (sem `^`). Tema persistente mas operacionalmente
   ok — sem incidente atribuído ao pin desde Fase 1. Re-checar quando o
   upstream estabilizar minor.
+- **R4** (NIP-44 v2 vs NIP-04 deprecation) — ✅ resolvido implicitamente
+  pela decisão "Drift só fala com Drift via DM". Drift signaling é
+  peer-Drift, não cross-client; clientes que ainda só falam NIP-04
+  ignoram nossas DMs sem prejuízo de protocolo.
+- **R12** (Bubblewrap CLI quirks 2025-2026) — ✅ resolvido. TWA shipped
+  estável em `v0.5.4`; workflow com `expect` driver + `NODE_OPTIONS=
+  --max-old-space-size=4096` cobre os pontos identificados. Sem
+  incidente novo desde então.
+- **R23** (Vercel COOP/COEP em 2026 + alternativas) — ✅ resolvido
+  (2026-05-02). `vercel.json` ganhou CSP restritiva no commit `4402acc`
+  alinhada com Tauri config; COOP/COEP funcionais em prod (`crossOriginIsolated
+  === true` confirmado no boot). Alternativa Cloudflare Pages permanece
+  como contingency mas não acionada.
+- **R25** (MapLibre vs Mapbox bundle size) — ✅ resolvido como "monitor
+  passivo". Estado atual aceitável; reabrir só se UX queixar de load
+  de mapa. Sem trabalho ativo.
 
 ---
 
 *Documento mantido (atribuição original: papel de research/curadoria).
-Última atualização: 2026-05-01.*
+Última atualização: 2026-05-02.*
 *Itens originais: 25. Resolvidos até 2026-05-01: 4 (R3, R5, R11, R21 parcial).*

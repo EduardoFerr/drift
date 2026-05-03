@@ -138,4 +138,4 @@ Arquivos `.pcapng` originais ficam em diretório local do executor:
 
 **Não commitados** no repo (artefatos pessoais; podem conter metadados
 de rede do host). Reproduzir requer rodar Sprint 7 manual conforme
-[`../sprint7-manual.md`](../sprint7-manual.md).
+[`sprint7-manual-2026-05-01.md`](sprint7-manual-2026-05-01.md).
