@@ -4,6 +4,69 @@ All notable changes to the Drift client. Uses [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+## [0.6.0-alpha.4] — 2026-05-04
+
+Release de hardening: Tier 1 legal posture, audit Docs/, fix de 2 gaps adversariais (Barney) e RFC Track B (Helia + NIP-94). 14 commits desde `alpha.3`. **+45 tests** (399 → 444 passing). Sem breaking changes; cliente continua compatível com posts existentes.
+
+### Added
+- **`SECURITY.md`, `PRIVACY.md`, `CONTRIBUTING.md`** — postura "named contributor com papel limitado por design". Sem SLA, sem CLA, escopo narrow. Tier 1 legal hardening.
+- **`Docs/continuity.md`** — reprodução de release sem cooperação de nenhum contributor. Mirrors, build reproduzível, multi-sig de tags como objetivo.
+- **`Docs/protocol-spec.md`** — kinds 9078–9081 standalone CC0. Single source of truth pro protocolo, independente do cliente.
+- **`Docs/blob-distribution.md`** v0.2 (RFC Track B) — Helia + NIP-94 `imeta` + auto-pin no favorito + 10 gaps documentados como convenções internas Drift (sem inventar NIP novo). Pendente persona review.
+- **`Docs/legal-todo.md`** (em `local/`, gitignored) — catalog incremental de PII pra refator manual case-by-case.
+- **`scripts/dms-refresh.sh`** — dead-man's switch refresh com tlock + OpenTimestamps. Dry-run mode.
+- **`public/serve.json`** — copiado pelo Vite pra `dist/`; self-host com `npx serve .` funciona out-of-box (manifesto §17). 2 patterns (`**` + `**/*.*`) cobrem `/` e subresources tipo `/assets/db.worker-*.js`.
+- **`src/components/UI/UpdatePrompt.tsx`** — banner "Nova versão disponível, atualizar?". User decide se aplica update; manifesto §17 (sem update silencioso).
+- **6 tests novos** em `tests/manifesto-conformance.test.ts`: CSP restritiva em vercel.json, registerType prompt, stack pin sqlite-wasm cross-doc, schema kind 9078 tag `d` em fachadas públicas, CSP paridade Tauri↔Vercel (7 core + 5 browser-only), no `unsafe-eval` cru.
+- **3 test files Barney** (`tests/no-telemetry.test.ts`, `tests/no-master-key.test.ts` + extensão `manifesto-conformance.test.ts`) — claims públicas (PRIVACY/SECURITY/manifesto §17/§22/§23/§25) viram prova executável.
+
+### Changed
+- **`vite.config.ts`**: `registerType: 'autoUpdate'` → `'prompt'` (Barney gap #1). Service Worker novo fica em waiting até user concordar; trade-off latência vs sem-chave-mestra-de-deploy.
+- **`vercel.json`**: CSP restritiva (Barney gap #2). Paridade com `src-tauri/tauri.conf.json` validada em CI. `'wasm-unsafe-eval'` permitido (SQLite WASM); `'unsafe-eval'` cru proibido.
+- **Manifesto declarado CC0** 1.0 Universal. Contrato técnico do Drift não tem dono — qualquer fork pode adotar/modificar/substituir sem permissão. Código continua MIT.
+- **`drift-arquitetura-v4.md` §6 LINK_REDUCE**: schemas JSON inline removidos; ponteiros pra `protocol-spec.md` (CC0 SSoT). Reduz drift surface entre 4 docs duplicados.
+- **`README.md` tabela kinds**: tag `d` obrigatória adicionada em row 9078 (estava omitida — implementador externo criava evento inválido).
+- **Pseudônimo pivot**: nome civil substituído por "O Arquiteto" em docs públicos (papel-metodologia já existente em `CLAUDE.md`). Refator incremental case-by-case via `local/legal-todo.md` 4.9.2.
+- **`Docs/deploy.md`**: self-host atalho `npx serve .` zero-config + warning sobre glob `**/*` enganador. Headers prosa duplicados → ponteiro pra `vercel.json` source.
+- **`Docs/fase-6-roadmap.md`**: status 6.4 sync (arti real shipped + smoke VERIFIED 2026-05-01). Fim do drift entre header e §6.4.
+- **`Docs/INDEX.md`**: trim seção "Por sessão" (186 → 152 linhas). Refs atualizadas pós-reorg.
+
+### Fixed
+- **BUG ATIVO `fase-6-roadmap.md:3`**: header dizia "falta arti real" enquanto §6.4 e INDEX:141 diziam "shipped + VERIFIED". Auto-contradição num mesmo doc. Marshall identificou; 4/4 reviewers HIMYM Round 2 confirmaram.
+- **`README.md:32`** schema POST omitia tag `d` (obrigatória per `protocol-spec.md`). Adicionada.
+- **`tauri-distribution.yml`** upload condition: `push`-only gate quebrava workflow_dispatch. Inclui `workflow_dispatch && tag != ''`.
+- **`Dockerfile.reproducible`** final stage: `FROM debian + WORKDIR /artifacts` exportava filesystem inteiro pro local output. Trocado pra `FROM scratch` — só os artefatos coletados.
+
+### Removed
+- **6 docs sensíveis movidos pra `local/`** (gitignored, fora do remoto):
+  `legal-todo.md`, `sessions/legal-analysis-marshall-2026-05-02.md`,
+  `sessions/robin-code-followup-2026-05-02.md`,
+  `sessions/barney-code-hardening-2026-05-02.md`,
+  `sessions/conformance-conversa-29-04.md`, `sessions/conversa-29-04-analise.md`.
+  ~134KB de notas pessoais saíram do remoto. Continuam em `local/` no working dir.
+- **`Docs/Capturar.PNG`** — debug screenshot órfão (134KB, untracked).
+- **`Docs/INDEX.md` "Por sessão"** — git log + sessions/ já cumprem índice histórico.
+
+### Security
+- **CSP em `vercel.json`** (commit `4402acc`) — fecha gap "PWA roda sem Content-Security-Policy mesmo com claim sem-telemetria" (Barney gap #2).
+- **`registerType: 'prompt'`** (commit `c020cb0`) — fecha gap "SW autoUpdate é chave mestra disfarçada" (Barney gap #1). Manifesto §17 fica honesto.
+- **LOCK_VIA_TEST extensions** (commit `c9a1bb1`) — 3 invariants em CI: stack pin cross-doc, schema tag `d`, CSP paridade Tauri↔Vercel. Detecta drift silencioso em PRs futuros.
+- **No-telemetry test** ativo (não mais it.todo) — verify estático que código não importa SDKs analytics/fingerprinting (`tests/no-telemetry.test.ts`).
+- **No-master-key test** ativo — assert que código não exporta `deletePost`/`banUser`/etc; manifesto §17 enforced via grep estático.
+
+### Docs
+- **HIMYM 2-round audit Docs/** (privado em `local/sessions/`) — 5 personas analisaram redundâncias e oportunidades de consolidação; Round 2 peer review entre eles. Verdict consolidado: 0 merges de arquivo; 10 ações cirúrgicas (LINK_REDUCE, LOCK_VIA_TEST, MOVE por convenção, fix de bugs).
+- **Marshall análise jurídica** (privada em `local/sessions/legal-analysis-marshall-2026-05-02.md`, ~5115 palavras) — 4-layer analysis (protocolo/cliente/distribuição/mantenedor), 7 cenários de stress, roteiro 4-tier. Constraint central: "penalidade do Arquiteto ≠ morte do Drift".
+- **Robin code follow-up + Barney hardening** (privados em `local/sessions/`) — implementação concreta + audit adversarial.
+- **Curadoria `research-backlog.md`** — R4/R12/R23/R25 movidos pra "Resolvido".
+- **`sprint7-manual.md` movido pra `sessions/sprint7-manual-2026-05-01.md`** — cumpre convenção `<tipo>-<contexto>-<data>.md`.
+
+### Operacional
+- **Tests:** 399 → 444 passing (+45). 6 todo (refactors documentados).
+- **Cargo workspace stable** com `arti = 0.41` + `Tauri 2.11`. MSRV cobrindo cascata documentada (1.83 → 1.90).
+- **CI:** workflows `ci.yml`, `release.yml`, `reproducible-build.yml`, `tauri-distribution.yml`, `twa.yml` todos verdes em commits desta release.
+- **Build reproduzível Linux** confirmado bit-identical via `Dockerfile.reproducible`.
+
 ## [0.6.0-alpha.3] — 2026-05-01
 
 **Manifesto §15 (anti-censura por país) deixou de ser asserted e virou
