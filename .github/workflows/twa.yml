@@ -17,7 +17,12 @@ jobs:
   build:
     name: TWA APK + AAB
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    # Bumped 25 → 40 (2026-05-04). Run 25301030461 (alpha.4) cancelled
+    # at 25min: `Bubblewrap init` step alone consumed 22min19s
+    # (downloading Gradle distribution + gerando Android project), deixando
+    # só 1min42s pra update + build. 40min dá folga pra cold-cache CI
+    # sem custo em runs rápidos (steps terminam quando terminam).
+    timeout-minutes: 40
 
     permissions:
       contents: write  # pra anexar assets ao Release
