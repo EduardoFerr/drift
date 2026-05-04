@@ -71,12 +71,29 @@ sha256sum -c SHA256SUMS
 unzip dist-v0.5.0.zip -d /var/www/drift
 ```
 
-Servir com nginx/caddy/qualquer servidor estático **com COOP/COEP**:
+Servir com qualquer servidor estático **com COOP/COEP**.
+
+**Atalho zero-config** (tem `npx`): o `dist.zip` já inclui `serve.json`
+com os 2 patterns (`**` + `**/*.*`) que cobrem tanto `/` quanto
+subresources tipo `/assets/db.worker-*.js`:
+
+```bash
+cd /var/www/drift
+npx serve .
+# COOP/COEP funciona out-of-box; abrir http://localhost:3000
+# Verificar no console: crossOriginIsolated === true
+```
+
+**nginx/caddy** (produção):
 
 ```nginx
 add_header Cross-Origin-Opener-Policy same-origin;
 add_header Cross-Origin-Embedder-Policy require-corp;
 ```
+
+> ⚠ Glob `**/*` sozinho em `serve.json` **não basta** — header chega
+> em `/` mas não em `/assets/db.worker-*.js`, e o browser bloqueia o
+> worker. Usar `**` + `**/*.*` (incluído).
 
 ## 3. Cloudflare Tunnel (dev distante / PWA install em mobile)
 
