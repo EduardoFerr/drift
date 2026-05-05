@@ -203,9 +203,9 @@ type HintKind = 'spread' | 'bury' | 'next' | 'prev'
 function hintLabel(h: HintKind): string {
   switch (h) {
     case 'spread':
-      return '↑ espalhou'
+      return '↑ DRIFT'
     case 'bury':
-      return '↓ enterrou'
+      return '↓ SINK'
     case 'next':
       return '→'
     case 'prev':

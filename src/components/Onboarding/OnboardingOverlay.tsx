@@ -37,7 +37,7 @@ export function OnboardingOverlay({ onClose, onOpenIdentity }: OnboardingOverlay
       body: (
         <>
           <p>
-            Drift é uma rede social descentralizada onde o conteúdo se espalha pelo{' '}
+            Drift é uma rede social descentralizada onde o conteúdo deriva pelo{' '}
             <span className="text-drift-accent">comportamento humano</span> — não por algoritmo.
           </p>
           <p>
@@ -56,12 +56,12 @@ export function OnboardingOverlay({ onClose, onOpenIdentity }: OnboardingOverlay
           <ul className="space-y-2">
             <li>
               <span className="text-drift-spread">↑</span> swipe pra cima ·{' '}
-              <span className="text-slate-300">espalha o post</span>
-              <span className="ml-1 text-slate-600">(empurra o score)</span>
+              <span className="text-slate-300">DRIFT (drifta o post)</span>
+              <span className="ml-1 text-slate-600">(empurra a deriva)</span>
             </li>
             <li>
               <span className="text-drift-bury">↓</span> swipe pra baixo ·{' '}
-              <span className="text-slate-300">enterra o post</span>
+              <span className="text-slate-300">SINK (afunda o post)</span>
               <span className="ml-1 text-slate-600">(reduz, não pune o autor)</span>
             </li>
             <li>

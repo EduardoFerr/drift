@@ -327,6 +327,76 @@ describe('Schema kind 9078 tag `d` presente em fachadas públicas (Marshall risc
   })
 })
 
+describe('Vocabulary UI guard (V0 redesign — Marshall LOCK_VIA_TEST)', () => {
+  // Drift mantém separação léxica entre camada UI (DRIFT/SINK/DERIVA)
+  // e camada protocolo (SPREAD/BURY). Strings PT antigas como
+  // 'espalhar'/'enterrar' foram migradas em V0 (commit subsequente);
+  // este teste garante que NÃO reaparecem em UI nova. Detalhes em
+  // CLAUDE.md "Vocabulary mapping" + Docs/design-system.md §1.
+  //
+  // Heurística: scan src/**/*.tsx por matches em strings (entre aspas
+  // ou JSX text). Strip comments primeiro (matches em comments OK pra
+  // contexto histórico).
+
+  function stripComments(source: string): string {
+    return source
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/(^|[^:'"])\/\/.*$/gm, '$1')
+  }
+
+  function findFiles(dir: string): string[] {
+    const fs = require('node:fs') as typeof import('node:fs')
+    const path = require('node:path') as typeof import('node:path')
+    const out: string[] = []
+    function walk(d: string): void {
+      for (const entry of fs.readdirSync(d, { withFileTypes: true })) {
+        const full = path.join(d, entry.name)
+        if (entry.isDirectory()) {
+          if (entry.name !== 'node_modules' && entry.name !== 'dist') walk(full)
+        } else if (entry.isFile() && entry.name.endsWith('.tsx')) {
+          out.push(full)
+        }
+      }
+    }
+    walk(dir)
+    return out
+  }
+
+  it('zero "espalha\\|enterra" em strings/JSX de src/**/*.tsx (UI vocab antigo migrado)', () => {
+    const tsxFiles = findFiles(join(ROOT, 'src'))
+    const offenders: { file: string; line: number; text: string }[] = []
+    const pattern = /(?:>[^<]*|['"`][^'"`]*)\b(?:espalha|enterra)\w*\b/i
+
+    for (const file of tsxFiles) {
+      const content = stripComments(readFileSync(file, 'utf8'))
+      const lines = content.split('\n')
+      for (let i = 0; i < lines.length; i++) {
+        if (pattern.test(lines[i])) {
+          offenders.push({
+            file: file.replace(ROOT, '').replace(/\\/g, '/'),
+            line: i + 1,
+            text: lines[i].trim().slice(0, 100),
+          })
+        }
+      }
+    }
+
+    expect(
+      offenders,
+      `Vocab UI antigo detectado em strings JSX. UI deve usar DRIFT/SINK/DERIVA. ` +
+        `Comentários OK; strings/JSX text não. Hits:\n${offenders
+          .map((o) => `  ${o.file}:${o.line}: ${o.text}`)
+          .join('\n')}`,
+    ).toEqual([])
+  })
+
+  it('protocol-spec.md preserva associação 9079↔SPREAD e 9080↔BURY', () => {
+    const spec = readFileSync(join(ROOT, 'Docs', 'protocol-spec.md'), 'utf8')
+    expect(spec, 'spec deve associar 9079 a SPREAD em alguma seção').toMatch(/9079[^]{0,100}SPREAD/)
+    expect(spec, 'spec deve associar 9080 a BURY em alguma seção').toMatch(/9080[^]{0,100}BURY/)
+  })
+})
+
 describe('Theme color paridade 5-way (V1 redesign — Marshall LOCK_VIA_TEST)', () => {
   // Paleta hex aparece em 5 fontes de verdade. Sem teste, próxima
   // mudança de paleta esquece 1-2 e drifta silenciosamente. Espelha

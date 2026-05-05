@@ -188,7 +188,7 @@ export function ContentSettings({ onClose, scrollTo }: ContentSettingsProps) {
             <div className="mb-2 text-[11px] text-slate-300">mapa de spread</div>
             <div className="mb-2 text-[10px] leading-relaxed text-slate-500">
               Como o mapa enquadra os pontos do post. <code>fechado</code>{' '}
-              foca na região onde houve espalhamento; <code>aberto</code>{' '}
+              foca na região onde houve deriva; <code>aberto</code>{' '}
               mostra o globo todo (útil pra posts intercontinentais).
             </div>
             <MapViewPicker
@@ -402,7 +402,7 @@ const MAP_VIEW_OPTIONS: { value: MapView; label: string; hint: string }[] = [
   {
     value: 'fit-bounds',
     label: 'fechado',
-    hint: 'foca na região (origem + espalhadores)',
+    hint: 'foca na região (origem + drifters)',
   },
   {
     value: 'open',

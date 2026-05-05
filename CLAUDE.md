@@ -37,6 +37,29 @@ artefatos de sessão (auditoria pontual, conformance check de uma data
 específica) vivem em `Docs/sessions/`. Raiz de `Docs/` reservada pra
 documentação ativa.
 
+## Vocabulary mapping (UI vs spec/código)
+
+Drift mantém **separação léxica** entre camada user-facing e camada
+protocolo/código. Crítico pra novos contributors / agentes:
+
+| Camada | Termos | Onde aparece |
+|---|---|---|
+| Protocol/spec/código | **SPREAD** (kind 9079) / **BURY** (kind 9080) | Manifesto, `protocol-spec.md`, function names (`spreadPost`, `buryPost`), CSS classes (`drift-spread`, `drift-bury`), TypeScript types (`'spread' \| 'bury'`), comentários técnicos, fixture files |
+| UI user-facing | **DRIFT** (verbo da ação ↑) / **SINK** (verbo da ação ↓) / **DERIVA** (substantivo, score) | Strings JSX em `src/components/**/*.tsx`, labels de botão, toasts, onboarding copy, README seção pública |
+
+**NÃO** renomear `spreadPost()` pra `driftPost()` "por consistência" —
+quebra grep histórico, refs em PRs, documentação de spec, sem ganhar
+nada (UI já comunica DRIFT pro user via strings JSX).
+
+**NÃO** introduzir "espalhar"/"enterrar" em UI string nova — vocabulário
+PT antigo já foi migrado. Use DRIFT/SINK em copy nova.
+
+LOCK_VIA_TEST ativo: `tests/manifesto-conformance.test.ts` falha se:
+- `\bespalha\|enterra\b` aparece em strings JSX (`>...<` ou `'...'`/`"..."`).
+- Spec deixa de associar `9079` a `SPREAD` ou `9080` a `BURY`.
+
+Glossário canônico: [`Docs/design-system.md`](Docs/design-system.md) §1.
+
 ---
 
 ## TL;DR — Em 30 segundos

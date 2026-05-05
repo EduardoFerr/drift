@@ -1149,7 +1149,7 @@ function PostCard({
             </span>
           )}
         </span>
-        <span title={`spreads ${displaySpreads} · buries ${displayBuries}`}>
+        <span title={`drifts ${displaySpreads} · sinks ${displayBuries}`}>
           score <span className="text-slate-400">{post.score.toFixed(3)}</span>
         </span>
       </div>
@@ -1199,7 +1199,7 @@ function PostCard({
               capturingLocation && pending === 'spread'
                 ? 'capturando localização (até 8s)'
                 : myAction === 'spread'
-                ? 'você espalhou — clique ↓ pra mudar de opinião'
+                ? 'você driftou — clique ↓ pra mudar de opinião'
                 : undefined
             }
             aria-pressed={spreadActive}
@@ -1208,7 +1208,7 @@ function PostCard({
               ? capturingLocation
                 ? '📍 location…'
                 : 'enviando…'
-              : '↑ espalhar'}
+              : '↑ DRIFT'}
           </button>
           <button
             onClick={onBury}
@@ -1220,12 +1220,12 @@ function PostCard({
             }`}
             title={
               myAction === 'bury'
-                ? 'você enterrou — clique ↑ pra mudar de opinião'
+                ? 'você sinkou — clique ↑ pra mudar de opinião'
                 : undefined
             }
             aria-pressed={buryActive}
           >
-            {pending === 'bury' ? 'enviando…' : '↓ enterrar'}
+            {pending === 'bury' ? 'enviando…' : '↓ SINK'}
           </button>
         </div>
       </div>

@@ -8,7 +8,7 @@ Use, modifique, redistribua, hospede, force. O protocolo é o contrato; o client
 
 Rede social descentralizada construída sobre [Nostr](https://github.com/nostr-protocol/nostr). Eventos imutáveis na rede; estado materializado localmente em SQLite WASM; UI React reativa via stores Zustand. Sem servidor proprietário, sem chave mestra, sem algoritmo de feed personalizado.
 
-A interação core são **swipes**: ↑ espalha · ↓ enterra · ← → navega subposts. PostViewer funciona como fila estilo Tinder — espalhar/enterrar avança automaticamente pro próximo post.
+A interação core são **swipes**: ↑ **DRIFT** (drifta) · ↓ **SINK** (afunda) · ← → navega subposts. PostViewer funciona como fila estilo Tinder — drift/sink avança automaticamente pro próximo post. Métrica de engajamento: **DERIVA** (score determinístico, não personalizado).
 
 ```
 ESCRITA:  UI → Negócio → Protocolo → Nostr → onNostrEvent() → SQLite → invalidateFeed()

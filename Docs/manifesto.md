@@ -7,6 +7,12 @@ adotado, modificado, redistribuído ou substituído por qualquer fork sem
 permissão. O contrato técnico do Drift não tem dono; é descrição de uma
 intenção compartilhável. Código continua sob MIT (ver [LICENSE](../LICENSE)).
 
+**Vocabulário UI vs Spec:** Manifesto e spec usam **SPREAD** (kind 9079)
+e **BURY** (kind 9080) como nomes técnicos. UI user-facing usa **DRIFT**
+(verbo da ação ↑), **SINK** (verbo da ação ↓) e **DERIVA** (substantivo,
+métrica de score). Separação léxica intencional — protocolo é eterno;
+copy UI é mutável. Glossário canônico em [`design-system.md`](design-system.md) §1.
+
 ---
 
 > *"Se eu quero uma rede livre de censura, eu também devo ser incapaz de censurá-la."*

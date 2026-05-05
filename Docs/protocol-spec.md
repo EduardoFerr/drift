@@ -14,12 +14,18 @@ Drift é um sub-protocolo construído sobre [Nostr](https://github.com/nostr-pro
 (NIP-01). Define quatro `kind`s na faixa de regular events imutáveis
 (1–9999):
 
-| Kind | Nome   | Função |
-|------|--------|--------|
-| 9078 | POST   | publicar conteúdo |
-| 9079 | SPREAD | sinalizar interesse positivo (= "espalhar") |
-| 9080 | BURY   | sinalizar interesse negativo (= "enterrar") |
-| 9081 | REPORT | reportar conteúdo a comunidade |
+| Kind | Nome (spec) | Label UI | Função |
+|------|-------------|----------|--------|
+| 9078 | POST        | (post)   | publicar conteúdo |
+| 9079 | SPREAD      | DRIFT (↑) | sinalizar interesse positivo |
+| 9080 | BURY        | SINK (↓)  | sinalizar interesse negativo |
+| 9081 | REPORT      | (report)  | reportar conteúdo a comunidade |
+
+**Convenção léxica.** Spec, código e manifesto usam **SPREAD** e **BURY**
+(nomes técnicos eternos, gravados em eventos imutáveis). UI user-facing
+usa **DRIFT**, **SINK** e **DERIVA** (substantivo da métrica de score).
+Mantida separação evita refactor cascata em refs de protocolo quando UI
+copy muda. Glossário em [`design-system.md`](design-system.md) §1.
 
 Drift assume conformidade NIP-01 sem extensões obrigatórias. Eventos
 Drift coexistem com eventos `kind: 1` e outros — clientes Nostr não

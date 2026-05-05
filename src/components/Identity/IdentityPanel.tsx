@@ -187,8 +187,8 @@ function BackupTab({ identity }: { identity: DriftIdentity }) {
 
       <div className="rounded border border-yellow-900/60 bg-yellow-950/10 p-3 text-[10px] leading-relaxed text-yellow-300/70">
         Esta é a sua identidade na rede Drift. Quem tiver acesso a ela
-        controla a sua conta — pode publicar como você, espalhar e
-        enterrar como você. Guarde offline (papel, gerenciador de
+        controla a sua conta — pode publicar como você, drift e
+        sink como você. Guarde offline (papel, gerenciador de
         senhas, fotografia em local seguro). Anthropic, Drift e Nostr
         não conseguem recuperá-la se você perder.
       </div>

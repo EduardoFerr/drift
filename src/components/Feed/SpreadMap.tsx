@@ -362,8 +362,8 @@ export function SpreadMap({
         title="sem dados de localização"
         body={
           <>
-            Spreads deste post ainda não têm tag <code>location</code>.
-            Quando alguém com GPS ativo espalhar, os arcos aparecem aqui.
+            Drifts deste post ainda não têm tag <code>location</code>.
+            Quando alguém com GPS ativo driftar, os arcos aparecem aqui.
           </>
         }
       />
@@ -374,7 +374,7 @@ export function SpreadMap({
     <div className={`relative overflow-hidden rounded border border-drift-border ${className}`}>
       <div ref={containerRef} className="h-full w-full" />
       <div className="pointer-events-none absolute bottom-2 left-2 rounded bg-drift-bg/80 px-2 py-1 text-[10px] text-slate-400 backdrop-blur-sm">
-        {data.totalSpreads} spreads · {data.countries.length}{' '}
+        {data.totalSpreads} drifts · {data.countries.length}{' '}
         {data.countries.length === 1 ? 'país' : 'países'}
       </div>
       <div

@@ -260,8 +260,8 @@ export function PostViewer({
           )}
         </span>
         <div className="flex items-center gap-3">
-          <span title={`spreads ${displaySpreads} · buries ${displayBuries}`}>
-            score <span className="text-slate-300">{post.score.toFixed(3)}</span>
+          <span title={`drifts ${displaySpreads} · sinks ${displayBuries}`}>
+            DERIVA <span className="text-slate-300">{post.score.toFixed(3)}</span>
           </span>
           <button
             onClick={handleTogglePin}
@@ -287,7 +287,7 @@ export function PostViewer({
                 ? 'border-drift-accent text-drift-accent'
                 : 'border-drift-border hover:border-drift-accent hover:text-drift-accent'
             }`}
-            title="mapa de espalhamento"
+            title="mapa de deriva"
             aria-label="Abrir mapa"
           >
             🗺️
@@ -427,7 +427,7 @@ export function PostViewer({
               próximo: anon…{queue.next.authorPub.slice(-6)}
             </span>
           ) : (
-            <span>↑ espalhar · ↓ enterrar{total > 1 && ' · ← → navega'}</span>
+            <span>↑ DRIFT · ↓ SINK{total > 1 && ' · ← → navega'}</span>
           )}
         </div>
         <div className="flex gap-2">
@@ -443,7 +443,7 @@ export function PostViewer({
               capturingLocation && pendingAction === 'spread'
                 ? 'capturando localização (até 8s)'
                 : myAction === 'spread'
-                ? 'você espalhou — ↓ pra mudar de opinião'
+                ? 'você driftou — ↓ pra mudar de opinião'
                 : undefined
             }
             aria-pressed={spreadActive}
@@ -464,7 +464,7 @@ export function PostViewer({
             }`}
             title={
               myAction === 'bury'
-                ? 'você enterrou — ↑ pra mudar de opinião'
+                ? 'você sinkou — ↑ pra mudar de opinião'
                 : undefined
             }
             aria-pressed={buryActive}
