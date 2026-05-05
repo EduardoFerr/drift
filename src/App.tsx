@@ -10,7 +10,9 @@ import {
 } from './lib/geolocation'
 import { restartSync, useSyncStore } from './lib/sync'
 import { createPost, spreadPost, buryPost } from './lib/protocol'
-import { applyContentFilters, getMyAction, refreshFeed, setFeedTab, useFeedStore } from './lib/feed'
+import { applyContentFilters, getMyAction, refreshFeed, useFeedStore } from './lib/feed'
+import { FeedTabs } from './components/Feed/FeedTabs'
+import { PostCard } from './components/Feed/PostCard'
 import {
   startBoot,
   useBootStore,
@@ -972,17 +974,7 @@ function Feed({
   return (
     <div>
       <div className="mb-3 flex items-center justify-between gap-2 border-b border-drift-border pb-2">
-        <div className="flex gap-1 text-[10px] uppercase tracking-widest">
-          <FeedTabBtn active={tab === 'global'} onClick={() => void setFeedTab('global')}>
-            global
-          </FeedTabBtn>
-          <FeedTabBtn active={tab === 'following'} onClick={() => void setFeedTab('following')}>
-            seguindo
-          </FeedTabBtn>
-          <FeedTabBtn active={tab === 'trending'} onClick={() => void setFeedTab('trending')}>
-            trending
-          </FeedTabBtn>
-        </div>
+        <FeedTabs />
         <span className="text-[10px] text-slate-600">{posts.length}</span>
       </div>
 
@@ -1022,29 +1014,6 @@ function Feed({
   )
 }
 
-function FeedTabBtn({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean
-  onClick: () => void
-  children: React.ReactNode
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`px-2 py-1 transition-colors ${
-        active
-          ? 'border-b-2 border-drift-accent text-drift-accent'
-          : 'border-b-2 border-transparent text-slate-600 hover:text-slate-300'
-      }`}
-    >
-      {children}
-    </button>
-  )
-}
-
 function FeedEmpty({ tab }: { tab: 'global' | 'following' | 'trending' }) {
   if (tab === 'following') {
     return (
@@ -1060,7 +1029,7 @@ function FeedEmpty({ tab }: { tab: 'global' | 'following' | 'trending' }) {
       <div className="rounded border border-dashed border-drift-border p-8 text-center text-xs text-slate-600">
         Nada em alta nas últimas 24h.
         <br />
-        Espalhar um post recente vai puxar ele pro trending.
+        Driftar um post recente vai puxar ele pro trending.
       </div>
     )
   }
@@ -1091,147 +1060,8 @@ function HiddenCard({
   )
 }
 
-function PostCard({
-  post,
-  isMine,
-  pending,
-  myAction,
-  capturingLocation,
-  blurred,
-  onOpen,
-  onSpread,
-  onBury,
-}: {
-  post: Post
-  isMine: boolean
-  pending: 'spread' | 'bury' | null
-  /**
-   * Última ação do user neste post (lida do SQLite). Usado pra destacar
-   * o botão correspondente — semântica "última ação vale". `null` quando
-   * o user ainda não interagiu.
-   */
-  myAction: 'spread' | 'bury' | null
-  /** GPS capture em curso pra spread/bury deste post (até 8s). */
-  capturingLocation: boolean
-  blurred: boolean
-  onOpen: () => void
-  onSpread: () => void
-  onBury: () => void
-}) {
-  const text = post.subposts[0]?.text ?? '(sem conteúdo de texto)'
-  const hasImage = post.subposts.some((s) => s.imageUrl)
-  // Optimistic UI (manifesto §10 + arquitetura §2.4): mostra +1 imediato
-  // quando o user acaba de espalhar/enterrar. Quando o evento real chega
-  // via subscribe, persistSpread/Bury → recalculateScore atualiza
-  // post.spreads/buries no banco e `pending` é limpo pelo useEffect que
-  // observa getMyAction. Daí o "+1 optimistic" some sem flicker porque
-  // post.spreads do banco já incluiu o evento.
-  const displaySpreads = post.spreads + (pending === 'spread' ? 1 : 0)
-  const displayBuries = post.buries + (pending === 'bury' ? 1 : 0)
-
-  // Estado visual efetivo dos botões: pending (em vôo) toma precedência,
-  // depois myAction (confirmada). Botão destacado = última ação do user.
-  const effectiveAction: 'spread' | 'bury' | null = pending ?? myAction
-  const spreadActive = effectiveAction === 'spread'
-  const buryActive = effectiveAction === 'bury'
-
-  return (
-    <article className="rounded border border-drift-border bg-drift-surface p-4">
-      <div className="mb-2 flex items-center justify-between text-[10px] text-slate-600">
-        <span>
-          {isMine ? 'você' : 'anon'}…{post.authorPub.slice(-8)} · {timeAgo(post.createdAt)}
-          {post.contentWarning && (
-            <span
-              className="ml-2 rounded bg-yellow-900/30 px-1.5 py-0.5 text-yellow-300"
-              title="aviso declarado pelo autor (manifesto §27)"
-            >
-              ⚠ {post.contentWarning}
-            </span>
-          )}
-        </span>
-        <span title={`drifts ${displaySpreads} · sinks ${displayBuries}`}>
-          score <span className="text-slate-400">{post.score.toFixed(3)}</span>
-        </span>
-      </div>
-
-      <button
-        onClick={onOpen}
-        className="block w-full text-left"
-        aria-label="abrir post em tela cheia"
-      >
-        <div
-          className={`transition-[filter] duration-200 ${
-            blurred ? 'select-none blur-md' : ''
-          }`}
-        >
-          <p className="whitespace-pre-wrap break-words text-sm text-slate-200">
-            {text}
-          </p>
-          {hasImage && (
-            <div className="mt-2 text-[10px] uppercase tracking-widest text-slate-600">
-              [imagem · toque pra abrir]
-            </div>
-          )}
-        </div>
-      </button>
-
-      <div className="mt-3 flex items-center justify-between text-[10px]">
-        <div className="flex gap-3 text-slate-500">
-          <span className="text-drift-spread">↑ {displaySpreads}</span>
-          <span className="text-drift-bury">↓ {displayBuries}</span>
-          <button
-            onClick={onOpen}
-            className="text-slate-500 hover:text-drift-accent"
-          >
-            abrir →
-          </button>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={onSpread}
-            disabled={pending !== null}
-            className={`rounded border px-2 py-1 transition-colors disabled:opacity-40 ${
-              spreadActive
-                ? 'border-drift-spread bg-emerald-900/40 text-emerald-300'
-                : 'border-drift-spread/40 text-drift-spread hover:bg-emerald-950/30'
-            }`}
-            title={
-              capturingLocation && pending === 'spread'
-                ? 'capturando localização (até 8s)'
-                : myAction === 'spread'
-                ? 'você driftou — clique ↓ pra mudar de opinião'
-                : undefined
-            }
-            aria-pressed={spreadActive}
-          >
-            {pending === 'spread'
-              ? capturingLocation
-                ? '📍 location…'
-                : 'enviando…'
-              : '↑ DRIFT'}
-          </button>
-          <button
-            onClick={onBury}
-            disabled={pending !== null}
-            className={`rounded border px-2 py-1 transition-colors disabled:opacity-40 ${
-              buryActive
-                ? 'border-drift-bury bg-red-900/40 text-red-300'
-                : 'border-drift-bury/40 text-drift-bury hover:bg-red-950/30'
-            }`}
-            title={
-              myAction === 'bury'
-                ? 'você sinkou — clique ↑ pra mudar de opinião'
-                : undefined
-            }
-            aria-pressed={buryActive}
-          >
-            {pending === 'bury' ? 'enviando…' : '↓ SINK'}
-          </button>
-        </div>
-      </div>
-    </article>
-  )
-}
+// PostCard extraído pra ./components/Feed/PostCard.tsx em V_pre0
+// (HIMYM Round 1 — Lily flag de App.tsx 1525 linhas).
 
 // ─── Bootstrap view ─────────────────────────────────────────────────
 
@@ -1513,12 +1343,9 @@ function Check({
   )
 }
 
-function timeAgo(unixSeconds: number): string {
-  const diff = Math.floor(Date.now() / 1000) - unixSeconds
-  if (diff < 60) return `${diff}s`
-  if (diff < 3600) return `${Math.floor(diff / 60)}min`
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h`
-  return `${Math.floor(diff / 86400)}d`
-}
+// `timeAgo` removido em V_pre0 — vive em components/Feed/PostCard.tsx.
+// Outros consumidores (PostViewer, LocalListsSettings) têm cópias
+// próprias com signatures diferentes (segundos vs ms). Consolidação
+// em util compartilhado é trabalho separado (Lily débito).
 
 export default App
