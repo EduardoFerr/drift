@@ -344,6 +344,31 @@ describe('Vocabulary UI guard (V0 redesign — Marshall LOCK_VIA_TEST)', () => {
       .replace(/(^|[^:'"])\/\/.*$/gm, '$1')
   }
 
+  /**
+   * Detecta se uma linha contém vocab UI antigo em contexto JSX/string.
+   * Cobre 3 casos:
+   *   1. JSX text inline: `<p>Espalhar...</p>` (entre > e <)
+   *   2. JSX text multi-line: linha começa com whitespace + texto (não
+   *      código JS), tipicamente após <br/> ou <tag>
+   *   3. String literal: `'espalhar'`, `"enterrar"`, ou backtick
+   */
+  function detectVocabOffense(line: string): boolean {
+    const banned = /\b(?:espalha|enterra)\w*\b/i
+    if (!banned.test(line)) return false
+    // Caso (3): string literal contendo o termo
+    if (/(['"`])[^'"`]*\b(?:espalha|enterra)\w*\b[^'"`]*\1/i.test(line)) return true
+    // Caso (1): JSX text após >
+    if (/>[^<]*\b(?:espalha|enterra)\w*\b/i.test(line)) return true
+    // Caso (2): linha de JSX text puro (sem código TS — typicamente
+    // só whitespace + palavra). Heurística: linha não tem `=`, `(`,
+    // `{`, `:` antes do termo (caso geral de prop/expr) e não tem
+    // typescript keywords. Falsos positivos aceitos: serão pegos
+    // visualmente em PR review se aparecerem.
+    const trimmed = line.trim()
+    const hasJsCode = /[={(:]/.test(trimmed.slice(0, trimmed.search(banned)))
+    return !hasJsCode
+  }
+
   function findFiles(dir: string): string[] {
     const fs = require('node:fs') as typeof import('node:fs')
     const path = require('node:path') as typeof import('node:path')
@@ -365,13 +390,12 @@ describe('Vocabulary UI guard (V0 redesign — Marshall LOCK_VIA_TEST)', () => {
   it('zero "espalha\\|enterra" em strings/JSX de src/**/*.tsx (UI vocab antigo migrado)', () => {
     const tsxFiles = findFiles(join(ROOT, 'src'))
     const offenders: { file: string; line: number; text: string }[] = []
-    const pattern = /(?:>[^<]*|['"`][^'"`]*)\b(?:espalha|enterra)\w*\b/i
 
     for (const file of tsxFiles) {
       const content = stripComments(readFileSync(file, 'utf8'))
       const lines = content.split('\n')
       for (let i = 0; i < lines.length; i++) {
-        if (pattern.test(lines[i])) {
+        if (detectVocabOffense(lines[i])) {
           offenders.push({
             file: file.replace(ROOT, '').replace(/\\/g, '/'),
             line: i + 1,
