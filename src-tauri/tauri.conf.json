@@ -20,7 +20,7 @@
         "resizable": true,
         "fullscreen": false,
         "decorations": true,
-        "backgroundColor": "#0a0a0f",
+        "backgroundColor": "#0c0c0b",
         "theme": "Dark"
       }
     ],

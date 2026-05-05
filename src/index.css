@@ -2,11 +2,33 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * CSS variables espelhando tokens Tailwind — útil pra inline styles
+ * (decorative letter em SubpostLayout V4, animações framer-motion que
+ * preferem hex direto). Source of truth = tailwind.config.js; aqui é
+ * cópia. LOCK_VIA_TEST garante paridade.
+ */
+:root {
+  /* Surface */
+  --drift-bg: #0c0c0b;
+  --drift-surface: #15151a;
+  --drift-border: #2a2a2e;
+  /* Brand */
+  --drift-accent: #e8ff5a;
+  --drift-accent2: #5affd4;
+  /* Type */
+  --drift-text: #f0f0ea;
+  --drift-muted: #4a4a46;
+  /* Role (protocolo) */
+  --drift-spread: #34d399;
+  --drift-bury: #f87171;
+}
+
 @layer base {
   html,
   body,
   #root {
-    @apply h-full bg-drift-bg text-slate-200 antialiased;
+    @apply h-full bg-drift-bg text-drift-text antialiased;
     overscroll-behavior: none;
   }
   body {

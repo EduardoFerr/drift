@@ -108,8 +108,8 @@ export default defineConfig({
         // Sem isso, o plugin emite default 'en' que confunde screen readers.
         lang: 'pt-BR',
         dir: 'ltr',
-        theme_color: '#0a0a0f',
-        background_color: '#08080f',
+        theme_color: '#0c0c0b',
+        background_color: '#0c0c0b',
         display: 'standalone',
         // Fallback gracioso — alguns browsers desktop preferem
         // window-controls-overlay (WCO) pra integração de barra de título.

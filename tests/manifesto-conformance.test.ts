@@ -327,6 +327,51 @@ describe('Schema kind 9078 tag `d` presente em fachadas públicas (Marshall risc
   })
 })
 
+describe('Theme color paridade 5-way (V1 redesign — Marshall LOCK_VIA_TEST)', () => {
+  // Paleta hex aparece em 5 fontes de verdade. Sem teste, próxima
+  // mudança de paleta esquece 1-2 e drifta silenciosamente. Espelha
+  // problema CSP que já foi resolvido. Source canônico: tailwind.config.js
+  // `theme.extend.colors.drift.bg`. Outras 4 fontes devem replicar.
+  it('theme_color/background_color batem entre tailwind, index.css, vite, index.html, tauri', () => {
+    // 1. Tailwind config (canônico)
+    const tailwindCfg = readFileSync(join(ROOT, 'tailwind.config.js'), 'utf8')
+    const tailwindBgMatch = tailwindCfg.match(/drift:\s*\{[^}]*\bbg:\s*['"]([^'"]+)['"]/s)
+    expect(tailwindBgMatch, 'tailwind.config.js deve definir drift.bg').toBeTruthy()
+    const canonicalBg = tailwindBgMatch![1].toLowerCase()
+
+    // 2. index.css :root --drift-bg
+    const indexCss = readFileSync(join(ROOT, 'src', 'index.css'), 'utf8')
+    const cssVarMatch = indexCss.match(/--drift-bg:\s*([^;]+);/)
+    expect(cssVarMatch, 'src/index.css deve definir --drift-bg em :root').toBeTruthy()
+    expect(cssVarMatch![1].trim().toLowerCase(), 'src/index.css --drift-bg deve bater com tailwind').toBe(canonicalBg)
+
+    // 3. vite.config.ts manifest theme_color + background_color
+    const viteCfg = readFileSync(join(ROOT, 'vite.config.ts'), 'utf8')
+    const themeColorMatch = viteCfg.match(/theme_color:\s*['"]([^'"]+)['"]/)
+    const bgColorMatch = viteCfg.match(/background_color:\s*['"]([^'"]+)['"]/)
+    expect(themeColorMatch, 'vite.config.ts deve definir theme_color').toBeTruthy()
+    expect(bgColorMatch, 'vite.config.ts deve definir background_color').toBeTruthy()
+    expect(themeColorMatch![1].toLowerCase(), 'vite theme_color deve bater com tailwind drift.bg').toBe(canonicalBg)
+    expect(bgColorMatch![1].toLowerCase(), 'vite background_color deve bater com tailwind drift.bg').toBe(canonicalBg)
+
+    // 4. index.html <meta name="theme-color">
+    const indexHtml = readFileSync(join(ROOT, 'index.html'), 'utf8')
+    const metaThemeMatch = indexHtml.match(/<meta\s+name="theme-color"\s+content="([^"]+)"/)
+    expect(metaThemeMatch, 'index.html deve ter <meta name="theme-color">').toBeTruthy()
+    expect(metaThemeMatch![1].toLowerCase(), 'index.html theme-color deve bater com tailwind drift.bg').toBe(
+      canonicalBg,
+    )
+
+    // 5. tauri.conf.json window backgroundColor
+    const tauriConf = JSON.parse(readFileSync(join(ROOT, 'src-tauri', 'tauri.conf.json'), 'utf8')) as {
+      app?: { windows?: Array<{ backgroundColor?: string }> }
+    }
+    const tauriBg = tauriConf.app?.windows?.[0]?.backgroundColor
+    expect(tauriBg, 'tauri.conf.json deve ter app.windows[0].backgroundColor').toBeTruthy()
+    expect(tauriBg!.toLowerCase(), 'tauri backgroundColor deve bater com tailwind drift.bg').toBe(canonicalBg)
+  })
+})
+
 describe('CSP paridade Tauri ↔ Vercel (Marshall risco #3)', () => {
   // Marshall apontou que vercel.json CSP tem `font-src`, `manifest-src`,
   // `form-action` que tauri.conf.json não tem. Paridade chave-a-chave
