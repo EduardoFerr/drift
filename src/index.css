@@ -1,3 +1,23 @@
+/*
+ * Fontes locais — Syne (display) + DM Mono (body/UI). V2 do redesign
+ * v0.7. Bundled via @fontsource/* packages: Vite empacota os woff2 em
+ * /assets/, zero requests pra fonts.googleapis.com ou fonts.gstatic.com.
+ *
+ * LOCK_VIA_TEST em manifesto-conformance.test.ts garante que nenhum
+ * import de Google Fonts URL volta a aparecer no source.
+ *
+ * Subset latin (latin-ext incluído via fontsource default). Variable
+ * font Syne cobre weights 400-800 num único woff2 (~30KB); DM Mono
+ * tem arquivos por weight.
+ *
+ * Atribuição (SIL OFL): ver Docs/fonts-licenses.md.
+ */
+@import '@fontsource-variable/syne/wght.css';
+@import '@fontsource/dm-mono/300.css';
+@import '@fontsource/dm-mono/400.css';
+@import '@fontsource/dm-mono/500.css';
+@import '@fontsource/dm-mono/300-italic.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

@@ -41,10 +41,14 @@ export default {
         },
       },
       fontFamily: {
-        // V2 vai adicionar `display: ['Syne', ...]` quando fontes locais
-        // estiverem em public/fonts/. Por enquanto monospace stack
-        // permanece — Syne ainda não bundled.
-        mono: ['DM Mono', 'SF Mono', 'Fira Code', 'monospace'],
+        // V2 (commit subsequente): fontes locais via @fontsource.
+        // 'Syne Variable' = nome canônico do package (variable font
+        // único arquivo cobrindo weights 400-800). 'DM Mono' tem
+        // weights 300/400/500 + 300-italic bundled.
+        // Fallbacks: system stack pra graceful degrade durante FOUT
+        // (se woff2 ainda não carregou, monospace fallback).
+        display: ['"Syne Variable"', 'Syne', 'system-ui', 'sans-serif'],
+        mono: ['"DM Mono"', 'SF Mono', 'Fira Code', 'monospace'],
       },
     },
   },

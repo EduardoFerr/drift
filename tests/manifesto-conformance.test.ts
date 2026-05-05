@@ -421,6 +421,76 @@ describe('Vocabulary UI guard (V0 redesign — Marshall LOCK_VIA_TEST)', () => {
   })
 })
 
+describe('Fontes self-hosted (V2 redesign — Marshall LOCK_VIA_TEST)', () => {
+  // PRIVACY.md afirma "cliente roda 100% local" e lista terceiros
+  // explicitamente. Google Fonts (fonts.googleapis.com / fonts.gstatic.com)
+  // NÃO está na lista — qualquer request a esses domínios viola a
+  // claim de privacy-first. V2 substituiu Google Fonts por @fontsource
+  // (woff2 bundled em /assets/). Este teste garante que reaparecimento
+  // de URL externa em CSS/HTML/TS é detectado em CI.
+  it('zero referências a fonts.googleapis.com / fonts.gstatic.com em src/, public/, index.html', () => {
+    const fs = require('node:fs') as typeof import('node:fs')
+    const path = require('node:path') as typeof import('node:path')
+
+    const targets: string[] = []
+    function walk(dir: string): void {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name)
+        if (entry.isDirectory()) {
+          if (entry.name !== 'node_modules' && entry.name !== 'dist' && entry.name !== '.git') {
+            walk(full)
+          }
+        } else if (entry.isFile()) {
+          const ext = path.extname(entry.name)
+          if (['.ts', '.tsx', '.css', '.html', '.js', '.jsx'].includes(ext)) {
+            targets.push(full)
+          }
+        }
+      }
+    }
+    walk(join(ROOT, 'src'))
+    walk(join(ROOT, 'public'))
+    targets.push(join(ROOT, 'index.html'))
+
+    const offenders: { file: string; line: number; text: string }[] = []
+    const pattern = /fonts\.(?:googleapis|gstatic)\.com/i
+
+    /**
+     * Strip comments. Cobre CSS (/* ... *\/) + JS/TS (// ... e /* ... *\/)
+     * + HTML (<!-- ... -->). Multi-line block comments removidos antes
+     * de split por linha pra preservar line numbers.
+     */
+    function stripAllComments(source: string): string {
+      return source
+        .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '))
+        .replace(/<!--[\s\S]*?-->/g, (m) => m.replace(/[^\n]/g, ' '))
+        .replace(/(^|[^:'"])\/\/.*$/gm, (m, prefix) => prefix + ''.padEnd(m.length - prefix.length, ' '))
+    }
+
+    for (const file of targets) {
+      const content = stripAllComments(readFileSync(file, 'utf8'))
+      const lines = content.split('\n')
+      for (let i = 0; i < lines.length; i++) {
+        if (pattern.test(lines[i])) {
+          offenders.push({
+            file: file.replace(ROOT, '').replace(/\\/g, '/'),
+            line: i + 1,
+            text: lines[i].trim().slice(0, 100),
+          })
+        }
+      }
+    }
+
+    expect(
+      offenders,
+      `Google Fonts URL detectada — viola privacy-first claim (PRIVACY.md). ` +
+        `Use @fontsource/* (bundled woff2) ou self-host. Hits:\n${offenders
+          .map((o) => `  ${o.file}:${o.line}: ${o.text}`)
+          .join('\n')}`,
+    ).toEqual([])
+  })
+})
+
 describe('Theme color paridade 5-way (V1 redesign — Marshall LOCK_VIA_TEST)', () => {
   // Paleta hex aparece em 5 fontes de verdade. Sem teste, próxima
   // mudança de paleta esquece 1-2 e drifta silenciosamente. Espelha
