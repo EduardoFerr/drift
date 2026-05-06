@@ -75,7 +75,9 @@ function App() {
   // Quando o user clica num indicador do Header (📍 location ou 🌐/🧅/🛡
   // network), abre Settings já scrollado pra seção certa. Default null =
   // sem scroll.
-  const [settingsScrollTo, setSettingsScrollTo] = useState<'location' | 'network' | null>(null)
+  const [settingsScrollTo, setSettingsScrollTo] = useState<
+    'filters' | 'location' | 'map' | 'network' | 'diagnostic' | null
+  >(null)
   const [showRelays, setShowRelays] = useState(false)
   const [showSwitcher, setShowSwitcher] = useState(false)
   const [showLists, setShowLists] = useState(false)
@@ -700,8 +702,24 @@ function App() {
                 case 'listas':
                   setShowLists(true)
                   break
-                case 'settings':
-                  setSettingsScrollTo(null)
+                case 'filtros':
+                  setSettingsScrollTo('filters')
+                  setShowSettings(true)
+                  break
+                case 'location':
+                  setSettingsScrollTo('location')
+                  setShowSettings(true)
+                  break
+                case 'mapa':
+                  setSettingsScrollTo('map')
+                  setShowSettings(true)
+                  break
+                case 'rede':
+                  setSettingsScrollTo('network')
+                  setShowSettings(true)
+                  break
+                case 'diagnostico':
+                  setSettingsScrollTo('diagnostic')
                   setShowSettings(true)
                   break
                 case 'status':
@@ -988,7 +1006,11 @@ type SettingsTarget =
   | 'identidades'
   | 'relays'
   | 'listas'
-  | 'settings'
+  | 'filtros'
+  | 'location'
+  | 'mapa'
+  | 'rede'
+  | 'diagnostico'
   | 'status'
   | 'limpar'
 
@@ -1007,6 +1029,9 @@ function SettingsRoot({
   // último porque diagnostic + destrutivo. Cada categoria tem header
   // muted small caps. Mantém UX previsível: idioma do label + hint
   // explicativo + chevron à direita.
+  // V9.2c — cada seção da ContentSettings também aparece como entry
+  // direto no menu inicial (não nested). Click → scroll-to-section
+  // em ContentSettings (rota direta sem buscar na overlay grande).
   const groups: {
     title: string
     items: {
@@ -1035,15 +1060,30 @@ function SettingsRoot({
           label: 'relays',
           hint: 'gerenciar relays + NIP-65',
         },
+        {
+          target: 'rede',
+          label: 'modo de rede',
+          hint: 'clearnet / tor / onion-only — manifesto §15',
+        },
       ],
     },
     {
       title: 'conteúdo',
       items: [
         {
-          target: 'settings',
+          target: 'filtros',
           label: 'filtros',
-          hint: 'content-warning + privacidade',
+          hint: 'NSFW / spoilers / anúncios',
+        },
+        {
+          target: 'location',
+          label: 'location',
+          hint: 'granularidade nos meus posts — §28',
+        },
+        {
+          target: 'mapa',
+          label: 'mapa de spread',
+          hint: 'enquadramento fechado / aberto',
         },
         {
           target: 'listas',
@@ -1059,6 +1099,11 @@ function SettingsRoot({
           target: 'status',
           label: showDiagnostic ? 'fechar status' : 'status',
           hint: 'painel de diagnóstico',
+        },
+        {
+          target: 'diagnostico',
+          label: 'redefinir cache',
+          hint: 'reconstrói banco local sem apagar identidade',
         },
         {
           target: 'limpar',

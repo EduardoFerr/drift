@@ -18,14 +18,26 @@ import { isTauri } from '../../lib/runtime'
 import { SEED_RELAY_CONFIGS } from '../../config/relays'
 import type { LocationGranularity, MapView, NetworkMode } from '../../types/drift'
 
+export type SettingsAnchor =
+  | 'filters'
+  | 'location'
+  | 'map'
+  | 'network'
+  | 'diagnostic'
+
 export interface ContentSettingsProps {
   onClose: () => void
   /**
-   * Ancora opcional pra scroll-to-section ao montar. Reconhece:
-   *   - 'location' — vem do indicador 📍 no Header
-   *   - 'network'  — vem do indicador 🌐/🧅/🛡️ no Header
+   * Ancora opcional pra scroll-to-section ao montar. Manifesto §27/28
+   * + V9.2 SettingsRoot: cada seção da ContentSettings também aparece
+   * como opção direta no menu inicial.
+   *   - 'filters'    — toggles NSFW/spoilers/ads
+   *   - 'location'   — granularidade
+   *   - 'map'        — mapa de spread (fechado/aberto)
+   *   - 'network'    — modo de rede (clearnet/tor/onion-only)
+   *   - 'diagnostic' — redefinir cache local
    */
-  scrollTo?: 'location' | 'network'
+  scrollTo?: SettingsAnchor
 }
 
 export function ContentSettings({ onClose, scrollTo }: ContentSettingsProps) {
@@ -34,8 +46,11 @@ export function ContentSettings({ onClose, scrollTo }: ContentSettingsProps) {
   const bootStep = useBootStore((s) => s.step)
   const degradedReasons = useBootStore((s) => s.degradedReasons)
   const [rebuilding, setRebuilding] = useState(false)
+  const filtersSectionRef = useRef<HTMLDivElement | null>(null)
   const locationSectionRef = useRef<HTMLDivElement | null>(null)
+  const mapSectionRef = useRef<HTMLDivElement | null>(null)
   const networkSectionRef = useRef<HTMLDivElement | null>(null)
+  const diagnosticSectionRef = useRef<HTMLDivElement | null>(null)
 
   const tauriRuntime = isTauri()
 
@@ -79,13 +94,19 @@ export function ContentSettings({ onClose, scrollTo }: ContentSettingsProps) {
     (r) => r.code === 'TOR_BOOTSTRAP_FAILED' || r.code === 'TOR_FEATURE_OFF',
   )
 
-  // Scroll-to-section quando aberto via indicador GPS / rede no Header.
+  // V9.2 scroll-to-section: cada anchor → ref correspondente.
+  // smooth + center pra dar contexto (resto da seção visível).
   useEffect(() => {
-    if (scrollTo === 'location' && locationSectionRef.current) {
-      locationSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    } else if (scrollTo === 'network' && networkSectionRef.current) {
-      networkSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    const refMap: Record<SettingsAnchor, React.RefObject<HTMLDivElement | null>> = {
+      filters: filtersSectionRef,
+      location: locationSectionRef,
+      map: mapSectionRef,
+      network: networkSectionRef,
+      diagnostic: diagnosticSectionRef,
     }
+    if (!scrollTo) return
+    const target = refMap[scrollTo].current
+    if (target) target.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }, [scrollTo])
 
   async function handleRebuild() {
@@ -150,6 +171,7 @@ export function ContentSettings({ onClose, scrollTo }: ContentSettingsProps) {
         </p>
 
         <section className="space-y-4">
+          <div ref={filtersSectionRef} className="space-y-4">
           <Toggle
             label="mostrar NSFW / violência sem blur"
             hint="default OFF — posts marcados aparecem com blur até toque"
@@ -168,6 +190,7 @@ export function ContentSettings({ onClose, scrollTo }: ContentSettingsProps) {
             value={prefs.hide_ads}
             onChange={(v) => setPref('hide_ads', v)}
           />
+          </div>
 
           <div ref={locationSectionRef} className="border-t border-drift-border pt-4">
             <div className="mb-2 text-[11px] text-slate-300">
@@ -184,7 +207,7 @@ export function ContentSettings({ onClose, scrollTo }: ContentSettingsProps) {
             />
           </div>
 
-          <div className="border-t border-drift-border pt-4">
+          <div ref={mapSectionRef} className="border-t border-drift-border pt-4">
             <div className="mb-2 text-[11px] text-slate-300">mapa de spread</div>
             <div className="mb-2 text-[10px] leading-relaxed text-slate-500">
               Como o mapa enquadra os pontos do post. <code>fechado</code>{' '}
@@ -310,7 +333,7 @@ export function ContentSettings({ onClose, scrollTo }: ContentSettingsProps) {
             )}
           </div>
 
-          <div className="border-t border-drift-border pt-4">
+          <div ref={diagnosticSectionRef} className="border-t border-drift-border pt-4">
             <div className="mb-2 text-[11px] text-slate-300">
               diagnóstico
             </div>
