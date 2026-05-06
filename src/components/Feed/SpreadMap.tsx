@@ -28,8 +28,10 @@ import { useSpreadMap } from '../../hooks/useSpreadMap'
 import { usePrefsStore } from '../../lib/prefs'
 
 export interface SpreadMapProps {
-  postId: string
+  postId: string | null
   className?: string
+  mode?: 'post' | 'global'
+  onModeChange?: (mode: 'post' | 'global') => void
   /**
    * Callback opcional pra abrir Settings na seção `location` (manifesto §28
    * — location é opt-in). Se passada, o estado vazio do mapa renderiza um
@@ -138,9 +140,11 @@ interface HeatmapPointProps {
 export function SpreadMap({
   postId,
   className = '',
+  mode = 'post',
+  onModeChange,
   onOpenLocationSettings,
 }: SpreadMapProps) {
-  const { data, loading, error } = useSpreadMap(postId)
+  const { data, loading, error } = useSpreadMap(postId, mode)
   const granularity = usePrefsStore((s) => s.location_granularity)
   const mapView = usePrefsStore((s) => s.map_view)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -373,14 +377,26 @@ export function SpreadMap({
   return (
     <div className={`relative overflow-hidden rounded border border-drift-border ${className}`}>
       <div ref={containerRef} className="h-full w-full" />
+
+      {/* Toggle post ↔ global — só renderiza se o pai fornece onModeChange */}
+      {onModeChange && (
+        <div className="pointer-events-auto absolute left-2 top-2 flex overflow-hidden rounded border border-drift-border bg-drift-bg/90 backdrop-blur-sm">
+          <ModeBtn active={mode === 'post'} onClick={() => onModeChange('post')}>
+            post
+          </ModeBtn>
+          <ModeBtn active={mode === 'global'} onClick={() => onModeChange('global')}>
+            global
+          </ModeBtn>
+        </div>
+      )}
+
       <div className="pointer-events-none absolute bottom-2 left-2 rounded bg-drift-bg/80 px-2 py-1 text-[10px] text-slate-400 backdrop-blur-sm">
         {data.totalSpreads} drifts · {data.countries.length}{' '}
         {data.countries.length === 1 ? 'país' : 'países'}
+        {mode === 'global' && ' · todos os posts'}
       </div>
       <div
         className="pointer-events-auto absolute bottom-2 right-2 rounded bg-drift-bg/80 px-2 py-1 text-[9px] text-slate-500 backdrop-blur-sm [&_a]:underline [&_a]:hover:text-slate-300"
-        // Atribuição embutida (CARTO + OSM TOS exigem). HTML é constante
-        // estática — sem risco de XSS.
         dangerouslySetInnerHTML={{ __html: MAP_ATTRIBUTION }}
       />
     </div>
@@ -418,6 +434,29 @@ export function _computeBounds(
 // (test-only) e mantém o prefixo undescore — mesma convenção do
 // `_buildArcs` em useSpreadMap.ts.
 const computeBounds = _computeBounds
+
+function ModeBtn({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean
+  onClick: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`px-[10px] py-[5px] font-mono text-[9px] uppercase tracking-[1.5px] transition-colors ${
+        active
+          ? 'bg-drift-accent/15 text-drift-accent'
+          : 'text-drift-muted hover:text-drift-text'
+      }`}
+    >
+      {children}
+    </button>
+  )
+}
 
 function Placeholder({
   className,

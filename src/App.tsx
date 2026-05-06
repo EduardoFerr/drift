@@ -1145,8 +1145,8 @@ function MapOverlay({
   onOpenLocationSettings: () => void
 }) {
   const events = useSyncStore((s) => s.eventsReceived)
+  const [mapMode, setMapMode] = useState<'post' | 'global'>('post')
 
-  // headerRight customizado = events count + close button.
   const headerRight = (
     <div className="flex items-center gap-3">
       <span
@@ -1165,6 +1165,8 @@ function MapOverlay({
     </div>
   )
 
+  const postId = mapMode === 'post' ? (currentPost?.id ?? null) : null
+
   return (
     <FullPageOverlay
       onClose={onClose}
@@ -1173,25 +1175,13 @@ function MapOverlay({
       ariaLabel="mapa de propagação"
     >
       <div className="relative h-full w-full">
-        {currentPost ? (
-          <SpreadMap
-            postId={currentPost.id}
-            className="h-full w-full"
-            onOpenLocationSettings={onOpenLocationSettings}
-          />
-        ) : (
-          <div className="flex h-full items-center justify-center font-mono text-[11px] text-drift-muted">
-            sem posts visíveis no momento
-          </div>
-        )}
-        <div className="pointer-events-none absolute bottom-[18px] left-5 flex gap-[14px]">
-          <span className="font-mono text-[9px] uppercase tracking-[2px] text-drift-muted">
-            • ativo
-          </span>
-          <span className="font-mono text-[9px] uppercase tracking-[2px] text-drift-muted">
-            • recente
-          </span>
-        </div>
+        <SpreadMap
+          postId={postId}
+          mode={mapMode}
+          onModeChange={setMapMode}
+          className="h-full w-full"
+          onOpenLocationSettings={onOpenLocationSettings}
+        />
       </div>
     </FullPageOverlay>
   )

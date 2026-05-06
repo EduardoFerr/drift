@@ -39,7 +39,10 @@ interface SpreadRow {
   event_id: string
 }
 
-export function useSpreadMap(postId: string | null): {
+export function useSpreadMap(
+  postId: string | null,
+  mode: 'post' | 'global' = 'post',
+): {
   data: SpreadMapData | null
   loading: boolean
   error: string | null
@@ -51,7 +54,7 @@ export function useSpreadMap(postId: string | null): {
   }>({ data: null, loading: false, error: null })
 
   useEffect(() => {
-    if (!postId) {
+    if (mode === 'post' && !postId) {
       setState({ data: null, loading: false, error: null })
       return
     }
@@ -61,15 +64,28 @@ export function useSpreadMap(postId: string | null): {
 
     ;(async () => {
       try {
+        const isGlobal = mode === 'global'
+
         const [postRow, spreadRows] = await Promise.all([
-          db.get<PostRow>(`SELECT location FROM posts WHERE id = ?`, [postId]),
-          db.exec<SpreadRow>(
-            `SELECT post_id, spreader_pub, created_at, location, event_id
-             FROM spreads
-             WHERE post_id = ? AND location IS NOT NULL
-             ORDER BY created_at ASC`,
-            [postId],
-          ),
+          isGlobal
+            ? Promise.resolve(null)
+            : db.get<PostRow>(`SELECT location FROM posts WHERE id = ?`, [postId]),
+          isGlobal
+            ? db.exec<SpreadRow>(
+                `SELECT post_id, spreader_pub, created_at, location, event_id
+                 FROM spreads
+                 WHERE location IS NOT NULL
+                 ORDER BY created_at ASC
+                 LIMIT 2000`,
+                [],
+              )
+            : db.exec<SpreadRow>(
+                `SELECT post_id, spreader_pub, created_at, location, event_id
+                 FROM spreads
+                 WHERE post_id = ? AND location IS NOT NULL
+                 ORDER BY created_at ASC`,
+                [postId],
+              ),
         ])
 
         const origin = parseLocation(postRow?.location ?? null)
@@ -113,9 +129,12 @@ export function useSpreadMap(postId: string | null): {
         if (!cancelled) {
           setState({ data, loading: false, error: null })
           // Fase 7.1a: PoI auto-discovery — best-effort, fire-and-forget.
-          void seedFromSpreaders(postId).catch(() => {
-            /* falha em seed não bloqueia mapa */
-          })
+          // Só faz sentido no modo post (postId conhecido).
+          if (postId && mode === 'post') {
+            void seedFromSpreaders(postId).catch(() => {
+              /* falha em seed não bloqueia mapa */
+            })
+          }
         }
       } catch (err) {
         if (!cancelled) {
@@ -131,7 +150,7 @@ export function useSpreadMap(postId: string | null): {
     return () => {
       cancelled = true
     }
-  }, [postId])
+  }, [postId, mode])
 
   return state
 }
