@@ -34,6 +34,8 @@ import { SwipeHandler } from './SwipeHandler'
 import { SubpostCarousel } from './SubpostCarousel'
 import { ReportModal } from './ReportModal'
 import { SpreadMap } from '../Feed/SpreadMap'
+import { SlideUpOverlay } from '../UI/SlideUpOverlay'
+import { ModalHeader } from '../UI/ModalHeader'
 
 /** 'up' = espalhou; 'down' = enterrou. Sai sem direção (X/ESC) = undefined. */
 export type QueueExitDir = 'up' | 'down'
@@ -123,6 +125,10 @@ export function PostViewer({
   const [showReport, setShowReport] = useState(false)
   const [reporting, setReporting] = useState(false)
   const [pinned, setPinned] = useState<boolean | null>(null) // null = loading
+  // V11: menu de ações no embedded mode (substitui os 8 botões do
+  // header bulky pré-V8). Acionado pelo botão ⋮ no canto top-right
+  // do card. Lista pin/map/follow/mute/block/report.
+  const [showActionsMenu, setShowActionsMenu] = useState(false)
   const isFollowing = useFollowsStore((s) => s.following.has(post.authorPub))
   const total = post.subposts.length
 
@@ -389,6 +395,24 @@ export function PostViewer({
           translateY 7px/14px, opacity 0.4/0.18. Efeito Tinder de "tem
           mais posts atrás". Aria-hidden — visual puro. */}
       <div className="relative flex-1 p-4">
+        {/* V11 — botão ⋮ menu de ações (embedded mode only).
+            Absolute top-right do card area, z-30 pra ficar acima do
+            SwipeHandler. onClick stopPropagation pra evitar conflito
+            com swipe gesture. Mockup-aligned: ícone discreto, abre
+            SlideUpOverlay com lista de ações. */}
+        {embedded && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              setShowActionsMenu(true)
+            }}
+            className="absolute right-6 top-6 z-30 flex h-7 w-7 items-center justify-center rounded-full border border-drift-border bg-drift-surface/80 text-drift-muted backdrop-blur-sm transition-colors hover:border-drift-accent hover:text-drift-accent focus:outline-none focus:ring-1 focus:ring-drift-accent2"
+            aria-label="abrir menu de ações"
+            title="ações do post"
+          >
+            <span className="text-[14px] leading-none">⋮</span>
+          </button>
+        )}
         {queue && queue.next && (
           <>
             <div
@@ -529,7 +553,189 @@ export function PostViewer({
           />
         )}
       </AnimatePresence>
+
+      {/* V11 — Actions menu (embedded mode only). SlideUpOverlay com
+          lista de ações. Cada item executa handler + fecha o menu. */}
+      <AnimatePresence>
+        {showActionsMenu && (
+          <ActionsMenu
+            isMine={isMine}
+            pinned={pinned}
+            isFollowing={isFollowing}
+            mapOpen={showMap}
+            onClose={() => setShowActionsMenu(false)}
+            onPinToggle={() => {
+              void handleTogglePin()
+              setShowActionsMenu(false)
+            }}
+            onMapToggle={() => {
+              setShowMap((v) => !v)
+              setShowActionsMenu(false)
+            }}
+            onFollowToggle={() => {
+              void handleFollowToggle()
+              setShowActionsMenu(false)
+            }}
+            onMute={() => {
+              void handleMute()
+              setShowActionsMenu(false)
+            }}
+            onBlock={() => {
+              void handleBlock()
+              setShowActionsMenu(false)
+            }}
+            onReport={() => {
+              setShowActionsMenu(false)
+              setShowReport(true)
+            }}
+          />
+        )}
+      </AnimatePresence>
     </Wrapper>
+  )
+}
+
+// ─── ActionsMenu (V11) ───────────────────────────────────────────────
+
+/**
+ * V11 — menu de ações do post no embedded mode. Substitui os 8 botões
+ * do header bulky pré-V8 (PostViewer modal mode).
+ *
+ * Acionado pelo botão ⋮ no canto top-right do card. Lista completa:
+ *   📌 fixar/desfixar (pin/unpin)
+ *   🗺 mapa de spread (toggle inline)
+ *   ➕/✓ seguir/deixar de seguir (só se !isMine)
+ *   🔇 silenciar (só se !isMine)
+ *   ⊘ bloquear (só se !isMine)
+ *   ⚠ denunciar (só se !isMine)
+ *
+ * Ações destrutivas (block) já têm confirm via window.confirm dentro
+ * dos handlers — não precisa duplicar UI.
+ */
+function ActionsMenu({
+  isMine,
+  pinned,
+  isFollowing,
+  mapOpen,
+  onClose,
+  onPinToggle,
+  onMapToggle,
+  onFollowToggle,
+  onMute,
+  onBlock,
+  onReport,
+}: {
+  isMine: boolean
+  pinned: boolean | null
+  isFollowing: boolean
+  mapOpen: boolean
+  onClose: () => void
+  onPinToggle: () => void
+  onMapToggle: () => void
+  onFollowToggle: () => void
+  onMute: () => void
+  onBlock: () => void
+  onReport: () => void
+}) {
+  type Action = {
+    icon: string
+    label: string
+    onClick: () => void
+    disabled?: boolean
+    danger?: boolean
+    hint?: string
+  }
+
+  const items: Action[] = [
+    {
+      icon: pinned ? '📌' : '📍',
+      label: pinned ? 'desfixar' : 'fixar',
+      onClick: onPinToggle,
+      disabled: pinned === null,
+      hint: pinned
+        ? 'fixado — protegido de eviction (manifesto §16)'
+        : 'fixar — protege de eviction local + marca pra re-broadcast',
+    },
+    {
+      icon: '🗺',
+      label: mapOpen ? 'fechar mapa' : 'mapa de spread',
+      onClick: onMapToggle,
+      hint: 'visualização da propagação deste post',
+    },
+  ]
+
+  if (!isMine) {
+    items.push(
+      {
+        icon: isFollowing ? '✓' : '➕',
+        label: isFollowing ? 'deixar de seguir' : 'seguir',
+        onClick: onFollowToggle,
+        hint: isFollowing
+          ? 'publica kind 3 atualizado'
+          : 'alimenta a aba "seguindo" do feed (NIP-02)',
+      },
+      {
+        icon: '🔇',
+        label: 'silenciar',
+        onClick: onMute,
+        hint: 'esconde posts dele do meu feed (manifesto §24)',
+      },
+      {
+        icon: '⊘',
+        label: 'bloquear',
+        onClick: onBlock,
+        danger: true,
+        hint: 'esconde posts e interações dele (manifesto §24)',
+      },
+      {
+        icon: '⚠',
+        label: 'denunciar',
+        onClick: onReport,
+        danger: true,
+        hint: 'reporta pra moderação comunitária — manifesto §26',
+      },
+    )
+  }
+
+  return (
+    <SlideUpOverlay onClose={onClose} ariaLabel="ações do post">
+      <ModalHeader title="ações" onClose={onClose} />
+      <ul className="-mx-1 divide-y divide-drift-border">
+        {items.map((item) => (
+          <li key={item.label}>
+            <button
+              onClick={item.onClick}
+              disabled={item.disabled}
+              className={`group flex w-full items-center gap-3 px-1 py-3 text-left transition-colors disabled:opacity-40 focus:outline-none focus:ring-1 focus:ring-drift-accent2 focus:ring-offset-2 focus:ring-offset-drift-surface ${
+                item.danger
+                  ? 'text-drift-bury hover:text-[#ff6b6b]'
+                  : 'text-drift-text hover:text-drift-accent'
+              }`}
+            >
+              <span aria-hidden="true" className="text-[16px] leading-none">
+                {item.icon}
+              </span>
+              <span className="flex flex-1 flex-col gap-[2px]">
+                <span className="font-mono text-[11px] uppercase tracking-[2px]">
+                  {item.label}
+                </span>
+                {item.hint && (
+                  <span className="font-mono text-[10px] normal-case tracking-normal text-drift-muted">
+                    {item.hint}
+                  </span>
+                )}
+              </span>
+              <span
+                aria-hidden="true"
+                className="font-mono text-[12px] text-drift-muted transition-colors group-hover:text-current"
+              >
+                →
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </SlideUpOverlay>
   )
 }
 
