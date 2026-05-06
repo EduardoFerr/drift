@@ -25,7 +25,6 @@ import { IdentityPanel } from './components/Identity/IdentityPanel'
 import { IdentitySwitcher } from './components/Identity/IdentitySwitcher'
 import { PostViewer } from './components/Post/PostViewer'
 import { ComposeOverlay } from './components/Create/ComposeOverlay'
-import { ContentSettings } from './components/Settings/ContentSettings'
 import {
   FiltersCard,
   LocationCard,
@@ -82,13 +81,6 @@ function App() {
   // por showStatusCard (card próprio acionado via SettingsRoot ou
   // status indicator do HomeHeader).
   const [showIdentity, setShowIdentity] = useState(false)
-  const [showSettings, setShowSettings] = useState(false)
-  // Quando o user clica num indicador do Header (📍 location ou 🌐/🧅/🛡
-  // network), abre Settings já scrollado pra seção certa. Default null =
-  // sem scroll.
-  const [settingsScrollTo, setSettingsScrollTo] = useState<
-    'filters' | 'location' | 'map' | 'network' | 'diagnostic' | null
-  >(null)
   const [showRelays, setShowRelays] = useState(false)
   const [showSwitcher, setShowSwitcher] = useState(false)
   const [showLists, setShowLists] = useState(false)
@@ -173,7 +165,7 @@ function App() {
       // — focus do textarea acontece via autoFocus no SubpostBlock primeiro.
       setShowCreate(true)
     } else if (action === 'settings') {
-      setShowSettings(true)
+      setShowSettingsRoot(true)
     }
     if (action) {
       const url = new URL(window.location.href)
@@ -619,8 +611,7 @@ function App() {
                     next: nextHomePost,
                   }}
                   onOpenLocationSettings={() => {
-                    setSettingsScrollTo('location')
-                    setShowSettings(true)
+                    setShowLocation(true)
                   }}
                   onSpread={() => {
                     handleSpread(currentPost)
@@ -723,8 +714,7 @@ function App() {
               !showIdentity &&
               !showSwitcher &&
               !showRelays &&
-              !showLists &&
-              !showSettings
+              !showLists
             }
             onSelect={(target) => {
               // V9.2e — UX: NÃO fechar SettingsRoot ao abrir sub-card.
@@ -856,21 +846,6 @@ function App() {
               </p>
             </div>
           </FullPageOverlay>
-        )}
-      </AnimatePresence>
-
-      {/* ContentSettings legacy — mantido só pra retrocompat de
-          MapOverlay's onOpenLocationSettings (route in via scrollTo).
-          Track futura remove quando MapOverlay rotear pra LocationCard. */}
-      <AnimatePresence>
-        {showSettings && (
-          <ContentSettings
-            onClose={() => {
-              setShowSettings(false)
-              setSettingsScrollTo(null)
-            }}
-            {...(settingsScrollTo ? { scrollTo: settingsScrollTo } : {})}
-          />
         )}
       </AnimatePresence>
 
