@@ -40,6 +40,13 @@ export interface SubpostEditorProps {
   capturingLocation?: boolean
   /** Limite de subposts pra esta identidade. Vem de `getMaxSubposts(weight)`. */
   maxSubposts: number
+  /**
+   * V7 structural: quando true, SubpostEditor renderiza sem o outer
+   * container (border/bg/padding/margin). Caller é responsável pelo
+   * wrapping (ex.: SlideUpOverlay no modo modal — V7). Default false
+   * mantém comportamento legado (always-mounted no top do feed).
+   */
+  bare?: boolean
   onPublish: (input: {
     subposts: Subpost[]
     contentWarning: ContentWarning | null
@@ -90,7 +97,7 @@ function isDraftEmpty(d: DraftSubpost): boolean {
   return !d.text.trim() && !d.imageUrl
 }
 
-export function SubpostEditor({ publishing, capturingLocation = false, maxSubposts, onPublish }: SubpostEditorProps) {
+export function SubpostEditor({ publishing, capturingLocation = false, maxSubposts, bare = false, onPublish }: SubpostEditorProps) {
   const [drafts, setDrafts] = useState<DraftSubpost[]>(() => [newDraft()])
   const [contentWarning, setContentWarning] = useState<ContentWarning | null>(null)
 
@@ -145,8 +152,12 @@ export function SubpostEditor({ publishing, capturingLocation = false, maxSubpos
     setContentWarning(null)
   }
 
+  // V7: bare mode pula o outer container — caller (SlideUpOverlay) já
+  // fornece border+bg+padding. Mantém comportamento legado quando bare=false.
+  const outerClass = bare ? '' : 'mb-6 rounded border border-drift-border bg-drift-surface p-3'
+
   return (
-    <div className="mb-6 rounded border border-drift-border bg-drift-surface p-3">
+    <div className={outerClass}>
       <div className="space-y-3">
         {drafts.map((draft, idx) => (
           <SubpostBlock

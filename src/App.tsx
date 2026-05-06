@@ -34,6 +34,9 @@ import { ProfileModal } from './components/Profile/ProfileModal'
 import { GpsErrorBanner } from './components/UI/GpsErrorBanner'
 import { MultiTabModal } from './components/UI/MultiTabModal'
 import { UpdatePrompt } from './components/UI/UpdatePrompt'
+import { NavBar } from './components/UI/NavBar'
+import { SlideUpOverlay } from './components/UI/SlideUpOverlay'
+import { ModalHeader } from './components/UI/ModalHeader'
 import type {
   DriftIdentity,
   LocationGranularity,
@@ -83,6 +86,10 @@ function App() {
   const [showLists, setShowLists] = useState(false)
   const [showProfile, setShowProfile] = useState(false)
   const [showOnboarding, setShowOnboarding] = useState(false)
+  // V7 structural: SubpostEditor migrou de always-mounted no top do feed
+  // pra modal acionado pelo botão `+` central da NavBar (mockup v0.7).
+  // Default false; PWA shortcut `?action=compose` abre direto.
+  const [showCreate, setShowCreate] = useState(false)
 
   // Banner de erro GPS (Lily 29-04): user habilita location_granularity
   // mas browser bloqueia silenciosamente. Trackeamos timestamp da última
@@ -135,12 +142,9 @@ function App() {
     const params = new URLSearchParams(window.location.search)
     const action = params.get('action')
     if (action === 'compose') {
-      // SubpostEditor já está sempre montado no topo do feed —
-      // foca o textarea pra UX consistente com "abrir compose".
-      const textarea = document.querySelector<HTMLTextAreaElement>(
-        'textarea[data-subpost-input]',
-      )
-      textarea?.focus()
+      // V7: SubpostEditor agora é modal (não always-mounted). Abre direto
+      // — focus do textarea acontece via autoFocus no SubpostBlock primeiro.
+      setShowCreate(true)
     } else if (action === 'settings') {
       setShowSettings(true)
     }
@@ -317,6 +321,9 @@ function App() {
         ...(input.contentWarning ? { contentWarning: input.contentWarning } : {}),
         ...(location ? { location } : {}),
       })
+      // V7: success path fecha o modal. SubpostEditor reseta seus drafts
+      // internos no próprio handleSubmit (já era assim antes do V7).
+      setShowCreate(false)
     } catch (err) {
       console.error('publish failed', err)
       alert(`Falha ao publicar: ${err instanceof Error ? err.message : String(err)}`)
@@ -536,13 +543,10 @@ function App() {
           />
         )}
 
-        <SubpostEditor
-          publishing={publishing}
-          capturingLocation={gpsCapturing.has('__publish__')}
-          maxSubposts={userWeight.maxSubposts}
-          onPublish={handlePublish}
-        />
-
+        {/* V7: SubpostEditor migrou pra modal — render via AnimatePresence
+            mais abaixo. Aqui só fica Feed (e padding extra pra NavBar
+            bottom não cobrir últimos cards). pb-24 = 96px ≥ 68px navbar
+            + 28px folga. */}
         <Feed
           posts={posts}
           identity={boot.identity}
@@ -553,7 +557,63 @@ function App() {
           onBury={handleBury}
           onSelect={openViewer}
         />
+        <div className="pb-24" aria-hidden="true" />
       </div>
+
+      {/* V7 — Compose modal (substitui inline always-mounted). */}
+      <AnimatePresence>
+        {showCreate && (
+          <SlideUpOverlay
+            onClose={() => setShowCreate(false)}
+            ariaLabel="criar post"
+            maxWidth="lg"
+            backdropDismissible={!publishing}
+          >
+            <ModalHeader
+              title="criar post"
+              onClose={() => setShowCreate(false)}
+              {...(publishing ? { hideClose: true } : {})}
+            />
+            <SubpostEditor
+              bare
+              publishing={publishing}
+              capturingLocation={gpsCapturing.has('__publish__')}
+              maxSubposts={userWeight.maxSubposts}
+              onPublish={handlePublish}
+            />
+          </SlideUpOverlay>
+        )}
+      </AnimatePresence>
+
+      {/* V7 — NavBar fixed bottom com plus central (consume V3.3 primitive).
+          3 slots: [perfil, +(compose), settings]. Outras navegações
+          (identidades/relays/listas/chave/limpar) ficam no header até
+          track futura consolidar Settings. */}
+      {!showCreate && !viewerPost && (
+        <NavBar
+          left={[
+            {
+              icon: '👤',
+              label: 'perfil',
+              onClick: () => setShowProfile(true),
+              ariaLabel: 'abrir perfil',
+            },
+          ]}
+          right={[
+            {
+              icon: '⚙',
+              label: 'config',
+              onClick: () => {
+                setSettingsScrollTo(null)
+                setShowSettings(true)
+              },
+              ariaLabel: 'abrir settings',
+            },
+          ]}
+          onCompose={() => setShowCreate(true)}
+          composeAriaLabel="criar post"
+        />
+      )}
 
       <AnimatePresence custom={viewerExitDir}>
         {viewerPost && (
