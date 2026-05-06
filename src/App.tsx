@@ -18,6 +18,7 @@ import {
   type BootState,
 } from './lib/bootstrap'
 import { getPrefs, usePrefsStore } from './lib/prefs'
+import { isTauri } from './lib/runtime'
 import { useUserWeight } from './hooks/useUserWeight'
 import { useInstallPrompt } from './hooks/useInstallPrompt'
 import { IdentityPanel } from './components/Identity/IdentityPanel'
@@ -44,6 +45,7 @@ import { FullPageOverlay } from './components/UI/FullPageOverlay'
 import { SpreadMap } from './components/Feed/SpreadMap'
 import type {
   DriftIdentity,
+  LocationGranularity,
   Post,
   Subpost,
   ContentWarning,
@@ -76,7 +78,9 @@ function App() {
   // de Record porque é só um boolean por id. publishing usa o mesmo
   // mecanismo via key especial '__publish__' (não colide com event.id hex).
   const [gpsCapturing, setGpsCapturing] = useState<Set<string>>(new Set())
-  const [showDiagnostic, setShowDiagnostic] = useState(false)
+  // V9.2e/V10a: showDiagnostic state legacy removido — substituído
+  // por showStatusCard (card próprio acionado via SettingsRoot ou
+  // status indicator do HomeHeader).
   const [showIdentity, setShowIdentity] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   // Quando o user clica num indicador do Header (📍 location ou 🌐/🧅/🛡
@@ -523,13 +527,11 @@ function App() {
         identity={boot.identity}
         userWeight={userWeight}
         currentScore={currentPost?.score ?? null}
-        showDiagnostic={showDiagnostic}
-        onToggleDiagnostic={() => setShowDiagnostic((s) => !s)}
+        locationGranularity={locationGranularity}
+        onOpenLocation={() => setShowLocation(true)}
+        onOpenNetworkMode={() => setShowNetworkMode(true)}
+        onOpenStatus={() => setShowStatusCard(true)}
         onOpenIdentity={() => setShowIdentity(true)}
-        onOpenSwitcher={() => setShowSwitcher(true)}
-        onOpenRelays={() => setShowRelays(true)}
-        onOpenLists={() => setShowLists(true)}
-        onClearLocal={handleClearLocal}
       />
 
       {/* Banners empilhados acima do stack. Layout flex-shrink-0 garante
@@ -950,52 +952,163 @@ function App() {
  * futuras integrações — long-press do logo abre IdentityPanel, etc.
  * Em V8, esses callbacks NÃO são consumidos — apenas tipados.
  */
+/**
+ * V10a — StatusIndicators. Restaura os indicadores de status que viviam
+ * no Header pré-V8 (📍 location, 🌐/🧅/🛡 network mode, ● events count).
+ *
+ * Layout compacto inline na linha do logo. Cada ícone é botão clicável:
+ *   - 📍 → LocationCard (granularidade GPS)
+ *   - 🌐/🧅/🛡 → NetworkModeCard (clearnet/tor/onion-only)
+ *   - ● <N> ev → StatusCard (DiagnosticPanel)
+ *
+ * Estado visual:
+ *   - location off (default privacidade) = ícone muted; ativa = âmbar
+ *   - network = ícone reflete modo atual; PWA não-Tauri com tor → muted
+ *   - events count = atualiza em tempo real do syncStore
+ *   - active dot = verde quando subscribe ativo, cinza quando offline
+ *
+ * Manifesto §28 (privacidade visível) + §15 (anti-censura auditável)
+ * exige que user veja o estado real da rede a qualquer momento. Esses
+ * indicadores garantem isso sem precisar abrir Settings.
+ */
+function StatusIndicators({
+  locationGranularity,
+  onOpenLocation,
+  onOpenNetworkMode,
+  onOpenStatus,
+}: {
+  locationGranularity: LocationGranularity
+  onOpenLocation: () => void
+  onOpenNetworkMode: () => void
+  onOpenStatus: () => void
+}) {
+  const networkMode = usePrefsStore((s) => s.network_mode)
+  const events = useSyncStore((s) => s.eventsReceived)
+  const active = useSyncStore((s) => s.active)
+  const degradedCount = useBootStore((s) => s.degradedReasons.length)
+
+  const networkIcon =
+    networkMode === 'tor' ? '🧅' : networkMode === 'onion-only' ? '🛡' : '🌐'
+  const tauriRuntime = isTauri()
+  const networkAlert = !tauriRuntime && networkMode !== 'clearnet'
+
+  return (
+    <div className="flex items-center gap-[10px] text-[12px] leading-none">
+      {/* Location indicator */}
+      <button
+        onClick={onOpenLocation}
+        className={`transition-opacity hover:opacity-80 focus:outline-none focus:ring-1 focus:ring-drift-accent2 ${
+          locationGranularity === 'off' ? 'text-drift-muted' : 'text-amber-300'
+        }`}
+        title={
+          locationGranularity === 'off'
+            ? 'GPS desativado — clique pra ativar'
+            : `Location: ${locationGranularity}`
+        }
+        aria-label="status de location"
+      >
+        📍
+      </button>
+
+      {/* Network indicator */}
+      <button
+        onClick={onOpenNetworkMode}
+        className={`transition-opacity hover:opacity-80 focus:outline-none focus:ring-1 focus:ring-drift-accent2 ${
+          networkAlert
+            ? 'text-amber-300'
+            : networkMode === 'clearnet'
+            ? 'text-drift-muted'
+            : 'text-drift-accent2'
+        }`}
+        title={
+          networkAlert
+            ? 'Modo Tor selecionado em PWA — IP vaza. Clique pra detalhes.'
+            : `Rede: ${networkMode}`
+        }
+        aria-label="status de rede"
+      >
+        {networkIcon}
+      </button>
+
+      {/* Degraded badge — só aparece se houver razões degradadas (Tor
+          falhou, etc.). Sinal forte de algo precisa atenção. */}
+      {degradedCount > 0 && (
+        <button
+          onClick={onOpenStatus}
+          className="text-amber-300 transition-opacity hover:opacity-80 focus:outline-none focus:ring-1 focus:ring-drift-accent2"
+          title={`Modo degradado — ${degradedCount} feature${degradedCount > 1 ? 's' : ''} indisponível${degradedCount > 1 ? 'is' : ''}`}
+          aria-label="modo degradado"
+        >
+          ⚠
+        </button>
+      )}
+
+      {/* Events counter — abre StatusCard. */}
+      <button
+        onClick={onOpenStatus}
+        className="flex items-center gap-1 font-mono text-[10px] uppercase tracking-[1px] text-drift-muted transition-colors hover:text-drift-text focus:outline-none focus:ring-1 focus:ring-drift-accent2"
+        title={`${events} eventos recebidos · subscribe ${active ? 'ativo' : 'offline'}`}
+        aria-label="painel de status"
+      >
+        <span
+          className={
+            active ? 'text-drift-spread' : 'text-drift-muted'
+          }
+          aria-hidden="true"
+        >
+          ●
+        </span>
+        <span>{events} ev</span>
+      </button>
+    </div>
+  )
+}
+
 function HomeHeader({
   identity,
   userWeight,
   currentScore,
-  showDiagnostic,
-  onToggleDiagnostic,
+  locationGranularity,
+  onOpenLocation,
+  onOpenNetworkMode,
+  onOpenStatus,
   onOpenIdentity,
-  onOpenSwitcher,
-  onOpenRelays,
-  onOpenLists,
-  onClearLocal,
 }: {
   identity: DriftIdentity | null
   userWeight: { weight: number; engagement: number; antiquity: number; maxSubposts: number }
   /** Score do post atualmente visível (manifesto §22). null = feed vazio. */
   currentScore: number | null
-  showDiagnostic: boolean
-  onToggleDiagnostic: () => void
+  locationGranularity: LocationGranularity
+  onOpenLocation: () => void
+  onOpenNetworkMode: () => void
+  onOpenStatus: () => void
   onOpenIdentity: () => void
-  onOpenSwitcher: () => void
-  onOpenRelays: () => void
-  onOpenLists: () => void
-  onClearLocal: () => void
 }) {
-  // Suprime "unused" warning — callbacks entram em V10 via long-press.
+  // Suprime "unused" warning — callbacks reservados pra long-press
+  // futuro (V11+ avatar/logo abrirá IdentityPanel via gesture).
   void identity
   void userWeight
-  void showDiagnostic
-  void onToggleDiagnostic
   void onOpenIdentity
-  void onOpenSwitcher
-  void onOpenRelays
-  void onOpenLists
-  void onClearLocal
 
   return (
     <header className="shrink-0 px-5 pt-4">
-      <div className="mb-[14px] flex items-center justify-between">
+      <div className="mb-[14px] flex items-center justify-between gap-3">
         <h1 className="font-display text-[25px] font-extrabold leading-none tracking-[-0.5px] text-drift-text">
           dri<em className="not-italic text-drift-accent">ft</em>
         </h1>
-        <div className="font-mono text-[10px] uppercase tracking-[1.5px] text-drift-muted">
-          deriva{' '}
-          <b className="font-medium text-drift-accent2">
-            {currentScore !== null ? formatScore(currentScore) : '—'}
-          </b>
+        <div className="flex items-center gap-3">
+          <StatusIndicators
+            locationGranularity={locationGranularity}
+            onOpenLocation={onOpenLocation}
+            onOpenNetworkMode={onOpenNetworkMode}
+            onOpenStatus={onOpenStatus}
+          />
+          <div className="font-mono text-[10px] uppercase tracking-[1.5px] text-drift-muted">
+            deriva{' '}
+            <b className="font-medium text-drift-accent2">
+              {currentScore !== null ? formatScore(currentScore) : '—'}
+            </b>
+          </div>
         </div>
       </div>
       <div className="border-b border-drift-border">
