@@ -575,7 +575,12 @@ function App() {
       {/* Stack — área central que contém o card atual. flex:1 expande
           até a navbar bottom. Card visual = PostViewer embedded.
           2 shadow cards atrás visíveis quando há nextHomePost. */}
-      <main className="relative min-h-0 flex-1 overflow-hidden px-4 pt-3 pb-2">
+      {/* Stack — área central que contém o card atual. flex:1 expande
+          até a navbar bottom. NavBar é fixed (z-30, h-68px no primitive
+          + padding); aplicamos pb-[88px] aqui (68 navbar + 20 folga)
+          pra evitar cards renderizarem POR TRÁS da navbar fixed.
+          Hidden navbar não importa — pb-[88px] preserva consistência. */}
+      <main className="relative min-h-0 flex-1 overflow-hidden px-4 pt-3 pb-[88px]">
         {posts.length === 0 ? (
           <HomeEmpty tab={useFeedStore.getState().tab} />
         ) : currentPost ? (

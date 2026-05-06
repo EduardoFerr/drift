@@ -270,21 +270,31 @@ function PortraitLayout({
   const hasImage =
     (subpost.type === 'image' || subpost.type === 'text+image') && subpost.imageUrl
 
+  // V9.3 graceful fallback: se subpost foi marcado como portrait mas
+  // NÃO tem imagem (autor escolheu portrait mas só escreveu texto),
+  // delega pra TextLayout — visual editorial com decorative letter
+  // em vez do feio "(sem imagem)" placeholder. Mockup nunca mostra
+  // portrait vazio; sempre é um dos 3 templates plenos.
+  if (!hasImage) {
+    return (
+      <TextLayout
+        subpost={subpost}
+        post={post}
+        subpostIdx={subpostIdx}
+        subpostsTotal={subpostsTotal}
+      />
+    )
+  }
+
   return (
     <div className="flex h-full w-full flex-col">
-      {/* Media flex:1 top. Sem image → fallback bg muted. */}
+      {/* Media flex:1 top. */}
       <div className="relative min-h-0 flex-1">
-        {hasImage ? (
-          <Image
-            src={subpost.imageUrl!}
-            className="block h-full w-full object-cover"
-            aspect="auto"
-          />
-        ) : (
-          <div className="flex h-full items-center justify-center text-xs text-drift-muted">
-            (sem imagem)
-          </div>
-        )}
+        <Image
+          src={subpost.imageUrl!}
+          className="block h-full w-full object-cover"
+          aspect="auto"
+        />
         {/* Gradient overlay sutil bottom (mockup .med-overlay portrait). */}
         <div
           className="pointer-events-none absolute inset-0"
@@ -321,9 +331,11 @@ function LandscapeLayout({
     (subpost.type === 'image' || subpost.type === 'text+image') && subpost.imageUrl
 
   if (!hasImage) {
-    // Sem imagem, landscape degenera pra portrait.
+    // V9.3 fallback: landscape sem imagem → TextLayout (não Portrait,
+    // porque Portrait sem imagem também caia em Text). Decorative
+    // letter > placeholder vazio.
     return (
-      <PortraitLayout
+      <TextLayout
         subpost={subpost}
         post={post}
         subpostIdx={subpostIdx}

@@ -22,8 +22,11 @@ type FeedTab = 'global' | 'following' | 'trending'
 export function FeedTabs() {
   const tab = useFeedStore((s) => s.tab)
 
+  // V9.3c — flex-1 + text-center (mockup .tab pattern). Cada tab ocupa
+  // 1/3 da largura da row, texto centralizado. Antes: gap-1 + px-2
+  // (inline width baseado no texto, alinhamento à esquerda).
   return (
-    <div className="flex gap-1 font-mono text-[10px] uppercase tracking-widest">
+    <div className="flex font-mono text-[10px] uppercase tracking-[2px]">
       <FeedTabBtn active={tab === 'global'} onClick={() => void setFeedTab('global')}>
         global
       </FeedTabBtn>
@@ -49,9 +52,9 @@ function FeedTabBtn({
   return (
     <button
       onClick={onClick}
-      className={`relative px-2 py-1 transition-colors ${
+      className={`relative flex-1 px-2 py-[10px] text-center transition-colors focus:outline-none focus:ring-1 focus:ring-drift-accent2 focus:ring-offset-1 focus:ring-offset-drift-bg ${
         active
-          ? 'font-medium text-drift-text'
+          ? 'text-drift-text'
           : 'text-drift-muted hover:text-drift-text'
       }`}
       aria-pressed={active}
