@@ -200,15 +200,19 @@ export interface FeedOptions {
 
 // ─── Mapa ────────────────────────────────────────────────────────────
 
+export interface PropagationArc {
+  from: [number, number]
+  to: [number, number]
+  /** Normalized time 0..1 when this arc fires in the animation. */
+  t: number
+}
+
 export interface SpreadMapData {
-  /**
-   * Origem do post — `posts.location` do autor original. `null` se o
-   * autor não publicou com location (manifesto §28 — opt-in). Renderizada
-   * com destaque visual (ScatterplotLayer amber raio maior).
-   */
   origin: GeoPoint | null
-  /** Cada spread com location, em ordem cronológica de espalhamento. */
-  destinations: { point: GeoPoint; createdAt: number }[]
+  /** Spread destinations with normalized animation time. */
+  destinations: { point: GeoPoint; createdAt: number; t: number }[]
+  /** Propagation chain arcs: consecutive pairs ordered by t. */
+  arcs: PropagationArc[]
   totalSpreads: number
   countries: string[]
   firstSpread: SpreadRecord | null

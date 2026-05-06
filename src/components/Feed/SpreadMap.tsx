@@ -1,53 +1,34 @@
 /**
- * SpreadMap — visualização geográfica do espalhamento de um post.
+ * SpreadMap — visualização geográfica do espalhamento.
  *
- * MapLibre GL (fork OSS de mapbox-gl) + Deck.gl ArcLayer pros arcos.
- * Tiles raster do CARTO Dark Matter (OSS, OSM-derived, sem API key).
+ * Dois modos:
+ *   post   — heatmap estático dos spreads de um único post (comportamento
+ *            histórico). Origem amber, destinos heatmap verde.
+ *   global — linhas animadas de propagação cross-post. Para cada post com
+ *            spreads com location, traça a cadeia cronológica
+ *            origin→spread₁→spread₂→... com animação RAF 8s + loop.
+ *            Usa LineLayer (2D flat) + ScatterplotLayer, não ArcLayer 3D.
  *
- * Por que NÃO Mapbox:
- *  - Token obrigatório centraliza o serviço (manifesto §17 — sem
- *    chave mestra, sem dependência crítica de fornecedor)
- *  - Free tier termina em 50k loads/mês com risco de cobrança
- *  - MapLibre tem API quase idêntica → migração trivial
+ * MapLibre GL + Deck.gl. Tiles CARTO Dark Matter (OSS, sem API key).
+ * Lazy import de ~400kb gzip — só carrega quando há geometria pra mostrar.
  *
- * Comportamento:
- *   - Se nenhum spread tem `location` (manifesto §28 — location é opt-in,
- *     default off) → mostra estado vazio educativo.
- *   - Senão → renderiza globo com arcos animados de origem → cada destino.
- *
- * Manifesto §28 (Privacidade pelo Mínimo): mapa só mostra location que
- * o autor do spread escolheu publicar. Nunca infere via IP, nunca por
- * heurística — só lê a tag `location` do evento Nostr.
- *
- * Trocar de tile provider: editar `MAP_STYLE` abaixo. Qualquer estilo
- * MapLibre style spec (https://maplibre.org/maplibre-style-spec/) serve.
+ * Manifesto §28: só mostra location publicada pelo autor do spread.
+ * Nunca infere via IP.
  */
 
 import { useEffect, useRef } from 'react'
 import { useSpreadMap } from '../../hooks/useSpreadMap'
 import { usePrefsStore } from '../../lib/prefs'
+import type { PropagationArc, SpreadMapData } from '../../types/drift'
 
 export interface SpreadMapProps {
   postId: string | null
   className?: string
   mode?: 'post' | 'global'
   onModeChange?: (mode: 'post' | 'global') => void
-  /**
-   * Callback opcional pra abrir Settings na seção `location` (manifesto §28
-   * — location é opt-in). Se passada, o estado vazio do mapa renderiza um
-   * CTA acionável quando `location_granularity === 'off'`. Sem callback,
-   * o placeholder mostra só texto (sem botão) — útil pra contextos onde
-   * o user não tem como navegar pra settings (e.g. preview).
-   */
   onOpenLocationSettings?: () => void
 }
 
-// CARTO Dark Matter — raster tiles OSS, sem chave de API. Subdomínios
-// {a,b,c,d} aliviam carga. Style inline em vez de URL pra não depender
-// de hospedagem externa.
-//
-// Atribuição CARTO+OSM é obrigatória pelos TOS — exibida em overlay
-// no canto inferior direito do mapa.
 const MAP_ATTRIBUTION =
   '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · © <a href="https://carto.com/attributions">CARTO</a>'
 
@@ -66,39 +47,20 @@ const MAP_STYLE: maplibregl.StyleSpecification = {
       attribution: MAP_ATTRIBUTION,
     },
   },
-  layers: [
-    {
-      id: 'carto',
-      type: 'raster',
-      source: 'carto',
-    },
-  ],
+  layers: [{ id: 'carto', type: 'raster', source: 'carto' }],
 }
 
-// ─── Subset mínimo dos tipos das libs externas ─────────────────────
-// Importamos lazy (dynamic import). Tipar minimamente evita `any` sem
-// pesar o bundle inicial — as libs só carregam quando user abre o mapa.
+// ─── Minimal type stubs (evita importar tipos pesados da lib) ─────────
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
 declare namespace maplibregl {
-  // Subset mínimo do schema do StyleSpec — nosso style inline acima
-  // só usa o que está aqui, então não precisamos importar o tipo da lib.
   interface StyleSpecification {
     version: 8
     sources: Record<string, RasterSource>
     layers: RasterLayer[]
   }
-  interface RasterSource {
-    type: 'raster'
-    tiles: string[]
-    tileSize: number
-    attribution?: string
-  }
-  interface RasterLayer {
-    id: string
-    type: 'raster'
-    source: string
-  }
+  interface RasterSource { type: 'raster'; tiles: string[]; tileSize: number; attribution?: string }
+  interface RasterLayer { id: string; type: 'raster'; source: string }
 }
 
 interface MaplibreStatic {
@@ -115,27 +77,17 @@ interface MaplibreStatic {
 interface MaplibreMap {
   addControl(ctrl: unknown): void
   remove(): void
-  /**
-   * Ajusta viewport pra caber um bounding box em coords `[[swLng, swLat],
-   * [neLng, neLat]]`. Quando `padding` é número, aplica em todos os lados
-   * (pixels). `maxZoom` evita zoom excessivo num único ponto. `duration: 0`
-   * = sem animação (instantâneo).
-   */
   fitBounds(
     bounds: [[number, number], [number, number]],
     options?: { padding?: number; maxZoom?: number; duration?: number },
   ): void
-  /** Registra handler one-shot pra evento (ex.: `'load'`). */
   once(event: string, callback: () => void): void
 }
 
-interface PointLayerProps {
-  position: [number, number]
-}
+type LayerCtor = new (props: Record<string, unknown>) => unknown
+type OverlayInstance = { setProps: (p: { layers: unknown[] }) => void }
 
-interface HeatmapPointProps {
-  point: { lng: number; lat: number }
-}
+// ─── Public component ─────────────────────────────────────────────────
 
 export function SpreadMap({
   postId,
@@ -146,69 +98,107 @@ export function SpreadMap({
 }: SpreadMapProps) {
   const { data, loading, error } = useSpreadMap(postId, mode)
   const granularity = usePrefsStore((s) => s.location_granularity)
+
+  const hasGeometry = !!data && (!!data.origin || data.destinations.length > 0)
+
+  if (loading) {
+    return <Placeholder className={className} title="carregando mapa…" body="" />
+  }
+  if (error) {
+    return <Placeholder className={className} title="erro no mapa" body={error} />
+  }
+  if (!hasGeometry) {
+    if (granularity === 'off' && mode === 'post') {
+      return (
+        <Placeholder
+          className={className}
+          title="GPS desativado nas suas configurações"
+          body="Mapa de spreads precisa de location opt-in (manifesto §28 — default off por privacidade). Ative se quiser que seus spreads apareçam no mapa de outros posts."
+          {...(onOpenLocationSettings ? { action: { label: 'ativar GPS', onClick: onOpenLocationSettings } } : {})}
+        />
+      )
+    }
+    return (
+      <Placeholder
+        className={className}
+        title={mode === 'global' ? 'sem dados de localização globais' : 'sem dados de localização'}
+        body={
+          mode === 'global'
+            ? 'Nenhum spread com tag location ainda. Quando alguém com GPS ativo driftar, a rede aparece aqui.'
+            : 'Drifts deste post ainda não têm tag location. Quando alguém com GPS ativo driftar, aparece aqui.'
+        }
+      />
+    )
+  }
+
+  if (mode === 'global') {
+    return (
+      <GlobalModeMap
+        data={data}
+        className={className}
+        mode={mode}
+        onModeChange={onModeChange}
+      />
+    )
+  }
+
+  return (
+    <PostModeMap
+      data={data}
+      className={className}
+      mode={mode}
+      onModeChange={onModeChange}
+    />
+  )
+}
+
+// ─── PostModeMap — heatmap estático (comportamento histórico) ─────────
+
+interface ModeMapProps {
+  data: SpreadMapData
+  className: string
+  mode: 'post' | 'global'
+  onModeChange?: (m: 'post' | 'global') => void
+}
+
+interface PointLayerProps { position: [number, number] }
+interface HeatmapPointProps { point: { lng: number; lat: number } }
+
+function PostModeMap({ data, className, mode, onModeChange }: ModeMapProps) {
   const mapView = usePrefsStore((s) => s.map_view)
   const containerRef = useRef<HTMLDivElement>(null)
 
-  // "Tem algo pra mostrar" = origem do post OU pelo menos 1 destino com
-  // location. Antes o gate era `arcs.length === 0`, mas mapa com 1 ponto
-  // só (origem sem espalhamento, ou 1 spread sem origem) também é visual
-  // útil — bug histórico que escondia esses casos.
-  const hasGeometry =
-    !!data && (!!data.origin || data.destinations.length > 0)
-
   useEffect(() => {
-    if (!hasGeometry || !data) return
     if (!containerRef.current) return
-
     let cancelled = false
     let cleanup: (() => void) | null = null
 
-    // Lazy import: maplibre-gl + deck.gl somam ~400kb gzip. Sem location,
-    // nem importamos.
     void (async () => {
       try {
-        const [maplibreModule, deckMapbox, layersModule, aggregationModule] =
-          await Promise.all([
-            import('maplibre-gl'),
-            // `MapboxOverlay` mora em `@deck.gl/mapbox`, NÃO em `@deck.gl/core`.
-            // Antes importávamos de `core` e o cast `as unknown` silenciava o
-            // erro de tipos — runtime explodia com "MapboxOverlay is not a
-            // constructor" assim que o useEffect disparava (sintoma só visível
-            // quando havia dados pra renderizar).
-            import('@deck.gl/mapbox'),
-            import('@deck.gl/layers'),
-            import('@deck.gl/aggregation-layers'),
-          ])
+        const [maplibreModule, deckMapbox, layersModule, aggregationModule] = await Promise.all([
+          import('maplibre-gl'),
+          import('@deck.gl/mapbox'),
+          import('@deck.gl/layers'),
+          import('@deck.gl/aggregation-layers'),
+        ])
         if (cancelled) return
 
         const maplibregl = maplibreModule.default as unknown as MaplibreStatic
         const { MapboxOverlay } = deckMapbox as unknown as {
-          // MapboxOverlay funciona com qualquer mapa compatível com a API
-          // do mapbox-gl — incluindo MapLibre, que é fork API-compatível.
-          // O nome continua "Mapbox" por razões históricas do deck.gl.
           MapboxOverlay: new (props: { layers: unknown[] }) => unknown
         }
         const { ScatterplotLayer } = layersModule as unknown as {
-          ScatterplotLayer: new (props: Record<string, unknown>) => unknown
+          ScatterplotLayer: LayerCtor
         }
         const { HeatmapLayer } = aggregationModule as unknown as {
-          HeatmapLayer: new (props: Record<string, unknown>) => unknown
+          HeatmapLayer: LayerCtor
         }
 
-        // Centro: prefere a origem (autor do post). Se não há origem mas
-        // há destinos, usa o primeiro destino. Fallback é centro do globo.
-        const centerPoint =
-          data.origin ?? data.destinations[0]?.point ?? null
+        const centerPoint = data.origin ?? data.destinations[0]?.point ?? null
         const center: [number, number] = centerPoint
           ? [centerPoint.lng, centerPoint.lat]
           : [0, 20]
 
-        // `mapView`:
-        //  - `'fit-bounds'` (default): zoom inicial baixo (1.5) e depois
-        //    `fitBounds` ajusta pro bbox dos pontos quando o map carrega.
-        //  - `'open'`: deixa zoom 1.5 estático mostrando o globo todo.
-        // Inicializar zoom em 1.5 nos dois casos evita flash de zoom alto
-        // enquanto tiles carregam — o `fitBounds` já roda no `'load'`.
         const map = new maplibregl.Map({
           container: containerRef.current!,
           style: MAP_STYLE,
@@ -221,27 +211,15 @@ export function SpreadMap({
         if (mapView === 'fit-bounds') {
           const bounds = computeBounds([
             ...(data.origin ? [[data.origin.lng, data.origin.lat] as [number, number]] : []),
-            ...data.destinations.map(
-              (d): [number, number] => [d.point.lng, d.point.lat],
-            ),
+            ...data.destinations.map((d): [number, number] => [d.point.lng, d.point.lat]),
           ])
           if (bounds) {
-            // Espera o style carregar antes — `fitBounds` antes do `'load'`
-            // pode ser ignorado em algumas versões do MapLibre.
             map.once('load', () => {
-              map.fitBounds(bounds, {
-                padding: 60,
-                // maxZoom 11 = ~rua/quarteirão; evita zoom 22 quando todos
-                // os pontos coincidem (granularity 'precise' no mesmo lugar).
-                maxZoom: 11,
-                duration: 0,
-              })
+              map.fitBounds(bounds, { padding: 60, maxZoom: 11, duration: 0 })
             })
           }
         }
 
-        // Pontos da origem e dos destinos. Origem é amber + raio maior
-        // (manifesto §28 — "ground zero" do post merece destaque visual).
         const originPoints: PointLayerProps[] = data.origin
           ? [{ position: [data.origin.lng, data.origin.lat] }]
           : []
@@ -251,10 +229,6 @@ export function SpreadMap({
 
         const overlay = new MapboxOverlay({
           layers: [
-            // Heatmap dos destinos (densidade de espalhamento). Renderizado
-            // PRIMEIRO pra ficar embaixo dos pontos (origem + destinos).
-            // Substitui o ArcLayer (radial) — visual mais legível pra
-            // posts virais com muitos destinos sobrepostos.
             new HeatmapLayer({
               id: 'spread-heat',
               data: data.destinations,
@@ -273,12 +247,11 @@ export function SpreadMap({
                 [178, 24, 43, 250],
               ],
             }),
-            // Ponto da origem (autor do post). Amber, raio grande.
             new ScatterplotLayer({
               id: 'spread-origin',
               data: originPoints,
               getPosition: (p: PointLayerProps) => p.position,
-              getFillColor: [251, 191, 36, 230], // drift amber
+              getFillColor: [251, 191, 36, 230],
               getRadius: 8,
               radiusUnits: 'pixels',
               stroked: true,
@@ -286,13 +259,11 @@ export function SpreadMap({
               lineWidthUnits: 'pixels',
               getLineWidth: 1.5,
             }),
-            // Pontos dos destinos (espalhadores). Verde drift-spread,
-            // alpha reduzido pra integrar com o heatmap embaixo.
             new ScatterplotLayer({
               id: 'spread-destinations',
               data: destPoints,
               getPosition: (p: PointLayerProps) => p.position,
-              getFillColor: [52, 211, 153, 140], // drift-spread (alpha reduzido)
+              getFillColor: [52, 211, 153, 140],
               getRadius: 3,
               radiusUnits: 'pixels',
             }),
@@ -300,100 +271,226 @@ export function SpreadMap({
         })
 
         map.addControl(overlay)
+        cleanup = () => { try { map.remove() } catch { /* noop */ } }
+      } catch (err) {
+        console.error('[SpreadMap post] init error:', err)
+      }
+    })()
 
-        cleanup = () => {
-          try {
-            map.remove()
-          } catch {
-            /* noop — map pode já ter sido destruído */
+    return () => { cancelled = true; cleanup?.() }
+  }, [data, mapView])
+
+  return (
+    <MapShell
+      containerRef={containerRef}
+      className={className}
+      mode={mode}
+      onModeChange={onModeChange}
+      stats={`${data.totalSpreads} drifts · ${data.countries.length} ${data.countries.length === 1 ? 'país' : 'países'}`}
+    />
+  )
+}
+
+// ─── GlobalModeMap — linhas animadas de propagação ────────────────────
+
+function GlobalModeMap({ data, className, mode, onModeChange }: ModeMapProps) {
+  const mapView = usePrefsStore((s) => s.map_view)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+
+    let cancelled = false
+    let rafId = 0
+    let pauseTimer: ReturnType<typeof setTimeout>
+    let mapCleanup: (() => void) | null = null
+    let overlay: OverlayInstance | null = null
+
+    // Layer constructors — cached after async import
+    let LineLayer: LayerCtor
+    let ScatterplotLayer: LayerCtor
+
+    // Precompute animation points from destinations
+    const destPoints = data.destinations.map((d) => ({
+      pos: [d.point.lng, d.point.lat] as [number, number],
+      t: d.t,
+    }))
+
+    void (async () => {
+      try {
+        const [maplibreModule, deckMapbox, layersModule] = await Promise.all([
+          import('maplibre-gl'),
+          import('@deck.gl/mapbox'),
+          import('@deck.gl/layers'),
+        ])
+        if (cancelled) return
+
+        const maplibregl = maplibreModule.default as unknown as MaplibreStatic
+        const { MapboxOverlay } = deckMapbox as unknown as {
+          MapboxOverlay: new (props: { layers: unknown[] }) => OverlayInstance
+        }
+        const mods = layersModule as unknown as { LineLayer: LayerCtor; ScatterplotLayer: LayerCtor }
+        LineLayer = mods.LineLayer
+        ScatterplotLayer = mods.ScatterplotLayer
+
+        const centerPt = data.destinations[0]?.point ?? null
+        const center: [number, number] = centerPt ? [centerPt.lng, centerPt.lat] : [0, 20]
+
+        const map = new maplibregl.Map({
+          container: el,
+          style: MAP_STYLE,
+          center,
+          zoom: 1.5,
+          attributionControl: false,
+          dragRotate: false,
+        })
+
+        mapCleanup = () => { try { map.remove() } catch { /* noop */ } }
+
+        if (mapView === 'fit-bounds' && data.destinations.length > 0) {
+          const bounds = computeBounds(
+            data.destinations.map((d): [number, number] => [d.point.lng, d.point.lat]),
+          )
+          if (bounds) {
+            map.once('load', () => map.fitBounds(bounds, { padding: 60, maxZoom: 8, duration: 0 }))
           }
         }
+
+        const inst = new MapboxOverlay({ layers: [] })
+        overlay = inst
+        map.addControl(inst)
+
+        // ─── Animation loop ────────────────────────────────────────
+        const ANIM_DURATION = 8000   // 8s pra percorrer toda a cadeia
+        const FADE_IN = 0.06         // segmento aparece em 6% do ciclo
+        const PAUSE_MS = 2000        // pausa entre ciclos
+
+        let startTime: number | null = null
+        let pausing = false
+
+        function renderFrame(p: number) {
+          if (!overlay) return
+
+          // Só mostra segmentos cujo "disparo" já ocorreu
+          const visSegs = data.arcs.filter((s) => s.t <= p)
+          const visPts = destPoints.filter((d) => d.t <= p)
+
+          overlay.setProps({
+            layers: [
+              new LineLayer({
+                id: 'prop-lines',
+                data: visSegs,
+                getSourcePosition: (d: PropagationArc) => d.from,
+                getTargetPosition: (d: PropagationArc) => d.to,
+                getWidth: 1.5,
+                // Fade-in suave: alpha sobe de 0→150 em FADE_IN do ciclo
+                getColor: (d: PropagationArc) => {
+                  const age = p - d.t
+                  const alpha = Math.round(Math.min(age / FADE_IN, 1) * 150)
+                  return [52, 211, 153, alpha]
+                },
+                widthUnits: 'pixels',
+                updateTriggers: { getColor: p },
+              }),
+              new ScatterplotLayer({
+                id: 'prop-dots',
+                data: visPts,
+                getPosition: (d: { pos: [number, number]; t: number }) => d.pos,
+                // Fade-in + pulso de chegada (cresce e volta)
+                getFillColor: (d: { pos: [number, number]; t: number }) => {
+                  const age = p - d.t
+                  const alpha = Math.round(Math.min(age / FADE_IN, 1) * 200)
+                  return [52, 211, 153, alpha]
+                },
+                getRadius: (d: { pos: [number, number]; t: number }) => {
+                  const age = p - d.t
+                  // Pulse: starts big, settles to 3px
+                  const pulse = age < FADE_IN ? 1 + (1 - age / FADE_IN) * 4 : 1
+                  return 3 * pulse
+                },
+                radiusUnits: 'pixels',
+                updateTriggers: { getFillColor: p, getRadius: p },
+              }),
+            ],
+          })
+        }
+
+        function tick(ts: number) {
+          if (pausing || cancelled) return
+          if (!startTime) startTime = ts
+          const p = Math.min((ts - startTime) / ANIM_DURATION, 1)
+          renderFrame(p)
+          if (p < 1) {
+            rafId = requestAnimationFrame(tick)
+          } else {
+            pausing = true
+            pauseTimer = setTimeout(() => {
+              if (!cancelled) {
+                startTime = null
+                pausing = false
+                rafId = requestAnimationFrame(tick)
+              }
+            }, PAUSE_MS)
+          }
+        }
+
+        map.once('load', () => {
+          if (!cancelled) rafId = requestAnimationFrame(tick)
+        })
       } catch (err) {
-        console.error('[SpreadMap] falha ao carregar maplibre/deckgl:', err)
+        console.error('[SpreadMap global] init error:', err)
       }
     })()
 
     return () => {
       cancelled = true
-      cleanup?.()
+      cancelAnimationFrame(rafId)
+      clearTimeout(pauseTimer)
+      mapCleanup?.()
+      overlay = null
     }
-  }, [data, hasGeometry, mapView])
+  }, [data, mapView])
 
-  // ─── Estados de fallback (renderizam sem importar MapLibre) ────────
+  return (
+    <MapShell
+      containerRef={containerRef}
+      className={className}
+      mode={mode}
+      onModeChange={onModeChange}
+      stats={`${data.totalSpreads} drifts · ${data.countries.length} ${data.countries.length === 1 ? 'país' : 'países'} · todos os posts`}
+    />
+  )
+}
 
-  if (loading) {
-    return (
-      <Placeholder className={className} title="carregando mapa…" body="" />
-    )
-  }
+// ─── MapShell — wrapper comum (toggle + stats + attribution) ──────────
 
-  if (error) {
-    return <Placeholder className={className} title="erro no mapa" body={error} />
-  }
-
-  if (!hasGeometry) {
-    // Duas razões possíveis pro mapa estar vazio:
-    //   1. User desligou GPS (granularity === 'off') — pode acionar CTA
-    //      pra abrir Settings na seção location.
-    //   2. User está com GPS ligado mas nenhum spread deste post tem
-    //      location ainda — só esperar; CTA seria ruído.
-    if (granularity === 'off') {
-      return (
-        <Placeholder
-          className={className}
-          title="GPS desativado nas suas configurações"
-          body={
-            <>
-              Mapa de spreads precisa de location opt-in (manifesto §28 —
-              default off por privacidade). Ative se quiser que seus spreads
-              apareçam no mapa de outros posts.
-            </>
-          }
-          {...(onOpenLocationSettings
-            ? {
-                action: {
-                  label: 'ativar GPS',
-                  onClick: onOpenLocationSettings,
-                },
-              }
-            : {})}
-        />
-      )
-    }
-    return (
-      <Placeholder
-        className={className}
-        title="sem dados de localização"
-        body={
-          <>
-            Drifts deste post ainda não têm tag <code>location</code>.
-            Quando alguém com GPS ativo driftar, os arcos aparecem aqui.
-          </>
-        }
-      />
-    )
-  }
-
+function MapShell({
+  containerRef,
+  className,
+  mode,
+  onModeChange,
+  stats,
+}: {
+  containerRef: React.RefObject<HTMLDivElement>
+  className: string
+  mode: 'post' | 'global'
+  onModeChange?: (m: 'post' | 'global') => void
+  stats: string
+}) {
   return (
     <div className={`relative overflow-hidden rounded border border-drift-border ${className}`}>
       <div ref={containerRef} className="h-full w-full" />
 
-      {/* Toggle post ↔ global — só renderiza se o pai fornece onModeChange */}
       {onModeChange && (
         <div className="pointer-events-auto absolute left-2 top-2 flex overflow-hidden rounded border border-drift-border bg-drift-bg/90 backdrop-blur-sm">
-          <ModeBtn active={mode === 'post'} onClick={() => onModeChange('post')}>
-            post
-          </ModeBtn>
-          <ModeBtn active={mode === 'global'} onClick={() => onModeChange('global')}>
-            global
-          </ModeBtn>
+          <ModeBtn active={mode === 'post'} onClick={() => onModeChange('post')}>post</ModeBtn>
+          <ModeBtn active={mode === 'global'} onClick={() => onModeChange('global')}>global</ModeBtn>
         </div>
       )}
 
-      <div className="pointer-events-none absolute bottom-2 left-2 rounded bg-drift-bg/80 px-2 py-1 text-[10px] text-slate-400 backdrop-blur-sm">
-        {data.totalSpreads} drifts · {data.countries.length}{' '}
-        {data.countries.length === 1 ? 'país' : 'países'}
-        {mode === 'global' && ' · todos os posts'}
+      <div className="pointer-events-none absolute bottom-2 left-2 rounded bg-drift-bg/80 px-2 py-1 font-mono text-[10px] text-slate-400 backdrop-blur-sm">
+        {stats}
       </div>
       <div
         className="pointer-events-auto absolute bottom-2 right-2 rounded bg-drift-bg/80 px-2 py-1 text-[9px] text-slate-500 backdrop-blur-sm [&_a]:underline [&_a]:hover:text-slate-300"
@@ -403,37 +500,7 @@ export function SpreadMap({
   )
 }
 
-/**
- * Calcula bounding box de uma lista de pontos `[lng, lat]`.
- * Retorna `null` se a lista está vazia. Output no formato esperado por
- * `MapLibre.fitBounds`: `[[swLng, swLat], [neLng, neLat]]`.
- *
- * Função pura — exposta como `_computeBounds` pra teste.
- */
-export function _computeBounds(
-  points: [number, number][],
-): [[number, number], [number, number]] | null {
-  if (points.length === 0) return null
-  let minLng = Infinity
-  let maxLng = -Infinity
-  let minLat = Infinity
-  let maxLat = -Infinity
-  for (const [lng, lat] of points) {
-    if (lng < minLng) minLng = lng
-    if (lng > maxLng) maxLng = lng
-    if (lat < minLat) minLat = lat
-    if (lat > maxLat) maxLat = lat
-  }
-  return [
-    [minLng, minLat],
-    [maxLng, maxLat],
-  ]
-}
-
-// Alias usado dentro deste módulo. `_computeBounds` é o nome exportado
-// (test-only) e mantém o prefixo undescore — mesma convenção do
-// `_buildArcs` em useSpreadMap.ts.
-const computeBounds = _computeBounds
+// ─── ModeBtn ──────────────────────────────────────────────────────────
 
 function ModeBtn({
   active,
@@ -448,15 +515,15 @@ function ModeBtn({
     <button
       onClick={onClick}
       className={`px-[10px] py-[5px] font-mono text-[9px] uppercase tracking-[1.5px] transition-colors ${
-        active
-          ? 'bg-drift-accent/15 text-drift-accent'
-          : 'text-drift-muted hover:text-drift-text'
+        active ? 'bg-drift-accent/15 text-drift-accent' : 'text-drift-muted hover:text-drift-text'
       }`}
     >
       {children}
     </button>
   )
 }
+
+// ─── Placeholder ──────────────────────────────────────────────────────
 
 function Placeholder({
   className,
@@ -467,17 +534,10 @@ function Placeholder({
   className: string
   title: string
   body: React.ReactNode
-  /**
-   * CTA opcional. Quando presente, renderiza um botão abaixo do body —
-   * usado no estado "GPS off" pra dar caminho direto pras settings em vez
-   * de só mandar o user procurar.
-   */
   action?: { label: string; onClick: () => void }
 }) {
   return (
-    <div
-      className={`flex flex-col items-center justify-center gap-2 rounded border border-dashed border-drift-border bg-drift-surface/40 p-6 text-center text-[11px] text-slate-500 ${className}`}
-    >
+    <div className={`flex flex-col items-center justify-center gap-2 rounded border border-dashed border-drift-border bg-drift-surface/40 p-6 text-center text-[11px] text-slate-500 ${className}`}>
       <span className="text-base">🗺️</span>
       <strong className="text-slate-400">{title}</strong>
       <p className="max-w-xs leading-relaxed">{body}</p>
@@ -492,3 +552,21 @@ function Placeholder({
     </div>
   )
 }
+
+// ─── computeBounds (pure, exported for tests) ─────────────────────────
+
+export function _computeBounds(
+  points: [number, number][],
+): [[number, number], [number, number]] | null {
+  if (points.length === 0) return null
+  let minLng = Infinity, maxLng = -Infinity, minLat = Infinity, maxLat = -Infinity
+  for (const [lng, lat] of points) {
+    if (lng < minLng) minLng = lng
+    if (lng > maxLng) maxLng = lng
+    if (lat < minLat) minLat = lat
+    if (lat > maxLat) maxLat = lat
+  }
+  return [[minLng, minLat], [maxLng, maxLat]]
+}
+
+const computeBounds = _computeBounds
