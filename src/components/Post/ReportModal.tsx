@@ -18,8 +18,9 @@
  */
 
 import { useState } from 'react'
-import { motion } from 'framer-motion'
 import type { ReportReason, Post } from '../../types/drift'
+import { SlideUpOverlay } from '../UI/SlideUpOverlay'
+import { ModalHeader } from '../UI/ModalHeader'
 
 export interface ReportModalProps {
   post: Post
@@ -69,99 +70,72 @@ export function ReportModal({ post, pending, onSubmit, onClose }: ReportModalPro
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.15 }}
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-drift-bg/95 p-4 backdrop-blur-sm"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-    >
-      <motion.div
-        initial={{ y: 12 }}
-        animate={{ y: 0 }}
-        className="w-full max-w-md rounded border border-drift-border bg-drift-surface p-5"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <header className="mb-4 flex items-center justify-between">
-          <h2 className="text-xs uppercase tracking-[0.2em] text-drift-accent">
-            denunciar post
-          </h2>
-          <button
-            onClick={onClose}
-            className="rounded border border-drift-border px-2 py-1 text-[10px] hover:border-drift-accent hover:text-drift-accent"
-            aria-label="Fechar"
-          >
-            ✕
-          </button>
-        </header>
+    <SlideUpOverlay onClose={onClose} ariaLabel="denunciar post">
+      <ModalHeader title="denunciar post" onClose={onClose} tone="danger" />
 
-        <p className="mb-4 text-[11px] leading-relaxed text-slate-500">
-          Reports são eventos públicos assinados (manifesto §26).
-          Quando o threshold dinâmico é atingido, o post some do feed
-          default — mas continua na rede. Cliente alternativo pode
-          exibir mesmo assim.
-        </p>
+      <p className="mb-4 text-[11px] leading-relaxed text-drift-muted">
+        Reports são eventos públicos assinados (manifesto §26).
+        Quando o threshold dinâmico é atingido, o post some do feed
+        default — mas continua na rede. Cliente alternativo pode
+        exibir mesmo assim.
+      </p>
 
-        {!confirmStep && (
-          <>
-            <div className="mb-4 rounded border border-drift-border bg-drift-bg/50 p-3 text-[10px] text-slate-400">
-              <div className="mb-1 text-slate-600">post sendo denunciado:</div>
-              <div className="line-clamp-3 text-slate-300">
-                {post.subposts[0]?.text ?? '(imagem)'}
-              </div>
+      {!confirmStep && (
+        <>
+          <div className="mb-4 rounded border border-drift-border bg-drift-bg/50 p-3 text-[10px] text-slate-400">
+            <div className="mb-1 text-drift-muted">post sendo denunciado:</div>
+            <div className="line-clamp-3 text-drift-text">
+              {post.subposts[0]?.text ?? '(imagem)'}
             </div>
+          </div>
 
-            <div className="space-y-2">
-              {REASONS.map((opt) => (
-                <button
-                  key={opt.value}
-                  onClick={() => setSelected(opt.value)}
-                  className={`w-full rounded border px-3 py-2 text-left transition-colors ${opt.color} ${
-                    selected === opt.value ? 'bg-opacity-50 ring-1 ring-current' : 'bg-transparent'
-                  }`}
-                >
-                  <div className="text-[12px] font-semibold">
-                    {selected === opt.value ? '✓ ' : ''}
-                    {opt.label}
-                  </div>
-                  <div className="mt-0.5 text-[10px] leading-relaxed opacity-80">
-                    {opt.description}
-                  </div>
-                </button>
-              ))}
-            </div>
-
-            <div className="mt-5 flex justify-end gap-2">
+          <div className="space-y-2">
+            {REASONS.map((opt) => (
               <button
-                onClick={onClose}
-                className="rounded border border-drift-border px-3 py-1 text-[11px] text-slate-500 hover:border-slate-500"
+                key={opt.value}
+                onClick={() => setSelected(opt.value)}
+                className={`w-full rounded border px-3 py-2 text-left transition-colors ${opt.color} ${
+                  selected === opt.value ? 'bg-opacity-50 ring-1 ring-current' : 'bg-transparent'
+                }`}
               >
-                cancelar
+                <div className="text-[12px] font-semibold">
+                  {selected === opt.value ? '✓ ' : ''}
+                  {opt.label}
+                </div>
+                <div className="mt-0.5 text-[10px] leading-relaxed opacity-80">
+                  {opt.description}
+                </div>
               </button>
-              <button
-                onClick={() => selected && setConfirmStep(true)}
-                disabled={!selected}
-                className="rounded border border-drift-accent px-3 py-1 text-[11px] uppercase tracking-widest text-drift-accent hover:bg-drift-accent/10 disabled:cursor-not-allowed disabled:opacity-30"
-              >
-                continuar →
-              </button>
-            </div>
-          </>
-        )}
+            ))}
+          </div>
 
-        {confirmStep && selected && (
-          <ConfirmStep
-            reason={selected}
-            pending={pending}
-            onBack={() => setConfirmStep(false)}
-            onSubmit={handleSubmit}
-          />
-        )}
-      </motion.div>
-    </motion.div>
+          <div className="mt-5 flex justify-end gap-2">
+            <button
+              onClick={onClose}
+              className="rounded border border-drift-border px-3 py-1 text-[11px] text-drift-muted hover:border-drift-text hover:text-drift-text"
+            >
+              cancelar
+            </button>
+            <button
+              onClick={() => selected && setConfirmStep(true)}
+              disabled={!selected}
+              className="rounded border border-drift-accent px-3 py-1 text-[11px] uppercase tracking-widest text-drift-accent hover:bg-drift-accent/10 disabled:cursor-not-allowed disabled:opacity-30"
+            >
+              continuar →
+            </button>
+          </div>
+        </>
+      )}
+
+      {confirmStep && selected && (
+        <ConfirmStep
+          reason={selected}
+          pending={pending}
+          onBack={() => setConfirmStep(false)}
+          onSubmit={handleSubmit}
+        />
+      )}
+    </SlideUpOverlay>
   )
 }
 

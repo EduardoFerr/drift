@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import QRCode from 'qrcode'
+import { SlideUpOverlay } from '../UI/SlideUpOverlay'
+import { ModalHeader } from '../UI/ModalHeader'
 import { setIdentityFromNsec } from '../../lib/identity'
 import { rebuildIdentityHistory } from '../../lib/sync'
 import {
@@ -30,28 +32,10 @@ export function IdentityPanel({ identity, onClose }: Props) {
   const [tab, setTab] = useState<'backup' | 'import' | 'passkey'>('backup')
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-md rounded border border-drift-border bg-drift-surface p-5"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <header className="mb-4 flex items-center justify-between">
-          <h2 className="text-xs uppercase tracking-[0.2em] text-drift-accent">
-            sua identidade
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-slate-500 hover:text-slate-300"
-            aria-label="fechar"
-          >
-            ✕
-          </button>
-        </header>
+    <SlideUpOverlay onClose={onClose} ariaLabel="sua identidade">
+      <ModalHeader title="sua identidade" onClose={onClose} />
 
-        <div className="mb-5 flex gap-1 text-[10px] uppercase tracking-widest">
+      <div className="mb-5 flex gap-1 text-[10px] uppercase tracking-widest">
           <button
             onClick={() => setTab('backup')}
             className={`flex-1 rounded border px-3 py-1.5 ${
@@ -85,11 +69,10 @@ export function IdentityPanel({ identity, onClose }: Props) {
           </button>
         </div>
 
-        {tab === 'backup' && <BackupTab identity={identity} />}
-        {tab === 'import' && <ImportTab onClose={onClose} />}
-        {tab === 'passkey' && <PasskeyTab npub={identity.npub} />}
-      </div>
-    </div>
+      {tab === 'backup' && <BackupTab identity={identity} />}
+      {tab === 'import' && <ImportTab onClose={onClose} />}
+      {tab === 'passkey' && <PasskeyTab npub={identity.npub} />}
+    </SlideUpOverlay>
   )
 }
 

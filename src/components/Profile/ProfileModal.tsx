@@ -16,8 +16,9 @@
  */
 
 import { useEffect, useState } from 'react'
-import { motion } from 'framer-motion'
 import { db } from '../../lib/db'
+import { SlideUpOverlay } from '../UI/SlideUpOverlay'
+import { ModalHeader } from '../UI/ModalHeader'
 import { useUserWeight } from '../../hooks/useUserWeight'
 import { getWeightTier, type WeightTier } from '../../lib/weight'
 import { useFollowsStore } from '../../lib/follows'
@@ -70,35 +71,10 @@ export function ProfileModal({ identity, onClose }: ProfileModalProps) {
   const label = activeRecord?.label ?? null
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.15 }}
-      className="fixed inset-0 z-40 flex items-center justify-center bg-drift-bg/90 p-4 backdrop-blur-sm"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-    >
-      <motion.div
-        initial={{ y: 12 }}
-        animate={{ y: 0 }}
-        className="w-full max-w-md rounded border border-drift-border bg-drift-surface p-5"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <header className="mb-4 flex items-center justify-between">
-          <h2 className="text-xs uppercase tracking-[0.2em] text-drift-accent">
-            perfil
-          </h2>
-          <button
-            onClick={onClose}
-            className="rounded border border-drift-border px-2 py-1 text-[10px] hover:border-drift-accent hover:text-drift-accent"
-          >
-            ✕
-          </button>
-        </header>
+    <SlideUpOverlay onClose={onClose} ariaLabel="perfil">
+      <ModalHeader title="perfil" onClose={onClose} />
 
-        <section className="mb-4 rounded border border-drift-border bg-drift-bg/30 p-3">
+      <section className="mb-4 rounded border border-drift-border bg-drift-bg/30 p-3">
           {label && (
             <div className="mb-1 text-[12px] text-slate-200">{label}</div>
           )}
@@ -144,13 +120,12 @@ export function ProfileModal({ identity, onClose }: ProfileModalProps) {
           </section>
         ) : null}
 
-        <p className="mt-3 text-[10px] leading-relaxed text-slate-600">
-          Manifesto §22 — score determinístico. Esses números vêm de eventos
-          Nostr públicos; qualquer cliente Drift calcula os mesmos a partir
-          do mesmo conjunto.
-        </p>
-      </motion.div>
-    </motion.div>
+      <p className="mt-3 text-[10px] leading-relaxed text-drift-muted">
+        Manifesto §22 — score determinístico. Esses números vêm de eventos
+        Nostr públicos; qualquer cliente Drift calcula os mesmos a partir
+        do mesmo conjunto.
+      </p>
+    </SlideUpOverlay>
   )
 }
 

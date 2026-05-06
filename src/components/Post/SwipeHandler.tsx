@@ -184,14 +184,17 @@ export function SwipeHandler({
     >
       {children}
 
-      {/* Overlay de feedback do gesto — aparece após swipe bem-sucedido. */}
+      {/* Overlay de feedback do gesto — badges estilizados (V3.5).
+          - i-drift (top-left): bg drift-accent, color drift-bg, Syne 800, rotate -5deg
+          - i-sink (top-right): border 2px #ff4f4f, color #ff4f4f, rotate 5deg
+          - i-sub (center): border 2px drift-accent2, color drift-accent2 (horizontal nav)
+          Opacity já gerenciado por show/hide via timer (600ms) — efeito visual puro. */}
       {hint && (
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <div
-            className={`rounded-full px-6 py-3 text-2xl font-bold ${hintBg(hint)}`}
-          >
-            {hintLabel(hint)}
-          </div>
+        <div
+          className={`pointer-events-none absolute ${hintPosition(hint)}`}
+          aria-hidden="true"
+        >
+          <div className={hintClasses(hint)}>{hintLabel(hint)}</div>
         </div>
       )}
     </motion.div>
@@ -207,20 +210,35 @@ function hintLabel(h: HintKind): string {
     case 'bury':
       return '↓ SINK'
     case 'next':
-      return '→'
+      return '→ SUB'
     case 'prev':
-      return '←'
+      return '← SUB'
   }
 }
 
-function hintBg(h: HintKind): string {
+function hintPosition(h: HintKind): string {
   switch (h) {
     case 'spread':
-      return 'bg-emerald-500/30 text-emerald-200 ring-2 ring-emerald-500/50'
+      return 'left-4 top-4'
     case 'bury':
-      return 'bg-red-500/30 text-red-200 ring-2 ring-red-500/50'
+      return 'right-4 top-4'
     case 'next':
     case 'prev':
-      return 'bg-drift-accent/30 text-drift-accent ring-2 ring-drift-accent/50'
+      return 'inset-0 flex items-center justify-center'
+  }
+}
+
+function hintClasses(h: HintKind): string {
+  // Comum: font-display Syne 800 uppercase tracking-widest, padding 5px 12px
+  const base =
+    'font-display text-base font-extrabold uppercase tracking-widest px-3 py-[5px] rounded-sm'
+  switch (h) {
+    case 'spread':
+      return `${base} bg-drift-accent text-drift-bg -rotate-[5deg]`
+    case 'bury':
+      return `${base} border-2 border-[#ff4f4f] text-[#ff4f4f] rotate-[5deg]`
+    case 'next':
+    case 'prev':
+      return `${base} border-2 border-drift-accent2 text-drift-accent2`
   }
 }

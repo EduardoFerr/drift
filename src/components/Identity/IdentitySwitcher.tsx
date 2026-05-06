@@ -18,7 +18,8 @@
  */
 
 import { useState } from 'react'
-import { motion } from 'framer-motion'
+import { SlideUpOverlay } from '../UI/SlideUpOverlay'
+import { ModalHeader } from '../UI/ModalHeader'
 import {
   createNewIdentity,
   importIdentityNsec,
@@ -187,33 +188,8 @@ export function IdentitySwitcher({ onRequestExport, onClose }: IdentitySwitcherP
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.15 }}
-      className="fixed inset-0 z-40 flex items-center justify-center bg-drift-bg/90 p-4 backdrop-blur-sm"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-    >
-      <motion.div
-        initial={{ y: 12 }}
-        animate={{ y: 0 }}
-        className="w-full max-w-md rounded border border-drift-border bg-drift-surface p-5"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <header className="mb-4 flex items-center justify-between">
-          <h2 className="text-xs uppercase tracking-[0.2em] text-drift-accent">
-            identidades
-          </h2>
-          <button
-            onClick={onClose}
-            className="rounded border border-drift-border px-2 py-1 text-[10px] hover:border-drift-accent hover:text-drift-accent"
-          >
-            ✕
-          </button>
-        </header>
+    <SlideUpOverlay onClose={onClose} ariaLabel="identidades">
+      <ModalHeader title="identidades" onClose={onClose} />
 
         <p className="mb-4 text-[11px] leading-relaxed text-slate-500">
           Manifesto §4 — anonimato por design. Múltiplas identidades
@@ -528,7 +504,6 @@ export function IdentitySwitcher({ onRequestExport, onClose }: IdentitySwitcherP
             </div>
           </>
         )}
-      </motion.div>
-    </motion.div>
+    </SlideUpOverlay>
   )
 }

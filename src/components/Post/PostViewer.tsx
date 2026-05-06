@@ -245,10 +245,13 @@ export function PostViewer({
       role="dialog"
       aria-modal="true"
     >
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-drift-border px-4 py-3 text-[10px] text-slate-500">
-        <span>
-          {isMine ? 'você' : 'anon'}…{post.authorPub.slice(-8)} ·{' '}
+      {/* Header — V3.1 reskin: Syne display pra autor, DM Mono pra DERIVA. */}
+      <div className="flex items-center justify-between border-b border-drift-border px-4 py-3 text-[10px] text-drift-muted">
+        <span className="font-mono">
+          <span className="font-display font-bold uppercase tracking-wider text-drift-text">
+            {isMine ? 'você' : 'anon'}…{post.authorPub.slice(-8)}
+          </span>
+          {' · '}
           {timeAgo(post.createdAt)}
           {post.contentWarning && (
             <span
@@ -259,9 +262,10 @@ export function PostViewer({
             </span>
           )}
         </span>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 font-mono">
           <span title={`drifts ${displaySpreads} · sinks ${displayBuries}`}>
-            DERIVA <span className="text-slate-300">{post.score.toFixed(3)}</span>
+            <span className="uppercase tracking-widest text-drift-muted">DERIVA</span>{' '}
+            <span className="font-medium text-drift-text">{post.score.toFixed(3)}</span>
           </span>
           <button
             onClick={handleTogglePin}
@@ -363,8 +367,25 @@ export function PostViewer({
         )}
       </AnimatePresence>
 
-      {/* Conteúdo com gestos */}
+      {/* Conteúdo com gestos — V3.1 card stack:
+          2 shadow cards atrás (próximos da fila) com scale 0.96/0.92,
+          translateY 7px/14px, opacity 0.4/0.18. Efeito Tinder de "tem
+          mais posts atrás". Aria-hidden — visual puro. */}
       <div className="relative flex-1 p-4">
+        {queue && queue.next && (
+          <>
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-x-4 top-4 bottom-4 -z-20 rounded border border-drift-border bg-drift-surface"
+              style={{ transform: 'translateY(14px) scale(0.92)', opacity: 0.18 }}
+            />
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-x-4 top-4 bottom-4 -z-10 rounded border border-drift-border bg-drift-surface"
+              style={{ transform: 'translateY(7px) scale(0.96)', opacity: 0.4 }}
+            />
+          </>
+        )}
         <SwipeHandler
           onSpread={pendingAction === null ? onSpread : undefined}
           onBury={pendingAction === null ? onBury : undefined}
@@ -402,19 +423,19 @@ export function PostViewer({
         </SwipeHandler>
       </div>
 
-      {/* Footer com ações + dicas */}
-      <div className="flex items-center justify-between border-t border-drift-border px-4 py-3 text-[10px] text-slate-500">
+      {/* Footer com ações + dicas — V3.1 paleta v0.7. */}
+      <div className="flex items-center justify-between border-t border-drift-border px-4 py-3 font-mono text-[10px] text-drift-muted">
         <div className="flex gap-3">
           <span className="text-drift-spread">↑ {displaySpreads}</span>
           <span className="text-drift-bury">↓ {displayBuries}</span>
           {total > 1 && (
-            <span className="text-slate-400">
+            <span className="text-drift-text">
               {subpostIdx + 1} / {total}
             </span>
           )}
           {queue && queue.total > 1 && (
             <span
-              className="text-slate-600"
+              className="text-drift-muted"
               title="posição na fila — ↑/↓ avança automaticamente"
             >
               fila {queue.index + 1}/{queue.total}
