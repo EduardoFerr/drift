@@ -24,12 +24,62 @@ export interface DriftIdentity {
 
 export type SubpostType = 'text' | 'image' | 'text+image'
 
+/**
+ * V4 — three-layout system (manifesto §27 cosmético; mockup v0.7).
+ *
+ * Hint visual de renderização do subpost. Single source of truth pra
+ * 7 camadas: types/drift.ts (esta const), lib/events.ts (parse+
+ * normalização), lib/protocol.ts (serialize), lib/feed.ts (consume
+ * via JSON.parse), SubpostEditor (3 chips), SubpostLayout (switch
+ * exhaustive), Docs/protocol-spec.md §3.5.x (referencia este array
+ * via test layout.spec-code-sync).
+ *
+ * Adicionar layout novo: append a `LAYOUT_VALUES` → TS exhaustiveness
+ * quebra `<SubpostLayout>` switch (assertNever) → quebra a build →
+ * single source of truth garantido.
+ *
+ * Drift entre relays: outros clientes Nostr (Damus/Snort/Coracle) que
+ * vejam kind 9078 com `subposts[].layout` ignoram silenciosamente
+ * (NIP-01 não regula o payload de aplicação dentro de content). Posts
+ * Drift continuam exibindo conteúdo nesses clientes — só perdem o
+ * cosmetic. Manifesto §29 compat.
+ *
+ * Decisão schema: campo no content JSON, NÃO tag NIP-01. HIMYM Round 1
+ * 4/5 GO_WITH_MOD + 1 BLOCK pra reverter tag→content; Round 2 ratificou.
+ */
+export const LAYOUT_VALUES = ['portrait', 'landscape', 'text'] as const
+export type LayoutKind = (typeof LAYOUT_VALUES)[number]
+export const DEFAULT_LAYOUT: LayoutKind = 'portrait'
+
+/** Type guard determinístico (manifesto §7). Use em events.ts e protocol.ts. */
+export function isLayoutKind(v: unknown): v is LayoutKind {
+  return typeof v === 'string' && (LAYOUT_VALUES as readonly string[]).includes(v)
+}
+
+/**
+ * Normaliza layout pra valor canônico. Determinístico (§7):
+ * - LayoutKind válido → o próprio valor
+ * - undefined/null/inválido → DEFAULT_LAYOUT
+ *
+ * Usado em events.ts (parse de eventos da rede) e em renderer
+ * (defesa em camada — nunca renderiza valor desconhecido).
+ */
+export function normalizeLayout(v: unknown): LayoutKind {
+  return isLayoutKind(v) ? v : DEFAULT_LAYOUT
+}
+
 export interface Subpost {
   id: string
   type: SubpostType
   text: string | null // máx 280 chars
   imageUrl: string | null // URL nostr.build
   order: number // 0-indexed
+  /**
+   * V4 — hint visual. Ausente em posts antigos (compat retro: parse em
+   * events.ts normaliza pra DEFAULT_LAYOUT='portrait'). Sempre presente
+   * em posts gerados pelo cliente Drift v0.7+ via createPost.
+   */
+  layout?: LayoutKind
 }
 
 export interface GeoPoint {

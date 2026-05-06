@@ -18,6 +18,7 @@ import { create } from 'zustand'
 import { db } from './db'
 import { hiddenReason } from './moderation-local'
 import { useFollowsStore } from './follows'
+import { normalizeLayout } from '../types/drift'
 import type {
   Post,
   Subpost,
@@ -295,11 +296,23 @@ export function applyContentFilters(post: Post, prefs: UserPrefs): RenderHint {
 }
 
 
-function parseSubposts(content: string): Subpost[] {
+/**
+ * @internal — exported pra testes (V4 LOCK_VIA_TEST `layout.fixture-legacy`,
+ * `layout.unknown-value-fallback`, `layout.roundtrip`). Não usar fora de
+ * tests/feed.ts. UI consome via `getGlobalFeed`/`getFollowingFeed`/etc.
+ */
+export function parseSubposts(content: string): Subpost[] {
   try {
     const parsed = JSON.parse(content) as { subposts?: unknown }
     if (!Array.isArray(parsed.subposts)) return []
-    return parsed.subposts.filter(isSubpost)
+    // V4: normaliza layout no read path (não muta content armazenado —
+    // preserva fidelidade ao evento original da rede, mantém content ===
+    // raw_event content, single defesa em camada antes da UI).
+    // Posts antigos sem campo `layout` recebem DEFAULT_LAYOUT='portrait'
+    // (compat retro). Valores desconhecidos ('cubist', etc.) também caem
+    // pra DEFAULT_LAYOUT — defensa contra tag flooding ou cliente futuro
+    // emitindo layout novo que este cliente não conhece.
+    return parsed.subposts.filter(isSubpost).map(normalizeSubpostLayout)
   } catch {
     return []
   }
@@ -309,6 +322,12 @@ function isSubpost(v: unknown): v is Subpost {
   if (typeof v !== 'object' || v === null) return false
   const s = v as Record<string, unknown>
   return typeof s.id === 'string' && typeof s.order === 'number'
+}
+
+function normalizeSubpostLayout(s: Subpost): Subpost {
+  // normalizeLayout faz o type guard + fallback determinístico (§7).
+  // Tira o `?` opcional do tipo — UI nunca vê layout undefined.
+  return { ...s, layout: normalizeLayout(s.layout) }
 }
 
 function parseLocation(raw: string | null): GeoPoint | null {

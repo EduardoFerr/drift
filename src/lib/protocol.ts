@@ -31,6 +31,7 @@
 
 import { signDriftEvent, publishToRelays } from './nostr'
 import { DRIFT_KIND, CLIENT_ID, DRIFT_VERSION } from '../config/constants'
+import { normalizeLayout } from '../types/drift'
 import type {
   Subpost,
   GeoPoint,
@@ -78,10 +79,21 @@ export async function createPost(input: CreatePostInput): Promise<SignedEvent> {
   const loc = locationTag(input.location)
   if (loc) tags.push(loc)
 
+  // V4: normaliza layout no write path. Drafts vêm do SubpostEditor com
+  // layout = LayoutKind explícito (3 chips no footer); se vier undefined
+  // por qualquer motivo (caller programático), normalizeLayout aplica
+  // DEFAULT_LAYOUT. Garante que content JSON na rede tem sempre valor
+  // canônico — outros clientes Drift que NÃO chamem parseSubposts
+  // (parsing direto do raw_event) ainda veem o enum válido.
+  const subposts = input.subposts.map((s) => ({
+    ...s,
+    layout: normalizeLayout(s.layout),
+  }))
+
   const event = await signDriftEvent({
     kind: DRIFT_KIND.POST,
     tags,
-    content: JSON.stringify({ subposts: input.subposts }),
+    content: JSON.stringify({ subposts }),
   })
   await publishToRelays(event)
   return event

@@ -5,15 +5,15 @@
  *
  * Posts com 1 subpost não mostram a barra (não há o que navegar).
  *
- * Renderiza o conteúdo do subpost atual:
- *   - text          → texto preservando \n
- *   - image         → <img>
- *   - text+image    → image em cima, text em baixo
+ * V4: rendering do conteúdo delega pra `<SubpostLayout>` — registry de
+ * 3 templates (portrait/landscape/text) baseado em `subpost.layout`.
+ * SubpostCarousel mantém apenas: dispatch animation, progress bar,
+ * fallback empty.
  */
 
 import { motion, AnimatePresence } from 'framer-motion'
 import type { Subpost } from '../../types/drift'
-import { Image } from '../UI/Image'
+import { SubpostLayout } from './SubpostLayout'
 
 export interface SubpostCarouselProps {
   subposts: Subpost[]
@@ -37,7 +37,7 @@ export function SubpostCarousel({ subposts, index }: SubpostCarouselProps) {
     <div className="flex h-full w-full flex-col">
       {showProgress && <ProgressBar total={subposts.length} current={index} />}
 
-      <div className="relative flex-1 overflow-hidden p-6">
+      <div className="relative flex-1 overflow-hidden">
         <AnimatePresence mode="wait">
           <motion.div
             key={current?.id ?? index}
@@ -45,9 +45,9 @@ export function SubpostCarousel({ subposts, index }: SubpostCarouselProps) {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -16 }}
             transition={{ duration: 0.18 }}
-            className="flex h-full flex-col items-center justify-center"
+            className="h-full w-full"
           >
-            {current && <SubpostBody subpost={current} />}
+            {current && <SubpostLayout subpost={current} />}
           </motion.div>
         </AnimatePresence>
       </div>
@@ -66,44 +66,10 @@ function ProgressBar({ total, current }: { total: number; current: number }) {
               ? 'bg-drift-accent/60'
               : i === current
               ? 'bg-drift-accent'
-              : 'bg-slate-700/60'
+              : 'bg-drift-border'
           }`}
         />
       ))}
     </div>
-  )
-}
-
-function SubpostBody({ subpost }: { subpost: Subpost }) {
-  if (subpost.type === 'image' && subpost.imageUrl) {
-    return (
-      <Image
-        src={subpost.imageUrl}
-        className="max-h-full max-w-full rounded"
-        aspect="auto"
-      />
-    )
-  }
-  if (subpost.type === 'text+image' && subpost.imageUrl) {
-    return (
-      <div className="flex h-full w-full flex-col items-center justify-center gap-4">
-        <Image
-          src={subpost.imageUrl}
-          className="max-h-[60vh] w-full max-w-full rounded"
-          aspect="auto"
-        />
-        {subpost.text && (
-          <p className="max-w-prose whitespace-pre-wrap text-center text-sm text-slate-200">
-            {subpost.text}
-          </p>
-        )}
-      </div>
-    )
-  }
-  // type === 'text' (ou fallback)
-  return (
-    <p className="max-w-prose whitespace-pre-wrap text-center text-base leading-relaxed text-slate-100">
-      {subpost.text ?? '(sem conteúdo de texto)'}
-    </p>
   )
 }

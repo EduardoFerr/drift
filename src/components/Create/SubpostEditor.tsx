@@ -17,10 +17,18 @@
  */
 
 import { useState } from 'react'
-import { CONTENT_WARNING_VALUES, type Subpost, type ContentWarning } from '../../types/drift'
+import {
+  CONTENT_WARNING_VALUES,
+  LAYOUT_VALUES,
+  DEFAULT_LAYOUT,
+  type Subpost,
+  type ContentWarning,
+  type LayoutKind,
+} from '../../types/drift'
 import { uploadImage, UploadError } from '../../lib/upload'
 import { DRIFT_LIMITS } from '../../config/constants'
 import { Image } from '../UI/Image'
+import { Chip } from '../UI/Chip'
 
 export interface SubpostEditorProps {
   publishing: boolean
@@ -45,6 +53,8 @@ interface DraftSubpost {
   imageFile: File | null
   uploading: boolean
   uploadError: string | null
+  /** V4 — layout escolhido pelo author. Default DEFAULT_LAYOUT='portrait'. */
+  layout: LayoutKind
 }
 
 function newDraft(): DraftSubpost {
@@ -55,6 +65,7 @@ function newDraft(): DraftSubpost {
     imageFile: null,
     uploading: false,
     uploadError: null,
+    layout: DEFAULT_LAYOUT,
   }
 }
 
@@ -71,6 +82,7 @@ function draftToSubpost(d: DraftSubpost, order: number): Subpost {
     text,
     imageUrl: d.imageUrl,
     order,
+    layout: d.layout,
   }
 }
 
@@ -262,6 +274,49 @@ function SubpostBlock({
           onFile={onFile}
         />
         <span className={overLimit ? 'text-red-400' : 'text-slate-600'}>{remaining}</span>
+      </div>
+
+      <LayoutPicker
+        value={draft.layout}
+        onChange={(layout) => onChange({ layout })}
+      />
+    </div>
+  )
+}
+
+/**
+ * V4 — layout picker. 3 chips: portrait/landscape/text.
+ * Renderiza horizontalmente após o ImagePicker, separação visual mínima.
+ * Manifesto §27 cosmético — autor escolhe template visual; valor vai no
+ * content JSON (`subposts[idx].layout`); leitor renderiza via
+ * SubpostLayout.tsx switch exhaustive.
+ */
+function LayoutPicker({
+  value,
+  onChange,
+}: {
+  value: LayoutKind
+  onChange: (v: LayoutKind) => void
+}) {
+  return (
+    <div
+      className="mt-2 flex items-center gap-2"
+      title="layout visual deste subpost (manifesto §27 cosmético)"
+    >
+      <span className="font-mono text-[9px] uppercase tracking-widest text-drift-muted">
+        layout
+      </span>
+      <div className="flex flex-wrap gap-1">
+        {LAYOUT_VALUES.map((kind) => (
+          <Chip
+            key={kind}
+            active={value === kind}
+            onClick={() => onChange(kind)}
+            ariaLabel={`layout ${kind}`}
+          >
+            {kind}
+          </Chip>
+        ))}
       </div>
     </div>
   )

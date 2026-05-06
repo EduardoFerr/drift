@@ -98,7 +98,8 @@ Princípios extensos em [manifesto.md](manifesto.md).
   "subposts": [
     {
       "text": "<string>",
-      "media": [{"url": "...", "hash": "...", "alt": "..."}]
+      "media": [{"url": "...", "hash": "...", "alt": "..."}],
+      "layout": "portrait"
     }
   ]
 }
@@ -106,6 +107,40 @@ Princípios extensos em [manifesto.md](manifesto.md).
 
 Múltiplos subposts permitem fluxo "swipe lateral" entre cards de um
 mesmo post. Implementações com UI diferente podem mapear como entender.
+
+### 3.5.1 Subpost — campo `layout` (opt-in, V4)
+
+Hint visual de renderização per-subpost. Cosmético — clientes Nostr
+genéricos (Damus/Snort/Coracle) ignoram o campo silenciosamente; não
+quebra leitura nem assinatura.
+
+Valores permitidos: `LAYOUT_VALUES = ['portrait', 'landscape', 'text']`.
+Single source of truth do enum vive em `src/types/drift.ts` no cliente
+oficial; teste `tests/manifesto-conformance.test.ts` (LOCK_VIA_TEST
+`layout.spec-code-sync`) garante que esta seção e o código não
+divergem.
+
+- `portrait` — imagem topo flex, texto bottom fixo. **Default** quando
+  o campo está ausente (compat retro com posts pré-V4).
+- `landscape` — imagem absolute fill, gradient overlay bottom 96%
+  opacity, texto sobreposto.
+- `text` — sem imagem; texto centralizado; cliente oficial renderiza
+  decorative letter (3 chars sanitizados do título via NFKC + strip
+  bidi/zero-width/control) como elemento puramente decorativo
+  (`aria-hidden`).
+
+**Conformidade renderer**: implementações DEVEM aceitar e parsear o
+campo se presente. Renderers PODEM ignorar o hint (renderizar todos
+como portrait, por exemplo) — não-conformance só se silenciosamente
+descartarem o campo do payload no roundtrip read→write.
+
+**Validação determinística (manifesto §7)**: valor desconhecido
+(ex.: `"square"`) ou ausente → fallback DEFAULT_LAYOUT='portrait'.
+Não throw, não erro silencioso — UI sempre renderiza.
+
+**Cliente oficial (`drift-official`)**: serializa sempre o campo
+mesmo quando igual ao default — bytes mínimos (~22 bytes/subpost),
+simplifica encoder/decoder, evita branch lógico.
 
 ## 4. Kind 9079 — SPREAD
 
