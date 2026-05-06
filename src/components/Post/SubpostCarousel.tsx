@@ -1,19 +1,30 @@
 /**
- * SubpostCarousel — exibe um subpost por vez com barra de progresso
- * estilo Stories no topo. Navegação horizontal vem do `SwipeHandler`
- * pai (← → ou setas de teclado).
+ * SubpostCarousel — exibe um subpost por vez com paginação por dots.
+ * Navegação horizontal vem do `SwipeHandler` pai (← → ou setas de
+ * teclado). Posts com 1 subpost não mostram dots (não há o que navegar).
  *
- * Posts com 1 subpost não mostram a barra (não há o que navegar).
+ * V4: rendering do conteúdo delega pra `<SubpostLayout>` — switch
+ * exhaustive de 3 templates (portrait/landscape/text) baseado em
+ * `subpost.layout`. SubpostCarousel mantém apenas: dispatch animation,
+ * paginação visual, fallback empty.
  *
- * V4: rendering do conteúdo delega pra `<SubpostLayout>` — registry de
- * 3 templates (portrait/landscape/text) baseado em `subpost.layout`.
- * SubpostCarousel mantém apenas: dispatch animation, progress bar,
- * fallback empty.
+ * V5 polish: substituiu ProgressBar Stories-style por `<DotsIndicator>`
+ * primitive (V3.0) — visual alinhado ao mockup v0.7 (`.c-dots`).
+ *
+ * Decisão de posicionamento: dots vivem ACIMA do SubpostLayout (carrossel
+ * level), não DENTRO de cada template. Mockup tem dots em posições
+ * diferentes per-layout (portrait: middle border-top/bottom; landscape:
+ * absolute bottom overlay; text: top border-bottom). Mover dots pra
+ * dentro de cada template exigiria SubpostLayout receber `idx`/`total`,
+ * quebrando o contrato V4 ("layout = função pura de Subpost"). Trade-off
+ * aceitável: visual ligeiramente diferente do mockup mas mantém pureza
+ * arquitetural.
  */
 
 import { motion, AnimatePresence } from 'framer-motion'
 import type { Subpost } from '../../types/drift'
 import { SubpostLayout } from './SubpostLayout'
+import { DotsIndicator } from '../UI/DotsIndicator'
 
 export interface SubpostCarouselProps {
   subposts: Subpost[]
@@ -31,11 +42,15 @@ export function SubpostCarousel({ subposts, index }: SubpostCarouselProps) {
   }
 
   const current = subposts[Math.max(0, Math.min(index, subposts.length - 1))]
-  const showProgress = subposts.length > 1
 
   return (
     <div className="flex h-full w-full flex-col">
-      {showProgress && <ProgressBar total={subposts.length} current={index} />}
+      {/* DotsIndicator returns null se total ≤ 1 — sem branch local. */}
+      <DotsIndicator
+        total={subposts.length}
+        active={index}
+        ariaLabel="paginação de subposts"
+      />
 
       <div className="relative flex-1 overflow-hidden">
         <AnimatePresence mode="wait">
@@ -51,25 +66,6 @@ export function SubpostCarousel({ subposts, index }: SubpostCarouselProps) {
           </motion.div>
         </AnimatePresence>
       </div>
-    </div>
-  )
-}
-
-function ProgressBar({ total, current }: { total: number; current: number }) {
-  return (
-    <div className="flex gap-1 px-4 pt-3">
-      {Array.from({ length: total }).map((_, i) => (
-        <div
-          key={i}
-          className={`h-0.5 flex-1 rounded-full ${
-            i < current
-              ? 'bg-drift-accent/60'
-              : i === current
-              ? 'bg-drift-accent'
-              : 'bg-drift-border'
-          }`}
-        />
-      ))}
     </div>
   )
 }

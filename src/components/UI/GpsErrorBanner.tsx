@@ -38,14 +38,20 @@ export function GpsErrorBanner({ reason, onDismiss }: GpsErrorBannerProps) {
 
   return (
     <>
+      {/*
+       * V5 polish: border-left 3px drift-bury (mockup v0.7) — visual de
+       * alerta sem o vermelho saturado. Mantém amber pra texto pq o
+       * padrão "atenção, não bloqueio" continua válido (manifesto §28
+       * privacy: post publicou sem location, não é falha catastrófica).
+       */}
       <div
         role="status"
-        className="mb-4 flex items-center gap-3 rounded border border-amber-500/30 bg-amber-500/5 p-3"
+        className="mb-4 flex items-center gap-3 rounded border border-amber-500/30 border-l-[3px] border-l-drift-bury bg-amber-500/5 p-3"
       >
         <span className="text-base" aria-hidden="true">
           📍
         </span>
-        <div className="flex-1 text-[11px]">
+        <div className="flex-1 font-mono text-[11px]">
           <div className="text-amber-200">{message}</div>
           <div className="text-[10px] text-amber-200/60">
             Post foi publicado sem location.
@@ -53,7 +59,7 @@ export function GpsErrorBanner({ reason, onDismiss }: GpsErrorBannerProps) {
         </div>
         <button
           onClick={() => setShowHelp(true)}
-          className="rounded border border-amber-500/60 px-3 py-1 text-[10px] uppercase tracking-widest text-amber-300 hover:bg-amber-500/10"
+          className="rounded border border-amber-500/60 px-3 py-1 font-mono text-[10px] uppercase tracking-widest text-amber-300 hover:bg-amber-500/10"
         >
           como ajustar
         </button>

@@ -24,6 +24,7 @@
  *     Sem ruído no console.
  */
 
+import { motion, AnimatePresence } from 'framer-motion'
 import { useRegisterSW } from 'virtual:pwa-register/react'
 
 export function UpdatePrompt() {
@@ -56,43 +57,52 @@ export function UpdatePrompt() {
     },
   })
 
-  if (!needRefresh) return null
-
+  // V5 polish: toast slide-up bottom com border-left accent + paleta v0.7
+  // (drift-surface/border/accent), font-mono, AnimatePresence pra entrada/saída
+  // suave em vez de pop in/out direto.
   return (
-    <div
-      role="status"
-      aria-live="polite"
-      className="fixed bottom-4 left-4 right-4 z-50 mx-auto max-w-md rounded-lg border border-purple-500/40 bg-zinc-900/95 p-4 shadow-lg backdrop-blur"
-    >
-      <div className="flex items-start gap-3">
-        <div className="flex-1">
-          <p className="text-sm font-medium text-zinc-100">
-            Nova versão do Drift disponível
-          </p>
-          <p className="mt-1 text-xs text-zinc-400">
-            Atualização propaga fixes de segurança e features. Você decide
-            quando aplicar — manifesto §17 (sem update silencioso).
-          </p>
-        </div>
-      </div>
-      <div className="mt-3 flex gap-2">
-        <button
-          type="button"
-          onClick={() => {
-            void updateServiceWorker(true)
-          }}
-          className="flex-1 rounded-md bg-purple-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-400"
+    <AnimatePresence>
+      {needRefresh && (
+        <motion.div
+          role="status"
+          aria-live="polite"
+          initial={{ y: 80, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: 80, opacity: 0 }}
+          transition={{ duration: 0.25, ease: 'easeOut' }}
+          className="fixed bottom-4 left-4 right-4 z-50 mx-auto max-w-md rounded border border-drift-border border-l-[3px] border-l-drift-accent bg-drift-surface p-4 shadow-lg backdrop-blur"
         >
-          Atualizar agora
-        </button>
-        <button
-          type="button"
-          onClick={() => setNeedRefresh(false)}
-          className="rounded-md border border-zinc-700 px-3 py-2 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-zinc-500"
-        >
-          Mais tarde
-        </button>
-      </div>
-    </div>
+          <div className="flex items-start gap-3">
+            <div className="flex-1 font-mono">
+              <p className="text-[12px] font-medium text-drift-text">
+                Nova versão do Drift disponível
+              </p>
+              <p className="mt-1 text-[10px] leading-relaxed text-drift-muted">
+                Atualização propaga fixes de segurança e features. Você decide
+                quando aplicar — manifesto §17 (sem update silencioso).
+              </p>
+            </div>
+          </div>
+          <div className="mt-3 flex gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                void updateServiceWorker(true)
+              }}
+              className="flex-1 rounded border border-drift-accent bg-drift-accent px-3 py-2 font-mono text-[11px] uppercase tracking-widest text-drift-bg transition hover:bg-drift-accent/90 focus:outline-none focus:ring-2 focus:ring-drift-accent2 focus:ring-offset-2 focus:ring-offset-drift-surface"
+            >
+              Atualizar agora
+            </button>
+            <button
+              type="button"
+              onClick={() => setNeedRefresh(false)}
+              className="rounded border border-drift-border px-3 py-2 font-mono text-[11px] uppercase tracking-widest text-drift-muted transition hover:border-drift-text hover:text-drift-text focus:outline-none focus:ring-1 focus:ring-drift-accent2"
+            >
+              Mais tarde
+            </button>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   )
 }

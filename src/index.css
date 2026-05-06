@@ -54,5 +54,51 @@
   body {
     /* impede zoom acidental no swipe em mobile */
     touch-action: pan-x pan-y;
+    /*
+     * Hover/focus rings padrão (V5 polish): sempre que um elemento
+     * interativo recebe :focus-visible, ring drift-accent2 com offset.
+     * Não usamos :focus genérico pra não poluir mouse users.
+     */
+    --ring-color: theme('colors.drift.accent2');
   }
+
+  /* V5 polish: focus visible global pra a11y keyboard nav. Componentes
+     individuais (Chip, ModalHeader, NavBar) já fazem ring inline; isso
+     cobre fallback pra elementos que não foram tocados ainda (links,
+     buttons sem className específica). */
+  :focus-visible {
+    outline: 1px solid var(--drift-accent2);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+}
+
+/*
+ * V5 polish — film grain noise overlay (alinhado ao mockup v0.7).
+ * SVG turbulence inline como data URI (~2KB), opacity 0.025, fixed
+ * inset z-index 999, pointer-events: none.
+ *
+ * GPU-friendly: `filter: url()` no SVG roda no compositor. CSS-only,
+ * sem JS, sem repaint do layout principal. Renderiza uma vez e fica
+ * estático (não anima — ruído animado quebraria CLS e battery).
+ *
+ * Deferido pra body::after (não html::after) pra que portals/modals
+ * fiquem ABAIXO do noise — visualmente coerente, todo o app fica
+ * com o mesmo grain. z-index 999 fica acima do conteúdo mas abaixo
+ * de eventuais alerts críticos (z-index 1000+).
+ *
+ * Acessibilidade: opacity 0.025 é abaixo do limiar de detecção pra
+ * maioria dos users; `prefers-reduced-motion` poderia desabilitar
+ * mas o noise é estático (não tem motion), então mantemos sempre.
+ * Settings → Content → "Reduzir efeitos visuais" pode toggle no
+ * futuro (open item #3 do plan).
+ */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  opacity: 0.025;
+  pointer-events: none;
+  z-index: 999;
 }
