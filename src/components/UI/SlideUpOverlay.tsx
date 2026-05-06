@@ -85,12 +85,17 @@ export function SlideUpOverlay({
       aria-modal="true"
       aria-label={ariaLabel}
     >
+      {/* V9 anti-overflow: max-h-[85dvh] + overflow-y-auto garantem que
+          content longo (e.g. ReportModal AuthoritiesBlock + ConfirmStep,
+          IdentityPanel com 3 tabs, SubpostEditor com 8 drafts) NÃO
+          ultrapassa viewport. Scrollbar interno em vez de modal cortado.
+          Pad inferior extra evita "última linha colada" na borda. */}
       <motion.div
         initial={{ y: 22, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         exit={{ y: 22, opacity: 0 }}
         transition={{ duration: 0.25, ease: 'easeOut' }}
-        className={`w-full ${MAX_WIDTH_CLASS[maxWidth]} rounded border border-drift-border bg-drift-surface ${
+        className={`flex max-h-[85dvh] w-full flex-col overflow-y-auto overscroll-contain rounded border border-drift-border bg-drift-surface ${MAX_WIDTH_CLASS[maxWidth]} ${
           padded ? 'p-5' : ''
         }`}
         onClick={(e) => e.stopPropagation()}

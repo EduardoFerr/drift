@@ -127,7 +127,7 @@ export function ContentSettings({ onClose, scrollTo }: ContentSettingsProps) {
       <motion.div
         initial={{ y: 12 }}
         animate={{ y: 0 }}
-        className="w-full max-w-md rounded border border-drift-border bg-drift-surface p-5"
+        className="flex max-h-[85dvh] w-full max-w-md flex-col overflow-y-auto overscroll-contain rounded border border-drift-border bg-drift-surface p-5"
         onClick={(e) => e.stopPropagation()}
       >
         <header className="mb-4 flex items-center justify-between">

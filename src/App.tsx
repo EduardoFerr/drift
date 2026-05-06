@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence } from 'framer-motion'
 import { OPTIMISTIC_TIMEOUT_MS } from './config/constants'
 import { db } from './lib/db'
 import {
@@ -23,7 +23,7 @@ import { useInstallPrompt } from './hooks/useInstallPrompt'
 import { IdentityPanel } from './components/Identity/IdentityPanel'
 import { IdentitySwitcher } from './components/Identity/IdentitySwitcher'
 import { PostViewer } from './components/Post/PostViewer'
-import { SubpostEditor } from './components/Create/SubpostEditor'
+import { ComposeOverlay } from './components/Create/ComposeOverlay'
 import { ContentSettings } from './components/Settings/ContentSettings'
 import { RelaySettings } from './components/Settings/RelaySettings'
 import { LocalListsSettings } from './components/Settings/LocalListsSettings'
@@ -33,8 +33,7 @@ import { GpsErrorBanner } from './components/UI/GpsErrorBanner'
 import { MultiTabModal } from './components/UI/MultiTabModal'
 import { UpdatePrompt } from './components/UI/UpdatePrompt'
 import { NavBar } from './components/UI/NavBar'
-import { SlideUpOverlay } from './components/UI/SlideUpOverlay'
-import { ModalHeader } from './components/UI/ModalHeader'
+import { FullPageOverlay } from './components/UI/FullPageOverlay'
 import { SpreadMap } from './components/Feed/SpreadMap'
 import type {
   DriftIdentity,
@@ -612,28 +611,19 @@ function App() {
         ) : null}
       </main>
 
-      {/* V7 — Compose modal (substitui inline always-mounted). */}
+      {/* V9 — Compose overlay full-page (substitui o modal V7).
+          Mockup v0.7: header "novo drift" + CANCELAR, csub dots
+          numerados, layout chips, drop area condicional, footer btn-del
+          + DRIFT ↑. */}
       <AnimatePresence>
         {showCreate && (
-          <SlideUpOverlay
+          <ComposeOverlay
+            publishing={publishing}
+            capturingLocation={gpsCapturing.has('__publish__')}
+            maxSubposts={userWeight.maxSubposts}
             onClose={() => setShowCreate(false)}
-            ariaLabel="criar post"
-            maxWidth="lg"
-            backdropDismissible={!publishing}
-          >
-            <ModalHeader
-              title="criar post"
-              onClose={() => setShowCreate(false)}
-              {...(publishing ? { hideClose: true } : {})}
-            />
-            <SubpostEditor
-              bare
-              publishing={publishing}
-              capturingLocation={gpsCapturing.has('__publish__')}
-              maxSubposts={userWeight.maxSubposts}
-              onPublish={handlePublish}
-            />
-          </SlideUpOverlay>
+            onPublish={handlePublish}
+          />
         )}
       </AnimatePresence>
 
@@ -924,39 +914,33 @@ function MapOverlay({
 }) {
   const events = useSyncStore((s) => s.eventsReceived)
 
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 22 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: 22 }}
-      transition={{ duration: 0.25, ease: 'easeOut' }}
-      className="fixed inset-0 z-40 flex flex-col bg-drift-bg"
-      role="dialog"
-      aria-modal="true"
-      aria-label="propagação"
-    >
-      <header className="flex shrink-0 items-center justify-between border-b border-drift-border px-5 py-[15px]">
-        <h2 className="font-display text-[19px] font-extrabold text-drift-text">
-          propagação
-        </h2>
-        <div className="flex items-center gap-3">
-          <span
-            className="font-mono text-[10px] uppercase tracking-[1.5px] text-drift-muted"
-            title="eventos recebidos pelo subscribe"
-          >
-            {events.toLocaleString('pt-BR')} ev
-          </span>
-          <button
-            onClick={onClose}
-            className="rounded border border-drift-border px-3 py-[5px] font-mono text-[10px] uppercase tracking-[2px] text-drift-muted transition-colors hover:text-drift-text"
-            aria-label="fechar mapa"
-          >
-            fechar
-          </button>
-        </div>
-      </header>
+  // headerRight customizado = events count + close button.
+  const headerRight = (
+    <div className="flex items-center gap-3">
+      <span
+        className="font-mono text-[10px] uppercase tracking-[1.5px] text-drift-muted"
+        title="eventos recebidos pelo subscribe"
+      >
+        {events.toLocaleString('pt-BR')} ev
+      </span>
+      <button
+        onClick={onClose}
+        className="rounded border border-drift-border px-3 py-[5px] font-mono text-[10px] uppercase tracking-[2px] text-drift-muted transition-colors hover:text-drift-text focus:outline-none focus:ring-1 focus:ring-drift-accent2"
+        aria-label="fechar mapa"
+      >
+        fechar
+      </button>
+    </div>
+  )
 
-      <div className="relative flex-1 overflow-hidden">
+  return (
+    <FullPageOverlay
+      onClose={onClose}
+      title="propagação"
+      headerRight={headerRight}
+      ariaLabel="mapa de propagação"
+    >
+      <div className="relative h-full w-full">
         {currentPost ? (
           <SpreadMap
             postId={currentPost.id}
@@ -968,17 +952,16 @@ function MapOverlay({
             sem posts visíveis no momento
           </div>
         )}
+        <div className="pointer-events-none absolute bottom-[18px] left-5 flex gap-[14px]">
+          <span className="font-mono text-[9px] uppercase tracking-[2px] text-drift-muted">
+            • ativo
+          </span>
+          <span className="font-mono text-[9px] uppercase tracking-[2px] text-drift-muted">
+            • recente
+          </span>
+        </div>
       </div>
-
-      <div className="absolute bottom-[18px] left-5 flex gap-[14px]">
-        <span className="font-mono text-[9px] uppercase tracking-[2px] text-drift-muted">
-          • ativo
-        </span>
-        <span className="font-mono text-[9px] uppercase tracking-[2px] text-drift-muted">
-          • recente
-        </span>
-      </div>
-    </motion.div>
+    </FullPageOverlay>
   )
 }
 
@@ -1019,74 +1002,129 @@ function SettingsRoot({
   /** Estado atual do toggle status — pra label refletir on/off. */
   showDiagnostic: boolean
 }) {
-  const items: { target: SettingsTarget; label: string; danger?: boolean; hint: string }[] = [
-    { target: 'chave', label: 'chave', hint: 'backup/import nsec' },
-    { target: 'identidades', label: 'identidades', hint: 'múltiplas identidades — manifesto §4' },
-    { target: 'relays', label: 'relays', hint: 'gerenciar relays + NIP-65' },
-    { target: 'listas', label: 'listas', hint: 'pinned, blocked, muted (filtros locais)' },
-    { target: 'settings', label: 'settings', hint: 'filtros de conteúdo e privacidade' },
+  // V9: agrupado por categoria visual (mockup s-row pattern). Identidade
+  // primeiro pq é o caminho mais comum; Sistema (status/limpar) por
+  // último porque diagnostic + destrutivo. Cada categoria tem header
+  // muted small caps. Mantém UX previsível: idioma do label + hint
+  // explicativo + chevron à direita.
+  const groups: {
+    title: string
+    items: {
+      target: SettingsTarget
+      label: string
+      danger?: boolean
+      hint: string
+    }[]
+  }[] = [
     {
-      target: 'status',
-      label: showDiagnostic ? 'fechar status' : 'status',
-      hint: 'painel de diagnóstico',
+      title: 'identidade',
+      items: [
+        { target: 'chave', label: 'chave', hint: 'backup/import nsec' },
+        {
+          target: 'identidades',
+          label: 'identidades',
+          hint: 'múltiplas identidades — manifesto §4',
+        },
+      ],
     },
-    { target: 'limpar', label: 'limpar local', danger: true, hint: 'apaga banco local — destrutivo' },
+    {
+      title: 'rede',
+      items: [
+        {
+          target: 'relays',
+          label: 'relays',
+          hint: 'gerenciar relays + NIP-65',
+        },
+      ],
+    },
+    {
+      title: 'conteúdo',
+      items: [
+        {
+          target: 'settings',
+          label: 'filtros',
+          hint: 'content-warning + privacidade',
+        },
+        {
+          target: 'listas',
+          label: 'listas',
+          hint: 'pinned, blocked, muted (filtros locais)',
+        },
+      ],
+    },
+    {
+      title: 'sistema',
+      items: [
+        {
+          target: 'status',
+          label: showDiagnostic ? 'fechar status' : 'status',
+          hint: 'painel de diagnóstico',
+        },
+        {
+          target: 'limpar',
+          label: 'limpar local',
+          danger: true,
+          hint: 'apaga banco local — destrutivo',
+        },
+      ],
+    },
   ]
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 22 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: 22 }}
-      transition={{ duration: 0.25, ease: 'easeOut' }}
-      className="fixed inset-0 z-40 flex flex-col bg-drift-bg"
-      role="dialog"
-      aria-modal="true"
-      aria-label="configurações"
+    <FullPageOverlay
+      onClose={onClose}
+      title="configurações"
+      ariaLabel="configurações"
     >
-      <header className="flex shrink-0 items-center justify-between border-b border-drift-border px-5 py-[15px]">
-        <h2 className="font-display text-[19px] font-extrabold text-drift-text">
-          configurações
-        </h2>
-        <button
-          onClick={onClose}
-          className="rounded border border-drift-border px-3 py-[5px] font-mono text-[10px] uppercase tracking-[2px] text-drift-muted transition-colors hover:text-drift-text"
-          aria-label="fechar configurações"
-        >
-          fechar
-        </button>
-      </header>
-
-      <div className="flex-1 overflow-y-auto px-5 py-[18px]">
-        <ul className="divide-y divide-drift-border">
-          {items.map((item) => (
-            <li key={item.target}>
-              <button
-                onClick={() => onSelect(item.target)}
-                className={`group flex w-full items-center justify-between py-[14px] text-left transition-colors ${
-                  item.danger ? 'text-drift-bury' : 'text-drift-text'
-                } hover:opacity-80`}
-              >
-                <div className="flex flex-col gap-[2px]">
-                  <span className="font-mono text-[11px] uppercase tracking-[2px]">
-                    {item.label}
-                  </span>
-                  <span className="font-mono text-[10px] text-drift-muted">
-                    {item.hint}
-                  </span>
-                </div>
-                <span
-                  aria-hidden="true"
-                  className="font-mono text-[10px] tracking-[2px] text-drift-muted transition-colors group-hover:text-drift-accent"
-                >
-                  →
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
+      <div className="px-5 py-[18px]">
+        {groups.map((group, gi) => (
+          <section
+            key={group.title}
+            className={gi > 0 ? 'mt-[28px]' : ''}
+            aria-labelledby={`settings-group-${gi}`}
+          >
+            <h3
+              id={`settings-group-${gi}`}
+              className="mb-2 font-mono text-[9px] uppercase tracking-[2.5px] text-drift-muted"
+            >
+              {group.title}
+            </h3>
+            <ul className="divide-y divide-drift-border border-y border-drift-border">
+              {group.items.map((item) => (
+                <li key={item.target}>
+                  <button
+                    onClick={() => onSelect(item.target)}
+                    className={`group flex w-full items-center justify-between gap-3 px-1 py-[14px] text-left transition-colors focus:outline-none focus:ring-1 focus:ring-drift-accent2 focus:ring-offset-2 focus:ring-offset-drift-bg ${
+                      item.danger
+                        ? 'text-drift-bury hover:text-[#ff6b6b]'
+                        : 'text-drift-text hover:text-drift-accent'
+                    }`}
+                  >
+                    <div className="flex min-w-0 flex-col gap-[2px]">
+                      <span className="font-mono text-[11px] uppercase tracking-[2px]">
+                        {item.label}
+                      </span>
+                      <span className="truncate font-mono text-[10px] normal-case tracking-normal text-drift-muted">
+                        {item.hint}
+                      </span>
+                    </div>
+                    <span
+                      aria-hidden="true"
+                      className="shrink-0 font-mono text-[12px] text-drift-muted transition-colors group-hover:text-current"
+                    >
+                      →
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ))}
+        {/* Padding bottom defensivo pra não cortar último item em
+            viewports curtos (anti-overflow V9.3). */}
+        <div className="h-6" aria-hidden="true" />
       </div>
-    </motion.div>
+    </FullPageOverlay>
   )
 }
 

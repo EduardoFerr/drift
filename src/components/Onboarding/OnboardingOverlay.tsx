@@ -168,7 +168,7 @@ export function OnboardingOverlay({ onClose, onOpenIdentity }: OnboardingOverlay
       role="dialog"
       aria-modal="true"
     >
-      <div className="w-full max-w-md rounded border border-drift-border bg-drift-surface p-5">
+      <div className="flex max-h-[85dvh] w-full max-w-md flex-col overflow-y-auto overscroll-contain rounded border border-drift-border bg-drift-surface p-5">
         {/* Progress bar estilo Stories */}
         <div className="mb-4 flex gap-1">
           {steps.map((_, i) => (
