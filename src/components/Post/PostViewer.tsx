@@ -74,6 +74,20 @@ export interface PostViewerProps {
    * sem isso, user via texto sem caminho de saída.
    */
   onOpenLocationSettings?: () => void
+  /**
+   * V8 paradigm shift: quando true, PostViewer renderiza como **home view**
+   * (não modal). Diferenças:
+   *   - Sem `fixed inset-0 z-50` — usa `relative h-full w-full`
+   *   - Sem backdrop bg/blur (parent já provê)
+   *   - Header bulky de buttons hidden (pin/follow/mute/block/report) —
+   *     migram pra menu 3-dots futuro
+   *   - Footer com ↑/↓ buttons hidden — swipe é o único input
+   *   - X close button hidden — não há "fechar" o home
+   *   - Card stack shadow cards ficam visíveis (parent renderiza)
+   *
+   * Default false mantém retrocompat (modal viewer fora desta sessão).
+   */
+  embedded?: boolean
   onSpread: () => void
   onBury: () => void
   onClose: () => void
@@ -88,6 +102,7 @@ export function PostViewer({
   custom,
   queue,
   onOpenLocationSettings,
+  embedded = false,
   onSpread,
   onBury,
   onClose,
@@ -235,17 +250,18 @@ export function PostViewer({
   // fade out simples.
   const exitVariant = custom ? EXIT_VARIANTS[custom] : EXIT_VARIANTS.none
 
+  // V8 embedded mode: home view, sem fixed-inset / sem role=dialog /
+  // sem backdrop. Modal mode (default) preserva retrocompat caso outra
+  // chamada ainda use PostViewer como overlay.
+  const Wrapper = embedded ? EmbeddedWrapper : ModalWrapper
+
   return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.96, y: 20 }}
-      animate={{ opacity: 1, scale: 1, y: 0 }}
-      exit={exitVariant}
-      transition={{ duration: 0.32, ease: [0.32, 0.72, 0, 1] }}
-      className="fixed inset-0 z-50 flex flex-col bg-drift-bg/95 backdrop-blur-sm"
-      role="dialog"
-      aria-modal="true"
-    >
-      {/* Header — V3.1 reskin: Syne display pra autor, DM Mono pra DERIVA. */}
+    <Wrapper exitVariant={exitVariant}>
+      {/* Header bulky com pin/follow/mute/block/report — só em modal mode.
+          Em embedded (V8), o header global do app + a tag row dentro do
+          card já entregam contexto; ações secundárias migram pra menu
+          3-dots futuro. */}
+      {!embedded && (
       <div className="flex items-center justify-between border-b border-drift-border px-4 py-3 text-[10px] text-drift-muted">
         <span className="font-mono">
           <span className="font-display font-bold uppercase tracking-wider text-drift-text">
@@ -349,6 +365,7 @@ export function PostViewer({
           </button>
         </div>
       </div>
+      )}
 
       <AnimatePresence>
         {showMap && (
@@ -400,7 +417,11 @@ export function PostViewer({
                 !revealed ? 'pointer-events-none blur-xl' : ''
               }`}
             >
-              <SubpostCarousel subposts={post.subposts} index={subpostIdx} />
+              <SubpostCarousel
+                subposts={post.subposts}
+                index={subpostIdx}
+                post={post}
+              />
             </div>
 
             {!revealed && (
@@ -423,7 +444,9 @@ export function PostViewer({
         </SwipeHandler>
       </div>
 
-      {/* Footer com ações + dicas — V3.1 paleta v0.7. */}
+      {/* Footer com ações + dicas — V3.1 paleta v0.7.
+          V8: hidden em embedded mode (swipe é o único input no home view). */}
+      {!embedded && (
       <div className="flex items-center justify-between border-t border-drift-border px-4 py-3 font-mono text-[10px] text-drift-muted">
         <div className="flex gap-3">
           <span className="text-drift-spread">↑ {displaySpreads}</span>
@@ -494,6 +517,7 @@ export function PostViewer({
           </button>
         </div>
       </div>
+      )}
 
       <AnimatePresence>
         {showReport && (
@@ -505,6 +529,54 @@ export function PostViewer({
           />
         )}
       </AnimatePresence>
+    </Wrapper>
+  )
+}
+
+// ─── Wrappers (modal vs embedded) ────────────────────────────────────
+
+interface WrapperProps {
+  children: React.ReactNode
+  exitVariant: { y?: string; opacity: number; scale?: number }
+}
+
+/**
+ * Modal mode (default, retrocompat). PostViewer como overlay sobre o
+ * resto do app — fixed inset z-50, role=dialog, animate enter/exit
+ * direcional.
+ */
+function ModalWrapper({ children, exitVariant }: WrapperProps) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.96, y: 20 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      exit={exitVariant}
+      transition={{ duration: 0.32, ease: [0.32, 0.72, 0, 1] }}
+      className="fixed inset-0 z-50 flex flex-col bg-drift-bg/95 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+    >
+      {children}
+    </motion.div>
+  )
+}
+
+/**
+ * V8 embedded mode: PostViewer como home view (não modal). Sem
+ * fixed-inset (parent provê layout flex), sem role=dialog, sem
+ * backdrop. Anima exit direcional (Tinder-style "voa pra cima/baixo")
+ * quando custom='up'|'down'.
+ */
+function EmbeddedWrapper({ children, exitVariant }: WrapperProps) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.96, y: 20 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      exit={exitVariant}
+      transition={{ duration: 0.32, ease: [0.32, 0.72, 0, 1] }}
+      className="relative flex h-full w-full flex-col overflow-hidden"
+    >
+      {children}
     </motion.div>
   )
 }

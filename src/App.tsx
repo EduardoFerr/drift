@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AnimatePresence } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
 import { OPTIMISTIC_TIMEOUT_MS } from './config/constants'
 import { db } from './lib/db'
 import {
@@ -10,16 +10,14 @@ import {
 } from './lib/geolocation'
 import { restartSync, useSyncStore } from './lib/sync'
 import { createPost, spreadPost, buryPost } from './lib/protocol'
-import { applyContentFilters, getMyAction, refreshFeed, useFeedStore } from './lib/feed'
+import { getMyAction, refreshFeed, useFeedStore } from './lib/feed'
 import { FeedTabs } from './components/Feed/FeedTabs'
-import { PostCard } from './components/Feed/PostCard'
 import {
   startBoot,
   useBootStore,
   type BootState,
 } from './lib/bootstrap'
 import { getPrefs, usePrefsStore } from './lib/prefs'
-import { isTauri } from './lib/runtime'
 import { useUserWeight } from './hooks/useUserWeight'
 import { useInstallPrompt } from './hooks/useInstallPrompt'
 import { IdentityPanel } from './components/Identity/IdentityPanel'
@@ -37,10 +35,9 @@ import { UpdatePrompt } from './components/UI/UpdatePrompt'
 import { NavBar } from './components/UI/NavBar'
 import { SlideUpOverlay } from './components/UI/SlideUpOverlay'
 import { ModalHeader } from './components/UI/ModalHeader'
+import { SpreadMap } from './components/Feed/SpreadMap'
 import type {
   DriftIdentity,
-  LocationGranularity,
-  NetworkMode,
   Post,
   Subpost,
   ContentWarning,
@@ -55,7 +52,6 @@ function App() {
 
   const onboardingDone = usePrefsStore((s) => s.onboarding_done)
   const locationGranularity = usePrefsStore((s) => s.location_granularity)
-  const networkMode = usePrefsStore((s) => s.network_mode)
 
   const [publishing, setPublishing] = useState(false)
   const [pending, setPending] = useState<Record<string, 'spread' | 'bury'>>({})
@@ -90,6 +86,13 @@ function App() {
   // pra modal acionado pelo botão `+` central da NavBar (mockup v0.7).
   // Default false; PWA shortcut `?action=compose` abre direto.
   const [showCreate, setShowCreate] = useState(false)
+  // V8: mapa global de propagação (acionado pelo MAPA da NavBar).
+  // Overlay fullscreen separado — agrega eventos de todos os posts.
+  const [showMap, setShowMap] = useState(false)
+  // V8: SettingsRoot menu consolidador (acionado pelo CONFIG da NavBar).
+  // Lista 7 opções (chave/identidades/relays/listas/settings/status/
+  // limpar local); cada item roteia pro overlay específico já existente.
+  const [showSettingsRoot, setShowSettingsRoot] = useState(false)
 
   // Banner de erro GPS (Lily 29-04): user habilita location_granularity
   // mas browser bloqueia silenciosamente. Trackeamos timestamp da última
@@ -117,8 +120,8 @@ function App() {
   // Ao espalhar/enterrar, avançamos pro próximo post da fila com animação
   // direcional. `viewerExitDir` informa pro PostViewer pra qual lado
   // animar a saída (up = espalhou, down = enterrou).
-  const [viewerPostId, setViewerPostId] = useState<string | null>(null)
-  const [viewerExitDir, setViewerExitDir] = useState<'up' | 'down'>('up')
+  // V8: modal viewer (viewerPostId/viewerExitDir) removido — home view
+  // embedded substituiu o paradigma "tap to open" + "queue como modal".
 
   // Onboarding aparece se ainda não foi feito. `loadPrefs` em bootstrap
   // garante que o prefs store já reflete o estado real do SQLite quando
@@ -238,35 +241,51 @@ function App() {
     }
   }, [posts, boot.identity])
 
-  // Resolve o post visível e o próximo da fila. Memoiza pra evitar O(n)
-  // findIndex em cada render (feed pode ter centenas de posts).
-  // Se o post atual saiu do feed (moderado, etc.), fecha o viewer.
-  // Como `useFeedStore` mantém o array em memória, a transição entre
-  // posts é instantânea — sem fetch.
-  const { viewerIdx, viewerPost, nextPost } = useMemo(() => {
-    const idx = viewerPostId ? posts.findIndex((p) => p.id === viewerPostId) : -1
-    return {
-      viewerIdx: idx,
-      viewerPost: idx >= 0 ? posts[idx]! : null,
-      nextPost: idx >= 0 && idx + 1 < posts.length ? posts[idx + 1]! : null,
-    }
-  }, [viewerPostId, posts])
-  useEffect(() => {
-    if (viewerPostId && !viewerPost) setViewerPostId(null)
-  }, [viewerPostId, viewerPost])
+  // V8 paradigm shift: home view = embedded card stack (não lista
+  // vertical). currentIdx aponta pro post atualmente exibido (não há
+  // mais "viewer modal"). Auto-skip de posts hidden por filtro local.
+  // Quando posts muda (entrada nova chega via subscribe), index 0
+  // = post mais recente; usuário decide quando avançar via swipe.
+  //
+  // V8: viewer modal e queue legada deletados completamente.
 
-  function openViewer(postId: string) {
-    setViewerExitDir('up') // entrada inicial sem direção dominante
-    setViewerPostId(postId)
-  }
+  // V8 home stack — currentIdx + currentPost + nextHomePost.
+  // Default 0 (post mais recente). Ao chegar no fim da fila, mantém
+  // último post e swipe ↑/↓ vira no-op de avanço (mas spread/sink
+  // continuam funcionando). useMemo evita findIndex desnecessário.
+  const [currentIdx, setCurrentIdx] = useState(0)
+  const [exitDir, setExitDir] = useState<'up' | 'down'>('up')
+  const { currentPost, nextHomePost } = useMemo(() => {
+    if (posts.length === 0) return { currentPost: null, nextHomePost: null }
+    const safeIdx = Math.max(0, Math.min(currentIdx, posts.length - 1))
+    return {
+      currentPost: posts[safeIdx]!,
+      nextHomePost: safeIdx + 1 < posts.length ? posts[safeIdx + 1]! : null,
+    }
+  }, [currentIdx, posts])
+  // Quando posts muda significativamente (post atual sumiu — moderado,
+  // muted), volta pra index 0 pra não quebrar a navegação.
+  useEffect(() => {
+    if (posts.length > 0 && currentIdx >= posts.length) {
+      setCurrentIdx(Math.max(0, posts.length - 1))
+    }
+  }, [posts.length, currentIdx])
+
+  // V8: openViewer + advanceViewer (modal viewer queue) deletados —
+  // home view embedded substituiu o paradigma. viewerPostId/viewerExitDir
+  // ainda existem mas não são setados em lugar nenhum (sempre null/'up'),
+  // mantidos pra evitar break em código downstream que ainda referencia
+  // (nenhum em V8). Track futura limpa o resíduo.
 
   /**
-   * Avança pra próximo post da fila com animação direcional.
-   * Sem próximo → fecha o viewer (estado "fim do feed" via close).
+   * V8 home stack advance. Avança currentIdx pra próximo post se houver.
+   * Fim da fila = no-op de avanço (spread/sink já executaram, só não
+   * troca o card visível). UX: card "trava" no último post até novos
+   * chegarem via subscribe.
    */
-  function advanceViewer(dir: 'up' | 'down') {
-    setViewerExitDir(dir)
-    setViewerPostId(nextPost?.id ?? null)
+  function advanceHome(dir: 'up' | 'down') {
+    setExitDir(dir)
+    setCurrentIdx((i) => (i + 1 < posts.length ? i + 1 : i))
   }
 
   // Ações ──────────────────────────────────────────────────────────────
@@ -475,40 +494,28 @@ function App() {
     return <BootView state={boot} />
   }
 
+  // V8 paradigm shift: layout vertical h-screen flex column.
+  // [Header (logo + DERIVA + tabs)] [Stack flex-1] [NavBar fixo bottom]
+  // Stack mostra 1 card por vez (PostViewer embedded), navegação via swipe.
   return (
-    <div className="min-h-full p-4 font-mono text-sm sm:p-8">
-      <div className="mx-auto max-w-2xl">
-        <Header
-          identity={boot.identity}
-          userWeight={userWeight}
-          showDiagnostic={showDiagnostic}
-          onToggleDiagnostic={() => setShowDiagnostic((s) => !s)}
-          onOpenIdentity={() => setShowIdentity(true)}
-          onOpenSwitcher={() => setShowSwitcher(true)}
-          onOpenSettings={() => {
-            setSettingsScrollTo(null)
-            setShowSettings(true)
-          }}
-          onOpenSettingsLocation={() => {
-            setSettingsScrollTo('location')
-            setShowSettings(true)
-          }}
-          onOpenSettingsNetwork={() => {
-            setSettingsScrollTo('network')
-            setShowSettings(true)
-          }}
-          locationGranularity={locationGranularity}
-          networkMode={networkMode}
-          onOpenRelays={() => setShowRelays(true)}
-          onOpenLists={() => setShowLists(true)}
-          onOpenProfile={() => setShowProfile(true)}
-          onClearLocal={handleClearLocal}
-        />
+    <div className="flex h-[100dvh] flex-col font-mono text-sm">
+      <HomeHeader
+        identity={boot.identity}
+        userWeight={userWeight}
+        currentScore={currentPost?.score ?? null}
+        showDiagnostic={showDiagnostic}
+        onToggleDiagnostic={() => setShowDiagnostic((s) => !s)}
+        onOpenIdentity={() => setShowIdentity(true)}
+        onOpenSwitcher={() => setShowSwitcher(true)}
+        onOpenRelays={() => setShowRelays(true)}
+        onOpenLists={() => setShowLists(true)}
+        onClearLocal={handleClearLocal}
+      />
 
+      {/* Banners empilhados acima do stack. Layout flex-shrink-0 garante
+          que stack pega o resto do espaço. */}
+      <div className="shrink-0 px-4">
         {(() => {
-          // Banner GPS: visível só se user optou por location, falhou nos
-          // últimos 60s, ainda não dispensou nesta sessão. Wrapped em IIFE
-          // pra calcular condição inline sem poluir top-level.
           if (locationGranularity === 'off') return null
           if (gpsBannerDismissed) return null
           if (gpsFailedAt === null || gpsFailReason === null) return null
@@ -529,8 +536,6 @@ function App() {
           )
         })()}
 
-        <UpdatePrompt />
-
         {showDiagnostic && <DiagnosticPanel boot={boot} />}
 
         {installPrompt.available && (
@@ -542,23 +547,70 @@ function App() {
             onDismiss={() => installPrompt.setDismissed(true)}
           />
         )}
-
-        {/* V7: SubpostEditor migrou pra modal — render via AnimatePresence
-            mais abaixo. Aqui só fica Feed (e padding extra pra NavBar
-            bottom não cobrir últimos cards). pb-24 = 96px ≥ 68px navbar
-            + 28px folga. */}
-        <Feed
-          posts={posts}
-          identity={boot.identity}
-          pending={pending}
-          myActions={myActions}
-          gpsCapturing={gpsCapturing}
-          onSpread={handleSpread}
-          onBury={handleBury}
-          onSelect={openViewer}
-        />
-        <div className="pb-24" aria-hidden="true" />
       </div>
+
+      <UpdatePrompt />
+
+      {/* Stack — área central que contém o card atual. flex:1 expande
+          até a navbar bottom. Card visual = PostViewer embedded.
+          2 shadow cards atrás visíveis quando há nextHomePost. */}
+      <main className="relative min-h-0 flex-1 overflow-hidden px-4 pt-3 pb-2">
+        {posts.length === 0 ? (
+          <HomeEmpty tab={useFeedStore.getState().tab} />
+        ) : currentPost ? (
+          <>
+            {/* Shadow cards atrás (mockup .card-shadow). */}
+            {nextHomePost && (
+              <>
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-x-4 top-3 bottom-2 rounded border border-drift-border bg-drift-surface"
+                  style={{ transform: 'translateY(14px) scale(0.92)', opacity: 0.18 }}
+                />
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-x-4 top-3 bottom-2 rounded border border-drift-border bg-drift-surface"
+                  style={{ transform: 'translateY(7px) scale(0.96)', opacity: 0.4 }}
+                />
+              </>
+            )}
+            <div className="relative h-full w-full overflow-hidden rounded border border-drift-border bg-drift-surface">
+              <AnimatePresence mode="wait" custom={exitDir}>
+                <PostViewer
+                  key={currentPost.id}
+                  embedded
+                  custom={exitDir}
+                  post={currentPost}
+                  isMine={currentPost.authorPub === boot.identity?.npub}
+                  pendingAction={pending[currentPost.id] ?? null}
+                  myAction={myActions[currentPost.id] ?? null}
+                  capturingLocation={gpsCapturing.has(currentPost.id)}
+                  queue={{
+                    index: currentIdx,
+                    total: posts.length,
+                    next: nextHomePost,
+                  }}
+                  onOpenLocationSettings={() => {
+                    setSettingsScrollTo('location')
+                    setShowSettings(true)
+                  }}
+                  onSpread={() => {
+                    handleSpread(currentPost)
+                    advanceHome('up')
+                  }}
+                  onBury={() => {
+                    handleBury(currentPost)
+                    advanceHome('down')
+                  }}
+                  onClose={() => {
+                    /* embedded — no-op */
+                  }}
+                />
+              </AnimatePresence>
+            </div>
+          </>
+        ) : null}
+      </main>
 
       {/* V7 — Compose modal (substitui inline always-mounted). */}
       <AnimatePresence>
@@ -585,28 +637,28 @@ function App() {
         )}
       </AnimatePresence>
 
-      {/* V7 — NavBar fixed bottom com plus central (consume V3.3 primitive).
-          3 slots: [perfil, +(compose), settings]. Outras navegações
-          (identidades/relays/listas/chave/limpar) ficam no header até
-          track futura consolidar Settings. */}
-      {!showCreate && !viewerPost && (
+      {/* V8 — NavBar fixed bottom com plus central (mockup v0.7).
+          3 slots: [MAPA, +(compose), CONFIG]. Mapa abre overlay
+          fullscreen mostrando propagação dos posts (eventos rede); +
+          abre compose page; CONFIG abre Settings tabbed (sub-overlays
+          futuro V10).
+          Hidden quando showCreate ou showMap em vôo (não competir com
+          modais fullscreen). */}
+      {!showCreate && !showMap && (
         <NavBar
           left={[
             {
-              icon: '👤',
-              label: 'perfil',
-              onClick: () => setShowProfile(true),
-              ariaLabel: 'abrir perfil',
+              icon: '🗺',
+              label: 'mapa',
+              onClick: () => setShowMap(true),
+              ariaLabel: 'abrir mapa de propagação',
             },
           ]}
           right={[
             {
               icon: '⚙',
               label: 'config',
-              onClick: () => {
-                setSettingsScrollTo(null)
-                setShowSettings(true)
-              },
+              onClick: () => setShowSettingsRoot(true),
               ariaLabel: 'abrir settings',
             },
           ]}
@@ -615,30 +667,61 @@ function App() {
         />
       )}
 
-      <AnimatePresence custom={viewerExitDir}>
-        {viewerPost && (
-          <PostViewer
-            key={viewerPost.id}
-            custom={viewerExitDir}
-            post={viewerPost}
-            isMine={viewerPost.authorPub === boot.identity?.npub}
-            pendingAction={pending[viewerPost.id] ?? null}
-            myAction={myActions[viewerPost.id] ?? null}
-            capturingLocation={gpsCapturing.has(viewerPost.id)}
-            queue={{ index: viewerIdx, total: posts.length, next: nextPost }}
+      {/* V8: modal viewer overlay deletado — home view embedded
+          substituiu o paradigma "tap to open". */}
+
+      {/* V8 — Mapa overlay (acionado pelo MAPA da NavBar). Mostra a
+          propagação do post atualmente visível + contador de eventos
+          rede no header. Mockup v0.7: header "propagação" + FECHAR. */}
+      <AnimatePresence>
+        {showMap && (
+          <MapOverlay
+            currentPost={currentPost}
+            onClose={() => setShowMap(false)}
             onOpenLocationSettings={() => {
+              setShowMap(false)
               setSettingsScrollTo('location')
               setShowSettings(true)
             }}
-            onSpread={() => {
-              handleSpread(viewerPost)
-              advanceViewer('up')
+          />
+        )}
+      </AnimatePresence>
+
+      {/* V8 — SettingsRoot menu (acionado pelo CONFIG da NavBar). Lista
+          7 opções consolidando o que estava no header legado. Cada item
+          fecha o root e abre o overlay específico. */}
+      <AnimatePresence>
+        {showSettingsRoot && (
+          <SettingsRoot
+            onClose={() => setShowSettingsRoot(false)}
+            showDiagnostic={showDiagnostic}
+            onSelect={(target) => {
+              setShowSettingsRoot(false)
+              switch (target) {
+                case 'chave':
+                  setShowIdentity(true)
+                  break
+                case 'identidades':
+                  setShowSwitcher(true)
+                  break
+                case 'relays':
+                  setShowRelays(true)
+                  break
+                case 'listas':
+                  setShowLists(true)
+                  break
+                case 'settings':
+                  setSettingsScrollTo(null)
+                  setShowSettings(true)
+                  break
+                case 'status':
+                  setShowDiagnostic((s) => !s)
+                  break
+                case 'limpar':
+                  void handleClearLocal()
+                  break
+              }
             }}
-            onBury={() => {
-              handleBury(viewerPost)
-              advanceViewer('down')
-            }}
-            onClose={() => setViewerPostId(null)}
           />
         )}
       </AnimatePresence>
@@ -710,184 +793,300 @@ function App() {
   )
 }
 
-// ─── Header ──────────────────────────────────────────────────────────
+// ─── HomeHeader (V8) ─────────────────────────────────────────────────
 
-function Header({
+/**
+ * V8 home header — alinhado ao mockup v0.7. Layout:
+ *
+ *   [dri<em>ft</em>]                    deriva 3.241
+ *   ─────────────────────────────────────────────
+ *   GLOBAL          SEGUINDO          TRENDING
+ *
+ * - Logo Syne 800 25px com "ft" em chartreuse italic
+ * - DERIVA stat = events count via syncStore (proxy de "atividade da rede")
+ * - FeedTabs com indicator slide elastic (V3.2)
+ *
+ * NOTA: O Header pré-V8 tinha 8 botões (chave/identidades/relays/listas/
+ * settings/status/limpar local + indicators 📍🌐). Esses migram pra
+ * NavBar [⚙ CONFIG] em V8.5; até consolidação completa em V10 (Settings
+ * tabbed sub-overlays), as ações ficam acessíveis via long-press menu
+ * futuro OU via SettingsRoot existente (acionado pelo CONFIG da NavBar).
+ *
+ * Props ainda recebidos (identity/onOpenIdentity/etc) preservados pra
+ * futuras integrações — long-press do logo abre IdentityPanel, etc.
+ * Em V8, esses callbacks NÃO são consumidos — apenas tipados.
+ */
+function HomeHeader({
   identity,
   userWeight,
+  currentScore,
   showDiagnostic,
   onToggleDiagnostic,
   onOpenIdentity,
   onOpenSwitcher,
-  onOpenSettings,
-  onOpenSettingsLocation,
-  onOpenSettingsNetwork,
   onOpenRelays,
   onOpenLists,
-  onOpenProfile,
   onClearLocal,
-  locationGranularity,
-  networkMode,
 }: {
   identity: DriftIdentity | null
   userWeight: { weight: number; engagement: number; antiquity: number; maxSubposts: number }
+  /** Score do post atualmente visível (manifesto §22). null = feed vazio. */
+  currentScore: number | null
   showDiagnostic: boolean
   onToggleDiagnostic: () => void
   onOpenIdentity: () => void
   onOpenSwitcher: () => void
-  onOpenSettings: () => void
-  onOpenSettingsLocation: () => void
-  onOpenSettingsNetwork: () => void
   onOpenRelays: () => void
   onOpenLists: () => void
-  onOpenProfile: () => void
   onClearLocal: () => void
-  locationGranularity: LocationGranularity
-  networkMode: NetworkMode
 }) {
-  const tauri = isTauri()
-  const networkIcon =
-    networkMode === 'tor' ? '🧅' : networkMode === 'onion-only' ? '🛡' : '🌐'
-  const networkTitle = !tauri
-    ? 'Tor exige cliente desktop (Tauri) — atual: clearnet. Clique pra ver opções.'
-    : networkMode === 'clearnet'
-    ? 'Rede: clearnet (WSS direto). Clique pra trocar pra Tor.'
-    : networkMode === 'tor'
-    ? 'Rede: Tor (WSS via SOCKS5 local — IP não vaza pro relay).'
-    : 'Rede: onion-only (paranoia máxima — só relays .onion).'
-  // Selectors granulares — re-render só quando o campo específico muda.
-  const active = useSyncStore((s) => s.active)
-  const events = useSyncStore((s) => s.eventsReceived)
-  const rebuilding = useSyncStore((s) => s.rebuildsInProgress.length > 0)
-  // Sprint 6: modo degradado (Tor falhou no boot, etc.) — indicador
-  // não-bloqueante no header. Click abre Settings → seção de rede,
-  // onde o banner detalhado já vive (Sprint 2).
-  const degradedCount = useBootStore((s) => s.degradedReasons.length)
+  // Suprime "unused" warning — callbacks entram em V10 via long-press.
+  void identity
+  void userWeight
+  void showDiagnostic
+  void onToggleDiagnostic
+  void onOpenIdentity
+  void onOpenSwitcher
+  void onOpenRelays
+  void onOpenLists
+  void onClearLocal
 
   return (
-    <header className="mb-6 flex flex-wrap items-center justify-between gap-3 border-b border-drift-border pb-4">
-      <div>
-        <h1 className="text-xl font-bold tracking-[0.25em] text-drift-accent">DRIFT</h1>
-        <button
-          onClick={onOpenIdentity}
-          className="mt-1 text-[10px] text-slate-600 hover:text-slate-300"
-          title="abrir backup/import de identidade"
-        >
-          {identity?.npubBech32.slice(0, 12)}…{identity?.npubBech32.slice(-6)}
-        </button>
+    <header className="shrink-0 px-5 pt-4">
+      <div className="mb-[14px] flex items-center justify-between">
+        <h1 className="font-display text-[25px] font-extrabold leading-none tracking-[-0.5px] text-drift-text">
+          dri<em className="not-italic text-drift-accent">ft</em>
+        </h1>
+        <div className="font-mono text-[10px] uppercase tracking-[1.5px] text-drift-muted">
+          deriva{' '}
+          <b className="font-medium text-drift-accent2">
+            {currentScore !== null ? formatScore(currentScore) : '—'}
+          </b>
+        </div>
       </div>
-      <div className="flex flex-wrap items-center gap-2 text-[10px] text-slate-500">
-        {/* Indicador 📍 — sempre visível pra dar caminho direto pras settings
-            de location. Cor sinaliza estado: cinza=off (default privacidade,
-            manifesto §28), âmbar=ativo. Click sempre abre Settings scrollado
-            pra seção location. */}
-        <button
-          onClick={onOpenSettingsLocation}
-          className={`text-[12px] leading-none hover:opacity-80 ${
-            locationGranularity === 'off' ? 'text-slate-600' : 'text-amber-300'
-          }`}
-          title={
-            locationGranularity === 'off'
-              ? 'GPS desativado — clique pra ativar'
-              : `Location declarado: ${locationGranularity}. Cliente vai pedir GPS antes de cada spread.`
-          }
-          aria-label={
-            locationGranularity === 'off'
-              ? 'GPS desativado — clique pra ativar'
-              : `Location declarado: ${locationGranularity}. Cliente vai pedir GPS antes de cada spread.`
-          }
-        >
-          📍
-        </button>
-        {/* Indicador de modo de rede (Fase 6.4) — manifesto §15.
-            🌐 clearnet (default) · 🧅 tor · 🛡 onion-only.
-            Em PWA browser, opacidade reduzida + tooltip explica que Tor
-            exige cliente desktop. Click sempre abre Settings na seção
-            "modo de rede". */}
-        <button
-          onClick={onOpenSettingsNetwork}
-          className={`text-[12px] leading-none hover:opacity-80 ${
-            !tauri
-              ? 'text-slate-700 opacity-60'
-              : networkMode === 'clearnet'
-              ? 'text-slate-600'
-              : 'text-amber-300'
-          }`}
-          title={networkTitle}
-          aria-label={networkTitle}
-        >
-          {networkIcon}
-        </button>
-        {degradedCount > 0 && (
-          <button
-            onClick={onOpenSettingsNetwork}
-            className="text-[12px] leading-none text-amber-300 hover:opacity-80"
-            title={`Modo degradado — ${degradedCount} feature${degradedCount > 1 ? 's' : ''} não disponível${degradedCount > 1 ? 'is' : ''}. Clique pra ver.`}
-            aria-label="Modo degradado — clique pra detalhes"
-          >
-            ⚠
-          </button>
-        )}
-        <button
-          onClick={onOpenProfile}
-          className="rounded hover:opacity-80"
-          title="ver perfil"
-        >
-          <WeightBadge data={userWeight} />
-        </button>
-        <span title="eventos recebidos pelo subscribe">
-          {active ? '●' : '○'} {events} ev
-          {rebuilding && <span className="ml-1 text-yellow-400">· rebuild…</span>}
-        </span>
-        <button
-          onClick={onOpenIdentity}
-          className="rounded border border-drift-border px-2 py-1 hover:border-drift-accent hover:text-drift-accent"
-          title="backup/import nsec"
-        >
-          chave
-        </button>
-        <button
-          onClick={onOpenSwitcher}
-          className="rounded border border-drift-border px-2 py-1 hover:border-drift-accent hover:text-drift-accent"
-          title="múltiplas identidades — manifesto §4"
-        >
-          identidades
-        </button>
-        <button
-          onClick={onOpenRelays}
-          className="rounded border border-drift-border px-2 py-1 hover:border-drift-accent hover:text-drift-accent"
-          title="gerenciar relays + NIP-65 — manifesto §14"
-        >
-          relays
-        </button>
-        <button
-          onClick={onOpenLists}
-          className="rounded border border-drift-border px-2 py-1 hover:border-drift-accent hover:text-drift-accent"
-          title="pinned, blocked, muted (filtros locais)"
-        >
-          listas
-        </button>
-        <button
-          onClick={onOpenSettings}
-          className="rounded border border-drift-border px-2 py-1 hover:border-drift-accent hover:text-drift-accent"
-          title="filtros de conteúdo e privacidade"
-        >
-          settings
-        </button>
-        <button
-          onClick={onToggleDiagnostic}
-          className="rounded border border-drift-border px-2 py-1 hover:border-drift-accent hover:text-drift-accent"
-        >
-          {showDiagnostic ? 'fechar status' : 'status'}
-        </button>
-        <button
-          onClick={onClearLocal}
-          className="rounded border border-red-900/60 px-2 py-1 text-red-400/80 hover:bg-red-950/30"
-        >
-          limpar local
-        </button>
+      <div className="border-b border-drift-border">
+        <FeedTabs />
       </div>
     </header>
+  )
+}
+
+/**
+ * Format do score determinístico (manifesto §22) pra exibição no header.
+ * `post.score` é float arbitrário; o mockup mostra "3.241" — formato com
+ * separador de milhar PT-BR pra inteiros, 3 decimais pra fracionários.
+ */
+function formatScore(score: number): string {
+  if (Math.abs(score) >= 1000) return Math.round(score).toLocaleString('pt-BR')
+  return score.toFixed(3)
+}
+
+// ─── HomeEmpty (V8) ──────────────────────────────────────────────────
+
+function HomeEmpty({ tab }: { tab: 'global' | 'following' | 'trending' }) {
+  const msg =
+    tab === 'following'
+      ? 'Você não segue ninguém ainda. Toque ➕ pra criar seu primeiro post — depois siga autores ao abrir os posts deles.'
+      : tab === 'trending'
+      ? 'Nada em alta nas últimas 24h. Driftar um post recente vai puxar ele pro trending.'
+      : 'Nenhum post no feed ainda. Toque ➕ pra publicar o primeiro — ele vai dar a volta pelos relays e voltar.'
+  return (
+    <div className="flex h-full items-center justify-center px-8">
+      <p className="max-w-prose text-center font-mono text-[11px] leading-relaxed text-drift-muted">
+        {msg}
+      </p>
+    </div>
+  )
+}
+
+// ─── MapOverlay (V8) ─────────────────────────────────────────────────
+
+/**
+ * V8 — overlay fullscreen de propagação. Acionado pela NavBar [MAPA].
+ *
+ * Mockup v0.7 (.overlay #map-overlay): header "propagação" + FECHAR,
+ * map svg fullscreen, legend bottom "• ATIVO • RECENTE", events count
+ * em algum canto.
+ *
+ * Implementação: usa SpreadMap existente do post atualmente visível
+ * (proxy de "global" — agregação real de eventos cross-post fica pra
+ * track futura). Events count vem do syncStore (contador de eventos
+ * recebidos via subscribe nos relays — manifesto §6).
+ */
+function MapOverlay({
+  currentPost,
+  onClose,
+  onOpenLocationSettings,
+}: {
+  currentPost: Post | null
+  onClose: () => void
+  onOpenLocationSettings: () => void
+}) {
+  const events = useSyncStore((s) => s.eventsReceived)
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 22 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 22 }}
+      transition={{ duration: 0.25, ease: 'easeOut' }}
+      className="fixed inset-0 z-40 flex flex-col bg-drift-bg"
+      role="dialog"
+      aria-modal="true"
+      aria-label="propagação"
+    >
+      <header className="flex shrink-0 items-center justify-between border-b border-drift-border px-5 py-[15px]">
+        <h2 className="font-display text-[19px] font-extrabold text-drift-text">
+          propagação
+        </h2>
+        <div className="flex items-center gap-3">
+          <span
+            className="font-mono text-[10px] uppercase tracking-[1.5px] text-drift-muted"
+            title="eventos recebidos pelo subscribe"
+          >
+            {events.toLocaleString('pt-BR')} ev
+          </span>
+          <button
+            onClick={onClose}
+            className="rounded border border-drift-border px-3 py-[5px] font-mono text-[10px] uppercase tracking-[2px] text-drift-muted transition-colors hover:text-drift-text"
+            aria-label="fechar mapa"
+          >
+            fechar
+          </button>
+        </div>
+      </header>
+
+      <div className="relative flex-1 overflow-hidden">
+        {currentPost ? (
+          <SpreadMap
+            postId={currentPost.id}
+            className="h-full w-full"
+            onOpenLocationSettings={onOpenLocationSettings}
+          />
+        ) : (
+          <div className="flex h-full items-center justify-center font-mono text-[11px] text-drift-muted">
+            sem posts visíveis no momento
+          </div>
+        )}
+      </div>
+
+      <div className="absolute bottom-[18px] left-5 flex gap-[14px]">
+        <span className="font-mono text-[9px] uppercase tracking-[2px] text-drift-muted">
+          • ativo
+        </span>
+        <span className="font-mono text-[9px] uppercase tracking-[2px] text-drift-muted">
+          • recente
+        </span>
+      </div>
+    </motion.div>
+  )
+}
+
+// ─── SettingsRoot (V8) ───────────────────────────────────────────────
+
+/**
+ * V8 — menu consolidador de configurações. Acionado pelo CONFIG da
+ * NavBar, substitui os 7 botões soltos do header legado:
+ *   chave (IdentityPanel) · identidades (IdentitySwitcher) ·
+ *   relays (RelaySettings) · listas (LocalListsSettings) ·
+ *   settings (ContentSettings) · status (toggle DiagnosticPanel) ·
+ *   limpar local (handleClearLocal — destrutivo, confirma 2x)
+ *
+ * Cada item é um botão s-row; click fecha o root e abre o overlay
+ * específico via onSelect. Pattern alinhado ao mockup v0.7 (.s-row).
+ *
+ * Track futura V10: virar tabbed sub-overlays (Identidade / Rede /
+ * Conteúdo / Localização / Sobre) com toggles inline (mockup .toggle).
+ * V8 entrega o intermediário simples — lista de routing, sem inline
+ * state, ainda valioso pra desempenado o header.
+ */
+type SettingsTarget =
+  | 'chave'
+  | 'identidades'
+  | 'relays'
+  | 'listas'
+  | 'settings'
+  | 'status'
+  | 'limpar'
+
+function SettingsRoot({
+  onClose,
+  onSelect,
+  showDiagnostic,
+}: {
+  onClose: () => void
+  onSelect: (target: SettingsTarget) => void
+  /** Estado atual do toggle status — pra label refletir on/off. */
+  showDiagnostic: boolean
+}) {
+  const items: { target: SettingsTarget; label: string; danger?: boolean; hint: string }[] = [
+    { target: 'chave', label: 'chave', hint: 'backup/import nsec' },
+    { target: 'identidades', label: 'identidades', hint: 'múltiplas identidades — manifesto §4' },
+    { target: 'relays', label: 'relays', hint: 'gerenciar relays + NIP-65' },
+    { target: 'listas', label: 'listas', hint: 'pinned, blocked, muted (filtros locais)' },
+    { target: 'settings', label: 'settings', hint: 'filtros de conteúdo e privacidade' },
+    {
+      target: 'status',
+      label: showDiagnostic ? 'fechar status' : 'status',
+      hint: 'painel de diagnóstico',
+    },
+    { target: 'limpar', label: 'limpar local', danger: true, hint: 'apaga banco local — destrutivo' },
+  ]
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 22 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 22 }}
+      transition={{ duration: 0.25, ease: 'easeOut' }}
+      className="fixed inset-0 z-40 flex flex-col bg-drift-bg"
+      role="dialog"
+      aria-modal="true"
+      aria-label="configurações"
+    >
+      <header className="flex shrink-0 items-center justify-between border-b border-drift-border px-5 py-[15px]">
+        <h2 className="font-display text-[19px] font-extrabold text-drift-text">
+          configurações
+        </h2>
+        <button
+          onClick={onClose}
+          className="rounded border border-drift-border px-3 py-[5px] font-mono text-[10px] uppercase tracking-[2px] text-drift-muted transition-colors hover:text-drift-text"
+          aria-label="fechar configurações"
+        >
+          fechar
+        </button>
+      </header>
+
+      <div className="flex-1 overflow-y-auto px-5 py-[18px]">
+        <ul className="divide-y divide-drift-border">
+          {items.map((item) => (
+            <li key={item.target}>
+              <button
+                onClick={() => onSelect(item.target)}
+                className={`group flex w-full items-center justify-between py-[14px] text-left transition-colors ${
+                  item.danger ? 'text-drift-bury' : 'text-drift-text'
+                } hover:opacity-80`}
+              >
+                <div className="flex flex-col gap-[2px]">
+                  <span className="font-mono text-[11px] uppercase tracking-[2px]">
+                    {item.label}
+                  </span>
+                  <span className="font-mono text-[10px] text-drift-muted">
+                    {item.hint}
+                  </span>
+                </div>
+                <span
+                  aria-hidden="true"
+                  className="font-mono text-[10px] tracking-[2px] text-drift-muted transition-colors group-hover:text-drift-accent"
+                >
+                  →
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </motion.div>
   )
 }
 
@@ -980,148 +1179,6 @@ function InstallBanner({
     </div>
   )
 }
-
-// ─── Weight Badge ────────────────────────────────────────────────────
-
-function WeightBadge({
-  data,
-}: {
-  data: { weight: number; engagement: number; antiquity: number; maxSubposts: number }
-}) {
-  const tone =
-    data.weight < 20
-      ? 'text-slate-500'
-      : data.weight < 50
-      ? 'text-emerald-500'
-      : data.weight < 75
-      ? 'text-emerald-400'
-      : 'text-yellow-300'
-  const tooltip =
-    `peso ${data.weight.toFixed(1)} = antiguidade ${data.antiquity.toFixed(1)} + engajamento ${data.engagement.toFixed(1)}\n` +
-    `max subposts: ${data.maxSubposts}\n` +
-    `manifesto §22 — score determinístico, sem reputação subjetiva`
-  return (
-    <span title={tooltip} className={`tabular-nums ${tone}`}>
-      ⚖ {data.weight.toFixed(0)}
-    </span>
-  )
-}
-
-// ─── Feed ────────────────────────────────────────────────────────────
-
-function Feed({
-  posts,
-  identity,
-  pending,
-  myActions,
-  gpsCapturing,
-  onSpread,
-  onBury,
-  onSelect,
-}: {
-  posts: Post[]
-  identity: DriftIdentity | null
-  pending: Record<string, 'spread' | 'bury'>
-  myActions: Record<string, 'spread' | 'bury' | null>
-  gpsCapturing: Set<string>
-  onSpread: (p: Post) => void
-  onBury: (p: Post) => void
-  onSelect: (postId: string) => void
-}) {
-  const prefs = usePrefsStore()
-  const tab = useFeedStore((s) => s.tab)
-
-  return (
-    <div>
-      <div className="mb-3 flex items-center justify-between gap-2 border-b border-drift-border pb-2">
-        <FeedTabs />
-        <span className="text-[10px] text-slate-600">{posts.length}</span>
-      </div>
-
-      {posts.length === 0 ? (
-        <FeedEmpty tab={tab} />
-      ) : (
-        <div className="space-y-3">
-          {posts.map((post) => {
-          const hint = applyContentFilters(post, prefs)
-          if (hint.hide) {
-            return (
-              <HiddenCard
-                key={post.id}
-                reason={hint.reason ?? 'oculto'}
-                onReveal={() => onSelect(post.id)}
-              />
-            )
-          }
-          return (
-            <PostCard
-              key={post.id}
-              post={post}
-              isMine={post.authorPub === identity?.npub}
-              pending={pending[post.id] ?? null}
-              myAction={myActions[post.id] ?? null}
-              capturingLocation={gpsCapturing.has(post.id)}
-              blurred={hint.blur}
-              onOpen={() => onSelect(post.id)}
-              onSpread={() => onSpread(post)}
-              onBury={() => onBury(post)}
-            />
-          )
-        })}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function FeedEmpty({ tab }: { tab: 'global' | 'following' | 'trending' }) {
-  if (tab === 'following') {
-    return (
-      <div className="rounded border border-dashed border-drift-border p-8 text-center text-xs text-slate-600">
-        Você não segue ninguém ainda.
-        <br />
-        Abra um post (toque) e use o botão ➕ pra seguir o autor.
-      </div>
-    )
-  }
-  if (tab === 'trending') {
-    return (
-      <div className="rounded border border-dashed border-drift-border p-8 text-center text-xs text-slate-600">
-        Nada em alta nas últimas 24h.
-        <br />
-        Driftar um post recente vai puxar ele pro trending.
-      </div>
-    )
-  }
-  return (
-    <div className="rounded border border-dashed border-drift-border p-8 text-center text-xs text-slate-600">
-      Nenhum post no feed local ainda.
-      <br />
-      Publica o primeiro acima — ele vai dar a volta pelos relays e voltar.
-    </div>
-  )
-}
-
-function HiddenCard({
-  reason,
-  onReveal,
-}: {
-  reason: string
-  onReveal: () => void
-}) {
-  return (
-    <button
-      onClick={onReveal}
-      className="block w-full rounded border border-dashed border-drift-border bg-drift-surface/40 p-3 text-left text-[11px] text-slate-500 hover:border-drift-accent/40 hover:text-slate-300"
-    >
-      ⚠ post marcado como <code className="text-yellow-400">{reason}</code> —
-      toque pra abrir
-    </button>
-  )
-}
-
-// PostCard extraído pra ./components/Feed/PostCard.tsx em V_pre0
-// (HIMYM Round 1 — Lily flag de App.tsx 1525 linhas).
 
 // ─── Bootstrap view ─────────────────────────────────────────────────
 

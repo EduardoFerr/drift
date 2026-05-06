@@ -1,62 +1,96 @@
 /**
- * SubpostLayout — V4 three-layout system.
+ * SubpostLayout — V4 three-layout system + V8 full card content.
  *
- * Aplica template visual baseado em `subpost.layout` (LayoutKind).
- * Single source of truth do enum: `LAYOUT_VALUES` em `types/drift.ts`.
+ * V4 introduziu layout enum (portrait/landscape/text). V8 expandiu o
+ * contrato: SubpostLayout agora renderiza o CARD COMPLETO (não só a
+ * mídia) — incluindo tag row, título Syne, body italic, meta stats,
+ * dots indicator. Razão: cada layout posiciona estes blocos de forma
+ * radicalmente diferente (mockup v0.7), e renderizar de fora obrigaria
+ * positioning hacks. Camada V4 "pure de subpost" virou "pure de
+ * (subpost, post, idx, total)" — ainda determinística (§7).
  *
- * IMPLEMENTAÇÃO: switch exhaustive (NÃO `Record<K, fn>` registry).
- * Razão: 3 keys fixas e fechadas — não há plug-in externo (manifesto §12,
- * sem chave mestra disfarçada de "extensão"). Switch + `assertNever` no
- * default branch é mais legível, mantém locality do control flow, e o
- * type-checker pega exhaustiveness via `never` (compile error se alguém
- * adicionar 'square' a LAYOUT_VALUES sem case correspondente).
+ * 3 templates (CSS reference: drift.html mockup linhas 65-105):
  *
- * HIMYM Round 1 (Ted, Lily) consensus: registry pattern era
- * over-engineering. Round 2: ratificado.
+ *   portrait — flex column. Media flex:1 top. Dots middle (border
+ *     top/bottom). Text block bottom (tag/title/body/meta).
  *
- * TEMPLATES (alinhados ao mockup v0.7):
+ *   landscape — display block. Media absolute fill com gradient bottom.
+ *     Dots absolute z-3 acima do text. Text block absolute bottom
+ *     transparent (sobre o gradient).
  *
- *   portrait — imagem topo flex:1, texto bottom fixo. Padrão Stories.
+ *   text — flex column. Sem media. Dots top (border-bottom). Text block
+ *     flex:1 centered. Decorative letter Syne 800 100px absolute
+ *     bottom-right (aria-hidden).
  *
- *   landscape — imagem absolute inset-0, gradient overlay bottom 96%
- *     opacity, texto overlaid (absolute bottom-16px). Photo-card.
+ * Switch exhaustive (assertNever) — adicionar layout novo a
+ * LAYOUT_VALUES sem case quebra a build.
  *
- *   text — sem imagem, texto centralizado, decorative letter Syne 800
- *     100px drift-border opacity 0.55 absolute bottom-right (aria-hidden).
- *     Card text-first. Manuscript vibe.
+ * HEURISTIC title/body split: subpost.text não tem campo title
+ * separado. Synthesis determinística (§7):
+ *   - text vazio          → title='(sem texto)', body=''
+ *   - text 1 linha curta  → title=text, body=''
+ *   - text com '\n'       → title=primeira linha, body=resto
+ *   - text long sem \n    → title=primeira frase (split '. '),
+ *                           body=resto. Se não tem '. ', title='',
+ *                           body=text inteiro.
  *
- * DEFESA: subpost.layout deveria sempre vir já normalizado (read path =
- * feed.ts:parseSubposts; write path = protocol.ts:createPost). Mesmo
- * assim, default branch chama assertNever — se um caller passar layout
- * inválido programaticamente, TS quebra. Defesa em camada (manifesto §7).
+ * TAG synthesis: post.category || post.location?.city || post.contentWarning.
+ * Sempre uppercase + tracking 2.5px (mockup .c-tag).
  */
 
 import type { ReactNode } from 'react'
-import type { Subpost, LayoutKind } from '../../types/drift'
+import type { Subpost, Post, LayoutKind } from '../../types/drift'
 import { DEFAULT_LAYOUT } from '../../types/drift'
 import { Image } from '../UI/Image'
 import { getDecorativeLetters } from '../../lib/decorativeLetters'
+import { DotsIndicator } from '../UI/DotsIndicator'
 
 export interface SubpostLayoutProps {
   subpost: Subpost
+  post: Post
+  /** 0-indexed position in subposts array. Pra dots indicator. */
+  subpostIdx: number
+  /** Total de subposts. DotsIndicator retorna null se ≤1. */
+  subpostsTotal: number
 }
 
-export function SubpostLayout({ subpost }: SubpostLayoutProps): ReactNode {
-  // Defensive: caller que não normalizou (ex.: test direto sem feed.ts
-  // pipeline) cai pra DEFAULT_LAYOUT. Não throw — UI sempre renderiza.
+export function SubpostLayout({
+  subpost,
+  post,
+  subpostIdx,
+  subpostsTotal,
+}: SubpostLayoutProps): ReactNode {
   const layout: LayoutKind = subpost.layout ?? DEFAULT_LAYOUT
 
   switch (layout) {
     case 'portrait':
-      return <PortraitLayout subpost={subpost} />
+      return (
+        <PortraitLayout
+          subpost={subpost}
+          post={post}
+          subpostIdx={subpostIdx}
+          subpostsTotal={subpostsTotal}
+        />
+      )
     case 'landscape':
-      return <LandscapeLayout subpost={subpost} />
+      return (
+        <LandscapeLayout
+          subpost={subpost}
+          post={post}
+          subpostIdx={subpostIdx}
+          subpostsTotal={subpostsTotal}
+        />
+      )
     case 'text':
-      return <TextLayout subpost={subpost} />
+      return (
+        <TextLayout
+          subpost={subpost}
+          post={post}
+          subpostIdx={subpostIdx}
+          subpostsTotal={subpostsTotal}
+        />
+      )
     default:
-      // Exhaustiveness check — adicionar layout novo a LAYOUT_VALUES sem
-      // case correspondente quebra o build (TS2345: Argument of type
-      // 'string' is not assignable to parameter of type 'never').
       return assertNever(layout)
   }
 }
@@ -65,98 +99,312 @@ function assertNever(x: never): never {
   throw new Error(`SubpostLayout: layout não tratado (${String(x)})`)
 }
 
-// ─── Templates ───────────────────────────────────────────────────────
+// ─── Pure helpers (testáveis) ────────────────────────────────────────
 
-function PortraitLayout({ subpost }: { subpost: Subpost }) {
-  const hasImage =
-    (subpost.type === 'image' || subpost.type === 'text+image') && subpost.imageUrl
+/**
+ * Synthesize tag row do post. Determinístico.
+ * Ex.: "DERIVA · SÃO PAULO" (location), "PENSAMENTO · INTERIOR" (category),
+ *      "⚠ NSFW" (contentWarning), "DERIVA" (fallback).
+ */
+export function synthesizeTag(post: Post): string {
+  const parts: string[] = []
+  if (post.category) parts.push(post.category.toUpperCase())
+  if (post.location?.city) parts.push(post.location.city.toUpperCase())
+  if (parts.length === 0 && post.contentWarning) {
+    return `⚠ ${String(post.contentWarning).toUpperCase()}`
+  }
+  if (parts.length === 0) return 'DERIVA'
+  return parts.join(' · ')
+}
 
+/**
+ * Synthesize title/body do subpost.text. Determinístico.
+ * Heurística: \n divide; senão primeiro `. ` divide; senão tudo é body.
+ */
+export function splitTitleBody(text: string | null): {
+  title: string
+  body: string
+} {
+  if (!text || !text.trim()) return { title: '(sem texto)', body: '' }
+  const trimmed = text.trim()
+
+  // 1. Newline divide?
+  const nl = trimmed.indexOf('\n')
+  if (nl > 0) {
+    return {
+      title: trimmed.slice(0, nl).trim(),
+      body: trimmed.slice(nl + 1).trim(),
+    }
+  }
+
+  // 2. Curto e sem newline → tudo é title
+  if (trimmed.length <= 60) {
+    return { title: trimmed, body: '' }
+  }
+
+  // 3. Longo e sem newline → split na primeira sentença
+  const dot = trimmed.indexOf('. ')
+  if (dot > 0 && dot < 80) {
+    return {
+      title: trimmed.slice(0, dot + 1).trim(),
+      body: trimmed.slice(dot + 2).trim(),
+    }
+  }
+
+  // 4. Sem split natural — tudo vai no body
+  return { title: '', body: trimmed }
+}
+
+/**
+ * Format meta stats numéricos. 22100 → "22.1K".
+ */
+export function formatStat(n: number): string {
+  if (n < 1000) return String(n)
+  if (n < 1_000_000) return `${(n / 1000).toFixed(1).replace(/\.0$/, '')}K`
+  return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`
+}
+
+/**
+ * Format "tempo atrás" no formato compacto do mockup ("6H", "3D", "12MIN").
+ * Determinístico — recebe `now` em segundos opcionalmente pra testes.
+ */
+export function timeAgoCompact(unixSeconds: number, now = Math.floor(Date.now() / 1000)): string {
+  const diff = now - unixSeconds
+  if (diff < 60) return `${diff}S`
+  if (diff < 3600) return `${Math.floor(diff / 60)}MIN`
+  if (diff < 86400) return `${Math.floor(diff / 3600)}H`
+  return `${Math.floor(diff / 86400)}D`
+}
+
+// ─── Card pieces (compartilhadas pelos 3 layouts) ────────────────────
+
+function CardDots({ idx, total }: { idx: number; total: number }) {
+  // Mockup .c-dots com border-top/bottom controlado pelo layout pai
+  // (portrait/text) ou border-none + position absolute (landscape).
+  // Layout pai aplica wrapper; aqui só renderiza os dots.
   return (
-    <div className="flex h-full w-full flex-col gap-3 p-4">
-      {hasImage && (
-        <div className="flex flex-1 items-center justify-center overflow-hidden">
-          <Image
-            src={subpost.imageUrl!}
-            className="max-h-full max-w-full rounded"
-            aspect="auto"
-          />
-        </div>
-      )}
-      {subpost.text && (
-        <p className="shrink-0 whitespace-pre-wrap text-center font-mono text-[13px] leading-relaxed text-drift-text">
-          {subpost.text}
-        </p>
-      )}
-      {!hasImage && !subpost.text && <EmptyContent />}
+    <div className="flex items-center justify-center gap-[5px] py-[7px]">
+      <DotsIndicator total={total} active={idx} />
     </div>
   )
 }
 
-function LandscapeLayout({ subpost }: { subpost: Subpost }) {
+function CardText({
+  post,
+  subpost,
+  variant,
+}: {
+  post: Post
+  subpost: Subpost
+  /**
+   * 'inset' = bg surface + padding 14/17/18 (portrait/text default).
+   * 'overlay' = bg transparent (landscape, sobre gradient).
+   * 'centered' = padding 28/22/28, body sem clamp (text layout).
+   */
+  variant: 'inset' | 'overlay' | 'centered'
+}) {
+  const tag = synthesizeTag(post)
+  const { title, body } = splitTitleBody(subpost.text)
+  const drift = formatStat(post.spreads)
+  const subs = post.subposts.length
+  const age = timeAgoCompact(post.createdAt)
+
+  const wrapperBg = variant === 'overlay' ? '' : 'bg-drift-surface'
+  const padding =
+    variant === 'centered'
+      ? 'px-[22px] py-[28px]'
+      : variant === 'overlay'
+      ? 'px-[17px] pt-[14px] pb-[18px]'
+      : 'px-[17px] pt-[14px] pb-[18px]'
+
+  // Layout 'text' (variant='centered') flex flex-col justify-center
+  // pra texto subir do meio. Outros: bloco normal.
+  const flex = variant === 'centered' ? 'flex flex-1 flex-col justify-center' : ''
+
+  // Body line-clamp 3 nos modos inset/overlay; text layout sem clamp.
+  const bodyClamp = variant === 'centered' ? '' : 'line-clamp-3'
+  const titleSize = variant === 'centered' ? 'text-[30px]' : 'text-[20px]'
+
+  return (
+    <div className={`relative ${wrapperBg} ${padding} ${flex}`}>
+      <div className="mb-[5px] font-mono text-[9px] uppercase tracking-[2.5px] text-drift-muted">
+        {tag}
+      </div>
+      {title && (
+        <h2
+          className={`mb-2 font-display font-bold leading-[1.08] tracking-[-0.3px] text-drift-text ${titleSize}`}
+        >
+          {title}
+        </h2>
+      )}
+      {body && (
+        <p
+          className={`mb-[10px] font-mono text-[12px] italic leading-[1.65] text-[#787874] ${bodyClamp}`}
+        >
+          {body}
+        </p>
+      )}
+      <div className="flex gap-3 font-mono text-[9px] uppercase tracking-[1.5px] text-drift-muted">
+        <span>
+          DRIFT <span className="text-drift-accent2">{drift}</span>
+        </span>
+        <span>
+          SUBS <span className="text-drift-accent2">{subs}</span>
+        </span>
+        <span>
+          HÁ <span className="text-drift-accent2">{age}</span>
+        </span>
+      </div>
+    </div>
+  )
+}
+
+// ─── Templates ───────────────────────────────────────────────────────
+
+function PortraitLayout({
+  subpost,
+  post,
+  subpostIdx,
+  subpostsTotal,
+}: SubpostLayoutProps) {
+  const hasImage =
+    (subpost.type === 'image' || subpost.type === 'text+image') && subpost.imageUrl
+
+  return (
+    <div className="flex h-full w-full flex-col">
+      {/* Media flex:1 top. Sem image → fallback bg muted. */}
+      <div className="relative min-h-0 flex-1">
+        {hasImage ? (
+          <Image
+            src={subpost.imageUrl!}
+            className="block h-full w-full object-cover"
+            aspect="auto"
+          />
+        ) : (
+          <div className="flex h-full items-center justify-center text-xs text-drift-muted">
+            (sem imagem)
+          </div>
+        )}
+        {/* Gradient overlay sutil bottom (mockup .med-overlay portrait). */}
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background:
+              'linear-gradient(to bottom, transparent 60%, rgba(0,0,0,0.35) 100%)',
+          }}
+          aria-hidden="true"
+        />
+      </div>
+
+      {/* Dots middle (border-top/bottom). DotsIndicator returns null se ≤1. */}
+      {subpostsTotal > 1 && (
+        <div className="shrink-0 border-y border-drift-border bg-drift-surface">
+          <CardDots idx={subpostIdx} total={subpostsTotal} />
+        </div>
+      )}
+
+      {/* Text bottom fixo. */}
+      <div className="shrink-0">
+        <CardText post={post} subpost={subpost} variant="inset" />
+      </div>
+    </div>
+  )
+}
+
+function LandscapeLayout({
+  subpost,
+  post,
+  subpostIdx,
+  subpostsTotal,
+}: SubpostLayoutProps) {
   const hasImage =
     (subpost.type === 'image' || subpost.type === 'text+image') && subpost.imageUrl
 
   if (!hasImage) {
-    // Sem imagem, landscape degenera pra portrait (sem fallback exótico).
-    return <PortraitLayout subpost={subpost} />
+    // Sem imagem, landscape degenera pra portrait.
+    return (
+      <PortraitLayout
+        subpost={subpost}
+        post={post}
+        subpostIdx={subpostIdx}
+        subpostsTotal={subpostsTotal}
+      />
+    )
   }
 
   return (
     <div className="relative h-full w-full overflow-hidden">
+      {/* Media absolute fill. */}
       <Image
         src={subpost.imageUrl!}
         className="absolute inset-0 h-full w-full object-cover"
         aspect="auto"
       />
-      {/* Gradient overlay bottom 96% opacity pra legibilidade do texto. */}
+      {/* Gradient overlay top:96% bottom (mockup landscape med-overlay). */}
       <div
-        className="pointer-events-none absolute inset-x-0 bottom-0 h-2/3"
+        className="pointer-events-none absolute inset-0"
         style={{
           background:
-            'linear-gradient(to top, rgba(12, 12, 11, 0.96), rgba(12, 12, 11, 0))',
+            'linear-gradient(to top, rgba(10,10,9,0.96) 0%, rgba(10,10,9,0.55) 45%, transparent 70%)',
         }}
         aria-hidden="true"
       />
-      {subpost.text && (
-        <p className="absolute inset-x-4 bottom-4 whitespace-pre-wrap text-center font-mono text-[13px] leading-relaxed text-drift-text">
-          {subpost.text}
-        </p>
+
+      {/* Dots absolute z-3, acima do text block.
+          Bottom calc: 16(meta gap) + 14(padding-top text) + 20(title)
+          + 38(body+meta) ≈ 88px. Aproximado. */}
+      {subpostsTotal > 1 && (
+        <div className="absolute inset-x-0 z-[3] bottom-[88px] py-2">
+          <CardDots idx={subpostIdx} total={subpostsTotal} />
+        </div>
       )}
+
+      {/* Text block absolute bottom transparent. */}
+      <div className="absolute inset-x-0 bottom-0 z-[2]">
+        <CardText post={post} subpost={subpost} variant="overlay" />
+      </div>
     </div>
   )
 }
 
-function TextLayout({ subpost }: { subpost: Subpost }) {
-  // Decorative letter usa text como fonte. Função pura sanitiza Unicode
-  // (NFKC + strip RTL/ZW/control) — manifesto §7 + Round 1 Barney #2.
+function TextLayout({
+  subpost,
+  post,
+  subpostIdx,
+  subpostsTotal,
+}: SubpostLayoutProps) {
   const letters = getDecorativeLetters(subpost.text)
 
   return (
-    <div className="relative flex h-full w-full flex-col items-center justify-center p-6">
-      <p className="z-10 max-w-prose whitespace-pre-wrap text-center font-mono text-[15px] leading-relaxed text-drift-text">
-        {subpost.text ?? '(sem conteúdo de texto)'}
-      </p>
-      {/* Decorative letter — visual puro, screen reader pula. */}
-      <span
-        aria-hidden="true"
-        className="pointer-events-none absolute bottom-2 right-3 select-none font-display font-extrabold uppercase text-drift-border"
-        style={{
-          fontSize: '100px',
-          letterSpacing: '-6px',
-          opacity: 0.55,
-          lineHeight: 1,
-        }}
-      >
-        {letters}
-      </span>
-    </div>
-  )
-}
+    <div className="flex h-full w-full flex-col bg-drift-surface">
+      {/* Dots top (border-bottom). */}
+      {subpostsTotal > 1 && (
+        <div className="shrink-0 border-b border-drift-border">
+          <CardDots idx={subpostIdx} total={subpostsTotal} />
+        </div>
+      )}
 
-function EmptyContent() {
-  return (
-    <div className="flex h-full items-center justify-center text-xs text-drift-muted">
-      (sem conteúdo)
+      {/* Text flex:1 centered. */}
+      <div className="relative flex flex-1 flex-col justify-center overflow-hidden">
+        <CardText post={post} subpost={subpost} variant="centered" />
+
+        {/* Decorative letter — Syne 800 100px drift-border opacity 0.55,
+            absolute bottom-right negative offsets pra colar na borda. */}
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute select-none font-display font-extrabold uppercase text-drift-border"
+          style={{
+            fontSize: '100px',
+            letterSpacing: '-6px',
+            opacity: 0.55,
+            lineHeight: 1,
+            right: '-10px',
+            bottom: '-18px',
+          }}
+        >
+          {letters}
+        </span>
+      </div>
     </div>
   )
 }
