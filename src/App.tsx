@@ -41,6 +41,15 @@ import { MultiTabModal } from './components/UI/MultiTabModal'
 import { UpdatePrompt } from './components/UI/UpdatePrompt'
 import { NavBar } from './components/UI/NavBar'
 import { FullPageOverlay } from './components/UI/FullPageOverlay'
+import {
+  GlobeIcon,
+  MapIcon,
+  OnionIcon,
+  PinIcon,
+  ShieldIcon,
+  SlidersIcon,
+  WarningIcon,
+} from './components/UI/Icons'
 import { SpreadMap } from './components/Feed/SpreadMap'
 import type {
   DriftIdentity,
@@ -658,7 +667,7 @@ function App() {
         <NavBar
           left={[
             {
-              icon: '🗺',
+              icon: <MapIcon size={18} />,
               label: 'mapa',
               onClick: () => setShowMap(true),
               ariaLabel: 'abrir mapa de propagação',
@@ -666,7 +675,7 @@ function App() {
           ]}
           right={[
             {
-              icon: '⚙',
+              icon: <SlidersIcon size={18} />,
               label: 'config',
               onClick: () => setShowSettingsRoot(true),
               ariaLabel: 'abrir settings',
@@ -963,7 +972,9 @@ function StatusIndicators({
   const degradedCount = useBootStore((s) => s.degradedReasons.length)
 
   const networkIcon =
-    networkMode === 'tor' ? '🧅' : networkMode === 'onion-only' ? '🛡' : '🌐'
+    networkMode === 'tor' ? <OnionIcon size={14} /> :
+    networkMode === 'onion-only' ? <ShieldIcon size={14} /> :
+    <GlobeIcon size={14} />
   const tauriRuntime = isTauri()
   const networkAlert = !tauriRuntime && networkMode !== 'clearnet'
 
@@ -982,7 +993,7 @@ function StatusIndicators({
         }
         aria-label="status de location"
       >
-        📍
+        <PinIcon size={14} />
       </button>
 
       {/* Network indicator */}
@@ -1014,7 +1025,7 @@ function StatusIndicators({
           title={`Modo degradado — ${degradedCount} feature${degradedCount > 1 ? 's' : ''} indisponível${degradedCount > 1 ? 'is' : ''}`}
           aria-label="modo degradado"
         >
-          ⚠
+          <WarningIcon size={14} />
         </button>
       )}
 
