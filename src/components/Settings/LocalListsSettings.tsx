@@ -12,7 +12,7 @@
  */
 
 import { useEffect, useState } from 'react'
-import { motion } from 'framer-motion'
+import { FullPageOverlay } from '../UI/FullPageOverlay'
 import { listPinned, unpinPost } from '../../lib/cache'
 import {
   listBlocked,
@@ -51,33 +51,8 @@ export function LocalListsSettings({ onClose }: LocalListsSettingsProps) {
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.15 }}
-      className="fixed inset-0 z-40 flex items-center justify-center bg-drift-bg/90 p-4 backdrop-blur-sm"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-    >
-      <motion.div
-        initial={{ y: 12 }}
-        animate={{ y: 0 }}
-        className="flex max-h-[85dvh] w-full max-w-md flex-col overflow-y-auto overscroll-contain rounded border border-drift-border bg-drift-surface p-5"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <header className="mb-4 flex items-center justify-between">
-          <h2 className="text-xs uppercase tracking-[0.2em] text-drift-accent">
-            settings · listas locais
-          </h2>
-          <button
-            onClick={onClose}
-            className="rounded border border-drift-border px-2 py-1 text-[10px] hover:border-drift-accent hover:text-drift-accent"
-          >
-            ✕
-          </button>
-        </header>
+    <FullPageOverlay onClose={onClose} title="listas locais" ariaLabel="settings · listas locais">
+      <div className="p-5">
 
         {/* Tabs */}
         <div className="mb-4 flex gap-1 border-b border-drift-border">
@@ -121,8 +96,8 @@ export function LocalListsSettings({ onClose }: LocalListsSettingsProps) {
             }}
           />
         )}
-      </motion.div>
-    </motion.div>
+      </div>
+    </FullPageOverlay>
   )
 }
 

@@ -10,7 +10,7 @@
  */
 
 import { useState } from 'react'
-import { motion } from 'framer-motion'
+import { FullPageOverlay } from '../UI/FullPageOverlay'
 import { addRelay, removeRelay, setRelayEnabled, useRelaysStore } from '../../lib/relays'
 import { entriesFromRecords, fetchRelayList, publishRelayList } from '../../lib/nip65'
 import { nip19 } from 'nostr-tools'
@@ -99,34 +99,8 @@ export function RelaySettings({ onClose }: RelaySettingsProps) {
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.15 }}
-      className="fixed inset-0 z-40 flex items-center justify-center bg-drift-bg/90 p-4 backdrop-blur-sm"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-    >
-      <motion.div
-        initial={{ y: 12 }}
-        animate={{ y: 0 }}
-        className="flex max-h-[85dvh] w-full max-w-md flex-col overflow-y-auto overscroll-contain rounded border border-drift-border bg-drift-surface p-5"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <header className="mb-4 flex items-center justify-between">
-          <h2 className="text-xs uppercase tracking-[0.2em] text-drift-accent">
-            settings · relays
-          </h2>
-          <button
-            onClick={onClose}
-            className="rounded border border-drift-border px-2 py-1 text-[10px] hover:border-drift-accent hover:text-drift-accent"
-          >
-            ✕
-          </button>
-        </header>
-
+    <FullPageOverlay onClose={onClose} title="relays" ariaLabel="settings · relays">
+      <div className="p-5">
         <p className="mb-4 text-[11px] leading-relaxed text-slate-500">
           Manifesto §14 — bootstrap distribuído. Relays são intercambiáveis;
           remover um não tira você da rede. Cliente sempre mantém ao
@@ -246,8 +220,8 @@ export function RelaySettings({ onClose }: RelaySettingsProps) {
             <div className="mt-1 text-[10px] text-slate-400">{publishMsg}</div>
           )}
         </section>
-      </motion.div>
-    </motion.div>
+      </div>
+    </FullPageOverlay>
   )
 }
 

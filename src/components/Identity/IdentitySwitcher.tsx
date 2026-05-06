@@ -18,8 +18,7 @@
  */
 
 import { useState } from 'react'
-import { SlideUpOverlay } from '../UI/SlideUpOverlay'
-import { ModalHeader } from '../UI/ModalHeader'
+import { FullPageOverlay } from '../UI/FullPageOverlay'
 import {
   createNewIdentity,
   importIdentityNsec,
@@ -188,9 +187,8 @@ export function IdentitySwitcher({ onRequestExport, onClose }: IdentitySwitcherP
   }
 
   return (
-    <SlideUpOverlay onClose={onClose} ariaLabel="identidades">
-      <ModalHeader title="identidades" onClose={onClose} />
-
+    <FullPageOverlay onClose={onClose} title="identidades" ariaLabel="identidades">
+      <div className="p-5">
         <p className="mb-4 text-[11px] leading-relaxed text-slate-500">
           Manifesto §4 — anonimato por design. Múltiplas identidades
           ajudam a compartimentalizar contextos: uma pública, outra pra
@@ -504,6 +502,7 @@ export function IdentitySwitcher({ onRequestExport, onClose }: IdentitySwitcherP
             </div>
           </>
         )}
-    </SlideUpOverlay>
+      </div>
+    </FullPageOverlay>
   )
 }

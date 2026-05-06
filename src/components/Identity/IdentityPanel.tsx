@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import QRCode from 'qrcode'
-import { SlideUpOverlay } from '../UI/SlideUpOverlay'
-import { ModalHeader } from '../UI/ModalHeader'
+import { FullPageOverlay } from '../UI/FullPageOverlay'
 import { setIdentityFromNsec } from '../../lib/identity'
 import { rebuildIdentityHistory } from '../../lib/sync'
 import {
@@ -32,9 +31,8 @@ export function IdentityPanel({ identity, onClose }: Props) {
   const [tab, setTab] = useState<'backup' | 'import' | 'passkey'>('backup')
 
   return (
-    <SlideUpOverlay onClose={onClose} ariaLabel="sua identidade">
-      <ModalHeader title="sua identidade" onClose={onClose} />
-
+    <FullPageOverlay onClose={onClose} title="sua identidade" ariaLabel="sua identidade">
+      <div className="p-5">
       <div className="mb-5 flex gap-1 text-[10px] uppercase tracking-widest">
           <button
             onClick={() => setTab('backup')}
@@ -72,7 +70,8 @@ export function IdentityPanel({ identity, onClose }: Props) {
       {tab === 'backup' && <BackupTab identity={identity} />}
       {tab === 'import' && <ImportTab onClose={onClose} />}
       {tab === 'passkey' && <PasskeyTab npub={identity.npub} />}
-    </SlideUpOverlay>
+      </div>
+    </FullPageOverlay>
   )
 }
 

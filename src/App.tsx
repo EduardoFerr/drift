@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AnimatePresence } from 'framer-motion'
-import { OPTIMISTIC_TIMEOUT_MS } from './config/constants'
+import { OPTIMISTIC_TIMEOUT_MS, CLIENT_VERSION } from './config/constants'
 import { db } from './lib/db'
 import {
   getCurrentLocation,
@@ -25,6 +25,13 @@ import { IdentitySwitcher } from './components/Identity/IdentitySwitcher'
 import { PostViewer } from './components/Post/PostViewer'
 import { ComposeOverlay } from './components/Create/ComposeOverlay'
 import { ContentSettings } from './components/Settings/ContentSettings'
+import {
+  FiltersCard,
+  LocationCard,
+  MapViewCard,
+  NetworkModeCard,
+  DiagnosticCard,
+} from './components/Settings/SettingsCards'
 import { RelaySettings } from './components/Settings/RelaySettings'
 import { LocalListsSettings } from './components/Settings/LocalListsSettings'
 import { OnboardingOverlay } from './components/Onboarding/OnboardingOverlay'
@@ -91,9 +98,21 @@ function App() {
   // Overlay fullscreen separado — agrega eventos de todos os posts.
   const [showMap, setShowMap] = useState(false)
   // V8: SettingsRoot menu consolidador (acionado pelo CONFIG da NavBar).
-  // Lista 7 opções (chave/identidades/relays/listas/settings/status/
-  // limpar local); cada item roteia pro overlay específico já existente.
+  // V9.2c: 11 opções organizadas em 4 grupos.
+  // V9.2d: cada opção abre seu próprio card focado (em vez de routar
+  // pra ContentSettings overlay grande). 5 cards novos (Filters/
+  // Location/MapView/NetworkMode/Diagnostic) substituem o "settings"
+  // monolítico — UX mais limpa, menos overflow.
   const [showSettingsRoot, setShowSettingsRoot] = useState(false)
+  const [showFilters, setShowFilters] = useState(false)
+  const [showLocation, setShowLocation] = useState(false)
+  const [showMapView, setShowMapView] = useState(false)
+  const [showNetworkMode, setShowNetworkMode] = useState(false)
+  const [showDiagnosticCard, setShowDiagnosticCard] = useState(false)
+  // V9.2e: status agora é card próprio (não mais toggle inline no home).
+  const [showStatusCard, setShowStatusCard] = useState(false)
+  // V9.2e: sobre = versão do cliente + manifesto link.
+  const [showAboutCard, setShowAboutCard] = useState(false)
 
   // Banner de erro GPS (Lily 29-04): user habilita location_granularity
   // mas browser bloqueia silenciosamente. Trackeamos timestamp da última
@@ -537,7 +556,8 @@ function App() {
           )
         })()}
 
-        {showDiagnostic && <DiagnosticPanel boot={boot} />}
+        {/* V9.2e: DiagnosticPanel não renderiza mais inline aqui —
+            agora é card próprio (StatusCard) acionado via SettingsRoot. */}
 
         {installPrompt.available && (
           <InstallBanner
@@ -672,8 +692,7 @@ function App() {
             onClose={() => setShowMap(false)}
             onOpenLocationSettings={() => {
               setShowMap(false)
-              setSettingsScrollTo('location')
-              setShowSettings(true)
+              setShowLocation(true)
             }}
           />
         )}
@@ -686,9 +705,27 @@ function App() {
         {showSettingsRoot && (
           <SettingsRoot
             onClose={() => setShowSettingsRoot(false)}
-            showDiagnostic={showDiagnostic}
+            escDismissible={
+              !showFilters &&
+              !showLocation &&
+              !showMapView &&
+              !showNetworkMode &&
+              !showDiagnosticCard &&
+              !showStatusCard &&
+              !showAboutCard &&
+              !showIdentity &&
+              !showSwitcher &&
+              !showRelays &&
+              !showLists &&
+              !showSettings
+            }
             onSelect={(target) => {
-              setShowSettingsRoot(false)
+              // V9.2e — UX: NÃO fechar SettingsRoot ao abrir sub-card.
+              // Sub-cards renderizam ON TOP (z-40 + DOM order) do root;
+              // ao fechar o sub-card, user volta naturalmente pra lista
+              // de configurações, sem hop brusco pro home view. Apenas
+              // ações destrutivas (limpar local) fecham o root via
+              // reload da página.
               switch (target) {
                 case 'chave':
                   setShowIdentity(true)
@@ -703,27 +740,25 @@ function App() {
                   setShowLists(true)
                   break
                 case 'filtros':
-                  setSettingsScrollTo('filters')
-                  setShowSettings(true)
+                  setShowFilters(true)
                   break
                 case 'location':
-                  setSettingsScrollTo('location')
-                  setShowSettings(true)
+                  setShowLocation(true)
                   break
                 case 'mapa':
-                  setSettingsScrollTo('map')
-                  setShowSettings(true)
+                  setShowMapView(true)
                   break
                 case 'rede':
-                  setSettingsScrollTo('network')
-                  setShowSettings(true)
+                  setShowNetworkMode(true)
                   break
                 case 'diagnostico':
-                  setSettingsScrollTo('diagnostic')
-                  setShowSettings(true)
+                  setShowDiagnosticCard(true)
                   break
                 case 'status':
-                  setShowDiagnostic((s) => !s)
+                  setShowStatusCard(true)
+                  break
+                case 'sobre':
+                  setShowAboutCard(true)
                   break
                 case 'limpar':
                   void handleClearLocal()
@@ -734,6 +769,92 @@ function App() {
         )}
       </AnimatePresence>
 
+      {/* V9.2d — cards focados (substituem routing pra ContentSettings
+          monolítica). Cada um abre como FullPageOverlay próprio. */}
+      <AnimatePresence>
+        {showFilters && <FiltersCard onClose={() => setShowFilters(false)} />}
+      </AnimatePresence>
+      <AnimatePresence>
+        {showLocation && <LocationCard onClose={() => setShowLocation(false)} />}
+      </AnimatePresence>
+      <AnimatePresence>
+        {showMapView && <MapViewCard onClose={() => setShowMapView(false)} />}
+      </AnimatePresence>
+      <AnimatePresence>
+        {showNetworkMode && (
+          <NetworkModeCard onClose={() => setShowNetworkMode(false)} />
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {showDiagnosticCard && (
+          <DiagnosticCard onClose={() => setShowDiagnosticCard(false)} />
+        )}
+      </AnimatePresence>
+
+      {/* V9.2e — Status card (substitui inline DiagnosticPanel). */}
+      <AnimatePresence>
+        {showStatusCard && (
+          <FullPageOverlay
+            onClose={() => setShowStatusCard(false)}
+            title="status"
+            ariaLabel="painel de diagnóstico"
+          >
+            <div className="p-5">
+              <DiagnosticPanel boot={boot} />
+            </div>
+          </FullPageOverlay>
+        )}
+      </AnimatePresence>
+
+      {/* V9.2e — Sobre card (versão + manifesto link). */}
+      <AnimatePresence>
+        {showAboutCard && (
+          <FullPageOverlay
+            onClose={() => setShowAboutCard(false)}
+            title="sobre"
+            ariaLabel="sobre o cliente Drift"
+          >
+            <div className="space-y-4 p-5 font-mono">
+              <div className="rounded border border-drift-border bg-drift-bg/50 p-4">
+                <div className="text-[10px] uppercase tracking-[2px] text-drift-muted">
+                  versão do cliente
+                </div>
+                <div className="mt-1 font-display text-[20px] font-extrabold text-drift-text">
+                  {CLIENT_VERSION}
+                </div>
+                <div className="mt-2 text-[10px] leading-relaxed text-drift-muted">
+                  cliente oficial Drift (
+                  <code className="text-drift-text">drift-official</code>) —
+                  vocab user-facing DRIFT/SINK/DERIVA · vocab spec SPREAD/
+                  BURY (kinds 9079/9080).
+                </div>
+              </div>
+              <a
+                href="https://github.com/anthropics/claude-code"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block rounded border border-drift-border bg-drift-bg/30 p-4 text-[11px] leading-relaxed text-drift-text transition-colors hover:border-drift-accent hover:text-drift-accent"
+              >
+                manifesto + arquitetura ↗
+                <div className="mt-1 text-[10px] text-drift-muted">
+                  34 princípios públicos. Compromissos vinculantes.
+                </div>
+              </a>
+              <p className="text-[10px] leading-relaxed text-drift-muted">
+                Drift é decentralized social network sobre Nostr.
+                Eventos imutáveis assinados, score determinístico,
+                sem afinidade no feed (manifesto §22), sem chave mestra
+                (§17). Cliente PWA + Tauri opcional. Identidade portável
+                via nsec1.
+              </p>
+            </div>
+          </FullPageOverlay>
+        )}
+      </AnimatePresence>
+
+      {/* ContentSettings legacy — mantido só pra retrocompat de
+          MapOverlay's onOpenLocationSettings (route in via scrollTo).
+          Track futura remove quando MapOverlay rotear pra LocationCard. */}
       <AnimatePresence>
         {showSettings && (
           <ContentSettings
@@ -1012,17 +1133,22 @@ type SettingsTarget =
   | 'rede'
   | 'diagnostico'
   | 'status'
+  | 'sobre'
   | 'limpar'
 
 function SettingsRoot({
   onClose,
   onSelect,
-  showDiagnostic,
+  escDismissible = true,
 }: {
   onClose: () => void
   onSelect: (target: SettingsTarget) => void
-  /** Estado atual do toggle status — pra label refletir on/off. */
-  showDiagnostic: boolean
+  /**
+   * V9.2e — quando um sub-card está aberto sobre o root, root NÃO
+   * deve responder ao ESC (sub-card é o topmost; senão ESC fecha
+   * ambos). App.tsx passa false quando algum sub-card está aberto.
+   */
+  escDismissible?: boolean
 }) {
   // V9: agrupado por categoria visual (mockup s-row pattern). Identidade
   // primeiro pq é o caminho mais comum; Sistema (status/limpar) por
@@ -1097,13 +1223,18 @@ function SettingsRoot({
       items: [
         {
           target: 'status',
-          label: showDiagnostic ? 'fechar status' : 'status',
-          hint: 'painel de diagnóstico',
+          label: 'status',
+          hint: 'painel de diagnóstico em tempo real',
         },
         {
           target: 'diagnostico',
           label: 'redefinir cache',
           hint: 'reconstrói banco local sem apagar identidade',
+        },
+        {
+          target: 'sobre',
+          label: `versão ${CLIENT_VERSION}`,
+          hint: 'cliente Drift, manifesto + licença',
         },
         {
           target: 'limpar',
@@ -1120,6 +1251,7 @@ function SettingsRoot({
       onClose={onClose}
       title="configurações"
       ariaLabel="configurações"
+      escDismissible={escDismissible}
     >
       <div className="px-5 py-[18px]">
         {groups.map((group, gi) => (

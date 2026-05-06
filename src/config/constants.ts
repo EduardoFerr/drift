@@ -52,6 +52,13 @@ export const ENGAGEMENT_POINTS = {
 
 export const CLIENT_ID = 'drift-official'
 export const DRIFT_VERSION = '1'
+/**
+ * Versão semântica do cliente Drift. Source: package.json (single source
+ * of truth). Vite resolve esse import como JSON em build/dev. User-facing
+ * em SettingsRoot ("sobre" group) + DiagnosticPanel (status técnico).
+ */
+import pkg from '../../package.json'
+export const CLIENT_VERSION = pkg.version
 
 /**
  * Janela de safety pra optimistic UI. Após esse tempo sem confirmação
