@@ -72,6 +72,28 @@ cloudflared tunnel --url http://localhost:5173
 
 URL `*.trycloudflare.com` tem cert válido — PWA instala em desktop e mobile.
 
+## Instalação cross-platform (cliente nativo Tauri)
+
+Cada tag `v*` dispara [`.github/workflows/tauri-distribution.yml`](.github/workflows/tauri-distribution.yml) e anexa binários ao GitHub Release correspondente. Build inclui `--features arti` (Tor real via `arti-client`) — entrega o §15 anti-censura por país pra users que não compilam do source.
+
+| Plataforma | Artefato | Onde baixar |
+|------------|----------|-------------|
+| Linux x86_64 | `.AppImage` + `.deb` | Releases page → assets da tag |
+| macOS arm64 (Apple Silicon) | `.dmg` | idem |
+| Windows x86_64 | `.exe` (NSIS installer) | idem |
+
+Cada plataforma também publica `SHA256SUMS-<plataforma>.txt` pra verificação manual (`sha256sum -c` / `Get-FileHash`).
+
+### Workaround: binários não-assinados (alpha)
+
+Builds atuais **não estão assinados** (Track A.2 do roadmap depende de Apple Developer cert + EV cert Windows, ~$300/ano combinado). Sistemas operacionais avisam:
+
+- **Windows (SmartScreen)**: ao executar o `.exe`, clique em **"More info"** → **"Run anyway"**. Microsoft Defender pode também bloquear primeira execução; aceitar uma vez.
+- **macOS (Gatekeeper)**: clique-direito no `.app` → **"Open"** → confirmar o aviso. Alternativa: `System Settings` → `Privacy & Security` → `Open Anyway` após primeira tentativa rejeitada.
+- **Linux (.deb / .AppImage)**: sem warning de SO. Verificar hash via `SHA256SUMS-linux.txt`. Build auditável bit-identical disponível via [`Dockerfile.reproducible`](Dockerfile.reproducible) ([`Docs/build-reproducible.md`](Docs/build-reproducible.md)).
+
+Esses warnings refletem ausência de assinatura de código, não problema de segurança intrínseco. Manifesto §17 (sem chave mestra na distribuição) e §25 (sem scan automático embutido) garantem que o binário não tem backdoor — o que está sendo construído é exatamente o que está em `src-tauri/`.
+
 ## Deploy
 
 Ver [`Docs/deploy.md`](Docs/deploy.md) — Vercel (recomendado), GitHub Releases, self-host.

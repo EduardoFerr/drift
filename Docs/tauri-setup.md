@@ -140,9 +140,9 @@ Diferenças vs PWA browser:
 **O que ainda não está:**
 - 🟡 **Tor smoke test e2e** — código compila e roteia, mas não há teste com `tcpdump`/Wireshark confirmando que tráfego sai via guards Tor e nada vaza pra relay clearnet. Sprint pendente no roadmap pós-6.4.
 - 🟡 **Trocar `network_mode` em runtime sem reload** — `installTorWebSocketImpl` é global no SimplePool; user precisa recarregar a aba pra trocar de modo. Sprint UX fix pendente.
-- ⛔ **Code signing** — release Tauri formal. Builds locais são unsigned (Windows: SmartScreen warning; macOS: Gatekeeper override).
+- ⛔ **Code signing** — release Tauri formal. Builds atuais são unsigned (Windows: SmartScreen warning; macOS: Gatekeeper override). Workaround pra users documentado no [README seção "Instalação cross-platform"](../README.md#instalação-cross-platform-cliente-nativo-tauri). Track A.2 do roadmap-v060 depende de Apple Developer cert + Windows EV cert.
 - ⛔ **Auto-update** — Tauri updater + manifest hospedado, sem timeline.
-- ⛔ **CI multi-plataforma binary release** — `cargo check` será coberto pelo Sprint 1 do roadmap atual; build matrix Linux/macOS/Windows pra release ainda não existe.
+- ✅ **CI multi-plataforma binary release** — [`.github/workflows/tauri-distribution.yml`](../.github/workflows/tauri-distribution.yml) cobre Linux (`.AppImage` + `.deb`), macOS arm64 (`.dmg`) e Windows (`.exe` NSIS) com `--features arti`. Dispara em push de tag `v*` e anexa ao GitHub Release. Reprodutibilidade auditável continua via [`Dockerfile.reproducible`](../Dockerfile.reproducible) ([`Docs/build-reproducible.md`](build-reproducible.md), Linux apenas).
 - 🟡 **Ícones não commitados** — gerar via `npx tauri icon public/pwa-512x512.png` antes do primeiro build (ver `src-tauri/icons/README.md`).
 
 ## Limitações herdadas
