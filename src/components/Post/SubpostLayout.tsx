@@ -348,14 +348,22 @@ function LandscapeLayout({
 
   return (
     <div className="relative h-full w-full overflow-hidden">
-      {/* Media absolute fill. */}
-      <Image
-        src={subpost.imageUrl!}
-        meta={subpost.meta}
-        fit="cover"
-        className="absolute inset-0 h-full w-full"
-        aspect="auto"
-      />
+      {/* Media absolute fill. Image internamente é position:relative
+          (precisa pro skeleton overlay) — então envolvemos num wrapper
+          absoluto pra escapar do flow normal. Antes: passávamos
+          `absolute inset-0` no className do próprio Image, mas Tailwind
+          gerava `relative` ANTES de `absolute` no CSS e o relative
+          ganhava — Image renderizava em flow normal e text ficava
+          empurrado pra baixo (parecia Portrait). */}
+      <div className="absolute inset-0">
+        <Image
+          src={subpost.imageUrl!}
+          meta={subpost.meta}
+          fit="cover"
+          className="block h-full w-full"
+          aspect="auto"
+        />
+      </div>
       {/* Gradient overlay top:96% bottom (mockup landscape med-overlay). */}
       <div
         className="pointer-events-none absolute inset-0"
