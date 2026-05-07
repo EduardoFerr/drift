@@ -31,6 +31,14 @@ export interface ImageProps {
   aspect?: string
   /** Modo de ajuste — `contain` (default — preserva integralidade) ou `cover`. */
   fit?: 'contain' | 'cover'
+  /**
+   * Alinhamento do conteúdo da imagem dentro do `<img>`. CSS
+   * `object-position`. Default 'center' (centro). Use `'top'` em
+   * Portrait pra evitar letterbox no topo (faces costumam ficar no
+   * topo de retratos — alinhar top mantém o sujeito visível, sobra
+   * cai embaixo).
+   */
+  position?: 'center' | 'top' | 'bottom'
   draggable?: boolean
   onLoad?: () => void
   onError?: () => void
@@ -43,6 +51,7 @@ export function Image({
   className = '',
   aspect = 'auto',
   fit = 'contain',
+  position = 'center',
   draggable = false,
   onLoad,
   onError,
@@ -104,6 +113,14 @@ export function Image({
         src={resolvedSrc}
         alt={alt}
         draggable={draggable}
+        style={{
+          objectPosition:
+            position === 'top'
+              ? 'center top'
+              : position === 'bottom'
+              ? 'center bottom'
+              : 'center center',
+        }}
         className={`h-full w-full transition-opacity duration-200 ${
           fit === 'cover' ? 'object-cover' : 'object-contain'
         } ${state === 'loaded' ? 'opacity-100' : 'opacity-0'}`}

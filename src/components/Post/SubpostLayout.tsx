@@ -290,10 +290,16 @@ function PortraitLayout({
     <div className="flex h-full w-full flex-col">
       {/* Media flex:1 top. */}
       <div className="relative min-h-0 flex-1">
+        {/* Portrait: fit=contain (default) preserva imagem inteira sem crop;
+            position=top alinha no topo do slot pra evitar letterbox no
+            topo (faces costumam ficar no topo). Sobra cai embaixo da
+            imagem mas antes do bloco de texto, que fica num shrink-0
+            separado. User feedback 2026-05-07: crop estava cortando
+            partes essenciais. */}
         <Image
           src={subpost.imageUrl!}
           meta={subpost.meta}
-          fit="cover"
+          position="top"
           className="block h-full w-full"
           aspect="auto"
         />
