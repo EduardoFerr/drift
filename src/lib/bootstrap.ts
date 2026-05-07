@@ -278,9 +278,19 @@ async function doBootstrap(): Promise<void> {
 
     await startSync()
 
-    setBoot((p) => ({ ...p, step: 'relays' }))
-    const relays = await checkRelayConnectivity()
-    setBoot((p) => ({ ...p, relays, step: 'ready' }))
+    // Boot completo — UI renderiza imediatamente.
+    // checkRelayConnectivity abre WebSockets DEDICADOS por relay
+    // só pra medir latency (uso só informacional em DiagnosticPanel).
+    // Com 4 relays seed, são +4 WS além das ~4 que `startSync` já
+    // abriu via SimplePool — dobra connections no boot crítico.
+    // Fix: marca step=ready imediatamente; relays como `null` (UI
+    // mostra "checando…"); health probe roda em background sem bloquear.
+    setBoot((p) => ({ ...p, step: 'ready' }))
+    void checkRelayConnectivity()
+      .then((relays) => setBoot((p) => ({ ...p, relays })))
+      .catch((err) => {
+        console.warn('[bootstrap] relay health check falhou:', err)
+      })
 
     // Schedule eviction. Idempotente — só roda se contagem ultrapassou
     // SOFT_LIMIT em cache.ts. Primeira corrida acontece após 6h (não

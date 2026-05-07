@@ -280,6 +280,10 @@ function App() {
   // continuam funcionando). useMemo evita findIndex desnecessário.
   const [currentIdx, setCurrentIdx] = useState(0)
   const [exitDir, setExitDir] = useState<'up' | 'down'>('up')
+  // Subscreve `tab` pra resetar idx ao trocar Global/Seguindo/Trending —
+  // user reportou "feed bagunça" ao trocar tab porque idx ficava no
+  // valor antigo (3) mas array de posts era totalmente diferente.
+  const feedTab = useFeedStore((s) => s.tab)
   const { currentPost, nextHomePost } = useMemo(() => {
     if (posts.length === 0) return { currentPost: null, nextHomePost: null }
     const safeIdx = Math.max(0, Math.min(currentIdx, posts.length - 1))
@@ -295,6 +299,13 @@ function App() {
       setCurrentIdx(Math.max(0, posts.length - 1))
     }
   }, [posts.length, currentIdx])
+  // Tab changed → start no top do novo feed. Sem isso, user troca de
+  // Global pra Trending e vê "post[3]" do trending em vez do mais
+  // relevante (post[0]). Manifesto §24 — feeds são views distintas
+  // sobre os dados, idx deve ser local de cada view.
+  useEffect(() => {
+    setCurrentIdx(0)
+  }, [feedTab])
 
   // V8: openViewer + advanceViewer (modal viewer queue) deletados —
   // home view embedded substituiu o paradigma. viewerPostId/viewerExitDir
