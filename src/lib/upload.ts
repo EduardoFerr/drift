@@ -34,8 +34,36 @@
  */
 
 import imageCompression from 'browser-image-compression'
+import { nip98 } from 'nostr-tools'
+import { finalizeEvent } from 'nostr-tools/pure'
+import type { EventTemplate } from 'nostr-tools'
+import { getOrCreateIdentity, nsecHexToBytes } from './identity'
 
 const NOSTR_BUILD_ENDPOINT = 'https://nostr.build/api/v2/upload/files'
+
+/**
+ * Constrói header `Authorization: Nostr <base64>` exigido por nostr.build
+ * (NIP-98). O endpoint `/api/v2/upload/files` rejeita 401 sem isso desde
+ * meados de 2025 — antes era anônimo. Token é um kind 27235 assinado
+ * com a identidade ativa, com tags `u <url>` + `method <METHOD>` +
+ * `created_at` (servidor valida ±60s).
+ *
+ * Fail soft: se identity não existe (boot incompleto) ou sign falha,
+ * retorna null — caller continua sem header e cai no 401 normal,
+ * que UI já trata.
+ */
+async function buildNip98Header(url: string, method: string): Promise<string | null> {
+  try {
+    const identity = await getOrCreateIdentity()
+    const nsecBytes = nsecHexToBytes(identity.nsec)
+    const sign = (template: EventTemplate) => finalizeEvent(template, nsecBytes)
+    // includeAuthorizationScheme=true → retorna string já com "Nostr "
+    return await nip98.getToken(url, method, sign, true)
+  } catch (err) {
+    console.warn('[upload] NIP-98 token build falhou:', err)
+    return null
+  }
+}
 
 const COMPRESSION_OPTIONS = {
   maxSizeMB: 2,
@@ -220,9 +248,16 @@ async function fetchWithProgress(
   options: UploadOptions,
 ): Promise<Response> {
   try {
+    // NIP-98 auth header — exigido pelo nostr.build /api/v2/upload/files.
+    // Sem isso, server retorna 401 fail-fast (não-retryable).
+    const authHeader = await buildNip98Header(url, 'POST')
+    const headers: Record<string, string> = {}
+    if (authHeader) headers['Authorization'] = authHeader
+
     const res = await fetch(url, {
       method: 'POST',
       body,
+      headers,
       signal: options.signal,
     })
     options.onProgress?.(1)

@@ -18,7 +18,6 @@ import {
   type BootState,
 } from './lib/bootstrap'
 import { getPrefs, usePrefsStore } from './lib/prefs'
-import { isTauri } from './lib/runtime'
 import { useUserWeight } from './hooks/useUserWeight'
 import { useInstallPrompt } from './hooks/useInstallPrompt'
 import { IdentityPanel } from './components/Identity/IdentityPanel'
@@ -30,6 +29,7 @@ import {
   LocationCard,
   MapViewCard,
   NetworkModeCard,
+  BlobsCard,
   DiagnosticCard,
 } from './components/Settings/SettingsCards'
 import { RelaySettings } from './components/Settings/RelaySettings'
@@ -42,12 +42,9 @@ import { UpdatePrompt } from './components/UI/UpdatePrompt'
 import { NavBar } from './components/UI/NavBar'
 import { FullPageOverlay } from './components/UI/FullPageOverlay'
 import {
-  GlobeIcon,
   MapIcon,
-  OnionIcon,
-  PinIcon,
-  ShieldIcon,
   SlidersIcon,
+  UserIcon,
   WarningIcon,
 } from './components/UI/Icons'
 import { SpreadMap } from './components/Feed/SpreadMap'
@@ -113,6 +110,7 @@ function App() {
   const [showLocation, setShowLocation] = useState(false)
   const [showMapView, setShowMapView] = useState(false)
   const [showNetworkMode, setShowNetworkMode] = useState(false)
+  const [showBlobsCard, setShowBlobsCard] = useState(false)
   const [showDiagnosticCard, setShowDiagnosticCard] = useState(false)
   // V9.2e: status agora é card próprio (não mais toggle inline no home).
   const [showStatusCard, setShowStatusCard] = useState(false)
@@ -318,6 +316,7 @@ function App() {
   async function handlePublish(input: {
     subposts: Subpost[]
     contentWarning: ContentWarning | null
+    imetas: import('./lib/nip94').BlobMeta[]
   }) {
     if (publishing || input.subposts.length === 0) return
     setPublishing(true)
@@ -364,6 +363,9 @@ function App() {
         subposts: input.subposts,
         ...(input.contentWarning ? { contentWarning: input.contentWarning } : {}),
         ...(location ? { location } : {}),
+        // Track B.2: tags `imeta` NIP-94 com hash + url + cid (best-effort).
+        // Posts só-texto não passam imetas (array vazio é omitido).
+        ...(input.imetas.length > 0 ? { imetas: input.imetas } : {}),
       })
       // V7: success path fecha o modal. SubpostEditor reseta seus drafts
       // internos no próprio handleSubmit (já era assim antes do V7).
@@ -533,6 +535,7 @@ function App() {
         onOpenNetworkMode={() => setShowNetworkMode(true)}
         onOpenStatus={() => setShowStatusCard(true)}
         onOpenIdentity={() => setShowIdentity(true)}
+        onOpenProfile={() => setShowProfile(true)}
       />
 
       {/* Banners empilhados acima do stack. Layout flex-shrink-0 garante
@@ -717,6 +720,7 @@ function App() {
               !showLocation &&
               !showMapView &&
               !showNetworkMode &&
+              !showBlobsCard &&
               !showDiagnosticCard &&
               !showStatusCard &&
               !showAboutCard &&
@@ -757,6 +761,9 @@ function App() {
                 case 'rede':
                   setShowNetworkMode(true)
                   break
+                case 'blobs':
+                  setShowBlobsCard(true)
+                  break
                 case 'diagnostico':
                   setShowDiagnosticCard(true)
                   break
@@ -789,6 +796,11 @@ function App() {
       <AnimatePresence>
         {showNetworkMode && (
           <NetworkModeCard onClose={() => setShowNetworkMode(false)} />
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {showBlobsCard && (
+          <BlobsCard onClose={() => setShowBlobsCard(false)} />
         )}
       </AnimatePresence>
       <AnimatePresence>
@@ -956,95 +968,56 @@ function App() {
  * indicadores garantem isso sem precisar abrir Settings.
  */
 function StatusIndicators({
-  locationGranularity,
-  onOpenLocation,
-  onOpenNetworkMode,
   onOpenStatus,
+  onOpenProfile,
 }: {
-  locationGranularity: LocationGranularity
-  onOpenLocation: () => void
-  onOpenNetworkMode: () => void
   onOpenStatus: () => void
+  onOpenProfile: () => void
 }) {
-  const networkMode = usePrefsStore((s) => s.network_mode)
   const events = useSyncStore((s) => s.eventsReceived)
   const active = useSyncStore((s) => s.active)
   const degradedCount = useBootStore((s) => s.degradedReasons.length)
 
-  const networkIcon =
-    networkMode === 'tor' ? <OnionIcon size={14} /> :
-    networkMode === 'onion-only' ? <ShieldIcon size={14} /> :
-    <GlobeIcon size={14} />
-  const tauriRuntime = isTauri()
-  const networkAlert = !tauriRuntime && networkMode !== 'clearnet'
-
   return (
     <div className="flex items-center gap-[10px] text-[12px] leading-none">
-      {/* Location indicator */}
+      {/* Profile indicator */}
       <button
-        onClick={onOpenLocation}
-        className={`transition-opacity hover:opacity-80 focus:outline-none focus:ring-1 focus:ring-drift-accent2 ${
-          locationGranularity === 'off' ? 'text-drift-muted' : 'text-amber-300'
-        }`}
-        title={
-          locationGranularity === 'off'
-            ? 'GPS desativado — clique pra ativar'
-            : `Location: ${locationGranularity}`
-        }
-        aria-label="status de location"
+        onClick={onOpenProfile}
+        className="text-drift-muted transition-opacity hover:opacity-80 focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2"
+        title="perfil"
+        aria-label="abrir perfil"
       >
-        <PinIcon size={14} />
+        <UserIcon size={14} />
       </button>
 
-      {/* Network indicator */}
+      {/* Degraded badge — reserva espaço sempre (invisible) pra não
+          causar layout shift quando aparece. Sinal forte de atenção. */}
       <button
-        onClick={onOpenNetworkMode}
-        className={`transition-opacity hover:opacity-80 focus:outline-none focus:ring-1 focus:ring-drift-accent2 ${
-          networkAlert
-            ? 'text-amber-300'
-            : networkMode === 'clearnet'
-            ? 'text-drift-muted'
-            : 'text-drift-accent2'
+        onClick={onOpenStatus}
+        className={`text-amber-300 transition-opacity hover:opacity-80 focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2 ${
+          degradedCount > 0 ? 'visible' : 'invisible pointer-events-none'
         }`}
-        title={
-          networkAlert
-            ? 'Modo Tor selecionado em PWA — IP vaza. Clique pra detalhes.'
-            : `Rede: ${networkMode}`
-        }
-        aria-label="status de rede"
+        title={`Modo degradado — ${degradedCount} feature${degradedCount > 1 ? 's' : ''} indisponível${degradedCount > 1 ? 'is' : ''}`}
+        aria-label="modo degradado"
+        aria-hidden={degradedCount === 0}
       >
-        {networkIcon}
+        <WarningIcon size={14} />
       </button>
-
-      {/* Degraded badge — só aparece se houver razões degradadas (Tor
-          falhou, etc.). Sinal forte de algo precisa atenção. */}
-      {degradedCount > 0 && (
-        <button
-          onClick={onOpenStatus}
-          className="text-amber-300 transition-opacity hover:opacity-80 focus:outline-none focus:ring-1 focus:ring-drift-accent2"
-          title={`Modo degradado — ${degradedCount} feature${degradedCount > 1 ? 's' : ''} indisponível${degradedCount > 1 ? 'is' : ''}`}
-          aria-label="modo degradado"
-        >
-          <WarningIcon size={14} />
-        </button>
-      )}
 
       {/* Events counter — abre StatusCard. */}
       <button
         onClick={onOpenStatus}
-        className="flex items-center gap-1 font-mono text-[10px] uppercase tracking-[1px] text-drift-muted transition-colors hover:text-drift-text focus:outline-none focus:ring-1 focus:ring-drift-accent2"
+        className="flex items-center gap-1 font-mono text-[10px] uppercase tracking-[1px] text-drift-muted transition-colors hover:text-drift-text focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2"
         title={`${events} eventos recebidos · subscribe ${active ? 'ativo' : 'offline'}`}
         aria-label="painel de status"
       >
         <span
-          className={
-            active ? 'text-drift-spread' : 'text-drift-muted'
-          }
+          className={active ? 'text-drift-spread' : 'text-drift-muted'}
           aria-hidden="true"
         >
           ●
         </span>
-        <span>{events} ev</span>
+        <span className="inline-block w-[52px]">{events > 9999 ? '9999+' : events} ev</span>
       </button>
     </div>
   )
@@ -1059,6 +1032,7 @@ function HomeHeader({
   onOpenNetworkMode,
   onOpenStatus,
   onOpenIdentity,
+  onOpenProfile,
 }: {
   identity: DriftIdentity | null
   userWeight: { weight: number; engagement: number; antiquity: number; maxSubposts: number }
@@ -1069,12 +1043,16 @@ function HomeHeader({
   onOpenNetworkMode: () => void
   onOpenStatus: () => void
   onOpenIdentity: () => void
+  onOpenProfile: () => void
 }) {
   // Suprime "unused" warning — callbacks reservados pra long-press
   // futuro (V11+ avatar/logo abrirá IdentityPanel via gesture).
   void identity
   void userWeight
   void onOpenIdentity
+  void locationGranularity
+  void onOpenLocation
+  void onOpenNetworkMode
 
   return (
     <header className="shrink-0 px-5 pt-4">
@@ -1084,14 +1062,12 @@ function HomeHeader({
         </h1>
         <div className="flex items-center gap-3">
           <StatusIndicators
-            locationGranularity={locationGranularity}
-            onOpenLocation={onOpenLocation}
-            onOpenNetworkMode={onOpenNetworkMode}
             onOpenStatus={onOpenStatus}
+            onOpenProfile={onOpenProfile}
           />
           <div className="font-mono text-[10px] uppercase tracking-[1.5px] text-drift-muted">
             deriva{' '}
-            <b className="font-medium text-drift-accent2">
+            <b className="inline-block w-[44px] font-medium text-drift-accent2">
               {currentScore !== null ? formatScore(currentScore) : '—'}
             </b>
           </div>
@@ -1168,7 +1144,7 @@ function MapOverlay({
       </span>
       <button
         onClick={onClose}
-        className="rounded border border-drift-border px-3 py-[5px] font-mono text-[10px] uppercase tracking-[2px] text-drift-muted transition-colors hover:text-drift-text focus:outline-none focus:ring-1 focus:ring-drift-accent2"
+        className="rounded border border-drift-border px-3 py-[5px] font-mono text-[10px] uppercase tracking-[2px] text-drift-muted transition-colors hover:text-drift-text focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2"
         aria-label="fechar mapa"
       >
         fechar
@@ -1225,6 +1201,7 @@ type SettingsTarget =
   | 'location'
   | 'mapa'
   | 'rede'
+  | 'blobs'
   | 'diagnostico'
   | 'status'
   | 'sobre'
@@ -1321,6 +1298,11 @@ function SettingsRoot({
           hint: 'painel de diagnóstico em tempo real',
         },
         {
+          target: 'blobs',
+          label: 'blobs (ipfs)',
+          hint: 'servindo blobs a peers — manifesto §16',
+        },
+        {
           target: 'diagnostico',
           label: 'redefinir cache',
           hint: 'reconstrói banco local sem apagar identidade',
@@ -1365,7 +1347,7 @@ function SettingsRoot({
                 <li key={item.target}>
                   <button
                     onClick={() => onSelect(item.target)}
-                    className={`group flex w-full items-center justify-between gap-3 px-1 py-[14px] text-left transition-colors focus:outline-none focus:ring-1 focus:ring-drift-accent2 focus:ring-offset-2 focus:ring-offset-drift-bg ${
+                    className={`group flex w-full items-center justify-between gap-3 px-1 py-[14px] text-left transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2 focus-visible:ring-offset-2 focus-visible:ring-offset-drift-bg ${
                       item.danger
                         ? 'text-drift-bury hover:text-[#ff6b6b]'
                         : 'text-drift-text hover:text-drift-accent'
@@ -1419,7 +1401,7 @@ function InstallBanner({
           <span className="text-base">📥</span>
           <div className="flex-1 text-[11px]">
             <div className="text-slate-200">instalar Drift no iOS</div>
-            <div className="text-[10px] text-slate-500">
+            <div className="text-[10px] text-drift-muted">
               Safari não tem botão de instalar — segue o passo a passo.
             </div>
           </div>
@@ -1431,7 +1413,7 @@ function InstallBanner({
           </button>
           <button
             onClick={onDismiss}
-            className="text-slate-600 hover:text-slate-400"
+            className="text-drift-muted hover:text-drift-text"
             aria-label="dispensar"
             title="dispensar"
           >
@@ -1467,7 +1449,7 @@ function InstallBanner({
       <span className="text-base">📥</span>
       <div className="flex-1 text-[11px]">
         <div className="text-slate-200">instalar Drift como app</div>
-        <div className="text-[10px] text-slate-500">
+        <div className="text-[10px] text-drift-muted">
           PWA — instala sem app store. Manifesto §1 (existência autônoma).
         </div>
       </div>
@@ -1479,7 +1461,7 @@ function InstallBanner({
       </button>
       <button
         onClick={onDismiss}
-        className="text-slate-600 hover:text-slate-400"
+        className="text-drift-muted hover:text-drift-text"
         aria-label="dispensar"
         title="dispensar"
       >
@@ -1493,11 +1475,13 @@ function InstallBanner({
 
 function BootView({ state }: { state: BootState }) {
   return (
-    <div className="min-h-full p-6 font-mono text-sm sm:p-10">
+    <main className="min-h-full p-6 font-mono text-sm sm:p-10">
       <div className="mx-auto max-w-2xl">
         <header className="mb-10">
-          <h1 className="text-2xl font-bold tracking-[0.25em] text-drift-accent">DRIFT</h1>
-          <p className="mt-1 text-xs uppercase tracking-widest text-slate-600">
+          <h1 className="font-display text-[25px] font-extrabold leading-none tracking-[-0.5px] text-drift-text">
+            dri<em className="not-italic text-drift-accent">ft</em>
+          </h1>
+          <p className="mt-2 text-xs uppercase tracking-widest text-slate-400">
             Bootstrap · {state.step}
           </p>
         </header>
@@ -1600,7 +1584,7 @@ function BootView({ state }: { state: BootState }) {
           </div>
         )}
       </div>
-    </div>
+    </main>
   )
 }
 
@@ -1632,7 +1616,7 @@ function DiagnosticPanel({ boot }: { boot: BootState }) {
   }
 
   return (
-    <div className="mb-6 rounded border border-drift-border bg-drift-surface p-3 text-[10px] text-slate-500">
+    <div className="mb-6 rounded border border-drift-border bg-drift-surface p-3 text-[10px] text-drift-muted">
       <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
         <div>
           storage:{' '}
@@ -1684,19 +1668,19 @@ function DiagnosticPanel({ boot }: { boot: BootState }) {
           (relay/network) e não rendering. */}
       {sync.recent.length > 0 && (
         <details className="mt-3 border-t border-drift-border pt-2">
-          <summary className="cursor-pointer text-slate-400">
+          <summary className="cursor-pointer text-drift-muted">
             últimos eventos ({sync.recent.length})
           </summary>
           <div className="mt-1 max-h-48 overflow-y-auto font-mono text-[9px]">
             {sync.recent.map((e, i) => (
               <div key={`${e.id}-${i}`} className="flex gap-2 py-0.5">
-                <span className="text-slate-600">
+                <span className="text-drift-muted">
                   {new Date(e.receivedAt).toLocaleTimeString()}
                 </span>
                 <span className={kindColor(e.kind)}>{kindLabel(e.kind)}</span>
-                <span className="text-slate-500">{e.id.slice(0, 8)}</span>
+                <span className="text-drift-muted/70">{e.id.slice(0, 8)}</span>
                 {e.ref && (
-                  <span className="truncate text-slate-600">
+                  <span className="truncate text-drift-muted">
                     → {e.ref.slice(0, 12)}
                   </span>
                 )}
@@ -1706,7 +1690,7 @@ function DiagnosticPanel({ boot }: { boot: BootState }) {
         </details>
       )}
 
-      <pre className="mt-2 break-all text-[10px] text-slate-600">
+      <pre className="mt-2 break-all text-[10px] text-drift-muted">
         {boot.identity?.npubBech32}
       </pre>
     </div>
@@ -1729,7 +1713,7 @@ function kindColor(kind: number): string {
     case 9079: return 'text-drift-spread'
     case 9080: return 'text-drift-bury'
     case 9081: return 'text-yellow-400'
-    default: return 'text-slate-500'
+    default: return 'text-drift-muted'
   }
 }
 
@@ -1757,14 +1741,14 @@ function Check({
       ? 'text-yellow-400'
       : state === 'fail'
       ? 'text-red-400'
-      : 'text-slate-700'
+      : 'text-drift-muted'
   return (
     <div className="mb-3 rounded border border-drift-border bg-drift-surface p-4">
       <div className="mb-2 flex items-center gap-3">
         <span className={`text-base ${color}`}>{dot}</span>
         <span className="text-[11px] uppercase tracking-[0.2em] text-slate-400">{label}</span>
       </div>
-      <pre className="ml-6 whitespace-pre-wrap break-all text-xs text-slate-500">{detail}</pre>
+      <pre className="ml-6 whitespace-pre-wrap break-all text-xs text-slate-400">{detail}</pre>
     </div>
   )
 }

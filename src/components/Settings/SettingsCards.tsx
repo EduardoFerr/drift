@@ -11,6 +11,7 @@
  *   LocationCard      — granularidade (off/país/cidade/GPS)
  *   MapViewCard       — fechado/aberto
  *   NetworkModeCard   — clearnet/tor/onion-only + warnings de PWA/Tor
+ *   BlobsCard         — Track B (IPFS/Helia status: peers + pinned)
  *   DiagnosticCard    — redefinir cache local
  *
  * Toggle/Picker helpers compartilhados entre as cards. Consomem direto
@@ -23,7 +24,7 @@
  * dos indicadores 📍🌐 do header pré-V8.
  */
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { setPref, usePrefsStore } from '../../lib/prefs'
 import { db } from '../../lib/db'
 import { useBootStore } from '../../lib/bootstrap'
@@ -422,6 +423,132 @@ function Alert({
     <div role="alert" className={`rounded border px-3 py-2 font-mono text-[10px] leading-relaxed ${colors}`}>
       <strong className={`block ${titleColor}`}>{title}</strong>
       <span className="mt-1 block opacity-80">{children}</span>
+    </div>
+  )
+}
+
+// ─── BlobsCard (Track B.3) ────────────────────────────────────────
+
+/**
+ * BlobsCard — status do Helia/IPFS local.
+ *
+ * Track B.3 (manifesto §16 — disponibilidade distribuída): mostra
+ * pra que ponto o user está contribuindo. "Servindo N blobs a M peers"
+ * dá feedback concreto de "minha cópia está disponível pra outros".
+ *
+ * Init é lazy: só baixa o ecosystem Helia (~950 KiB) quando o user abre
+ * este card. Antes disso, status é "não inicializado". Botão explícito
+ * "ligar Helia" — manifesto §17 (sem chave mestra, opt-in vence).
+ */
+export function BlobsCard({ onClose }: CardProps) {
+  type Stats = { running: boolean; peerCount: number; pinnedCount: number }
+  const [stats, setStats] = useState<Stats | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function refresh() {
+    setLoading(true)
+    setError(null)
+    try {
+      const helia = await import('../../lib/helia')
+      const s = await helia.heliaStats()
+      setStats(s)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Auto-refresh a cada 5s enquanto o card está aberto E Helia já foi
+  // inicializado pelo menos uma vez. Sem isso, peer count fica
+  // desatualizado em conexões instáveis. Para quando user fecha.
+  useEffect(() => {
+    if (!stats) return
+    const id = setInterval(() => void refresh(), 5_000)
+    return () => clearInterval(id)
+  }, [stats])
+
+  return (
+    <FullPageOverlay
+      onClose={onClose}
+      title="distribuição de blobs"
+      ariaLabel="status helia ipfs"
+    >
+      <div className="space-y-4 p-5">
+        <p className="font-mono text-[11px] leading-relaxed text-drift-muted">
+          Drift hospeda imagens via IPFS (Helia) com fallback HTTP.
+          Quando você dá DRIFT em um post, sua cópia local também serve
+          aquele blob a outros usuários — manifesto §16 (disponibilidade
+          distribuída).
+        </p>
+
+        {!stats && !loading && (
+          <button
+            onClick={() => void refresh()}
+            className="w-full rounded border border-drift-accent2 bg-drift-surface px-3 py-3 font-mono text-[11px] uppercase tracking-[1.5px] text-drift-accent2 transition-colors hover:bg-drift-accent2/10 focus:outline-none focus:ring-1 focus:ring-drift-accent2 focus:ring-offset-2 focus:ring-offset-drift-bg"
+          >
+            ⊕ inicializar helia
+          </button>
+        )}
+
+        {loading && (
+          <div className="font-mono text-[11px] text-drift-muted">
+            inicializando helia… (~950 KiB no primeiro uso)
+          </div>
+        )}
+
+        {error && (
+          <div className="rounded border border-red-700/60 bg-red-950/20 p-3 font-mono text-[11px] leading-relaxed text-red-300">
+            falha: {error}
+          </div>
+        )}
+
+        {stats && (
+          <div className="space-y-2 rounded border border-drift-border bg-drift-surface p-4 font-mono text-[11px]">
+            <Row
+              label="estado"
+              value={stats.running ? '● rodando' : '○ parado'}
+              valueClass={stats.running ? 'text-drift-spread' : 'text-drift-muted'}
+            />
+            <Row
+              label="peers conectados"
+              value={String(stats.peerCount)}
+              valueClass="text-drift-text"
+            />
+            <Row
+              label="blobs servindo"
+              value={String(stats.pinnedCount)}
+              valueClass="text-drift-text"
+            />
+            <button
+              onClick={() => void refresh()}
+              className="mt-2 w-full rounded border border-drift-border px-3 py-2 text-[10px] uppercase tracking-[1.5px] text-drift-muted transition-colors hover:text-drift-text focus:outline-none focus:ring-1 focus:ring-drift-accent2"
+            >
+              ↻ atualizar
+            </button>
+          </div>
+        )}
+      </div>
+    </FullPageOverlay>
+  )
+}
+
+function Row({
+  label,
+  value,
+  valueClass,
+}: {
+  label: string
+  value: string
+  valueClass: string
+}) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-[10px] uppercase tracking-[1.5px] text-drift-muted">
+        {label}
+      </span>
+      <span className={valueClass}>{value}</span>
     </div>
   )
 }

@@ -34,7 +34,9 @@ import {
   type ContentWarning,
   type LayoutKind,
 } from '../../types/drift'
-import { uploadImage, UploadError } from '../../lib/upload'
+import { uploadBlob, BlobError } from '../../lib/blobs'
+import { UploadError } from '../../lib/upload'
+import type { BlobMeta } from '../../lib/nip94'
 import { DRIFT_LIMITS } from '../../config/constants'
 import { Image } from '../UI/Image'
 import { FullPageOverlay } from '../UI/FullPageOverlay'
@@ -47,6 +49,10 @@ export interface ComposeOverlayProps {
   onPublish: (input: {
     subposts: Subpost[]
     contentWarning: ContentWarning | null
+    /** Metadados NIP-94 dos blobs uploaded (Track B.2). Ordem casa com
+     *  a ordem dos subposts que têm imageUrl. Subposts sem imagem não
+     *  contribuem entrada aqui. */
+    imetas: BlobMeta[]
   }) => Promise<void> | void
 }
 
@@ -55,6 +61,12 @@ interface DraftSubpost {
   text: string
   imageUrl: string | null
   imageFile: File | null
+  /**
+   * Metadado NIP-94 do blob uploaded (Track B.2). Populado por handleFile
+   * após uploadBlob retornar com hash + cid + size + mime. Vira tag
+   * `imeta` no kind 9078.
+   */
+  blobMeta: BlobMeta | null
   uploading: boolean
   uploadError: string | null
   layout: LayoutKind
@@ -66,6 +78,7 @@ function newDraft(): DraftSubpost {
     text: '',
     imageUrl: null,
     imageFile: null,
+    blobMeta: null,
     uploading: false,
     uploadError: null,
     layout: DEFAULT_LAYOUT,
@@ -129,11 +142,20 @@ export function ComposeOverlay({
   async function handleFile(file: File) {
     updateCurrent({ imageFile: file, uploading: true, uploadError: null })
     try {
-      const url = await uploadImage(file)
-      updateCurrent({ imageUrl: url, uploading: false })
+      // Track B.2: uploadBlob retorna BlobMeta completo (url + hash +
+      // size + mime + opcional cid). Helia é best-effort — se falhar,
+      // cid fica undefined mas post ainda publica via HTTP url.
+      const meta = await uploadBlob(file)
+      updateCurrent({
+        imageUrl: meta.url,
+        blobMeta: meta,
+        uploading: false,
+      })
     } catch (err) {
       const msg =
         err instanceof UploadError
+          ? `upload falhou: ${err.message}`
+          : err instanceof BlobError
           ? `upload falhou: ${err.message}`
           : err instanceof Error
           ? err.message
@@ -143,7 +165,12 @@ export function ComposeOverlay({
   }
 
   function clearImage() {
-    updateCurrent({ imageUrl: null, imageFile: null, uploadError: null })
+    updateCurrent({
+      imageUrl: null,
+      imageFile: null,
+      blobMeta: null,
+      uploadError: null,
+    })
   }
 
   // Validação agregada (todos os drafts).
@@ -156,11 +183,17 @@ export function ComposeOverlay({
 
   async function handlePublish() {
     if (blocked) return
-    const subposts: Subpost[] = drafts
-      .filter((d) => !isDraftEmpty(d))
-      .map((d, i) => draftToSubpost(d, i))
+    const nonEmpty = drafts.filter((d) => !isDraftEmpty(d))
+    const subposts: Subpost[] = nonEmpty.map((d, i) => draftToSubpost(d, i))
     if (subposts.length === 0) return
-    await onPublish({ subposts, contentWarning })
+
+    // imetas na ordem dos subposts com imagem (RFC §3.5.3 — convenção
+    // ordem = ordem). Subposts só-texto não contribuem entrada.
+    const imetas: BlobMeta[] = nonEmpty
+      .map((d) => d.blobMeta)
+      .filter((m): m is BlobMeta => m !== null)
+
+    await onPublish({ subposts, contentWarning, imetas })
     // Reset interno (caller fecha o overlay).
     setDrafts([newDraft()])
     setCurrentIdx(0)
@@ -381,6 +414,13 @@ function ImageDrop({
         <>
           <Image
             src={draft.imageUrl}
+            // Track B.2 — passa blobMeta pro preview também. Image
+            // resolve via fetchBlobUrl (objeto blob: URL local), o que
+            // bypassa COEP em browsers strict. Sem isso, o `<img>` puxa
+            // direto do CDN do nostr.build e algumas configurações de
+            // COEP bloqueiam (require-corp; image.nostr.build não
+            // envia CORP header).
+            meta={draft.blobMeta ?? undefined}
             className="absolute inset-0 h-full w-full object-cover"
             aspect="auto"
           />

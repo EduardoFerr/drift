@@ -149,6 +149,46 @@ async function persistSpread(event: SignedEvent): Promise<void> {
   // e limpa o pending optimistic. Manifesto §6 (Verdade por Eventos).
   invalidateFeed()
   scheduleScoreRecalc(postId)
+  // Track B.2 — "favorito = mirror automático" (RFC §5.3, manifesto §16).
+  // Quando o user atual emite SPREAD em um post, cliente pina o blob
+  // local. Best-effort, fire-and-forget — falha não derruba o spread.
+  void maybeAutoPinBlobs(event.pubkey, postId)
+}
+
+/**
+ * Track B.2.d — auto-pin de blobs quando o user atual espalha um post.
+ * RFC §5.3: "Espalhar = mirror" é semântica Drift (não NIP-94). Disparado
+ * só quando `spreaderPub === active identity`; spreads de outros usuários
+ * não nos forçam a hospedar.
+ *
+ * Best-effort: se o post ainda não chegou (race spread-antes-do-post),
+ * sem imeta tags ou Helia indisponível, log e segue. Pin é opt-in via
+ * ação social explícita (manifesto §22 — pin não é score-driven).
+ */
+async function maybeAutoPinBlobs(spreaderPub: string, postId: string): Promise<void> {
+  try {
+    const { getCurrentNpub } = await import('./identity')
+    const myNpub = await getCurrentNpub()
+    if (!myNpub || myNpub !== spreaderPub) return // não fui eu — não pino
+
+    // Lookup do raw_event do post pra extrair tags `imeta`. Se o post
+    // ainda não chegou (race), `row` é undefined → silently skip.
+    const row = await db.get<{ raw_event: string }>(
+      `SELECT raw_event FROM posts WHERE id = ?`,
+      [postId],
+    )
+    if (!row) return
+
+    const parsedEvent = JSON.parse(row.raw_event) as SignedEvent
+    const { parseImetaTags } = await import('./nip94')
+    const metas = parseImetaTags(parsedEvent)
+    if (metas.length === 0) return // post sem blobs ou pré-RFC (sem imeta)
+
+    const { pinBlobsFromMeta } = await import('./blobs')
+    await pinBlobsFromMeta(metas)
+  } catch (err) {
+    console.warn('[events] auto-pin falhou (degraded):', err)
+  }
 }
 
 async function persistBury(event: SignedEvent): Promise<void> {

@@ -102,7 +102,7 @@ function NavBtn({ action }: { action: NavAction }) {
       onClick={action.onClick}
       aria-label={action.ariaLabel ?? action.label}
       aria-pressed={action.active}
-      className={`flex flex-col items-center gap-1 rounded px-2 py-1 transition-colors focus:outline-none focus:ring-1 focus:ring-drift-accent2 ${
+      className={`flex flex-col items-center gap-1 rounded px-2 py-1 transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2 ${
         action.active
           ? 'text-drift-accent'
           : 'text-drift-muted hover:text-drift-text'

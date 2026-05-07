@@ -19,6 +19,7 @@ import { db } from './db'
 import { hiddenReason } from './moderation-local'
 import { useFollowsStore } from './follows'
 import { normalizeLayout } from '../types/drift'
+import { parseImetaTag as parseImetaTagSync, type BlobMeta } from './nip94'
 import type {
   Post,
   Subpost,
@@ -47,11 +48,13 @@ interface PostRow {
   score: number
   spreads: number
   buries: number
+  /** raw_event JSON — usado pra extrair tags `imeta` no read path (B.2). */
+  raw_event: string
 }
 
 export async function getGlobalFeed(limit = 50): Promise<Post[]> {
   const rows = await db.exec<PostRow>(
-    `SELECT id, author_pub, content, created_at, category, location, client, content_warning, score, spreads, buries
+    `SELECT id, author_pub, content, created_at, category, location, client, content_warning, score, spreads, buries, raw_event
      FROM posts
      WHERE score > -999
      ORDER BY score DESC, created_at DESC
@@ -75,7 +78,7 @@ export async function getFollowingFeed(limit = 50): Promise<Post[]> {
 
   const placeholders = Array.from(followingSet).map(() => '?').join(',')
   const rows = await db.exec<PostRow>(
-    `SELECT id, author_pub, content, created_at, category, location, client, content_warning, score, spreads, buries
+    `SELECT id, author_pub, content, created_at, category, location, client, content_warning, score, spreads, buries, raw_event
      FROM posts
      WHERE score > -999 AND author_pub IN (${placeholders})
      ORDER BY score DESC, created_at DESC
@@ -95,7 +98,7 @@ export async function getFollowingFeed(limit = 50): Promise<Post[]> {
 export async function getTrendingFeed(limit = 50, now = Date.now()): Promise<Post[]> {
   const cutoffSeconds = Math.floor((now - TRENDING_WINDOW_HOURS * 3600 * 1000) / 1000)
   const rows = await db.exec<PostRow>(
-    `SELECT id, author_pub, content, created_at, category, location, client, content_warning, score, spreads, buries
+    `SELECT id, author_pub, content, created_at, category, location, client, content_warning, score, spreads, buries, raw_event
      FROM posts
      WHERE score > -999 AND created_at >= ?
      ORDER BY score DESC, created_at DESC
@@ -219,11 +222,16 @@ export async function refreshFeed(): Promise<void> {
 // ─── Helpers ─────────────────────────────────────────────────────────
 
 function rowToPost(row: PostRow): Post {
+  const subposts = parseSubposts(row.content)
+  // Track B.2 — attach imeta tags do raw_event aos subposts com imagem.
+  // Convenção Drift (RFC §3.5.3): imetas aparecem na ordem dos subposts
+  // que têm imageUrl. Subposts só-texto não consomem entrada da lista.
+  attachImetasToSubposts(subposts, row.raw_event)
   return {
     id: row.id,
     authorPub: row.author_pub,
     content: row.content,
-    subposts: parseSubposts(row.content),
+    subposts,
     createdAt: row.created_at,
     category: row.category,
     location: parseLocation(row.location),
@@ -234,6 +242,44 @@ function rowToPost(row: PostRow): Post {
     buries: row.buries,
   }
 }
+
+/**
+ * Vincula tags `imeta` do raw_event aos subposts correspondentes.
+ * Mutativa pra evitar realocar — chama-se em hot path do feed (50/refresh).
+ *
+ * Falha de parse é silenciosa: subposts ficam sem `meta` e Image cai pro
+ * `imageUrl` direto sem hash verify (compat retro).
+ */
+function attachImetasToSubposts(subposts: Subpost[], rawEvent: string): void {
+  let event: { tags?: unknown }
+  try {
+    event = JSON.parse(rawEvent) as { tags?: unknown }
+  } catch {
+    return
+  }
+  if (!Array.isArray(event.tags)) return
+
+  // parseImetaTag é puro e síncrono (string ops); import estático é OK
+  // porque nip94.ts não tem deps pesadas (sem Helia).
+  const tags = event.tags as unknown as string[][]
+  const metas: BlobMeta[] = []
+  for (const tag of tags) {
+    if (!Array.isArray(tag) || tag[0] !== 'imeta') continue
+    const meta = parseImetaTagSync(tag)
+    if (meta) metas.push(meta)
+  }
+  if (metas.length === 0) return
+
+  // Distribui em ordem pelos subposts COM imagem.
+  let mi = 0
+  for (const sp of subposts) {
+    if (sp.imageUrl) {
+      const m = metas[mi++]
+      if (m) sp.meta = m
+    }
+  }
+}
+
 
 // ─── Filtros locais (manifesto §27) ──────────────────────────────────
 //

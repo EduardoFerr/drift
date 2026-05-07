@@ -32,6 +32,8 @@
 import { signDriftEvent, publishToRelays } from './nostr'
 import { DRIFT_KIND, CLIENT_ID, DRIFT_VERSION } from '../config/constants'
 import { normalizeLayout } from '../types/drift'
+import { buildImetaTag } from './nip94'
+import type { BlobMeta } from './nip94'
 import type {
   Subpost,
   GeoPoint,
@@ -58,6 +60,17 @@ export interface CreatePostInput {
    * só como "marcado".
    */
   contentWarning?: ContentWarning | string
+  /**
+   * Metadados NIP-94 dos blobs anexados (Track B.2). Cada `BlobMeta`
+   * vira uma tag `imeta` no evento, na ordem em que aparece no array.
+   * Convenção Drift (RFC §3.5.3): a ordem das imetas tags casa com a
+   * ordem dos `subposts[i].imageUrl` no JSON. Reader Drift usa isso
+   * pra resolver `cid`/`hash` do subpost correspondente.
+   *
+   * Posts sem imeta (legacy ou só-texto) continuam válidos — readers
+   * caem pro `imageUrl` do subpost diretamente, sem hash verify.
+   */
+  imetas?: BlobMeta[]
 }
 
 /**
@@ -78,6 +91,21 @@ export async function createPost(input: CreatePostInput): Promise<SignedEvent> {
   if (input.contentWarning) tags.push(['content-warning', input.contentWarning])
   const loc = locationTag(input.location)
   if (loc) tags.push(loc)
+
+  // NIP-94 imeta tags — Track B.2. Cada blob anexado vira uma tag.
+  // Compat: clientes não-Drift com NIP-94 renderizam via `url`.
+  // Cliente Drift com Helia prefere `cid`. RFC §6.
+  if (input.imetas) {
+    for (const meta of input.imetas) {
+      try {
+        tags.push(buildImetaTag(meta))
+      } catch (err) {
+        // Meta mal-formada (sem url/cid ou valor com espaço) — log e
+        // pula; outros subposts continuam válidos.
+        console.warn('[protocol] imeta inválida pulada:', err)
+      }
+    }
+  }
 
   // V4: normaliza layout no write path. Drafts vêm do SubpostEditor com
   // layout = LayoutKind explícito (3 chips no footer); se vier undefined

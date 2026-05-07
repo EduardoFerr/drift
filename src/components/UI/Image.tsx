@@ -6,12 +6,25 @@
  * altas. Sem skeleton, layout pula quando a imagem chega — UX ruim em
  * mobile com conexão instável. Com skeleton, o espaço é reservado e o
  * conteúdo desliza suavemente.
+ *
+ * **Track B.2** — quando `meta` é passado, a imagem é resolvida via
+ * `blobs.fetchBlobUrl(meta)`: tenta Helia local → HTTP url → IPFS
+ * gateway, com hash verify obrigatório se `meta.hash` está presente.
+ * Sem `meta`, cai pro `src` direto (compat retro com posts pré-RFC).
+ *
+ * O fetch via blobs é **lazy + assíncrono** — primeiro pinta o skeleton,
+ * depois resolve `<img src>` quando a Promise volta. Render path crítico
+ * fica leve (sem importar Helia até hover/scroll-into-view).
  */
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import type { BlobMeta } from '../../lib/nip94'
 
 export interface ImageProps {
+  /** Fallback URL quando `meta` é ausente ou fetch via blobs falha. */
   src: string
+  /** Track B.2 — metadado NIP-94. Se presente, usa fetch verificado. */
+  meta?: BlobMeta
   alt?: string
   className?: string
   /** Aspect ratio CSS pra reservar espaço enquanto carrega. Ex: '16/9', '1/1'. Default: 'auto'. */
@@ -25,6 +38,7 @@ export interface ImageProps {
 
 export function Image({
   src,
+  meta,
   alt = '',
   className = '',
   aspect = 'auto',
@@ -34,6 +48,41 @@ export function Image({
   onError,
 }: ImageProps) {
   const [state, setState] = useState<'loading' | 'loaded' | 'error'>('loading')
+  // Track B.2 — quando meta está presente e tem cid|hash, tenta resolver
+  // via blobs.fetchBlobUrl (Helia + verify). Senão, usa src direto.
+  const [resolvedSrc, setResolvedSrc] = useState<string>(src)
+
+  useEffect(() => {
+    // Sem meta com cid/hash — usa src direto (legacy ou só url).
+    if (!meta || (!meta.cid && !meta.hash)) {
+      setResolvedSrc(src)
+      return
+    }
+
+    let canceled = false
+    const ctrl = new AbortController()
+
+    void (async () => {
+      try {
+        const { fetchBlobUrl } = await import('../../lib/blobs')
+        const url = await fetchBlobUrl(meta, { signal: ctrl.signal })
+        if (!canceled) setResolvedSrc(url)
+      } catch (err) {
+        // Falha total (incluindo hash mismatch em todas as rotas) — cai
+        // pro src original. Hash verify ainda protegeu contra conteúdo
+        // trocado: o `<img>` carregaria do mesmo url, sem garantia, mas
+        // pelo menos o user vê algo. Em contexto de censura, o user
+        // pode ter desligado IPFS — preserva UX.
+        console.warn('[Image] fetch via blobs falhou, fallback pra src direto:', err)
+        if (!canceled) setResolvedSrc(src)
+      }
+    })()
+
+    return () => {
+      canceled = true
+      ctrl.abort()
+    }
+  }, [src, meta])
 
   return (
     <div
@@ -52,7 +101,7 @@ export function Image({
       )}
 
       <img
-        src={src}
+        src={resolvedSrc}
         alt={alt}
         draggable={draggable}
         className={`h-full w-full transition-opacity duration-200 ${

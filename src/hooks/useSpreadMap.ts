@@ -5,8 +5,10 @@
  * mode='post': origin do post + suas spread destinations, cadeias por ordem
  *   cronológica. Arcos: origin→dest[0]→dest[1]→...
  *
- * mode='global': agrega TODOS os posts/spreads com location. Agrupa por
- *   post_id, constrói cadeias temporais, normaliza timestamps pra [0,1].
+ * mode='global': modelo de árvore viral real. JOIN posts+spreads via
+ *   posts.author_pub — cada arco é "local do autor do post → local de quem
+ *   espalhou". A→B quando A cria um post e B espalha; B→D quando B cria
+ *   um post e D espalha. Resultado: árvore A→{B,C}, B→{D,F}, D→{H,I,J}.
  *   LIMIT 2000 spreads pra não travar mapa com dados enormes.
  *
  * Manifesto §28 (Privacidade pelo Mínimo): só usa location que o autor
@@ -19,12 +21,6 @@ import { seedFromSpreaders } from '../lib/seeder'
 import type { GeoPoint, PropagationArc, SpreadMapData, SpreadRecord } from '../types/drift'
 
 interface PostRow {
-  location: string | null
-  created_at: number
-}
-
-interface GlobalPostRow {
-  id: string
   location: string | null
   created_at: number
 }
@@ -165,76 +161,54 @@ async function buildPostData(postId: string): Promise<SpreadMapData> {
 
 // ─── Global mode ──────────────────────────────────────────────────────
 
+interface VirtualArcRow {
+  from_loc: string   // posts.location (autor do post)
+  to_loc: string     // spreads.location (quem espalhou)
+  spread_at: number  // spreads.created_at
+}
+
+/**
+ * Modelo de árvore viral: JOIN posts+spreads.
+ *
+ * Cada linha do resultado representa uma borda da árvore:
+ *   from_loc = local onde o post foi criado (quem "infectou")
+ *   to_loc   = local de quem espalhou (quem foi "infectado")
+ *
+ * Exemplos:
+ *   A cria post em LA, B espalha em LB → arco LA→LB (A infecta B)
+ *   B cria post em LB, D espalha em LD → arco LB→LD (B infecta D)
+ *   Juntos formam a árvore A→B→D, não uma estrela A→{B,D}.
+ */
 async function buildGlobalData(): Promise<SpreadMapData> {
-  const [postRows, spreadRows] = await Promise.all([
-    db.exec<GlobalPostRow>(
-      `SELECT id, location, created_at FROM posts WHERE location IS NOT NULL LIMIT 1000`,
-      [],
-    ),
-    db.exec<SpreadRow>(
-      `SELECT post_id, spreader_pub, created_at, location, event_id
-       FROM spreads
-       WHERE location IS NOT NULL
-       ORDER BY post_id, created_at ASC
-       LIMIT 2000`,
-      [],
-    ),
-  ])
+  const rows = await db.exec<VirtualArcRow>(
+    `SELECT p.location  AS from_loc,
+            s.location  AS to_loc,
+            s.created_at AS spread_at
+     FROM spreads s
+     JOIN posts p ON s.post_id = p.id
+     WHERE s.location IS NOT NULL
+       AND p.location  IS NOT NULL
+     ORDER BY s.created_at ASC
+     LIMIT 2000`,
+    [],
+  )
 
-  // Index posts by id
-  const postMap = new Map<string, { loc: GeoPoint; createdAt: number }>()
-  for (const row of postRows) {
-    const loc = parseLocation(row.location)
-    if (loc) postMap.set(row.id, { loc, createdAt: row.created_at })
-  }
-
-  // Group spreads by post_id
-  const spreadsByPost = new Map<string, { loc: GeoPoint; createdAt: number; spreaderPub: string; eventId: string }[]>()
-  for (const row of spreadRows) {
-    const loc = parseLocation(row.location)
-    if (!loc) continue
-    const arr = spreadsByPost.get(row.post_id) ?? []
-    arr.push({ loc, createdAt: row.created_at, spreaderPub: row.spreader_pub, eventId: row.event_id })
-    spreadsByPost.set(row.post_id, arr)
-  }
-
-  // Collect all timestamps for global normalization
-  const allTs: number[] = []
-  for (const [pid, post] of postMap) {
-    if (spreadsByPost.has(pid)) allTs.push(post.createdAt)
-  }
-  for (const dests of spreadsByPost.values()) {
-    for (const d of dests) allTs.push(d.createdAt)
-  }
-
-  const { normalize } = makeNormalizer(allTs)
+  const { normalize } = makeNormalizer(rows.map((r) => r.spread_at))
 
   const allArcs: PropagationArc[] = []
   const allDests: SpreadMapData['destinations'] = []
   const allCountries = new Set<string>()
 
-  for (const [pid, spreads] of spreadsByPost) {
-    const post = postMap.get(pid)
+  for (const row of rows) {
+    const fromLoc = parseLocation(row.from_loc)
+    const toLoc   = parseLocation(row.to_loc)
+    if (!fromLoc || !toLoc) continue
 
-    type ChainPoint = { pos: [number, number]; t: number }
-    const chain: ChainPoint[] = []
-    if (post) {
-      chain.push({ pos: [post.loc.lng, post.loc.lat], t: normalize(post.createdAt) })
-      if (post.loc.country) allCountries.add(post.loc.country)
-    }
-    for (const s of spreads) {
-      const t = normalize(s.createdAt)
-      chain.push({ pos: [s.loc.lng, s.loc.lat], t })
-      allDests.push({ point: s.loc, createdAt: s.createdAt, t })
-      if (s.loc.country) allCountries.add(s.loc.country)
-    }
-
-    // Arcs: consecutive pairs in this post's chain
-    for (let i = 0; i < chain.length - 1; i++) {
-      const cur = chain[i]
-      const next = chain[i + 1]
-      if (cur && next) allArcs.push({ from: cur.pos, to: next.pos, t: next.t })
-    }
+    const t = normalize(row.spread_at)
+    allArcs.push({ from: [fromLoc.lng, fromLoc.lat], to: [toLoc.lng, toLoc.lat], t })
+    allDests.push({ point: toLoc, createdAt: row.spread_at, t })
+    if (fromLoc.country) allCountries.add(fromLoc.country)
+    if (toLoc.country)   allCountries.add(toLoc.country)
   }
 
   return {

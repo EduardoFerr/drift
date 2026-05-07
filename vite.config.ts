@@ -55,9 +55,10 @@ export default defineConfig({
       },
       workbox: {
         // Precache só os assets críticos pra abrir o app — chunks lazy do
-        // maplibre-gl (1.1MB) e tesselator do deck.gl (467K) NÃO entram aqui;
-        // são cacheados sob demanda via runtimeCaching abaixo. Isso baixa o
-        // precache de ~3.8MB pra ~800KB no PWA install.
+        // maplibre-gl (1.1MB), tesselator do deck.gl (467K) e helia/libp2p
+        // (~950KB pra Track B) NÃO entram aqui; são cacheados sob demanda
+        // via runtimeCaching abaixo. Isso baixa o precache do install
+        // inicial de ~3.8MB pra ~800KB.
         globPatterns: [
           'index.html',
           'manifest.webmanifest',
@@ -70,8 +71,9 @@ export default defineConfig({
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         runtimeCaching: [
           {
-            // Lazy chunks do mapa: cacheia ao primeiro uso, mantém indefinidamente.
-            urlPattern: /\/assets\/(maplibre-gl|tesselator|rebroadcast)-[^.]+\.js$/,
+            // Lazy chunks do mapa + Track B (helia/libp2p): cacheia ao
+            // primeiro uso, mantém indefinidamente.
+            urlPattern: /\/assets\/(maplibre-gl|tesselator|rebroadcast|helia-deps)-[^.]+\.js$/,
             handler: 'CacheFirst',
             options: {
               cacheName: 'lazy-chunks',
@@ -179,6 +181,29 @@ export default defineConfig({
     // SQLite WASM não pode ser bundled
     exclude: ['@sqlite.org/sqlite-wasm'],
   },
+  build: {
+    // Track B: dá nome explícito aos chunks de Helia/libp2p pra que
+    // o regex de runtimeCaching (em workbox acima) e o Glob de
+    // precache os identifiquem. Sem isso, Vite emite `index-<hash>.js`
+    // genérico e o lazy-chunks bucket do SW não bate.
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          // helia, @helia/*, libp2p, @libp2p/*, @chainsafe/* (libp2p
+          // family), multiformats, blockstore-*, datastore-* — agrupa
+          // tudo num único chunk grande "helia-deps". Vite ainda
+          // code-splita o que for usado por outras rotas; este é só o
+          // hint de naming.
+          if (
+            /[\\/]node_modules[\\/](helia|@helia|libp2p|@libp2p|@chainsafe|multiformats|blockstore-|datastore-|interface-blockstore|interface-datastore|interface-store|@multiformats|protons-runtime|uint8arrays|@noble[\\/]ed25519|@noble[\\/]secp256k1|@noble[\\/]hashes|it-[a-z]+|p-defer|p-queue|p-event|p-fifo|any-signal|race-event|merge-options|abortable-iterator|hashlru|progress-events|murmurhash3|just-safe-stringify)[\\/]/.test(id)
+          ) {
+            return 'helia-deps'
+          }
+          return undefined
+        },
+      },
+    },
+  },
   server: {
     // Escuta em todas as interfaces — necessário para acesso via
     // celular pela rede local (sem isso, Vite só responde em localhost).
@@ -199,9 +224,15 @@ export default defineConfig({
         }
       : {}),
     headers: {
-      // OBRIGATÓRIO para SharedArrayBuffer (SQLite WASM com OPFS)
+      // OBRIGATÓRIO para SharedArrayBuffer (SQLite WASM com OPFS).
+      // `credentialless` (em vez de `require-corp`) ainda dá
+      // crossOriginIsolated mas permite imagens/recursos cross-origin
+      // sem CORP header. Necessário pra image.nostr.build (CDN não
+      // envia Cross-Origin-Resource-Policy). Chrome 96+, Edge 96+,
+      // Firefox 119+. Safari ainda não suporta — mas o app já depende
+      // de Chrome/Firefox para outras features (WebRTC + COOP).
       'Cross-Origin-Opener-Policy': 'same-origin',
-      'Cross-Origin-Embedder-Policy': 'require-corp',
+      'Cross-Origin-Embedder-Policy': 'credentialless',
     },
   },
   worker: {

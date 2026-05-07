@@ -444,6 +444,54 @@ cumprimento de §16.
 
 ## Histórico
 
+- **2026-05-06 v0.4**: B.2 + B.3 entregues (`v0.6.0-alpha.5` candidate):
+  - **B.2.a** `src/lib/nip94.ts` — buildImetaTag/parseImetaTag/parseImetaTags/
+    sha256Hex. 21 unit tests cobrindo round-trip, compat NIP-94 puro, Drift
+    extension `cid`, forward-compat com keys desconhecidas.
+  - **B.2.b** `src/lib/blobs.ts` — orquestrador uploadBlob/fetchBlob/
+    fetchBlobUrl/pinBlobsFromMeta. Cache de object URL, hash verify
+    obrigatório, fallback Helia → HTTP url → IPFS gateway. 9 unit tests.
+    `src/config/gateways.ts` — Cloudflare/dweb.link/ipfs.io.
+  - **B.2.c** `protocol.ts` emite tags `imeta`; `ComposeOverlay` usa
+    `uploadBlob` (substitui `uploadImage` direto). Posts publicados a
+    partir desta versão carregam url + hash + (best-effort) cid.
+  - **B.2.d** `events.ts:persistSpread` dispara `pinBlobsFromMeta`
+    quando spreader é o user atual. "Favorito = mirror" implementado.
+  - **B.2.e** `feed.ts:rowToPost` parseia tags `imeta` do raw_event e
+    attach a `Subpost.meta`. `Image` component aceita `meta?` opcional
+    e usa `blobs.fetchBlobUrl` (lazy import) com hash verify; cai pra
+    `src` direto em falha (UX preservado).
+  - **B.3** `BlobsCard` em `SettingsCards.tsx` — UI mostra estado Helia
+    (rodando/parado), peer count, blobs servindo. Auto-refresh 5s.
+    Init lazy: ~950 KiB só baixa quando user abre o card.
+  - **Total: 508/508 tests passing.** Initial bundle prod inalterado
+    (723 kB). Hash verify protege contra gateway/host trocando bytes
+    silenciosamente — manifesto §17 honrado.
+- **2026-05-06 v0.4 (continuação)**: **B.4 deferred** com bloqueador
+  técnico documentado. Drift opera 2 stacks libp2p paralelos (WebRTC
+  custom + Helia interno); bridging entre eles é engenharia, não
+  polish. Trigger pra reabrir: latency mediana de fetch via gateway
+  > 2s pra CIDs que peers Drift conhecidos têm pinados. Doc em
+  `src/lib/seeder.ts` headcomment.
+- **2026-05-06 v0.3**: B.1 (Helia spike) executado:
+  - Wrapper `src/lib/helia.ts` — lazy init, IndexedDB persistence
+    (`blockstore-idb`/`datastore-idb`), API mínima
+    (addBlob/getBlob/pinBlob/unpinBlob/listPinned/heliaStats + CID
+    helpers).
+  - DEV smoke test exposed: `window.driftHelia.smokeTest()`.
+  - 7 unit tests Vitest pros helpers de CID (round-trip CIDv0/v1 +
+    `ipfs://` prefix). Suite total: 478/478.
+  - **Bundle measurement (medição forçada vs revertida):**
+    - Initial bundle prod: **723.23 kB** (245.08 kB gzip) —
+      **idêntico ao baseline**. Lazy-load via dynamic import().
+    - Helia ecosystem completo (chunks lazy): ~**950 KiB raw** /
+      ~280 KiB gzip. Acima dos ~500KB estimados na §11.1, **abaixo
+      do trigger de 1MB pra reconsiderar arquitetura**. Aceito.
+    - Helia chunks só carregam quando user efetivamente
+      faz upload/fetch via IPFS (B.2).
+  - Open question §11.2 (IndexedDB vs OPFS): **decidido IndexedDB**
+    via blockstore-idb/datastore-idb. OPFS seria refactor de B.4+
+    se cap default 500MB se mostrar insuficiente.
 - **2026-05-03 v0.1**: Draft inicial. Afirmação imprecisa "Helia +
   NIP-94 cobre 90% sem inventar protocolo novo" no §1.
 - **2026-05-03 v0.2**: revisão honesta dos 10% não cobertos por

@@ -292,6 +292,7 @@ function PortraitLayout({
       <div className="relative min-h-0 flex-1">
         <Image
           src={subpost.imageUrl!}
+          meta={subpost.meta}
           className="block h-full w-full object-cover"
           aspect="auto"
         />
@@ -349,6 +350,7 @@ function LandscapeLayout({
       {/* Media absolute fill. */}
       <Image
         src={subpost.imageUrl!}
+        meta={subpost.meta}
         className="absolute inset-0 h-full w-full object-cover"
         aspect="auto"
       />

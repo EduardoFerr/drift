@@ -75,6 +75,17 @@ export interface Subpost {
   imageUrl: string | null // URL nostr.build
   order: number // 0-indexed
   /**
+   * Metadado NIP-94 do blob (Track B.2). Populado em feed.ts a partir
+   * das tags `imeta` do evento, na ordem dos subposts com `imageUrl`.
+   * Quando presente, o reader (Image component) prefere fetch via
+   * `blobs.fetchBlobUrl(meta)` — Helia local + verify SHA-256 + gateway
+   * fallback. Quando ausente (post legacy pré-RFC ou cliente sem suporte
+   * a imeta), reader cai pro `imageUrl` direto sem hash verify.
+   *
+   * NÃO serializa no `content` JSON — vem das tags do evento.
+   */
+  meta?: import('../lib/nip94').BlobMeta
+  /**
    * V4 — hint visual. Ausente em posts antigos (compat retro: parse em
    * events.ts normaliza pra DEFAULT_LAYOUT='portrait'). Sempre presente
    * em posts gerados pelo cliente Drift v0.7+ via createPost.

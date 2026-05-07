@@ -96,3 +96,13 @@ export function WarningIcon({ size = 14, className = '' }: IconProps) {
     </svg>
   )
 }
+
+/** Perfil / usuário — círculo (cabeça) + arco (ombros). */
+export function UserIcon({ size = 18, className = '' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" className={className} {...base}>
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
+    </svg>
+  )
+}

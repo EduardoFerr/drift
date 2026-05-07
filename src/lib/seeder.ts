@@ -8,6 +8,23 @@
  * Idempotente — peers já conectados são skip. Cap respeita MAX_PEERS.
  * Default off em modo mock (UUID por aba não persiste); ativo em modo
  * Nostr (npub estável).
+ *
+ * ─── Track B.4 — DEFERRED ────────────────────────────────────────────
+ *
+ * Integração `seeder` ↔ Helia (libp2p provider hints) está adiada.
+ * Plano original (RFC blob-distribution.md §10 B.4): quando seeder
+ * descobre peer com `spreader_pub` X, sinalizar pra Helia/libp2p que
+ * "peer X provavelmente tem os CIDs do post Y" — `libp2p.peerStore.add`
+ * + provider routing. Reduziria latency de fetch via gateway público.
+ *
+ * Bloqueador técnico: Drift roda **2 stacks libp2p paralelos** — o
+ * WebRTC custom (`lib/transport/webrtc/`) e o que vem dentro do Helia.
+ * Bridging exige dial de um peer pelo outro, ou compartilhamento de
+ * peerStore — engenharia real, não polish trivial. RFC §10 confirma
+ * "B.4 é polish, não bloqueia cumprimento de §16".
+ *
+ * Trigger pra reabrir B.4: medições mostrarem latency mediana de fetch
+ * via gateway > 2s para CIDs que peers Drift conhecidos têm pinados.
  */
 
 import { db } from './db'

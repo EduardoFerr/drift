@@ -52,7 +52,7 @@ function FeedTabBtn({
   return (
     <button
       onClick={onClick}
-      className={`relative flex-1 px-2 py-[10px] text-center transition-colors focus:outline-none focus:ring-1 focus:ring-drift-accent2 focus:ring-offset-1 focus:ring-offset-drift-bg ${
+      className={`relative flex-1 px-2 py-[10px] text-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2 focus-visible:ring-offset-1 focus-visible:ring-offset-drift-bg ${
         active
           ? 'text-drift-text'
           : 'text-drift-muted hover:text-drift-text'

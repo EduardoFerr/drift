@@ -73,11 +73,11 @@ quem servir. Ordem natural é A→B.
 
 | Item | Status | Esforço |
 |------|--------|---------|
-| B.0 — RFC [`Docs/blob-distribution.md`](blob-distribution.md) v0.1 draft | 🟡 | drafted 2026-05-03; pendente revisão personas |
-| B.1 — Helia spike (POC IPFS no PWA, mede bundle) | ⛔ | ~4h |
-| B.2 — NIP-94 `imeta` + auto-pin no favorito | ⛔ | ~6h |
-| B.3 — UI "servindo N blobs a M peers" (Lily Fase 7.1c) | ⛔ | ~4h |
-| B.4 — Integração PoI seeder + Helia | ⛔ | ~2-4h |
+| B.0 — RFC [`Docs/blob-distribution.md`](blob-distribution.md) v0.4 | ✅ | 2026-05-03 + atualização 2026-05-06 |
+| B.1 — Helia spike (POC IPFS no PWA, mede bundle) | ✅ | 2026-05-06 — bundle inicial intacto, ~950KiB lazy |
+| B.2 — NIP-94 `imeta` + auto-pin no favorito | ✅ | 2026-05-06 — a/b/c/d/e shipped, 30 unit tests |
+| B.3 — UI "servindo N blobs a M peers" (Lily Fase 7.1c) | ✅ | 2026-05-06 — `BlobsCard` em Settings |
+| B.4 — Integração PoI seeder + Helia | ⏸ | DEFERRED — bloqueador 2 libp2p paralelos, RFC §10 |
 
 ### Track C — Polish pré-stable (~17-23h, prioridade 3)
 
