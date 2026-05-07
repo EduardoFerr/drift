@@ -148,9 +148,9 @@ async function buildPostData(postId: string): Promise<SpreadMapData> {
   }
 
   const allCountries = new Set<string>()
-  if (origin?.country) allCountries.add(origin.country)
+  if (origin) allCountries.add(regionKey(origin))
   for (const r of records) {
-    if (r.location.country) allCountries.add(r.location.country)
+    allCountries.add(regionKey(r.location))
   }
 
   return {
@@ -220,8 +220,8 @@ async function buildGlobalData(currentPostId: string | null): Promise<SpreadMapD
       isCurrent,
     })
     allDests.push({ point: toLoc, createdAt: row.spread_at, t, isCurrent })
-    if (fromLoc.country) allCountries.add(fromLoc.country)
-    if (toLoc.country)   allCountries.add(toLoc.country)
+    allCountries.add(regionKey(fromLoc))
+    allCountries.add(regionKey(toLoc))
   }
 
   return {
@@ -243,6 +243,33 @@ function makeNormalizer(timestamps: number[]): { normalize: (ts: number) => numb
   const maxTs = Math.max(...timestamps)
   const range = maxTs - minTs || 1
   return { normalize: (ts: number) => (ts - minTs) / range }
+}
+
+/**
+ * Identifica uma região geográfica distinta a partir de um GeoPoint.
+ *
+ * Por que não usar `country`? O cliente oficial Drift NÃO faz reverse
+ * geocoding (manifesto §17/§28 — privacidade pelo mínimo, sem chave
+ * mestra disfarçada via serviço externo de geocoding). Logo `country`
+ * sempre vem `''` em GeoPoints gerados pelo cliente oficial. Contar
+ * `country` distinto resultava em counter sempre 0 mesmo com 39 drifts
+ * em 5 países diferentes (sintoma reportado em 2026-05-07).
+ *
+ * Solução pura/determinística: bucket por coordenada arredondada a 0
+ * casas decimais (~111km, ~grão de país pequeno). Países pequenos viram
+ * 1-2 buckets; países grandes (BR/US/RU) viram dezenas. Counter exibido
+ * como "X países" é aproximação grosseira mas ≠ 0 quando há atividade
+ * geograficamente distribuída — promessa cumprida.
+ *
+ * Quando `country` for não-vazio (cliente alternativo com reverse
+ * geocoding plugado, ou tag legacy com nome real), preferir o nome real
+ * em vez do bucket — assim Set agrupa "Brasil" e não "(-15,-47)".
+ */
+export function regionKey(p: GeoPoint): string {
+  if (p.country) return p.country
+  // Bucket de ~111km. Round, não floor — coords negativas (Brasil tem
+  // lat negativo) cruzam zero corretamente.
+  return `${Math.round(p.lat)},${Math.round(p.lng)}`
 }
 
 function parseLocation(raw: string | null): GeoPoint | null {
