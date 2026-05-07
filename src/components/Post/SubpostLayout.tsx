@@ -210,12 +210,18 @@ function CardText({
   const age = timeAgoCompact(post.createdAt)
 
   const wrapperBg = variant === 'overlay' ? '' : 'bg-drift-surface'
+  // pb maior pra inset (Portrait): user feedback 2026-05-07 — depois
+  // que removemos o p-4 do wrapper externo do card no PostViewer, o
+  // pb-[18px] anterior deixava o meta line "colado" no fim do card
+  // (faltavam 16px que vinham do p-4). Bumpa pra 28px só no inset;
+  // overlay (Landscape) absorve visualmente via gradient + tem o
+  // próprio bottom-0 absoluto, não muda.
   const padding =
     variant === 'centered'
       ? 'px-[22px] py-[28px]'
       : variant === 'overlay'
       ? 'px-[17px] pt-[14px] pb-[18px]'
-      : 'px-[17px] pt-[14px] pb-[18px]'
+      : 'px-[17px] pt-[14px] pb-[28px]'
 
   // Layout 'text' (variant='centered') flex flex-col justify-center
   // pra texto subir do meio. Outros: bloco normal.
