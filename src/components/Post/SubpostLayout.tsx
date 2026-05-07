@@ -213,15 +213,14 @@ function CardText({
   // pb maior pra inset (Portrait): user feedback 2026-05-07 — depois
   // que removemos o p-4 do wrapper externo do card no PostViewer, o
   // pb-[18px] anterior deixava o meta line "colado" no fim do card
-  // (faltavam 16px que vinham do p-4). Bumpa pra 28px só no inset;
-  // overlay (Landscape) absorve visualmente via gradient + tem o
-  // próprio bottom-0 absoluto, não muda.
+  // (faltavam 16px que vinham do p-4). Bumpa pra pb-7 (28px) só no
+  // inset; overlay (Landscape) e centered (Text) ficam intocados.
   const padding =
     variant === 'centered'
       ? 'px-[22px] py-[28px]'
       : variant === 'overlay'
       ? 'px-[17px] pt-[14px] pb-[18px]'
-      : 'px-[17px] pt-[14px] pb-[28px]'
+      : 'px-[17px] pt-[14px] pb-7'
 
   // Layout 'text' (variant='centered') flex flex-col justify-center
   // pra texto subir do meio. Outros: bloco normal.
