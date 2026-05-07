@@ -43,6 +43,32 @@ const NAMESPACE = 'global'
 const INITIAL_WINDOW_SECONDS = 7 * 24 * 60 * 60 // 7d (Barney peer review 29-04)
 const FLUSH_INTERVAL_MS = 30_000
 
+/**
+ * Limit aplicado na filter de subscribe (NIP-01) — relay retorna no
+ * MÁXIMO esses N eventos stored mais recentes que match o filter.
+ * Real-time pós-EOSE flui sem cap.
+ *
+ * 500 × 4 relays = teto teórico ~2000 events no boot inicial (deduped
+ * cross-transport pelo orchestrator). Sem isso (estado anterior),
+ * relays podem despejar tudo do range `since`-onwards num burst — em
+ * rede ativa, milhares de events martelam o pipeline `verifyEvent +
+ * INSERT + scheduleScoreRecalc` causando lag perceptível no boot.
+ *
+ * **Trade-off conhecido (Ted review 2026-05-07):** se densidade de
+ * eventos numa janela `since`-now exceder 500, relay descarta os mais
+ * antigos da janela — buraco no histórico local. Mitigado por:
+ *  - `rebuildIdentityHistory(npub)` em `lib/sync.ts` cobre eventos do
+ *    próprio user sem limit (full backfill)
+ *  - SPREAD/BURY órfãos sobre posts não-vistos têm impacto local-only
+ *    (manifesto §7 — score determinístico DADO o mesmo input set;
+ *    score parcial sob input parcial é esperado, não quebra invariante)
+ *
+ * **TODO** (Fase futura): paginação real via filtros sucessivos com
+ * `until` (NIP-01) pra resgatar histórico mais antigo sem martelar
+ * o boot inicial. Reabrir quando densidade de eventos justificar.
+ */
+const SUBSCRIBE_LIMIT = 500
+
 /** Item do ring buffer de últimos eventos recebidos — usado pra
  *  diagnóstico (ver no DiagnosticPanel se um evento específico chegou
  *  ao cliente, debugar sync entre devices). Capacidade pequena pra
@@ -135,6 +161,9 @@ export async function startSync(): Promise<SyncStatus> {
         DRIFT_KIND.REPORT,
       ],
       since,
+      // Cap de stored events por relay — ver doc-comment de
+      // SUBSCRIBE_LIMIT acima. Boot inicial não martela pipeline.
+      limit: SUBSCRIBE_LIMIT,
     },
     {
       onevent: async (event: SignedEvent) => {
