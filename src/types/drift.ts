@@ -216,12 +216,26 @@ export interface PropagationArc {
   to: [number, number]
   /** Normalized time 0..1 when this arc fires in the animation. */
   t: number
+  /**
+   * True quando o arco pertence ao `currentPostId` passado em
+   * `useSpreadMap` (modo global). UI usa pra destacar visualmente os
+   * arcos do post atualmente focado dentro do agregado global. Default
+   * false (post mode não aplica esse hint — todos os arcos pertencem
+   * ao post sendo visualizado por construção).
+   */
+  isCurrent?: boolean
 }
 
 export interface SpreadMapData {
   origin: GeoPoint | null
   /** Spread destinations with normalized animation time. */
-  destinations: { point: GeoPoint; createdAt: number; t: number }[]
+  destinations: {
+    point: GeoPoint
+    createdAt: number
+    t: number
+    /** Mesmo significado de `PropagationArc.isCurrent`. */
+    isCurrent?: boolean
+  }[]
   /** Propagation chain arcs: consecutive pairs ordered by t. */
   arcs: PropagationArc[]
   totalSpreads: number

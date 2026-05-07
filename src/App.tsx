@@ -1173,6 +1173,7 @@ function MapOverlay({
           onModeChange={setMapMode}
           className="h-full w-full"
           onOpenLocationSettings={onOpenLocationSettings}
+          {...(currentPost ? { currentPostId: currentPost.id } : {})}
         />
       </div>
     </FullPageOverlay>

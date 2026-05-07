@@ -27,6 +27,13 @@ export interface SpreadMapProps {
   mode?: 'post' | 'global'
   onModeChange?: (mode: 'post' | 'global') => void
   onOpenLocationSettings?: () => void
+  /**
+   * Em modo `global`, post atualmente em foco no overlay. Arcos/dots
+   *  desse post são destacados visualmente (chartreuse), demais ficam
+   *  em mint atenuado. Resolve UX "global é sempre o mesmo" — agora dá
+   *  pra ver onde meu post se encaixa no agregado.
+   */
+  currentPostId?: string | null
 }
 
 const MAP_ATTRIBUTION =
@@ -95,8 +102,9 @@ export function SpreadMap({
   mode = 'post',
   onModeChange,
   onOpenLocationSettings,
+  currentPostId,
 }: SpreadMapProps) {
-  const { data, loading, error } = useSpreadMap(postId, mode)
+  const { data, loading, error } = useSpreadMap(postId, mode, currentPostId)
   const granularity = usePrefsStore((s) => s.location_granularity)
 
   const hasGeometry = !!data && (!!data.origin || data.destinations.length > 0)
@@ -163,6 +171,13 @@ interface ModeMapProps {
 
 interface PointLayerProps { position: [number, number] }
 interface HeatmapPointProps { point: { lng: number; lat: number } }
+/** Dot animado no GlobalModeMap. `isCurrent` controla cor (chartreuse
+ *  vs mint atenuado) e raio (4 vs 3 px). */
+interface AnimDotProps {
+  pos: [number, number]
+  t: number
+  isCurrent: boolean
+}
 
 function PostModeMap({ data, className, mode, onModeChange }: ModeMapProps) {
   const mapView = usePrefsStore((s) => s.map_view)
@@ -311,10 +326,12 @@ function GlobalModeMap({ data, className, mode, onModeChange }: ModeMapProps) {
     let LineLayer: LayerCtor
     let ScatterplotLayer: LayerCtor
 
-    // Precompute animation points from destinations
-    const destPoints = data.destinations.map((d) => ({
+    // Precompute animation points from destinations.
+    // isCurrent propaga o flag do data → render layer (cor condicional).
+    const destPoints: AnimDotProps[] = data.destinations.map((d) => ({
       pos: [d.point.lng, d.point.lat] as [number, number],
       t: d.t,
+      isCurrent: d.isCurrent === true,
     }))
 
     void (async () => {
@@ -383,31 +400,42 @@ function GlobalModeMap({ data, className, mode, onModeChange }: ModeMapProps) {
                 data: visSegs,
                 getSourcePosition: (d: PropagationArc) => d.from,
                 getTargetPosition: (d: PropagationArc) => d.to,
-                getWidth: 1.5,
-                // Fade-in suave: alpha sobe de 0→150 em FADE_IN do ciclo
+                // Arco do post corrente: linha mais grossa (2.5px) +
+                // chartreuse drift-accent. Demais: mint atenuado fino.
+                getWidth: (d: PropagationArc) => (d.isCurrent ? 2.5 : 1.5),
+                // Fade-in suave: alpha sobe de 0→max em FADE_IN do ciclo.
+                // isCurrent → chartreuse [232, 255, 90] alpha 220.
+                // Outros → mint [52, 211, 153] alpha 90 (atenuado).
                 getColor: (d: PropagationArc) => {
                   const age = p - d.t
-                  const alpha = Math.round(Math.min(age / FADE_IN, 1) * 150)
-                  return [52, 211, 153, alpha]
+                  const fade = Math.min(age / FADE_IN, 1)
+                  if (d.isCurrent) {
+                    return [232, 255, 90, Math.round(fade * 220)]
+                  }
+                  return [52, 211, 153, Math.round(fade * 90)]
                 },
                 widthUnits: 'pixels',
-                updateTriggers: { getColor: p },
+                updateTriggers: { getColor: p, getWidth: 1 },
               }),
               new ScatterplotLayer({
                 id: 'prop-dots',
                 data: visPts,
-                getPosition: (d: { pos: [number, number]; t: number }) => d.pos,
-                // Fade-in + pulso de chegada (cresce e volta)
-                getFillColor: (d: { pos: [number, number]; t: number }) => {
+                getPosition: (d: AnimDotProps) => d.pos,
+                // isCurrent → chartreuse (mesma do arco) + raio maior.
+                getFillColor: (d: AnimDotProps) => {
                   const age = p - d.t
-                  const alpha = Math.round(Math.min(age / FADE_IN, 1) * 200)
-                  return [52, 211, 153, alpha]
+                  const fade = Math.min(age / FADE_IN, 1)
+                  if (d.isCurrent) {
+                    return [232, 255, 90, Math.round(fade * 240)]
+                  }
+                  return [52, 211, 153, Math.round(fade * 130)]
                 },
-                getRadius: (d: { pos: [number, number]; t: number }) => {
+                getRadius: (d: AnimDotProps) => {
                   const age = p - d.t
-                  // Pulse: starts big, settles to 3px
+                  // Pulse: starts big, settles. isCurrent maior baseline.
                   const pulse = age < FADE_IN ? 1 + (1 - age / FADE_IN) * 4 : 1
-                  return 3 * pulse
+                  const baseR = d.isCurrent ? 4 : 3
+                  return baseR * pulse
                 },
                 radiusUnits: 'pixels',
                 updateTriggers: { getFillColor: p, getRadius: p },

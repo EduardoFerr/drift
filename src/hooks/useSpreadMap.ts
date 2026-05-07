@@ -36,6 +36,11 @@ interface SpreadRow {
 export function useSpreadMap(
   postId: string | null,
   mode: 'post' | 'global' = 'post',
+  /** Em modo `global`, post sendo visualizado no overlay. Arcos/dots
+   *  cujo `post_id` bate são taggeados `isCurrent: true` na data de
+   *  retorno — UI destaca visualmente. Quando ausente, nenhum arco
+   *  ganha highlight (modo "verdadeiramente agregado"). */
+  currentPostId?: string | null,
 ): {
   data: SpreadMapData | null
   loading: boolean
@@ -60,7 +65,7 @@ export function useSpreadMap(
       try {
         const data =
           mode === 'global'
-            ? await buildGlobalData()
+            ? await buildGlobalData(currentPostId ?? null)
             : await buildPostData(postId!)
 
         if (!cancelled) {
@@ -81,7 +86,7 @@ export function useSpreadMap(
     })()
 
     return () => { cancelled = true }
-  }, [postId, mode])
+  }, [postId, mode, currentPostId])
 
   return state
 }
@@ -162,6 +167,7 @@ async function buildPostData(postId: string): Promise<SpreadMapData> {
 // ─── Global mode ──────────────────────────────────────────────────────
 
 interface VirtualArcRow {
+  post_id: string    // identifica o post — usado pra tag isCurrent
   from_loc: string   // posts.location (autor do post)
   to_loc: string     // spreads.location (quem espalhou)
   spread_at: number  // spreads.created_at
@@ -179,10 +185,11 @@ interface VirtualArcRow {
  *   B cria post em LB, D espalha em LD → arco LB→LD (B infecta D)
  *   Juntos formam a árvore A→B→D, não uma estrela A→{B,D}.
  */
-async function buildGlobalData(): Promise<SpreadMapData> {
+async function buildGlobalData(currentPostId: string | null): Promise<SpreadMapData> {
   const rows = await db.exec<VirtualArcRow>(
-    `SELECT p.location  AS from_loc,
-            s.location  AS to_loc,
+    `SELECT s.post_id    AS post_id,
+            p.location   AS from_loc,
+            s.location   AS to_loc,
             s.created_at AS spread_at
      FROM spreads s
      JOIN posts p ON s.post_id = p.id
@@ -205,8 +212,14 @@ async function buildGlobalData(): Promise<SpreadMapData> {
     if (!fromLoc || !toLoc) continue
 
     const t = normalize(row.spread_at)
-    allArcs.push({ from: [fromLoc.lng, fromLoc.lat], to: [toLoc.lng, toLoc.lat], t })
-    allDests.push({ point: toLoc, createdAt: row.spread_at, t })
+    const isCurrent = currentPostId !== null && row.post_id === currentPostId
+    allArcs.push({
+      from: [fromLoc.lng, fromLoc.lat],
+      to: [toLoc.lng, toLoc.lat],
+      t,
+      isCurrent,
+    })
+    allDests.push({ point: toLoc, createdAt: row.spread_at, t, isCurrent })
     if (fromLoc.country) allCountries.add(fromLoc.country)
     if (toLoc.country)   allCountries.add(toLoc.country)
   }
