@@ -401,7 +401,7 @@ export function PostViewer({
           2 shadow cards atrás (próximos da fila) com scale 0.96/0.92,
           translateY 7px/14px, opacity 0.4/0.18. Efeito Tinder de "tem
           mais posts atrás". Aria-hidden — visual puro. */}
-      <div className="relative flex-1 p-4">
+      <div className="relative flex-1">
         {/* V11 — botão ⋮ menu de ações (embedded mode only).
             Absolute top-right do card area, z-30 pra ficar acima do
             SwipeHandler. onClick stopPropagation pra evitar conflito
