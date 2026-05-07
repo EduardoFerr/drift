@@ -186,6 +186,27 @@ export interface ReportRecord {
   createdAt: number
 }
 
+// ─── Comments (Track C — kind 1111 NIP-22) ──────────────────────────
+
+/**
+ * Linha materializada da tabela `comments`. Mirror direto das colunas
+ * SQLite (snake_case → camelCase na borda).
+ *
+ * `replyTo === postId` ⇒ comment top-level (resposta direta ao post).
+ * `replyTo !== postId` ⇒ resposta a outro comment (cuja id é `replyTo`).
+ *
+ * Score = -999 esconde do thread (mesmo mecanismo de posts, manifesto §17).
+ */
+export interface CommentRecord {
+  id: string
+  postId: string
+  replyTo: string
+  authorPub: string
+  content: string
+  createdAt: number
+  score: number
+}
+
 // ─── Usuário (perfil agregado) ───────────────────────────────────────
 
 export interface DriftUser {
