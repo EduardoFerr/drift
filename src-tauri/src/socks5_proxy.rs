@@ -97,12 +97,13 @@ const REP_ADDR_TYPE_NOT_SUPPORTED: u8 = 0x08;
 /// Implementação atual: o task fica rodando até o processo morrer
 /// (drop graceful do listener é follow-up — não é crítico porque
 /// `tor_disconnect` é raro e o usuário pode encerrar o app).
+///
+/// `active_streams` (param) é o counter shared com `TorState.active_streams`.
+/// Incrementado quando uma conexão SOCKS5 é aceita; decrementado via
+/// guard quando `handle_connection` retorna (independente de ok/err).
+/// Refletido em `TorStatus.circuit_count` no read path de `tor_status`.
 pub async fn start_socks5_listener(
     client: Arc<ArtiClient>,
-    /// Counter atômico shared com `TorState.active_streams`. Incrementado
-    /// quando a conexão SOCKS5 é aceita; decrementado via guard quando
-    /// `handle_connection` retorna (independente de ok/err). Refletido em
-    /// `TorStatus.circuit_count` no read path de `tor_status`.
     active_streams: Arc<AtomicU32>,
 ) -> Result<SocketAddr, String> {
     let bind: SocketAddr = "127.0.0.1:0".parse().expect("loopback parse infalível");
