@@ -27,10 +27,9 @@
 //! orchestration.
 
 use serde::Serialize;
-use std::sync::Mutex;
-
-#[cfg(feature = "arti")]
 use std::sync::Arc;
+use std::sync::Mutex;
+use std::sync::atomic::{AtomicU32, Ordering};
 
 #[cfg(feature = "arti")]
 use arti_client::{TorClient, TorClientConfig};
@@ -47,10 +46,14 @@ use tor_rtcompat::PreferredRuntime;
 pub struct TorStatus {
     /// Estado atual: 'disconnected' | 'connecting' | 'connected' | 'error'.
     pub state: String,
-    /// Número de circuits ativos (0 quando desconectado). Em modo arti,
-    /// hoje não temos métrica live desse contador — fica 1 enquanto
-    /// bootstrap-completed, 0 caso contrário. Live counter é follow-up
-    /// (depende de `TorClient::circmgr` introspection, API instável).
+    /// Número de circuits/streams ativos. 0 quando desconectado.
+    /// Em modo arti: contador live de conexões SOCKS5 ativas, atualizado
+    /// pelo listener (`socks5_proxy.rs`) via `Arc<AtomicU32>` shared.
+    /// Cada conexão SOCKS5 corresponde a (pelo menos) 1 circuit Tor sendo
+    /// usado — boa proxy pra "Tor está roteando ativamente". Em idle pós-
+    /// bootstrap = 0 (circuit guard existe mas não está carregando stream).
+    /// Métrica exata de circuits internos do arti exige `TorClient::circmgr`
+    /// introspection (API instável); active SOCKS streams é proxy estável.
     pub circuit_count: u32,
     /// Mensagem de erro mais recente, se algum.
     pub last_error: Option<String>,
@@ -86,12 +89,20 @@ pub struct TorState {
     pub status: Mutex<TorStatus>,
     #[cfg(feature = "arti")]
     pub client: Mutex<Option<Arc<TorClient<PreferredRuntime>>>>,
+    /// Contador atômico de streams SOCKS5 ativos. `Arc` permite clone
+    /// pra dentro do listener task (move semantics) sem mover ownership
+    /// do counter. Incrementado em `start_socks5_listener` quando uma
+    /// conexão é aceita; decrementado no fim do `handle_connection`.
+    /// Refletido em `TorStatus.circuit_count` no read path de
+    /// `tor_status`. Atomic permite incrementar sem lock na hot path.
+    pub active_streams: Arc<AtomicU32>,
 }
 
 impl Default for TorState {
     fn default() -> Self {
         Self {
             status: Mutex::new(TorStatus::default()),
+            active_streams: Arc::new(AtomicU32::new(0)),
             #[cfg(feature = "arti")]
             client: Mutex::new(None),
         }
@@ -174,7 +185,17 @@ pub async fn tor_connect(state: tauri::State<'_, TorState>) -> Result<TorStatus,
     // não tem onde se ligar. Mas mantemos o client armazenado pra o
     // próximo retry de tor_connect reusar (idempotência via "connected"
     // check no topo).
-    let proxy_addr = match crate::socks5_proxy::start_socks5_listener(client_arc.clone()).await {
+    // Clone do Arc<AtomicU32> — listener captura próprio handle, o
+    // estado da app continua dono do original. Increment/decrement
+    // atômico é shared-memory entre listener task e tor_status read.
+    let stream_counter = state.active_streams.clone();
+
+    let proxy_addr = match crate::socks5_proxy::start_socks5_listener(
+        client_arc.clone(),
+        stream_counter,
+    )
+    .await
+    {
         Ok(addr) => addr,
         Err(err) => {
             let mut s = state.status.lock().map_err(|e| e.to_string())?;
@@ -192,7 +213,9 @@ pub async fn tor_connect(state: tauri::State<'_, TorState>) -> Result<TorStatus,
     }
     let mut s = state.status.lock().map_err(|e| e.to_string())?;
     s.state = "connected".to_string();
-    s.circuit_count = 1;
+    // circuit_count fica 0 em idle (sem streams ativos) — atualizado via
+    // atomic load em `tor_status`. Só ficar "1 hardcoded" era enganoso.
+    s.circuit_count = state.active_streams.load(Ordering::Relaxed);
     s.last_error = None;
     s.proxy_addr = Some(proxy_addr.to_string());
     Ok(s.clone())
@@ -229,6 +252,11 @@ pub async fn tor_disconnect(state: tauri::State<'_, TorState>) -> Result<TorStat
         // estiver estável.
         *c = None;
     }
+    // Reset do counter atômico — listener task ainda pode estar viva,
+    // mas sem o TorClient ela vai falhar no próximo handle_connection
+    // e dropar streams; mais robusto resetar aqui pra TorStatus refletir
+    // estado real imediatamente.
+    state.active_streams.store(0, Ordering::Relaxed);
     let mut s = state.status.lock().map_err(|e| e.to_string())?;
     s.state = "disconnected".to_string();
     s.circuit_count = 0;
@@ -239,8 +267,16 @@ pub async fn tor_disconnect(state: tauri::State<'_, TorState>) -> Result<TorStat
 // ─── tor_status ──────────────────────────────────────────────────────
 
 /// Consulta status atual sem mutar nada. Read-only em ambos os modos.
+///
+/// Em modo arti, lê `active_streams` atomicamente e injeta no
+/// `circuit_count` retornado — TS-side recebe contagem live de
+/// conexões SOCKS5 ativas em vez de hardcode `1`.
 #[tauri::command]
 pub async fn tor_status(state: tauri::State<'_, TorState>) -> Result<TorStatus, String> {
-    let s = state.status.lock().map_err(|e| e.to_string())?;
-    Ok(s.clone())
+    let mut s = state.status.lock().map_err(|e| e.to_string())?.clone();
+    // Live count: atomic load é cheaper que segurar o mutex de status
+    // pra ler. Em estado != connected, o counter já é 0 por construção
+    // (tor_disconnect zera; pré-bootstrap counter never increments).
+    s.circuit_count = state.active_streams.load(Ordering::Relaxed);
+    Ok(s)
 }

@@ -77,6 +77,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Detecta se o PR/push tocou em arquivos Rust ou Tauri config.
+      # Usado pelo step `cargo check --features arti` pra rodar em PRs
+      # que mexem em src-tauri/, capturando regressões arti antes de
+      # merge. Cache compartilhado mantém custo baixo (~5s warm).
+      - name: Detect Rust/Tauri changes
+        id: rust-changed
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            rust:
+              - 'src-tauri/**'
+              - '.github/workflows/ci.yml'
+
       - name: Setup Rust toolchain
         # Trocado de pin específico pra `stable` após cascata de bumps:
         #   1.83 → edition2024 (serde_spanned)
@@ -115,8 +128,13 @@ jobs:
         run: cargo check --locked
 
       - name: cargo check (--features arti)
-        # Roda apenas em push pra main (não em PR de fork) pra economizar
-        # minutos. Cold cache primeira vez ~4min; subsequente ~5s.
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        # Roda em:
+        #   - push pra main (regressão guard)
+        #   - PR que toca src-tauri/** ou ci.yml (catch antes de merge)
+        # Cold cache primeira vez ~4min; subsequente ~5s. Cache key
+        # inclui Cargo.lock — invalida ao bumpar deps.
+        if: |
+          (github.event_name == 'push' && github.ref == 'refs/heads/main')
+          || (github.event_name == 'pull_request' && steps.rust-changed.outputs.rust == 'true')
         working-directory: src-tauri
         run: cargo check --locked --features arti

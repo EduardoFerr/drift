@@ -3,6 +3,14 @@ import QRCode from 'qrcode'
 import { FullPageOverlay } from '../UI/FullPageOverlay'
 import { dialog } from '../../lib/dialog'
 import { setIdentityFromNsec } from '../../lib/identity'
+import {
+  buildBackup,
+  parseBackup,
+  serializeBackup,
+  suggestBackupFilename,
+  BackupParseError,
+} from '../../lib/identity-backup'
+import { CLIENT_VERSION } from '../../config/constants'
 import { rebuildIdentityHistory } from '../../lib/sync'
 import {
   disablePasskey,
@@ -82,6 +90,11 @@ function BackupTab({ identity }: { identity: DriftIdentity }) {
   const [reveal, setReveal] = useState(false)
   const [qrUrl, setQrUrl] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [downloaded, setDownloaded] = useState(false)
+  // Track C.3 — checkbox de confirmação. UX guia: user precisa
+  // explicitamente declarar que guardou. Não bloqueia (não é gate),
+  // só sinaliza visualmente. Manifesto §3 — usuário detém a chave.
+  const [confirmed, setConfirmed] = useState(false)
   const qrRef = useRef<string | null>(null)
 
   useEffect(() => {
@@ -106,6 +119,29 @@ function BackupTab({ identity }: { identity: DriftIdentity }) {
     } catch (err) {
       console.error('[copy]', err)
     }
+  }
+
+  // Track C.3 — download backup como JSON file. Browser file picker
+  // via blob URL + a.download. Sem upload remoto, sem servidor —
+  // arquivo gerado e salvo 100% client-side (manifesto §28).
+  function handleDownload() {
+    const backup = buildBackup({
+      npub: identity.npubBech32,
+      nsec: identity.nsecBech32,
+      appVersion: CLIENT_VERSION,
+    })
+    const text = serializeBackup(backup)
+    const blob = new Blob([text], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = suggestBackupFilename(identity.npubBech32)
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    setDownloaded(true)
+    setTimeout(() => setDownloaded(false), 2000)
   }
 
   return (
@@ -154,12 +190,21 @@ function BackupTab({ identity }: { identity: DriftIdentity }) {
               )}
             </div>
 
-            <button
-              onClick={handleCopy}
-              className="w-full rounded border border-drift-border px-3 py-2 text-[11px] uppercase tracking-widest text-slate-400 transition-colors hover:border-drift-accent hover:text-drift-accent"
-            >
-              {copied ? 'copiado ✓' : 'copiar nsec'}
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={handleCopy}
+                className="flex-1 rounded border border-drift-border px-3 py-2 text-[11px] uppercase tracking-widest text-slate-400 transition-colors hover:border-drift-accent hover:text-drift-accent"
+              >
+                {copied ? 'copiado ✓' : 'copiar nsec'}
+              </button>
+              <button
+                onClick={handleDownload}
+                className="flex-1 rounded border border-drift-accent2 px-3 py-2 text-[11px] uppercase tracking-widest text-drift-accent2 transition-colors hover:bg-drift-accent2/10"
+                title="Baixa um arquivo .json com nsec + npub + metadados. Guarde em local seguro."
+              >
+                {downloaded ? 'baixado ✓' : 'baixar arquivo'}
+              </button>
+            </div>
           </div>
         ) : (
           <div className="rounded border border-drift-border bg-black/30 p-2 text-[11px] text-slate-700">
@@ -167,6 +212,23 @@ function BackupTab({ identity }: { identity: DriftIdentity }) {
           </div>
         )}
       </div>
+
+      {reveal && (
+        <label className="flex cursor-pointer items-start gap-3 rounded border border-drift-border p-3 text-[11px] leading-relaxed text-slate-300 transition-colors hover:border-drift-accent2/40">
+          <input
+            type="checkbox"
+            checked={confirmed}
+            onChange={(e) => setConfirmed(e.target.checked)}
+            className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-drift-accent2"
+          />
+          <span>
+            Confirmo que <strong className="text-drift-text">guardei o nsec
+            em local seguro</strong> (papel, gerenciador de senhas, arquivo
+            offline). Entendo que perder isso = perder a identidade
+            permanentemente.
+          </span>
+        </label>
+      )}
 
       <div className="rounded border border-yellow-900/60 bg-yellow-950/10 p-3 text-[10px] leading-relaxed text-yellow-300/70">
         Esta é a sua identidade na rede Drift. Quem tiver acesso a ela
@@ -185,12 +247,37 @@ function ImportTab({ onClose }: { onClose: () => void }) {
   const [nsec, setNsec] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [loadedFrom, setLoadedFrom] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Track C.3 — carrega backup .json. Lê localmente (FileReader),
+  // valida shape via parseBackup, e popula textarea com nsec1.
+  // User ainda precisa confirmar no botão "importar" — file load
+  // não é destrutivo.
+  async function handleFileLoad(file: File) {
+    setError(null)
+    setLoadedFrom(null)
+    try {
+      const text = await file.text()
+      const backup = parseBackup(text)
+      setNsec(backup.nsec)
+      setLoadedFrom(`${file.name} · npub ${backup.npub.slice(0, 14)}…`)
+    } catch (err) {
+      const msg =
+        err instanceof BackupParseError
+          ? `arquivo inválido (${err.cause}): ${err.message}`
+          : err instanceof Error
+          ? err.message
+          : String(err)
+      setError(msg)
+    }
+  }
 
   async function handleImport() {
     setError(null)
     const trimmed = nsec.trim()
     if (!trimmed) {
-      setError('Cole uma chave nsec1...')
+      setError('Cole uma chave nsec1 ou carregue um arquivo de backup.')
       return
     }
     const ok = await dialog.confirm(
@@ -222,6 +309,42 @@ function ImportTab({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="space-y-4">
+      {/* Track C.3 — file picker pra carregar backup .json. */}
+      <div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="application/json,.json"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0]
+            if (file) void handleFileLoad(file)
+            // Reset value pra permitir reload do mesmo arquivo
+            e.target.value = ''
+          }}
+        />
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          disabled={busy}
+          className="w-full rounded border border-drift-accent2 bg-drift-accent2/5 px-3 py-2 text-[11px] uppercase tracking-widest text-drift-accent2 transition-colors hover:bg-drift-accent2/10 disabled:opacity-40"
+        >
+          ⤓ carregar arquivo de backup (.json)
+        </button>
+        {loadedFrom && (
+          <div className="mt-1 truncate font-mono text-[10px] text-drift-accent2/80" title={loadedFrom}>
+            ✓ carregado: {loadedFrom}
+          </div>
+        )}
+      </div>
+
+      <div className="flex items-center gap-3">
+        <div className="h-px flex-1 bg-drift-border" />
+        <span className="font-mono text-[9px] uppercase tracking-widest text-slate-600">
+          ou cole manual
+        </span>
+        <div className="h-px flex-1 bg-drift-border" />
+      </div>
+
       <div>
         <div className="mb-1 text-[10px] uppercase tracking-widest text-slate-500">
           chave nsec

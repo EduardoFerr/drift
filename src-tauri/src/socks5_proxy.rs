@@ -52,6 +52,7 @@
 
 use std::net::SocketAddr;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, Ordering};
 
 use arti_client::{TorClient, TorClientBuilder};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -96,7 +97,14 @@ const REP_ADDR_TYPE_NOT_SUPPORTED: u8 = 0x08;
 /// Implementação atual: o task fica rodando até o processo morrer
 /// (drop graceful do listener é follow-up — não é crítico porque
 /// `tor_disconnect` é raro e o usuário pode encerrar o app).
-pub async fn start_socks5_listener(client: Arc<ArtiClient>) -> Result<SocketAddr, String> {
+pub async fn start_socks5_listener(
+    client: Arc<ArtiClient>,
+    /// Counter atômico shared com `TorState.active_streams`. Incrementado
+    /// quando a conexão SOCKS5 é aceita; decrementado via guard quando
+    /// `handle_connection` retorna (independente de ok/err). Refletido em
+    /// `TorStatus.circuit_count` no read path de `tor_status`.
+    active_streams: Arc<AtomicU32>,
+) -> Result<SocketAddr, String> {
     let bind: SocketAddr = "127.0.0.1:0".parse().expect("loopback parse infalível");
     let listener = TcpListener::bind(bind)
         .await
@@ -112,7 +120,14 @@ pub async fn start_socks5_listener(client: Arc<ArtiClient>) -> Result<SocketAddr
             match listener.accept().await {
                 Ok((socket, peer)) => {
                     let client_clone = client.clone();
+                    let counter_clone = active_streams.clone();
                     tokio::spawn(async move {
+                        // Increment ao aceitar; decrement via guard
+                        // garante decremento mesmo em panic/early-return.
+                        counter_clone.fetch_add(1, Ordering::Relaxed);
+                        let _guard = StreamGuard {
+                            counter: counter_clone,
+                        };
                         if let Err(err) = handle_connection(socket, client_clone).await {
                             // Erro de cliente individual não derruba o listener.
                             // Log via eprintln pra ficar visível em dev (Tauri
@@ -122,6 +137,7 @@ pub async fn start_socks5_listener(client: Arc<ArtiClient>) -> Result<SocketAddr
                                 peer, err
                             );
                         }
+                        // _guard drop aqui → fetch_sub
                     });
                 }
                 Err(err) => {
@@ -318,4 +334,19 @@ async fn send_reply(socks: &mut TcpStream, rep: u8) -> std::io::Result<()> {
 #[allow(dead_code)]
 fn _ensure_builder_visible() -> Option<TorClientBuilder<PreferredRuntime>> {
     None
+}
+
+/// RAII guard pra decrementar o counter de streams ativos quando a task
+/// do handler termina (ok, err, ou panic). Garantia mais forte que
+/// `fetch_sub` no fim de função — cobre early-return, `?`, panic.
+/// Owned Arc (não borrow) porque o guard vive dentro de um tokio::spawn,
+/// onde lifetime tradicional não se aplica bem.
+struct StreamGuard {
+    counter: Arc<AtomicU32>,
+}
+
+impl Drop for StreamGuard {
+    fn drop(&mut self) {
+        self.counter.fetch_sub(1, Ordering::Relaxed);
+    }
 }
