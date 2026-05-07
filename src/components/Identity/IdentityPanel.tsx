@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import QRCode from 'qrcode'
 import { FullPageOverlay } from '../UI/FullPageOverlay'
+import { dialog } from '../../lib/dialog'
 import { setIdentityFromNsec } from '../../lib/identity'
 import { rebuildIdentityHistory } from '../../lib/sync'
 import {
@@ -192,13 +193,15 @@ function ImportTab({ onClose }: { onClose: () => void }) {
       setError('Cole uma chave nsec1...')
       return
     }
-    if (
-      !confirm(
-        'Importar uma nova identidade APAGA a identidade atual deste dispositivo. Você fez backup da chave atual? Continuar?',
-      )
-    ) {
-      return
-    }
+    const ok = await dialog.confirm(
+      'Importar uma nova identidade APAGA a identidade atual deste dispositivo. Você fez backup da chave atual?',
+      {
+        title: 'importar nsec',
+        dangerous: true,
+        okLabel: 'continuar',
+      },
+    )
+    if (!ok) return
 
     setBusy(true)
     try {
@@ -301,15 +304,14 @@ function PasskeyTab({ npub }: { npub: string }) {
 
   async function handleDisable() {
     if (working) return
-    if (
-      !confirm(
-        'Desabilitar Passkey?\n\n' +
-          'O cliente vai parar de pedir autenticação no boot. A identidade\n' +
-          'em si NÃO é afetada — só o gate local.\n\n' +
-          'OK = desabilitar.',
-      )
+    const ok = await dialog.confirm(
+      'O cliente vai parar de pedir autenticação no boot. A identidade em si NÃO é afetada — só o gate local.',
+      {
+        title: 'desabilitar passkey',
+        okLabel: 'desabilitar',
+      },
     )
-      return
+    if (!ok) return
     setWorking(true)
     setError(null)
     try {

@@ -26,6 +26,7 @@
 
 import { useEffect, useState } from 'react'
 import { setPref, usePrefsStore } from '../../lib/prefs'
+import { dialog } from '../../lib/dialog'
 import { db } from '../../lib/db'
 import { useBootStore } from '../../lib/bootstrap'
 import { useRelaysStore } from '../../lib/relays'
@@ -297,9 +298,12 @@ export function NetworkModeCard({ onClose }: CardProps) {
   async function changeMode(v: NetworkMode) {
     if (v === prefs.network_mode) return
     const next = v === 'tor' || v === 'onion-only' ? 'Tor' : 'clearnet'
-    const ok = window.confirm(
-      `Trocar para ${next} exige recarregar a aba para aplicar.\n\n` +
-        'Recarregar agora? (cancelar = manter modo atual)',
+    const ok = await dialog.confirm(
+      `Trocar para ${next} exige recarregar a aba para aplicar.`,
+      {
+        title: 'modo de rede',
+        okLabel: 'recarregar',
+      },
     )
     if (!ok) return
     await setPref('network_mode', v)
@@ -559,26 +563,24 @@ export function DiagnosticCard({ onClose }: CardProps) {
   const [rebuilding, setRebuilding] = useState(false)
 
   async function handleRebuild() {
-    if (
-      !confirm(
-        'Reconstruir banco local?\n\n' +
-          '• Sua identidade (nsec) será preservada\n' +
-          '• Suas preferências serão preservadas\n' +
-          '• Posts, spreads, buries e reports locais serão apagados\n' +
-          '• Tudo será re-sincronizado dos relays automaticamente\n\n' +
-          'Útil quando o banco entrou em estado inconsistente após upgrade.',
-      )
-    ) {
-      return
-    }
+    const ok = await dialog.confirm(
+      'Identidade (nsec) e preferências serão preservadas. Posts, spreads, buries e reports locais serão apagados — tudo re-sincroniza dos relays automaticamente.\n\nÚtil quando o banco entrou em estado inconsistente após upgrade.',
+      {
+        title: 'reconstruir banco local',
+        dangerous: true,
+        okLabel: 'reconstruir',
+      },
+    )
+    if (!ok) return
     setRebuilding(true)
     try {
       await db.rebuildDomainSchema()
       location.reload()
     } catch (err) {
       setRebuilding(false)
-      alert(
+      await dialog.alert(
         `Falha ao reconstruir: ${err instanceof Error ? err.message : String(err)}`,
+        { title: 'erro' },
       )
     }
   }

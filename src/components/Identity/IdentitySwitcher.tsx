@@ -19,6 +19,7 @@
 
 import { useState } from 'react'
 import { FullPageOverlay } from '../UI/FullPageOverlay'
+import { dialog } from '../../lib/dialog'
 import {
   createNewIdentity,
   importIdentityNsec,
@@ -123,14 +124,15 @@ export function IdentitySwitcher({ onRequestExport, onClose }: IdentitySwitcherP
   async function handleSwitch(target: IdentityRecord) {
     if (target.npub === activeNpub) return
 
-    const exportFirst = confirm(
-      `Trocar pra identidade "${target.label || target.npubBech32.slice(0, 12) + '…'}"?\n\n` +
-        '⚠ A identidade ATUAL ainda está aqui (não some). Mas o estado local\n' +
-        'em memória vai resetar, e a app vai recarregar. Recomendado:\n\n' +
-        '  → fazer backup do nsec da identidade atual antes\n\n' +
-        'OK = continuar. Cancelar = voltar e fazer backup primeiro.',
+    const proceed = await dialog.confirm(
+      `Trocar pra "${target.label || target.npubBech32.slice(0, 12) + '…'}"?\n\nA identidade ATUAL fica salva. Mas o estado local em memória vai resetar e a app recarrega. Recomendado fazer backup do nsec da identidade atual antes.`,
+      {
+        title: 'trocar identidade',
+        okLabel: 'continuar',
+        cancelLabel: 'fazer backup',
+      },
     )
-    if (!exportFirst) {
+    if (!proceed) {
       onRequestExport()
       return
     }
@@ -150,16 +152,19 @@ export function IdentitySwitcher({ onRequestExport, onClose }: IdentitySwitcherP
 
   async function handleRemove(target: IdentityRecord) {
     if (target.npub === activeNpub) {
-      alert('Não pode remover a identidade ativa. Troque pra outra primeiro.')
+      await dialog.alert(
+        'Não pode remover a identidade ativa. Troque pra outra primeiro.',
+        { title: 'remover identidade' },
+      )
       return
     }
-    const confirmed = confirm(
-      `Remover identidade "${target.label || target.npubBech32.slice(0, 12) + '…'}"?\n\n` +
-        '⚠ DESTRUTIVO: o nsec encriptado dessa identidade será apagado deste\n' +
-        'dispositivo. Se você não tem backup do nsec1, recupera-la será\n' +
-        'IMPOSSÍVEL (manifesto §3).\n\n' +
-        'Recomendado: exportar nsec antes.\n\n' +
-        'OK = remover. Cancelar = voltar.',
+    const confirmed = await dialog.confirm(
+      `Remover "${target.label || target.npubBech32.slice(0, 12) + '…'}"?\n\nDESTRUTIVO: o nsec encriptado será apagado deste dispositivo. Sem backup do nsec1, recuperá-la é IMPOSSÍVEL (manifesto §3). Recomendado exportar antes.`,
+      {
+        title: 'remover identidade',
+        dangerous: true,
+        okLabel: 'remover',
+      },
     )
     if (!confirmed) return
 
@@ -174,10 +179,12 @@ export function IdentitySwitcher({ onRequestExport, onClose }: IdentitySwitcherP
   }
 
   async function handleRename(target: IdentityRecord) {
-    const next = prompt(
-      'Novo label:',
-      target.label ?? '',
-    )
+    const next = await dialog.prompt('Novo label:', {
+      title: 'renomear identidade',
+      defaultValue: target.label ?? '',
+      placeholder: 'ex: público, anônimo, work',
+      maxLength: 32,
+    })
     if (next === null) return
     try {
       await renameIdentity(target.npub, next.trim() || null)

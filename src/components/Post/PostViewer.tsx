@@ -23,6 +23,7 @@
 import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { Post, RenderHint, ReportReason } from '../../types/drift'
+import { dialog } from '../../lib/dialog'
 import { applyContentFilters } from '../../lib/feed'
 import { usePrefsStore } from '../../lib/prefs'
 import { reportPost } from '../../lib/protocol'
@@ -173,7 +174,10 @@ export function PostViewer({
       setShowReport(false)
     } catch (err) {
       console.error('report failed', err)
-      alert(`Falha ao denunciar: ${err instanceof Error ? err.message : String(err)}`)
+      await dialog.alert(
+        `Falha ao denunciar: ${err instanceof Error ? err.message : String(err)}`,
+        { title: 'erro' },
+      )
     } finally {
       setReporting(false)
     }
@@ -193,20 +197,19 @@ export function PostViewer({
   }
 
   async function handleBlock() {
-    if (
-      !confirm(
-        `Bloquear este autor?\n\n` +
-          `Posts e interações dele somem do SEU feed (manifesto §24 — filtro local).\n` +
-          `Não muda o score nem afeta outros users.\n` +
-          `Você pode desbloquear depois em Settings → listas.`,
-      )
+    const ok = await dialog.confirm(
+      `Posts e interações deste autor somem do SEU feed (manifesto §24 — filtro local).\nNão muda o score nem afeta outros users.\nVocê pode desbloquear depois em Settings → listas.`,
+      { title: 'bloquear autor', dangerous: true, okLabel: 'bloquear' },
     )
-      return
+    if (!ok) return
     try {
       await block(post.authorPub)
       onClose()
     } catch (err) {
-      alert(`Falha ao bloquear: ${err instanceof Error ? err.message : String(err)}`)
+      await dialog.alert(
+        `Falha ao bloquear: ${err instanceof Error ? err.message : String(err)}`,
+        { title: 'erro' },
+      )
     }
   }
 
@@ -215,7 +218,10 @@ export function PostViewer({
       await mute(post.authorPub)
       onClose()
     } catch (err) {
-      alert(`Falha ao silenciar: ${err instanceof Error ? err.message : String(err)}`)
+      await dialog.alert(
+        `Falha ao silenciar: ${err instanceof Error ? err.message : String(err)}`,
+        { title: 'erro' },
+      )
     }
   }
 
@@ -224,10 +230,11 @@ export function PostViewer({
       if (isFollowing) await unfollow(post.authorPub)
       else await follow(post.authorPub)
     } catch (err) {
-      alert(
+      await dialog.alert(
         `Falha ao ${isFollowing ? 'deixar de seguir' : 'seguir'}: ${
           err instanceof Error ? err.message : String(err)
         }`,
+        { title: 'erro' },
       )
     }
   }

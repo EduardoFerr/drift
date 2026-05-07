@@ -39,6 +39,8 @@ import { ProfileModal } from './components/Profile/ProfileModal'
 import { GpsErrorBanner } from './components/UI/GpsErrorBanner'
 import { MultiTabModal } from './components/UI/MultiTabModal'
 import { UpdatePrompt } from './components/UI/UpdatePrompt'
+import { DialogHost } from './components/UI/DialogHost'
+import { dialog } from './lib/dialog'
 import { NavBar } from './components/UI/NavBar'
 import { FullPageOverlay } from './components/UI/FullPageOverlay'
 import {
@@ -372,7 +374,10 @@ function App() {
       setShowCreate(false)
     } catch (err) {
       console.error('publish failed', err)
-      alert(`Falha ao publicar: ${err instanceof Error ? err.message : String(err)}`)
+      await dialog.alert(
+        `Falha ao publicar: ${err instanceof Error ? err.message : String(err)}`,
+        { title: 'erro' },
+      )
     } finally {
       setPublishing(false)
       // Garante limpeza mesmo se getCurrentLocation throw (não deveria —
@@ -497,12 +502,11 @@ function App() {
   }
 
   async function handleClearLocal() {
-    if (
-      !confirm(
-        'Apagar TODOS os posts/spreads/buries locais? (identidade preservada)',
-      )
+    const ok = await dialog.confirm(
+      'Apagar TODOS os posts/spreads/buries locais? (identidade preservada)',
+      { title: 'limpar local', dangerous: true, okLabel: 'apagar' },
     )
-      return
+    if (!ok) return
     await db.run(`DELETE FROM posts`)
     await db.run(`DELETE FROM spreads`)
     await db.run(`DELETE FROM buries`)
@@ -577,6 +581,7 @@ function App() {
       </div>
 
       <UpdatePrompt />
+      <DialogHost />
 
       {/* Stack — área central que contém o card atual. flex:1 expande
           até a navbar bottom. Card visual = PostViewer embedded.

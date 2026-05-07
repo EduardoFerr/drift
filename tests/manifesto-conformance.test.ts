@@ -624,3 +624,50 @@ describe('CSP paridade Tauri ↔ Vercel (Marshall risco #3)', () => {
     expect(tauriTokens, "tauri CSP não pode conter 'unsafe-eval'").not.toContain("'unsafe-eval'")
   })
 })
+
+describe('Native dialogs banidos em src/ (UX consistency, V14.2)', () => {
+  // Native window.alert/confirm/prompt renderiza em estilo do browser
+  // — feio sobre o tema dark Drift, e em Tauri nem sempre disponível.
+  // src/lib/dialog.ts substitui com modal próprio (drift-surface +
+  // framer-motion). Test guarda contra regressão silenciosa.
+  //
+  // Whitelist: useInstallPrompt.ts usa `evt.prompt()` (BeforeInstall
+  // PromptEvent API, não o native window.prompt — assinatura diferente).
+  // src/lib/dialog.ts contém os definitions e exemplos no docstring.
+
+  it('zero chamadas window.alert/confirm/prompt em src/components e src/App.tsx', async () => {
+    const fg = await import('fast-glob')
+    const files = await fg.default(
+      [
+        'src/App.tsx',
+        'src/components/**/*.{ts,tsx}',
+        'src/lib/!(dialog).ts',
+        'src/hooks/!(useInstallPrompt).ts',
+      ],
+      {
+        cwd: ROOT,
+        onlyFiles: true,
+        // DialogHost é a implementação do modal — comentários internos
+        // referenciam alert/confirm/prompt como termo conceitual.
+        ignore: ['src/components/UI/DialogHost.tsx'],
+      },
+    )
+    const offenders: { file: string; line: number; text: string }[] = []
+    for (const rel of files) {
+      const src = readFileSync(join(ROOT, rel), 'utf8')
+      src.split('\n').forEach((line, i) => {
+        // Match início de identifier (não dentro de outro identifier).
+        // alert( / confirm( / prompt( standalone, sem prefixo de objeto
+        // (ex.: dialog.alert, evt.prompt passam — esses têm `.` antes).
+        if (/(?<![\w.])(alert|confirm|prompt)\s*\(/.test(line)) {
+          offenders.push({ file: '/' + rel.replace(/\\/g, '/'), line: i + 1, text: line.trim() })
+        }
+      })
+    }
+    expect(
+      offenders,
+      'Native dialogs detectados. Use `dialog.alert/confirm/prompt` de src/lib/dialog.ts. Hits:\n' +
+        offenders.map((o) => `  ${o.file}:${o.line}: ${o.text}`).join('\n'),
+    ).toEqual([])
+  })
+})
