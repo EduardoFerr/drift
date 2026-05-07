@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+﻿import { useEffect, useMemo, useState } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import { OPTIMISTIC_TIMEOUT_MS, CLIENT_VERSION } from './config/constants'
 import { db } from './lib/db'
@@ -1070,7 +1070,7 @@ function HomeHeader({
             onOpenStatus={onOpenStatus}
             onOpenProfile={onOpenProfile}
           />
-          <div className="font-mono text-[10px] uppercase tracking-[1.5px] text-drift-muted">
+          <div className="font-mono text-[10px] uppercase tracking-meta text-drift-muted">
             deriva{' '}
             <b className="inline-block w-[44px] font-medium text-drift-accent2">
               {currentScore !== null ? formatScore(currentScore) : '—'}
@@ -1142,7 +1142,7 @@ function MapOverlay({
   const headerRight = (
     <div className="flex items-center gap-3">
       <span
-        className="font-mono text-[10px] uppercase tracking-[1.5px] text-drift-muted"
+        className="font-mono text-[10px] uppercase tracking-meta text-drift-muted"
         title="eventos recebidos pelo subscribe"
       >
         {events.toLocaleString('pt-BR')} ev
@@ -1343,7 +1343,7 @@ function SettingsRoot({
           >
             <h3
               id={`settings-group-${gi}`}
-              className="mb-2 font-mono text-[9px] uppercase tracking-[2.5px] text-drift-muted"
+              className="mb-2 font-mono text-[9px] uppercase tracking-tag text-drift-muted"
             >
               {group.title}
             </h3>
@@ -1666,7 +1666,7 @@ function DiagnosticPanel({ boot }: { boot: BootState }) {
         <button
           onClick={handleRefresh}
           disabled={refreshing}
-          className="flex-1 rounded border border-drift-border px-3 py-2 font-mono text-[10px] uppercase tracking-[1.5px] text-slate-400 transition-colors hover:border-drift-accent hover:text-drift-accent disabled:opacity-50 focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2"
+          className="flex-1 rounded border border-drift-border px-3 py-2 font-mono text-[10px] uppercase tracking-meta text-slate-400 transition-colors hover:border-drift-accent hover:text-drift-accent disabled:opacity-50 focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2"
           title="re-query SQLite e atualiza o feed local — útil se UI parece stale"
         >
           {refreshing ? '…' : '↻ atualizar feed'}
@@ -1674,7 +1674,7 @@ function DiagnosticPanel({ boot }: { boot: BootState }) {
         <button
           onClick={handleResync}
           disabled={resyncing}
-          className="flex-1 rounded border border-drift-border px-3 py-2 font-mono text-[10px] uppercase tracking-[1.5px] text-slate-400 transition-colors hover:border-drift-accent hover:text-drift-accent disabled:opacity-50 focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2"
+          className="flex-1 rounded border border-drift-border px-3 py-2 font-mono text-[10px] uppercase tracking-meta text-slate-400 transition-colors hover:border-drift-accent hover:text-drift-accent disabled:opacity-50 focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2"
           title="re-subscrever em todos os relays do zero — útil se eventos pararam de chegar"
         >
           {resyncing ? '…' : '↻ re-subscribe'}
@@ -1710,7 +1710,7 @@ function DiagnosticPanel({ boot }: { boot: BootState }) {
       )}
 
       <div className="overflow-hidden rounded border border-drift-border bg-drift-surface p-3">
-        <div className="mb-1 font-mono text-[10px] uppercase tracking-[1.5px] text-slate-400">
+        <div className="mb-1 font-mono text-[10px] uppercase tracking-meta text-slate-400">
           minha npub
         </div>
         {/* whitespace-pre-wrap necessário porque <pre> tem white-space:
@@ -1739,7 +1739,7 @@ function Row({
 }) {
   return (
     <div className="flex items-center justify-between">
-      <span className="text-[10px] uppercase tracking-[1.5px] text-slate-400">
+      <span className="text-[10px] uppercase tracking-meta text-slate-400">
         {label}
       </span>
       <span className={valueClass}>{value}</span>

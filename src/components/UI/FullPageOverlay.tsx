@@ -1,4 +1,4 @@
-/**
+﻿/**
  * FullPageOverlay — primitive de overlay fullscreen (não modal centrado).
  *
  * Contraste com `<SlideUpOverlay>` (V3.0): SlideUp é modal pequeno

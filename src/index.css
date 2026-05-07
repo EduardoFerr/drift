@@ -42,6 +42,24 @@
   /* Role (protocolo) */
   --drift-spread: #34d399;
   --drift-bury: #f87171;
+  /*
+   * Mockup v0.7 tokens — valores que não caem na escala 4px do
+   * Tailwind. Definidos como CSS vars pra permitir override dinâmico
+   * (theming, A/B, debug em DevTools). tailwind.config.js mapeia
+   * estes pra named utilities com fallback estático: ex
+   *   spacing: { 'card-x': 'var(--card-px, 17px)' }
+   * permite `px-card-x` no JSX. Se a var sumir, fallback estático
+   * mantém o layout — render nunca quebra.
+   */
+  --card-px: 17px;
+  --card-px-wide: 22px;
+  --card-pb: 18px;
+  --tracking-tag: 2.5px;
+  --tracking-meta: 1.5px;
+  --tracking-title: -0.3px;
+  --leading-title: 1.08;
+  --leading-body: 1.65;
+  --drift-body: #787874;
 }
 
 @layer base {

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * PostViewer — tela cheia de leitura com gestos. Comporta-se como uma
  * **fila estilo Tinder**: ao espalhar (↑) ou enterrar (↓), o caller
  * avança pro próximo post — o componente apenas anima a saída na

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * SettingsCards — V9.2d. Cada seção da ContentSettings vira sua
  * própria overlay focada (FullPageOverlay). User feedback: "cada nova
  * opção nas configurações deveria abrir o seu card exclusivo".
@@ -193,7 +193,7 @@ export function LocationCard({ onClose }: CardProps) {
                 role="radio"
                 aria-checked={active}
                 onClick={() => void setPref('location_granularity', opt.value)}
-                className={`rounded border px-2 py-3 font-mono text-[11px] uppercase tracking-[1.5px] transition-colors focus:outline-none focus:ring-1 focus:ring-drift-accent2 focus:ring-offset-2 focus:ring-offset-drift-bg ${
+                className={`rounded border px-2 py-3 font-mono text-[11px] uppercase tracking-meta transition-colors focus:outline-none focus:ring-1 focus:ring-drift-accent2 focus:ring-offset-2 focus:ring-offset-drift-bg ${
                   active
                     ? 'border-drift-accent bg-drift-accent/10 text-drift-accent'
                     : 'border-drift-border text-drift-muted hover:border-drift-text hover:text-drift-text'
@@ -243,7 +243,7 @@ export function MapViewCard({ onClose }: CardProps) {
                 role="radio"
                 aria-checked={active}
                 onClick={() => void setPref('map_view', opt.value)}
-                className={`rounded border px-2 py-3 font-mono text-[11px] uppercase tracking-[1.5px] transition-colors focus:outline-none focus:ring-1 focus:ring-drift-accent2 focus:ring-offset-2 focus:ring-offset-drift-bg ${
+                className={`rounded border px-2 py-3 font-mono text-[11px] uppercase tracking-meta transition-colors focus:outline-none focus:ring-1 focus:ring-drift-accent2 focus:ring-offset-2 focus:ring-offset-drift-bg ${
                   active
                     ? 'border-drift-accent bg-drift-accent/10 text-drift-accent'
                     : 'border-drift-border text-drift-muted hover:border-drift-text hover:text-drift-text'
@@ -339,7 +339,7 @@ export function NetworkModeCard({ onClose }: CardProps) {
                   void changeMode(opt.value)
                 }}
                 disabled={disabled}
-                className={`rounded border px-2 py-3 font-mono text-[11px] uppercase tracking-[1.5px] transition-colors focus:outline-none focus:ring-1 focus:ring-drift-accent2 focus:ring-offset-2 focus:ring-offset-drift-bg ${
+                className={`rounded border px-2 py-3 font-mono text-[11px] uppercase tracking-meta transition-colors focus:outline-none focus:ring-1 focus:ring-drift-accent2 focus:ring-offset-2 focus:ring-offset-drift-bg ${
                   active
                     ? 'border-drift-accent bg-drift-accent/10 text-drift-accent'
                     : 'border-drift-border text-drift-muted hover:border-drift-text hover:text-drift-text'
@@ -490,7 +490,7 @@ export function BlobsCard({ onClose }: CardProps) {
         {!stats && !loading && (
           <button
             onClick={() => void refresh()}
-            className="w-full rounded border border-drift-accent2 bg-drift-surface px-3 py-3 font-mono text-[11px] uppercase tracking-[1.5px] text-drift-accent2 transition-colors hover:bg-drift-accent2/10 focus:outline-none focus:ring-1 focus:ring-drift-accent2 focus:ring-offset-2 focus:ring-offset-drift-bg"
+            className="w-full rounded border border-drift-accent2 bg-drift-surface px-3 py-3 font-mono text-[11px] uppercase tracking-meta text-drift-accent2 transition-colors hover:bg-drift-accent2/10 focus:outline-none focus:ring-1 focus:ring-drift-accent2 focus:ring-offset-2 focus:ring-offset-drift-bg"
           >
             ⊕ inicializar helia
           </button>
@@ -527,7 +527,7 @@ export function BlobsCard({ onClose }: CardProps) {
             />
             <button
               onClick={() => void refresh()}
-              className="mt-2 w-full rounded border border-drift-border px-3 py-2 text-[10px] uppercase tracking-[1.5px] text-drift-muted transition-colors hover:text-drift-text focus:outline-none focus:ring-1 focus:ring-drift-accent2"
+              className="mt-2 w-full rounded border border-drift-border px-3 py-2 text-[10px] uppercase tracking-meta text-drift-muted transition-colors hover:text-drift-text focus:outline-none focus:ring-1 focus:ring-drift-accent2"
             >
               ↻ atualizar
             </button>
@@ -549,7 +549,7 @@ function Row({
 }) {
   return (
     <div className="flex items-center justify-between">
-      <span className="text-[10px] uppercase tracking-[1.5px] text-drift-muted">
+      <span className="text-[10px] uppercase tracking-meta text-drift-muted">
         {label}
       </span>
       <span className={valueClass}>{value}</span>
@@ -602,7 +602,7 @@ export function DiagnosticCard({ onClose }: CardProps) {
         <button
           onClick={handleRebuild}
           disabled={rebuilding}
-          className="w-full rounded border border-yellow-700/60 bg-yellow-950/20 px-3 py-3 font-mono text-[11px] uppercase tracking-[1.5px] text-yellow-300 transition-colors hover:bg-yellow-950/40 disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus:ring-1 focus:ring-drift-accent2 focus:ring-offset-2 focus:ring-offset-drift-bg"
+          className="w-full rounded border border-yellow-700/60 bg-yellow-950/20 px-3 py-3 font-mono text-[11px] uppercase tracking-meta text-yellow-300 transition-colors hover:bg-yellow-950/40 disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus:ring-1 focus:ring-drift-accent2 focus:ring-offset-2 focus:ring-offset-drift-bg"
         >
           {rebuilding ? 'reconstruindo…' : '↻ redefinir cache local'}
         </button>

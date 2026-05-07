@@ -215,15 +215,16 @@ function CardText({
   // pb-[18px] anterior deixava o meta line "colado" no fim do card
   // (faltavam 16px que vinham do p-4). Bumpa pra pb-7 (28px) só no
   // inset; overlay (Landscape) e centered (Text) ficam intocados.
-  // px-[17px] / px-[22px] / pb-[18px] não têm equivalente exato na escala
-  // Tailwind (4px-step) — vêm do mockup v0.7. pt-3.5 == pt-[14px] e py-7
-  // == py-[28px] são matches exatos, então usam Tailwind padrão.
+  // Padding tokens vêm do design-system mockup v0.7 (definidos em
+  // tailwind.config.js + CSS vars em index.css). 'inset' Portrait
+  // dispensa pt — texto fica abaixo da imagem que já tem padding
+  // visual via gradient ou bg.
   const padding =
     variant === 'centered'
-      ? 'px-[22px] py-7'
+      ? 'px-card-x-wide py-7'
       : variant === 'overlay'
-      ? 'px-[17px] pt-3.5 pb-[18px]'
-      : 'px-[17px] pt-3.5 pb-7'
+      ? 'px-card-x pt-3.5 pb-card'
+      : 'px-card-x pb-7'
 
   // Layout 'text' (variant='centered') flex flex-col justify-center
   // pra texto subir do meio. Outros: bloco normal.
@@ -235,24 +236,24 @@ function CardText({
 
   return (
     <div className={`relative ${wrapperBg} ${padding} ${flex}`}>
-      <div className="mb-[5px] font-mono text-[9px] uppercase tracking-[2.5px] text-drift-muted">
+      <div className="mb-[5px] font-mono text-[9px] uppercase tracking-tag text-drift-muted">
         {tag}
       </div>
       {title && (
         <h2
-          className={`mb-2 font-display font-bold leading-[1.08] tracking-[-0.3px] text-drift-text ${titleSize}`}
+          className={`mb-2 font-display font-bold leading-title tracking-title text-drift-text ${titleSize}`}
         >
           {title}
         </h2>
       )}
       {body && (
         <p
-          className={`mb-2.5 font-mono text-xs italic leading-[1.65] text-[#787874] ${bodyClamp}`}
+          className={`mb-2.5 font-mono text-xs italic leading-body text-drift-body ${bodyClamp}`}
         >
           {body}
         </p>
       )}
-      <div className="flex gap-3 font-mono text-[9px] uppercase tracking-[1.5px] text-drift-muted">
+      <div className="flex gap-3 font-mono text-[9px] uppercase tracking-meta text-drift-muted">
         <span>
           DRIFT <span className="text-drift-accent2">{drift}</span>
         </span>
@@ -294,39 +295,50 @@ function PortraitLayout({
     )
   }
 
+  // V14.3 — refactor estrutural (user feedback 2026-05-07): "pense em
+  // dois cards, imagem em baixo e texto em cima com fundo transparente".
+  // Antes: flex column com image flex-1 + text shrink-0 — texto e
+  // imagem como siblings no mesmo nível. Agora: layered overlay igual
+  // ao LandscapeLayout. Image absolute fill (preserva inteira via
+  // fit=contain + position=top, sem crop), text absolute bottom com
+  // bg transparente via variant=overlay + gradient pra legibilidade.
   return (
-    <div className="flex h-full w-full flex-col">
-      {/* Media flex:1 top. */}
-      <div className="relative min-h-0 flex-1">
-        {/* Portrait: fit=contain (default) preserva imagem inteira sem
-            crop. User confirmou OK antes — manter assim. */}
+    <div className="relative h-full w-full overflow-hidden">
+      {/* Card de baixo: imagem. fit=contain preserva imagem inteira
+          (sem crop); position=top alinha no topo, letterbox cai embaixo
+          onde o gradient + text overlay absorvem. */}
+      <div className="absolute inset-0 overflow-hidden">
         <Image
           src={subpost.imageUrl!}
           meta={subpost.meta}
+          position="top"
           className="block h-full w-full"
           aspect="auto"
         />
-        {/* Gradient overlay sutil bottom (mockup .med-overlay portrait). */}
-        <div
-          className="pointer-events-none absolute inset-0"
-          style={{
-            background:
-              'linear-gradient(to bottom, transparent 60%, rgba(0,0,0,0.35) 100%)',
-          }}
-          aria-hidden="true"
-        />
       </div>
 
-      {/* Dots middle (border-top/bottom). DotsIndicator returns null se ≤1. */}
+      {/* Gradient bottom pra legibilidade do texto sobre imagem clara. */}
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            'linear-gradient(to top, rgba(10,10,9,0.96) 0%, rgba(10,10,9,0.55) 45%, transparent 70%)',
+        }}
+        aria-hidden="true"
+      />
+
+      {/* Dots: absolute z-3 acima do text block (mesma posição calc do
+          LandscapeLayout — bottom 88px aproxima a base do texto). */}
       {subpostsTotal > 1 && (
-        <div className="shrink-0 border-y border-drift-border bg-drift-surface">
+        <div className="absolute inset-x-0 z-[3] bottom-[88px] py-2">
           <CardDots idx={subpostIdx} total={subpostsTotal} />
         </div>
       )}
 
-      {/* Text bottom fixo. */}
-      <div className="shrink-0">
-        <CardText post={post} subpost={subpost} variant="inset" />
+      {/* Card de cima: texto. variant=overlay = bg transparente, sobre
+          o gradient + imagem. Mesmo padding do Landscape. */}
+      <div className="absolute inset-x-0 bottom-0 z-[2]">
+        <CardText post={post} subpost={subpost} variant="overlay" />
       </div>
     </div>
   )

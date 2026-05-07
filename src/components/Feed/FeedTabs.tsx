@@ -1,4 +1,4 @@
-/**
+﻿/**
  * FeedTabs — seletor de aba do feed (Global / Seguindo / Trending).
  *
  * V_pre0 extraiu de App.tsx; V3.2 (este reskin) adiciona indicator

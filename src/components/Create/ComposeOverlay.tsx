@@ -1,4 +1,4 @@
-/**
+﻿/**
  * ComposeOverlay — V9 full-page editor de post (mockup v0.7).
  *
  * Substitui o SubpostEditor modal (V7) pelo padrão do mockup: página
@@ -304,7 +304,7 @@ export function ComposeOverlay({
               +
             </button>
           )}
-          <span className="ml-auto shrink-0 font-mono text-[9px] uppercase tracking-[1.5px] text-drift-muted">
+          <span className="ml-auto shrink-0 font-mono text-[9px] uppercase tracking-meta text-drift-muted">
             {drafts.length}/{maxSubposts}
           </span>
         </div>
@@ -326,7 +326,7 @@ export function ComposeOverlay({
                   onClick={() => updateCurrent({ layout: kind })}
                   role="radio"
                   aria-checked={isActive}
-                  className={`flex flex-1 items-center justify-center gap-[5px] rounded-sm border-[1.5px] py-[8px] font-mono text-[9px] uppercase tracking-[1.5px] transition-colors focus:outline-none focus:ring-1 focus:ring-drift-accent2 focus:ring-offset-2 focus:ring-offset-drift-bg ${
+                  className={`flex flex-1 items-center justify-center gap-[5px] rounded-sm border-[1.5px] py-[8px] font-mono text-[9px] uppercase tracking-meta transition-colors focus:outline-none focus:ring-1 focus:ring-drift-accent2 focus:ring-offset-2 focus:ring-offset-drift-bg ${
                     isActive
                       ? 'border-drift-accent text-drift-accent'
                       : 'border-drift-border text-drift-muted hover:border-drift-text hover:text-drift-text'
@@ -440,7 +440,7 @@ function ImageDrop({
           <span aria-hidden="true" className="text-[24px] opacity-35">
             🖼
           </span>
-          <span className="font-mono text-[10px] uppercase tracking-[1.5px] text-drift-muted">
+          <span className="font-mono text-[10px] uppercase tracking-meta text-drift-muted">
             {draft.uploading ? 'fazendo upload…' : 'adicionar imagem'}
           </span>
         </>
@@ -485,7 +485,7 @@ function ContentWarningRow({
               key={cw}
               type="button"
               onClick={() => onChange(active ? null : cw)}
-              className={`rounded-sm border-[1.5px] px-[10px] py-[5px] font-mono text-[9px] uppercase tracking-[1.5px] transition-colors focus:outline-none focus:ring-1 focus:ring-drift-accent2 ${
+              className={`rounded-sm border-[1.5px] px-[10px] py-[5px] font-mono text-[9px] uppercase tracking-meta transition-colors focus:outline-none focus:ring-1 focus:ring-drift-accent2 ${
                 active
                   ? 'border-amber-400 bg-amber-500/15 text-amber-300'
                   : 'border-drift-border text-drift-muted hover:border-drift-text hover:text-drift-text'

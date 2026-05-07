@@ -35,6 +35,9 @@ export default {
           // Type tokens
           text: '#f0f0ea',
           muted: '#4a4a46',
+          // Body italic — mockup v0.7. CSS var permite override dinâmico,
+          // fallback estático garante render se var sumir.
+          body: 'var(--drift-body, #787874)',
           // Role tokens (semântica de protocolo — não renomear)
           spread: '#34d399', // ação positiva (kind 9079, label UI = DRIFT)
           bury: '#f87171', // ação negativa (kind 9080, label UI = SINK)
@@ -49,6 +52,27 @@ export default {
         // (se woff2 ainda não carregou, monospace fallback).
         display: ['"Syne Variable"', 'Syne', 'system-ui', 'sans-serif'],
         mono: ['"DM Mono"', 'SF Mono', 'Fira Code', 'monospace'],
+      },
+      // Mockup v0.7 spacing tokens. Valores específicos do design que
+      // não caem na escala 4px. CSS vars permitem override; fallback
+      // estático mantém render. Use em CardText / SubpostLayout.
+      spacing: {
+        'card-x': 'var(--card-px, 17px)',
+        'card-x-wide': 'var(--card-px-wide, 22px)',
+        'card': 'var(--card-pb, 18px)',
+      },
+      letterSpacing: {
+        // Tracking uppercase — usado em meta lines (DRIFT/SUBS/HÁ),
+        // labels (CONFIG, MAPA), tag rows (DERIVA, NSFW).
+        tag: 'var(--tracking-tag, 2.5px)',
+        meta: 'var(--tracking-meta, 1.5px)',
+        // Display title (Syne ExtraBold) tracking negativo sutil.
+        title: 'var(--tracking-title, -0.3px)',
+      },
+      lineHeight: {
+        // Title display tight (1.08) e body italic generoso (1.65).
+        title: 'var(--leading-title, 1.08)',
+        body: 'var(--leading-body, 1.65)',
       },
     },
   },

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * SpreadMap — visualização geográfica do espalhamento.
  *
  * Dois modos:
@@ -514,7 +514,7 @@ function ModeBtn({
   return (
     <button
       onClick={onClick}
-      className={`px-[10px] py-[5px] font-mono text-[9px] uppercase tracking-[1.5px] transition-colors ${
+      className={`px-[10px] py-[5px] font-mono text-[9px] uppercase tracking-meta transition-colors ${
         active ? 'bg-drift-accent/15 text-drift-accent' : 'text-drift-muted hover:text-drift-text'
       }`}
     >
