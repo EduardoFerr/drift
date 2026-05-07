@@ -189,7 +189,15 @@ describe('Vercel headers (PRIVACY/SECURITY claims operacionais)', () => {
     expect(map.get('referrer-policy')).toBe('no-referrer')
     expect(map.get('x-content-type-options')).toBe('nosniff')
     expect(map.get('cross-origin-opener-policy')).toBe('same-origin')
-    expect(map.get('cross-origin-embedder-policy')).toBe('require-corp')
+    // COEP: 'require-corp' OR 'credentialless' — ambos garantem
+    // crossOriginIsolated (SharedArrayBuffer + SQLite WASM OPFS funcionam).
+    // Drift usa 'credentialless' desde Track B (2026-05-06) pra permitir
+    // imagens cross-origin sem CORP header (image.nostr.build CDN não
+    // envia CORP). Modelo de segurança preservado — só relaxa resource
+    // loading. Chrome 96+, Firefox 119+. Ref: blob-distribution.md §9.
+    expect(map.get('cross-origin-embedder-policy')).toMatch(
+      /^(require-corp|credentialless)$/,
+    )
   })
 
   it('vercel.json define Content-Security-Policy restritiva', () => {

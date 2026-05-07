@@ -1615,39 +1615,53 @@ function DiagnosticPanel({ boot }: { boot: BootState }) {
     }
   }
 
+  // V14.1 — restruturado pra match do padrão visual de outros submenus
+  // (BlobsCard, FiltersCard): paragrafo descritivo + bloco bordered de
+  // pares label/value com contraste WCAG AA, botões consistent.
+  // Antes: tudo `text-drift-muted` (#4a4a46) sobre `bg-drift-surface`
+  // (#15151a) — contraste 2:1, ilegível.
+  const storageLabel =
+    boot.storage === 'opfs'
+      ? 'OPFS'
+      : boot.storage === 'kvvfs'
+      ? 'localStorage'
+      : boot.storage === 'memory'
+      ? 'memória (não persiste)'
+      : '?'
+  const relaysOk = boot.relays?.filter((r) => r.ok).length ?? '?'
+  const relaysTotal = boot.relays?.length ?? '?'
   return (
-    <div className="mb-6 rounded border border-drift-border bg-drift-surface p-3 text-[10px] text-drift-muted">
-      <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
-        <div>
-          storage:{' '}
-          {boot.storage === 'opfs'
-            ? 'OPFS'
-            : boot.storage === 'kvvfs'
-            ? 'localStorage'
-            : boot.storage === 'memory'
-            ? 'memória (não persiste)'
-            : '?'}
-        </div>
-        <div>sync: {sync.active ? 'ativo' : 'inativo'} · cursor {sync.cursor}</div>
-        <div>eventos recebidos: {sync.eventsReceived}</div>
-        <div>
-          relays ok: {boot.relays?.filter((r) => r.ok).length ?? '?'}/
-          {boot.relays?.length ?? '?'}
-        </div>
+    <div className="space-y-4">
+      <p className="font-mono text-[11px] leading-relaxed text-slate-400">
+        Estado do cliente em tempo real. Use os botões abaixo se UI parecer
+        stale ou eventos pararem de chegar.
+      </p>
+
+      <div className="space-y-2 rounded border border-drift-border bg-drift-surface p-4 font-mono text-[11px]">
+        <Row label="storage" value={storageLabel} />
+        <Row
+          label="sync"
+          value={`${sync.active ? '● ativo' : '○ inativo'} · cursor ${sync.cursor}`}
+          valueClass={sync.active ? 'text-drift-spread' : 'text-slate-400'}
+        />
+        <Row label="eventos recebidos" value={String(sync.eventsReceived)} />
+        <Row label="relays ok" value={`${relaysOk}/${relaysTotal}`} />
         {sync.rebuildsInProgress.length > 0 && (
-          <div className="col-span-full text-yellow-400">
-            rebuild em andamento: {sync.rebuildsInProgress.length}
-          </div>
+          <Row
+            label="rebuild em andamento"
+            value={String(sync.rebuildsInProgress.length)}
+            valueClass="text-yellow-400"
+          />
         )}
       </div>
 
       {/* Botões de diagnóstico — pra forçar resync quando subscribe morre
           silenciosamente, ou refresh manual quando suspeita de UI stale. */}
-      <div className="mt-3 flex gap-2 border-t border-drift-border pt-2">
+      <div className="flex gap-2">
         <button
           onClick={handleRefresh}
           disabled={refreshing}
-          className="rounded border border-drift-border px-2 py-1 hover:border-drift-accent hover:text-drift-accent disabled:opacity-50"
+          className="flex-1 rounded border border-drift-border px-3 py-2 font-mono text-[10px] uppercase tracking-[1.5px] text-slate-400 transition-colors hover:border-drift-accent hover:text-drift-accent disabled:opacity-50 focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2"
           title="re-query SQLite e atualiza o feed local — útil se UI parece stale"
         >
           {refreshing ? '…' : '↻ atualizar feed'}
@@ -1655,7 +1669,7 @@ function DiagnosticPanel({ boot }: { boot: BootState }) {
         <button
           onClick={handleResync}
           disabled={resyncing}
-          className="rounded border border-drift-border px-2 py-1 hover:border-drift-accent hover:text-drift-accent disabled:opacity-50"
+          className="flex-1 rounded border border-drift-border px-3 py-2 font-mono text-[10px] uppercase tracking-[1.5px] text-slate-400 transition-colors hover:border-drift-accent hover:text-drift-accent disabled:opacity-50 focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2"
           title="re-subscrever em todos os relays do zero — útil se eventos pararam de chegar"
         >
           {resyncing ? '…' : '↻ re-subscribe'}
@@ -1667,20 +1681,20 @@ function DiagnosticPanel({ boot }: { boot: BootState }) {
           cliente B não vê na lista aqui, o problema é propagação
           (relay/network) e não rendering. */}
       {sync.recent.length > 0 && (
-        <details className="mt-3 border-t border-drift-border pt-2">
-          <summary className="cursor-pointer text-drift-muted">
+        <details className="rounded border border-drift-border bg-drift-surface p-3">
+          <summary className="cursor-pointer font-mono text-[11px] text-slate-400 hover:text-drift-text">
             últimos eventos ({sync.recent.length})
           </summary>
-          <div className="mt-1 max-h-48 overflow-y-auto font-mono text-[9px]">
+          <div className="mt-2 max-h-48 overflow-y-auto font-mono text-[10px]">
             {sync.recent.map((e, i) => (
               <div key={`${e.id}-${i}`} className="flex gap-2 py-0.5">
-                <span className="text-drift-muted">
+                <span className="text-slate-500">
                   {new Date(e.receivedAt).toLocaleTimeString()}
                 </span>
                 <span className={kindColor(e.kind)}>{kindLabel(e.kind)}</span>
-                <span className="text-drift-muted/70">{e.id.slice(0, 8)}</span>
+                <span className="text-slate-500">{e.id.slice(0, 8)}</span>
                 {e.ref && (
-                  <span className="truncate text-drift-muted">
+                  <span className="truncate text-slate-500">
                     → {e.ref.slice(0, 12)}
                   </span>
                 )}
@@ -1690,9 +1704,38 @@ function DiagnosticPanel({ boot }: { boot: BootState }) {
         </details>
       )}
 
-      <pre className="mt-2 break-all text-[10px] text-drift-muted">
-        {boot.identity?.npubBech32}
-      </pre>
+      <div className="rounded border border-drift-border bg-drift-surface p-3">
+        <div className="mb-1 font-mono text-[10px] uppercase tracking-[1.5px] text-slate-400">
+          minha npub
+        </div>
+        <pre className="break-all font-mono text-[10px] text-drift-text">
+          {boot.identity?.npubBech32}
+        </pre>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Linha label/value reusável dentro de cards de status (DiagnosticPanel,
+ * BlobsCard, etc.). Padrão visual: label em DM Mono uppercase tracking
+ * wide muted, valor à direita em cor de destaque.
+ */
+function Row({
+  label,
+  value,
+  valueClass = 'text-drift-text',
+}: {
+  label: string
+  value: string
+  valueClass?: string
+}) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-[10px] uppercase tracking-[1.5px] text-slate-400">
+        {label}
+      </span>
+      <span className={valueClass}>{value}</span>
     </div>
   )
 }
