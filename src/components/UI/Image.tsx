@@ -39,6 +39,15 @@ export interface ImageProps {
    * cai embaixo).
    */
   position?: 'center' | 'top' | 'bottom'
+  /**
+   * Quando true, o `<img>` renderiza em tamanho natural (`width:auto;
+   * height:auto`) em vez de `h-full w-full`. `object-fit` e
+   * `object-position` viram inertes nesse modo (não há scaling). Use
+   * em Landscape onde queremos a imagem servida tal qual o autor
+   * subiu, com overflow no container cortando o que extrapola — user
+   * feedback 2026-05-07: "estilo mínimo correto pra paisagem".
+   */
+  natural?: boolean
   draggable?: boolean
   onLoad?: () => void
   onError?: () => void
@@ -52,6 +61,7 @@ export function Image({
   aspect = 'auto',
   fit = 'contain',
   position = 'center',
+  natural = false,
   draggable = false,
   onLoad,
   onError,
@@ -113,17 +123,40 @@ export function Image({
         src={resolvedSrc}
         alt={alt}
         draggable={draggable}
-        style={{
-          objectPosition:
-            position === 'top'
-              ? 'center top'
-              : position === 'bottom'
-              ? 'center bottom'
-              : 'center center',
-        }}
-        className={`h-full w-full transition-opacity duration-200 ${
-          fit === 'cover' ? 'object-cover' : 'object-contain'
-        } ${state === 'loaded' ? 'opacity-100' : 'opacity-0'}`}
+        style={
+          natural
+            ? {
+                // Tamanho natural — width/height auto, sem object-fit.
+                // Container tem overflow-hidden; pixels que extrapolam
+                // são cortados. object-position guia qual região fica
+                // visível quando há overflow.
+                width: 'auto',
+                height: 'auto',
+                objectPosition:
+                  position === 'top'
+                    ? 'center top'
+                    : position === 'bottom'
+                    ? 'center bottom'
+                    : 'center center',
+              }
+            : {
+                objectPosition:
+                  position === 'top'
+                    ? 'center top'
+                    : position === 'bottom'
+                    ? 'center bottom'
+                    : 'center center',
+              }
+        }
+        className={
+          natural
+            ? `transition-opacity duration-200 ${
+                state === 'loaded' ? 'opacity-100' : 'opacity-0'
+              }`
+            : `h-full w-full transition-opacity duration-200 ${
+                fit === 'cover' ? 'object-cover' : 'object-contain'
+              } ${state === 'loaded' ? 'opacity-100' : 'opacity-0'}`
+        }
         onLoad={() => {
           setState('loaded')
           onLoad?.()

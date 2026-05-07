@@ -290,16 +290,11 @@ function PortraitLayout({
     <div className="flex h-full w-full flex-col">
       {/* Media flex:1 top. */}
       <div className="relative min-h-0 flex-1">
-        {/* Portrait: fit=contain (default) preserva imagem inteira sem crop;
-            position=top alinha no topo do slot pra evitar letterbox no
-            topo (faces costumam ficar no topo). Sobra cai embaixo da
-            imagem mas antes do bloco de texto, que fica num shrink-0
-            separado. User feedback 2026-05-07: crop estava cortando
-            partes essenciais. */}
+        {/* Portrait: fit=contain (default) preserva imagem inteira sem
+            crop. User confirmou OK antes — manter assim. */}
         <Image
           src={subpost.imageUrl!}
           meta={subpost.meta}
-          position="top"
           className="block h-full w-full"
           aspect="auto"
         />
@@ -356,16 +351,18 @@ function LandscapeLayout({
     <div className="relative h-full w-full overflow-hidden">
       {/* Media absolute fill. Image internamente é position:relative
           (precisa pro skeleton overlay) — então envolvemos num wrapper
-          absoluto pra escapar do flow normal. Antes: passávamos
-          `absolute inset-0` no className do próprio Image, mas Tailwind
-          gerava `relative` ANTES de `absolute` no CSS e o relative
-          ganhava — Image renderizava em flow normal e text ficava
-          empurrado pra baixo (parecia Portrait). */}
-      <div className="absolute inset-0">
+          absoluto pra escapar do flow normal.
+          User feedback 2026-05-07: paisagem deve renderizar imagem em
+          tamanho natural (width/height auto) com object-position: center
+          top. Container tem overflow-hidden; pixels que extrapolam ficam
+          cortados a partir do bottom. Sem object-fit, sem scaling.
+          natural=true muda os styles do <img> internamente. */}
+      <div className="absolute inset-0 overflow-hidden">
         <Image
           src={subpost.imageUrl!}
           meta={subpost.meta}
-          fit="cover"
+          natural
+          position="top"
           className="block h-full w-full"
           aspect="auto"
         />
