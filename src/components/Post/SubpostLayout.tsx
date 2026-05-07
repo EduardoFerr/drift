@@ -293,7 +293,8 @@ function PortraitLayout({
         <Image
           src={subpost.imageUrl!}
           meta={subpost.meta}
-          className="block h-full w-full object-cover"
+          fit="cover"
+          className="block h-full w-full"
           aspect="auto"
         />
         {/* Gradient overlay sutil bottom (mockup .med-overlay portrait). */}
@@ -351,7 +352,8 @@ function LandscapeLayout({
       <Image
         src={subpost.imageUrl!}
         meta={subpost.meta}
-        className="absolute inset-0 h-full w-full object-cover"
+        fit="cover"
+        className="absolute inset-0 h-full w-full"
         aspect="auto"
       />
       {/* Gradient overlay top:96% bottom (mockup landscape med-overlay). */}
