@@ -1704,11 +1704,13 @@ function DiagnosticPanel({ boot }: { boot: BootState }) {
         </details>
       )}
 
-      <div className="rounded border border-drift-border bg-drift-surface p-3">
+      <div className="overflow-hidden rounded border border-drift-border bg-drift-surface p-3">
         <div className="mb-1 font-mono text-[10px] uppercase tracking-[1.5px] text-slate-400">
           minha npub
         </div>
-        <pre className="break-all font-mono text-[10px] text-drift-text">
+        {/* whitespace-pre-wrap necessário porque <pre> tem white-space:
+            pre por default e ignora break-all sozinho. */}
+        <pre className="whitespace-pre-wrap break-all font-mono text-[10px] text-drift-text">
           {boot.identity?.npubBech32}
         </pre>
       </div>
