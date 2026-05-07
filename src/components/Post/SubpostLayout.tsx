@@ -317,28 +317,27 @@ function PortraitLayout({
         />
       </div>
 
-      {/* Gradient bottom pra legibilidade do texto sobre imagem clara. */}
+      {/* Card de cima: gradient é o bg do card de texto — dots e texto
+          são filhos dele (correção user feedback: estavam siblings, mas
+          semanticamente são parte do mesmo "card de texto").
+          pointer-events-none no wrapper deixa cliques passarem pra
+          imagem nas áreas vazias do gradient; filhos com
+          pointer-events-auto recuperam interatividade onde precisa. */}
       <div
-        className="pointer-events-none absolute inset-0"
+        className="pointer-events-none absolute inset-0 z-[2]"
         style={{
           background:
             'linear-gradient(to top, rgba(10,10,9,0.96) 0%, rgba(10,10,9,0.55) 45%, transparent 70%)',
         }}
-        aria-hidden="true"
-      />
-
-      {/* Dots: absolute z-3 acima do text block (mesma posição calc do
-          LandscapeLayout — bottom 88px aproxima a base do texto). */}
-      {subpostsTotal > 1 && (
-        <div className="absolute inset-x-0 z-[3] bottom-[88px] py-2">
-          <CardDots idx={subpostIdx} total={subpostsTotal} />
+      >
+        {subpostsTotal > 1 && (
+          <div className="pointer-events-auto absolute inset-x-0 z-[3] bottom-[88px] py-2">
+            <CardDots idx={subpostIdx} total={subpostsTotal} />
+          </div>
+        )}
+        <div className="pointer-events-auto absolute inset-x-0 bottom-0">
+          <CardText post={post} subpost={subpost} variant="overlay" />
         </div>
-      )}
-
-      {/* Card de cima: texto. variant=overlay = bg transparente, sobre
-          o gradient + imagem. Mesmo padding do Landscape. */}
-      <div className="absolute inset-x-0 bottom-0 z-[2]">
-        <CardText post={post} subpost={subpost} variant="overlay" />
       </div>
     </div>
   )
@@ -387,28 +386,27 @@ function LandscapeLayout({
           aspect="auto"
         />
       </div>
-      {/* Gradient overlay top:96% bottom (mockup landscape med-overlay). */}
+      {/* Card de cima: gradient é o bg do card de texto — dots e texto
+          são filhos. pointer-events-none no wrapper deixa cliques
+          passarem pra imagem nas áreas vazias; filhos com pointer-
+          events-auto recuperam interatividade onde precisa.
+          Bottom calc do dots: 16(meta gap) + 14(padding-top text) +
+          20(title) + 38(body+meta) ≈ 88px. */}
       <div
-        className="pointer-events-none absolute inset-0"
+        className="pointer-events-none absolute inset-0 z-[2]"
         style={{
           background:
             'linear-gradient(to top, rgba(10,10,9,0.96) 0%, rgba(10,10,9,0.55) 45%, transparent 70%)',
         }}
-        aria-hidden="true"
-      />
-
-      {/* Dots absolute z-3, acima do text block.
-          Bottom calc: 16(meta gap) + 14(padding-top text) + 20(title)
-          + 38(body+meta) ≈ 88px. Aproximado. */}
-      {subpostsTotal > 1 && (
-        <div className="absolute inset-x-0 z-[3] bottom-[88px] py-2">
-          <CardDots idx={subpostIdx} total={subpostsTotal} />
+      >
+        {subpostsTotal > 1 && (
+          <div className="pointer-events-auto absolute inset-x-0 z-[3] bottom-[88px] py-2">
+            <CardDots idx={subpostIdx} total={subpostsTotal} />
+          </div>
+        )}
+        <div className="pointer-events-auto absolute inset-x-0 bottom-0">
+          <CardText post={post} subpost={subpost} variant="overlay" />
         </div>
-      )}
-
-      {/* Text block absolute bottom transparent. */}
-      <div className="absolute inset-x-0 bottom-0 z-[2]">
-        <CardText post={post} subpost={subpost} variant="overlay" />
       </div>
     </div>
   )
