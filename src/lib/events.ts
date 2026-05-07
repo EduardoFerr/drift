@@ -32,8 +32,12 @@ import { calculateUserWeight, calculateWeight } from './weight'
 import type { ReportReason } from '../types/drift'
 
 export async function onNostrEvent(event: SignedEvent): Promise<void> {
-  // 1. Kind check (cheapest)
-  if (!DRIFT_KIND_SET.has(event.kind)) return
+  // 1. Kind check (cheapest). NIP-22 comment (kind 1111) NÃO está em
+  //    DRIFT_KIND_SET (kinds proprietários Drift) mas é aceito como
+  //    extensão NIP-22 (manifesto §29 compat). Track C.1.
+  const isDriftKind = DRIFT_KIND_SET.has(event.kind)
+  const isNip22Comment = event.kind === NIP22_COMMENT_KIND
+  if (!isDriftKind && !isNip22Comment) return
 
   // 2. Schema check (cheap)
   if (!passesSchemaCheck(event)) return
@@ -42,6 +46,10 @@ export async function onNostrEvent(event: SignedEvent): Promise<void> {
   if (!verifyDriftEvent(event)) return
 
   // 4. Persist
+  if (isNip22Comment) {
+    await persistCommentRow(event)
+    return
+  }
   switch (event.kind) {
     case DRIFT_KIND.POST:
       await persistPost(event)
@@ -57,6 +65,12 @@ export async function onNostrEvent(event: SignedEvent): Promise<void> {
       return
   }
 }
+
+/**
+ * Kind 1111 — NIP-22 comments. Não vive em DRIFT_KIND porque não é
+ * proprietário; Drift reusa pra threads (Track C, manifesto §29).
+ */
+export const NIP22_COMMENT_KIND = 1111
 
 // ─── Schema check (cheap, before verify) ─────────────────────────────
 
@@ -93,9 +107,101 @@ export function passesSchemaCheck(event: SignedEvent): boolean {
       return isHex64(getTag(event, 'e'))
     case DRIFT_KIND.REPORT:
       return isHex64(getTag(event, 'e')) && getTag(event, 'reason') !== null
+    case NIP22_COMMENT_KIND:
+      // NIP-22 exige: tag E maiúscula (root) + e minúscula (parent direto)
+      // ambas com event.id hex 64. content é texto plain (NIP-22 não exige
+      // formato; cap de 1000 chars é convenção Drift — comentário maior é
+      // rejeitado pra evitar inflar relays e atacar UI).
+      return passesNip22SchemaCheck(event)
     default:
       return false
   }
+}
+
+// ─── NIP-22 schema/parse (puro, testável) ───────────────────────────
+
+/** Cap em chars de content de comment (Drift convention, NIP-22 não exige). */
+export const COMMENT_MAX_CHARS = 1000
+
+/**
+ * Parsing puro de tags NIP-22. Retorna estrutura normalizada ou `null`
+ * se faltar tag obrigatória / hex inválido. SEM I/O — testável sem db.
+ *
+ * Tags maiúsculas (`E`/`K`/`P`) = root marker (NIP-22). Tags minúsculas
+ * (`e`/`k`/`p`) = direct parent. Drift exige ambos os pares; se cliente
+ * NIP-22 emite reply top-level com root === parent, repetir as duas
+ * variants (E + e ambas iguais ao post.id) é a forma compliant.
+ */
+export interface ParsedNip22Comment {
+  /** root post.id (E) — kind 9078 do post Drift */
+  rootEventId: string
+  /** root kind (K) — esperamos '9078' pra Drift */
+  rootKind: string
+  /** root author pubkey (P) */
+  rootPubkey: string
+  /** direct parent id (e). Se top-level reply, igual a rootEventId. */
+  parentEventId: string
+  /** direct parent kind (k). '9078' top-level, '1111' nested. */
+  parentKind: string
+  /** direct parent author pubkey (p) */
+  parentPubkey: string
+}
+
+export function parseNip22Comment(event: SignedEvent): ParsedNip22Comment | null {
+  let E: string[] | null = null
+  let K: string[] | null = null
+  let P: string[] | null = null
+  let e: string[] | null = null
+  let k: string[] | null = null
+  let p: string[] | null = null
+  for (const tag of event.tags) {
+    if (tag[0] === 'E' && E === null) E = tag
+    else if (tag[0] === 'K' && K === null) K = tag
+    else if (tag[0] === 'P' && P === null) P = tag
+    else if (tag[0] === 'e' && e === null) e = tag
+    else if (tag[0] === 'k' && k === null) k = tag
+    else if (tag[0] === 'p' && p === null) p = tag
+  }
+  if (!E || !K || !P || !e || !k || !p) return null
+  const rootEventId = E[1] ?? ''
+  const rootKind = K[1] ?? ''
+  const rootPubkey = P[1] ?? ''
+  const parentEventId = e[1] ?? ''
+  const parentKind = k[1] ?? ''
+  const parentPubkey = p[1] ?? ''
+  if (!isHex64(rootEventId)) return null
+  if (!isHex64(rootPubkey)) return null
+  if (!isHex64(parentEventId)) return null
+  if (!isHex64(parentPubkey)) return null
+  if (rootKind.length === 0 || parentKind.length === 0) return null
+  return {
+    rootEventId,
+    rootKind,
+    rootPubkey,
+    parentEventId,
+    parentKind,
+    parentPubkey,
+  }
+}
+
+/**
+ * Schema check NIP-22 (puro). Cobre:
+ * - Estrutura mínima (parser não-null)
+ * - Drift extensions exigidas (drift-version)
+ * - Sanity: rootKind == '9078' (Drift só aceita comments em posts Drift —
+ *   reply em outros kinds Nostr ainda é NIP-22 válido mas fora do escopo
+ *   deste cliente; será descartado silenciosamente)
+ * - content non-empty + ≤ COMMENT_MAX_CHARS
+ */
+export function passesNip22SchemaCheck(event: SignedEvent): boolean {
+  if (!getTag(event, 'drift-version')) return false
+  if (typeof event.content !== 'string') return false
+  if (event.content.length === 0) return false
+  if (event.content.length > COMMENT_MAX_CHARS) return false
+  const parsed = parseNip22Comment(event)
+  if (!parsed) return false
+  if (parsed.rootKind !== String(DRIFT_KIND.POST)) return false
+  return true
 }
 
 // ─── Persist handlers ────────────────────────────────────────────────
@@ -203,6 +309,64 @@ async function persistBury(event: SignedEvent): Promise<void> {
   invalidateFeed() // mesmo motivo de persistSpread — race spread-antes-do-post
   scheduleScoreRecalc(postId)
   // bury NÃO penaliza o autor — diferença filosófica central
+}
+
+/**
+ * Persiste comment NIP-22 (kind 1111). PRIVADO — única porta de INSERT
+ * da tabela `comments` é `onNostrEvent` via este helper (CLAUDE.md
+ * invariante #1).
+ *
+ * Sanity check (Barney HIGH #1): apesar do parser NIP-22 dar uma
+ * estrutura aparentemente válida, atacante pode forjar pares onde
+ * `E` (root) ≠ `e` (parent direto) **resolvido**. Aqui resolvemos a
+ * raiz da thread:
+ *
+ *  - parent `k === '9078'` ⇒ reply top-level; `e` deve apontar pro
+ *    mesmo post.id da tag `E` (caso contrário, atacante anexa reply
+ *    cross-post pra free-ride visibilidade do post X reportando
+ *    como root o post Y).
+ *  - parent `k === '1111'` ⇒ reply nested; `e` aponta pra outro
+ *    comment, mas esse comment DEVE pertencer ao mesmo `post_id`
+ *    declarado em `E`. Se ainda não chegou (race), aceitamos
+ *    optimistically — buildThread (futuro) trata órfãos. Atacante
+ *    que envia comment com parent inexistente fica preso ao post_id
+ *    declarado; quando real parent chegar, ou bate ou atacante já
+ *    falhou.
+ *
+ * Reject silently (não lança) — manifesto §29 (cliente não fala com
+ * atacante; só descarta).
+ */
+async function persistCommentRow(event: SignedEvent): Promise<void> {
+  const parsed = parseNip22Comment(event)
+  if (!parsed) return // schema check já rejeitou, defesa em camada
+
+  // Sanity #1: top-level reply (parent kind = post kind) — `e` DEVE === `E`
+  // Sem isso, atacante anexa replies cross-post free-riding visibilidade.
+  if (parsed.parentKind === String(DRIFT_KIND.POST)) {
+    if (parsed.parentEventId !== parsed.rootEventId) return
+    if (parsed.parentPubkey !== parsed.rootPubkey) return
+  }
+  // (Para parent kind=1111, deferimos: parent comment pode não ter chegado
+  // ainda — Drift aceita órfãos. buildThread no read path resolve.)
+
+  await db.run(
+    `INSERT OR IGNORE INTO comments
+     (id, post_id, reply_to, author_pub, content, created_at, raw_event, score)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 0)`,
+    [
+      event.id,
+      parsed.rootEventId,
+      parsed.parentEventId,
+      event.pubkey,
+      event.content,
+      event.created_at,
+      JSON.stringify(event),
+    ],
+  )
+  await updateUserActivity(event.pubkey, event.created_at)
+  // Não invalidateFeed nem scheduleScoreRecalc aqui em C.1 —
+  // applyCommentReceived em scoring é trabalho de C.5. Threads são
+  // lidos lazy via useThread (C.3); feed atual ignora comments.
 }
 
 async function persistReport(event: SignedEvent): Promise<void> {

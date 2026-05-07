@@ -104,6 +104,35 @@ CREATE TABLE IF NOT EXISTS reports (
 CREATE INDEX IF NOT EXISTS idx_reports_post   ON reports(post_id);
 CREATE INDEX IF NOT EXISTS idx_reports_reason ON reports(reason);
 
+-- ── Comments (Track C — kind 1111 NIP-22) ───────────────────────
+-- Threads de comentários reusando NIP-22 (manifesto §29 compat). Drift
+-- adiciona tags `drift-version` + `client`; outros clientes Nostr
+-- NIP-22-aware renderizam normalmente.
+--
+-- IMPORTANTE: SEM FK pra posts(id). Race comment-antes-do-post existe e
+-- é compromisso do manifesto §16 (disponibilidade distribuída — eventos
+-- chegam fora de ordem por relays distintos). buildThread (futuro C.3)
+-- trata órfãos como top-level temporários.
+--
+-- `reply_to` é id do parent direto: igual a `post_id` se top-level
+-- reply ao post; ou outro `comments.id` se reply a outro comment. Sort
+-- determinístico em buildThread: created_at ASC, tie-break id ASC.
+--
+-- Score = -999 esconde do thread (manifesto §17, igual posts);
+-- moderação reativa (Fase C.5+) opera por mesmo mecanismo.
+CREATE TABLE IF NOT EXISTS comments (
+  id              TEXT PRIMARY KEY,         -- event.id hex 64
+  post_id         TEXT NOT NULL,            -- root event.id (kind 9078)
+  reply_to        TEXT NOT NULL,            -- direct parent id (= post_id se top-level)
+  author_pub      TEXT NOT NULL,            -- pubkey hex 64 do autor do comment
+  content         TEXT NOT NULL,            -- texto plain UTF-8 (NIP-22 content)
+  created_at      INTEGER NOT NULL,         -- unix seconds
+  raw_event       TEXT NOT NULL,            -- JSON do evento original
+  score           REAL DEFAULT 0            -- moderação: -999 esconde
+);
+CREATE INDEX IF NOT EXISTS idx_comments_post  ON comments(post_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_comments_reply ON comments(reply_to);
+
 -- ── Pinned (Fase 5+) ─────────────────────────────────────────────
 -- Posts que o user "fixou" — cliente garante re-broadcast e mantém em
 -- cache (eviction nunca remove). Manifesto §16 (Disponibilidade

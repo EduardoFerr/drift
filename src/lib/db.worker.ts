@@ -151,6 +151,7 @@ const DOMAIN_TABLES = [
   'spreads',
   'buries',
   'reports',
+  'comments',
   'users',
   'follows',
   'sync_log',
@@ -368,13 +369,39 @@ function applyMigrations(schema: string) {
       }
     }
 
+    // schema_v=8 (Track C.1): comments para threads NIP-22 (kind 1111).
+    // CREATE TABLE IF NOT EXISTS — não-destrutivo, idempotente. SEM FK
+    // pra posts(id) por design (manifesto §16 race comment-antes-do-post).
+    if (current < 8) {
+      log(`schema_v=${current} < 8 — criando comments (Track C.1)`)
+      try {
+        db.exec(`
+          CREATE TABLE IF NOT EXISTS comments (
+            id              TEXT PRIMARY KEY,
+            post_id         TEXT NOT NULL,
+            reply_to        TEXT NOT NULL,
+            author_pub      TEXT NOT NULL,
+            content         TEXT NOT NULL,
+            created_at      INTEGER NOT NULL,
+            raw_event       TEXT NOT NULL,
+            score           REAL DEFAULT 0
+          );
+          CREATE INDEX IF NOT EXISTS idx_comments_post  ON comments(post_id, created_at);
+          CREATE INDEX IF NOT EXISTS idx_comments_reply ON comments(reply_to);
+        `)
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        log(`migração comments FALHOU (continuando): ${msg}`)
+      }
+    }
+
     db.exec({
-      sql: `INSERT INTO user_prefs (key, value) VALUES ('schema_v', '7')
+      sql: `INSERT INTO user_prefs (key, value) VALUES ('schema_v', '8')
             ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
     })
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    log(`migração schema_v=7 FALHOU (continuando): ${msg}`)
+    log(`migração schema_v=8 FALHOU (continuando): ${msg}`)
   }
 
   // Auto-recuperação: se alguma migração falhou, rebuild do schema de

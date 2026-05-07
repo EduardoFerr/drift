@@ -183,6 +183,82 @@ export interface ReportPostInput {
   reason: ReportReason
 }
 
+// ─── Comment (kind 1111 NIP-22) — Track C ────────────────────────────
+
+/**
+ * Kind NIP-22 — não vive em DRIFT_KIND porque é padrão Nostr reusado
+ * (manifesto §29). Drift adiciona tags `drift-version` + `client` sem
+ * quebrar compat com clientes NIP-22-aware (habla.news, Highlighter).
+ */
+const NIP22_COMMENT_KIND = 1111
+
+/** Cap em chars de content de comment (Drift convention). */
+export const COMMENT_MAX_CHARS = 1000
+
+export interface CommentOnPostInput {
+  /** event.id hex 64 do post raiz (kind 9078 Drift). */
+  postId: string
+  /** pubkey hex 64 do autor do post raiz. */
+  postAuthorPub: string
+  /**
+   * Parent direto da resposta. Se top-level reply ao post: igual a
+   * `postId` + `replyToKind: '9078'` + `replyToAuthorPub: postAuthorPub`.
+   * Se reply a outro comment: id desse comment + kind '1111' + pubkey
+   * do autor desse comment.
+   */
+  replyTo: string
+  replyToKind: string
+  replyToAuthorPub: string
+  /** Texto do comentário (≤ 1000 chars). */
+  text: string
+  /** Auto-classificação opcional (manifesto §27). */
+  contentWarning?: ContentWarning | string
+}
+
+/**
+ * Publica um comentário NIP-22. Cliente NÃO escreve em SQLite — evento
+ * volta pelo subscribe ativo e onNostrEvent persiste (invariante #1).
+ *
+ * Wire format NIP-22:
+ *   E/K/P (maiúsculas) = root marker
+ *   e/k/p (minúsculas) = direct parent
+ *
+ * Drift extensions (`drift-version`, `client`) são metadata adicional —
+ * clientes NIP-22 não-Drift ignoram silenciosamente.
+ */
+export async function commentOnPost(input: CommentOnPostInput): Promise<SignedEvent> {
+  const text = input.text
+  if (typeof text !== 'string' || text.length === 0) {
+    throw new Error('commentOnPost: text vazio')
+  }
+  if (text.length > COMMENT_MAX_CHARS) {
+    throw new Error(`commentOnPost: text excede ${COMMENT_MAX_CHARS} chars`)
+  }
+
+  const tags: string[][] = [
+    // root marker (NIP-22 padrão)
+    ['E', input.postId, '', input.postAuthorPub],
+    ['K', String(9078)],
+    ['P', input.postAuthorPub],
+    // direct parent (NIP-22 padrão; em top-level reply, mesmo do root)
+    ['e', input.replyTo, '', input.replyToAuthorPub],
+    ['k', input.replyToKind],
+    ['p', input.replyToAuthorPub],
+    // Drift extensions
+    ['drift-version', DRIFT_VERSION],
+    ['client', CLIENT_ID],
+  ]
+  if (input.contentWarning) tags.push(['content-warning', input.contentWarning])
+
+  const event = await signDriftEvent({
+    kind: NIP22_COMMENT_KIND,
+    tags,
+    content: text,
+  })
+  await publishToRelays(event)
+  return event
+}
+
 export async function reportPost(input: ReportPostInput): Promise<SignedEvent> {
   const event = await signDriftEvent({
     kind: DRIFT_KIND.REPORT,

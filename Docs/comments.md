@@ -1,13 +1,13 @@
 # RFC — Threads de Comentários (Track C)
 
-**Status:** Draft v0.1 · **Data:** 2026-05-07
+**Status:** v0.2 (C.1 implementado — schema + onNostrEvent + protocol) · **Data:** 2026-05-07
 **Manifesto:** §22 (score determinístico), §24 (sem afinidade), §26
 (moderação reativa), §27 (auto-classificação), §29 (compat Nostr).
 **License:** CC0 1.0 Universal (manifesto + spec do Drift são domínio público).
 
-> Documento de proposta. Decisões aqui ainda podem ser revisadas antes
-> de C.1 (schema + onNostrEvent). Comentários via PR ou issues; revisão
-> crítica das 5 personas LLM pendente antes de mover pra "Final".
+> v0.2 incorpora os 6 issues de revisão Ted/Barney listados em
+> [`design-comments.md`](design-comments.md) §15. C.1 (schema + persist
+> + protocol.commentOnPost + tests) já shipped neste branch.
 
 ---
 
@@ -101,23 +101,27 @@ inteiros. Fica diferido pra polish.
 
 ### 3.3 Storage e tree assembly
 
-Tabela `comments`:
+Tabela `comments` (v0.2 — **sem FK**, ver Ted Issue #2 abaixo):
 ```sql
-CREATE TABLE comments (
-  id TEXT PRIMARY KEY,         -- event.id hex 64
-  post_id TEXT NOT NULL,       -- root event.id (kind 9078)
-  reply_to TEXT NOT NULL,      -- direct parent (post_id se top-level, ou outro comment.id)
-  author_pub TEXT NOT NULL,
-  content TEXT NOT NULL,       -- texto plain (NIP-22 content é plain text)
-  created_at INTEGER NOT NULL,
-  raw_event TEXT NOT NULL,     -- JSON pra rebuild + tags imeta opcional
-  score INTEGER DEFAULT 0,     -- moderação: -999 esconde
-  FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE
+CREATE TABLE IF NOT EXISTS comments (
+  id              TEXT PRIMARY KEY,    -- event.id hex 64
+  post_id         TEXT NOT NULL,       -- root event.id (kind 9078)
+  reply_to        TEXT NOT NULL,       -- direct parent (= post_id se top-level)
+  author_pub      TEXT NOT NULL,
+  content         TEXT NOT NULL,       -- plain UTF-8 (NIP-22)
+  created_at      INTEGER NOT NULL,
+  raw_event       TEXT NOT NULL,       -- JSON pra rebuild + tags imeta opcional
+  score           REAL DEFAULT 0       -- moderação: -999 esconde
 );
-
-CREATE INDEX idx_comments_post ON comments(post_id, created_at);
-CREATE INDEX idx_comments_reply ON comments(reply_to);
+CREATE INDEX IF NOT EXISTS idx_comments_post  ON comments(post_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_comments_reply ON comments(reply_to);
 ```
+
+**v0.2 fix (Ted Issue #2):** removida FK `post_id REFERENCES posts(id)`.
+Race comment-antes-do-post existe e é compromisso do manifesto §16
+(eventos chegam fora de ordem por relays distintos). FK rejeitaria
+INSERT de comments órfãos; `buildThread` no read path (futuro C.3) já
+trata órfãos como top-level temporários quando parent ainda não chegou.
 
 Tree assembly (read path):
 ```typescript
@@ -439,6 +443,36 @@ sem C.5 (comments aparecem mas score não é afetado ainda); C.3 sem C.4
 ---
 
 ## Histórico
+
+- **2026-05-07 v0.2**: C.1 implementado (schema + persist + protocol +
+  tests). Incorpora fixes da revisão Ted/Barney
+  (`design-comments.md` §15):
+  - **Ted #1 [BLOCK] resolvido**: `persistCommentRow` é função PRIVADA
+    em `events.ts` invocada inline no switch de `onNostrEvent` —
+    invariante #1 ("única porta de INSERT em domínio") preservada. Não
+    exportada, não chamada de fora.
+  - **Ted #2 [FIX] resolvido**: schema `comments` sem FK pra `posts(id)`.
+    Race comment-antes-do-post é compromisso §16; órfãos tratados em
+    `buildThread` (read path, futuro C.3).
+  - **Ted #3 [FIX] deferido pra C.5**: semântica weight × cap no recalc
+    de score (snapshot temporal). Não toca C.1 — score de comments só
+    entra no scoring em C.5.
+  - **Ted #4 [FIX] deferido pra C.3**: refcount lazy subscribe per
+    postId. C.1 não subscribe — apenas persiste eventos kind 1111 que
+    chegam pelo subscribe genérico do sync ativo.
+  - **Barney HIGH #1 [FIX] resolvido**: sanity check em
+    `persistCommentRow`. Top-level reply (parent kind=9078) onde `e[1]
+    !== E[1]` ou `p[1] !== P[1]` é REJEITADO (silently dropped) —
+    atacante não anexa replies cross-post pra free-ride visibilidade.
+    Reply nested (parent kind=1111) é aceito com parent ≠ root porque
+    parent comment pode estar em outra ordem de chegada (manifesto §16);
+    `buildThread` resolve no read.
+  - **Barney HIGH #3 [FIX] deferido pra C.5**: exclusão de
+    `c.author_pub == post.author_pub` no recalc — só importa quando
+    score consome comments (C.5).
+  - **Bonus**: cap `COMMENT_MAX_CHARS = 1000` enforced no schema check
+    (rejeita antes do INSERT) e no `protocol.commentOnPost` (rejeita
+    antes do sign).
 
 - **2026-05-07 v0.1**: Draft inicial. Decisões herdadas:
   - NIP-22 (kind 1111) reuse vs kind 9083 Drift-native — escolhido NIP-22
