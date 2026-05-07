@@ -215,12 +215,15 @@ function CardText({
   // pb-[18px] anterior deixava o meta line "colado" no fim do card
   // (faltavam 16px que vinham do p-4). Bumpa pra pb-7 (28px) só no
   // inset; overlay (Landscape) e centered (Text) ficam intocados.
+  // px-[17px] / px-[22px] / pb-[18px] não têm equivalente exato na escala
+  // Tailwind (4px-step) — vêm do mockup v0.7. pt-3.5 == pt-[14px] e py-7
+  // == py-[28px] são matches exatos, então usam Tailwind padrão.
   const padding =
     variant === 'centered'
-      ? 'px-[22px] py-[28px]'
+      ? 'px-[22px] py-7'
       : variant === 'overlay'
-      ? 'px-[17px] pt-[14px] pb-[18px]'
-      : 'px-[17px] pt-[14px] pb-7'
+      ? 'px-[17px] pt-3.5 pb-[18px]'
+      : 'px-[17px] pt-3.5 pb-7'
 
   // Layout 'text' (variant='centered') flex flex-col justify-center
   // pra texto subir do meio. Outros: bloco normal.
@@ -228,7 +231,7 @@ function CardText({
 
   // Body line-clamp 3 nos modos inset/overlay; text layout sem clamp.
   const bodyClamp = variant === 'centered' ? '' : 'line-clamp-3'
-  const titleSize = variant === 'centered' ? 'text-[30px]' : 'text-[20px]'
+  const titleSize = variant === 'centered' ? 'text-3xl' : 'text-xl'
 
   return (
     <div className={`relative ${wrapperBg} ${padding} ${flex}`}>
@@ -244,7 +247,7 @@ function CardText({
       )}
       {body && (
         <p
-          className={`mb-[10px] font-mono text-[12px] italic leading-[1.65] text-[#787874] ${bodyClamp}`}
+          className={`mb-2.5 font-mono text-xs italic leading-[1.65] text-[#787874] ${bodyClamp}`}
         >
           {body}
         </p>
