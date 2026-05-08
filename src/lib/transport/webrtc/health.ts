@@ -20,6 +20,7 @@ import {
 import { iterPeers } from './state'
 import type { PeerState } from './types'
 import { markPing, validatePong } from '../policy/pingPongTracker'
+import { clampPeerTimestamp } from '../policy/clockClamp'
 
 let healthTimer: ReturnType<typeof setInterval> | null = null
 
@@ -51,11 +52,21 @@ export function _markPing(peer: PeerState, now: number): void {
 /** Test-only: processa pong recebido, atualiza RTT.
  *  Re-exportado em `webrtc/index.ts` como `_handlePong`. */
 export function _handlePong(peer: PeerState, pingTs: number, now: number): void {
-  // Defense-in-depth (herdado): defesa contra replay e timestamps futuros.
-  // Permanece aqui porque é específico do transporte (HEALTH_PONG_MAX_AGE_MS),
-  // não do pareamento 1:1 — util pura cobre só o tracking.
-  if (now - pingTs > HEALTH_PONG_MAX_AGE_MS) return
-  if (pingTs > now) return // pong com timestamp futuro — drop
+  // fix: T3 Date.now() unprotected (Threat audit). pingTs vem do peer
+  // (echoed back do nosso ping) — input não-confiável. Clampamos contra
+  // janela ±N do relógio local antes de qualquer trabalho. Substitui os
+  // checks inline (`pingTs > now`, `now - pingTs > HEALTH_PONG_MAX_AGE_MS`)
+  // por util compartilhada `transport/policy/clockClamp`. Defense-in-depth:
+  // T2 (validatePong abaixo) já rejeita pings forjados via membership 1:1,
+  // mas o clamp protege se tracker for desabilitado/contornado.
+  // - maxFutureSkewMs=0: pong com pingTs > now é fisicamente impossível
+  //   (não enviamos ping no futuro). Tolerância zero.
+  // - maxPastSkewMs=HEALTH_PONG_MAX_AGE_MS: replay window do herdado.
+  const clamp = clampPeerTimestamp(pingTs, now, {
+    maxFutureSkewMs: 0,
+    maxPastSkewMs: HEALTH_PONG_MAX_AGE_MS,
+  })
+  if (!clamp.ok) return
   // fix: T2 ping/pong 1:1 (Threat audit) — pong só é aceito se
   // corresponde a um ping efetivamente enviado por nós. Antes do fix,
   // qualquer pong com TS plausível era aceito; atacante mandava pong

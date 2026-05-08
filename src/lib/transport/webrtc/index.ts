@@ -56,6 +56,16 @@ import {
   subscriptionCount,
 } from './state'
 import type { SubscriptionRecord } from './types'
+import {
+  DEFAULT_SUB_VALIDATOR_CFG,
+  validateSubscriptionFilter,
+} from '../policy/subValidator'
+
+/** fix: T4 sub maliciosa (Threat audit) — hard cap de subscriptions
+ *  simultâneas. Sub validation cobre per-filter; o cap global protege
+ *  contra caller que cria N subs sane mas em volume abusivo. Antes
+ *  havia só warn em >50 (poluição de log, não defesa). */
+const MAX_SIMULTANEOUS_SUBSCRIPTIONS = 64
 
 // ─── Transport API ───────────────────────────────────────────────────
 
@@ -93,6 +103,35 @@ async function publish(event: SignedEvent): Promise<PublishResult> {
 }
 
 function subscribe(filter: Filter, handlers: SubscribeHandlers): Unsubscribe {
+  // fix: T4 sub maliciosa (Threat audit) — valida filter antes de registrar.
+  // Match-all (sem kinds/authors/ids/tags/since/until) causa load
+  // amplification: cada evento percorre todas as subs sem trabalho.
+  // Filters com authors=[1000] / kinds=[100] também são abusivos.
+  // Audit §T4 + 2.3 da auditoria 2026-05-08.
+  const validation = validateSubscriptionFilter(filter, DEFAULT_SUB_VALIDATOR_CFG)
+  if (!validation.ok) {
+    console.warn('[webrtc] subscribe rejected — invalid filter:', validation.reason)
+    // EOSE imediato pra não travar caller; onevent nunca dispara.
+    if (handlers.oneose) queueMicrotask(() => handlers.oneose?.())
+    return () => {
+      /* noop */
+    }
+  }
+  // fix: T4 — hard cap simultâneo. Caller passou da cota: drop sub.
+  if (subscriptionCount() >= MAX_SIMULTANEOUS_SUBSCRIPTIONS) {
+    console.warn(
+      '[webrtc] subscribe rejected — cap reached (',
+      subscriptionCount(),
+      '/',
+      MAX_SIMULTANEOUS_SUBSCRIPTIONS,
+      ')',
+    )
+    if (handlers.oneose) queueMicrotask(() => handlers.oneose?.())
+    return () => {
+      /* noop */
+    }
+  }
+
   // Fire-and-forget — boot do signaling pode ser async (modo Nostr).
   // Subscribe shape externa permanece síncrona; falhas async são logadas
   // pelo caller via onevent que nunca dispara, ou pelo console aqui.
@@ -110,11 +149,6 @@ function subscribe(filter: Filter, handlers: SubscribeHandlers): Unsubscribe {
     seenIds: new Set<string>(),
   }
   setSubscription(record)
-  if (subscriptionCount() > 50) {
-    console.warn(
-      '[webrtc] subscriptions.size > 50 — possível leak (Unsubscribe não chamado?)',
-    )
-  }
   // Sem oneose síncrono: WebRTC não tem "histórico" — peers só repassam
   // tempo real. Chamamos oneose assim mesmo no próximo tick pra sinalizar
   // "fim do flush inicial" (não há histórico aqui).

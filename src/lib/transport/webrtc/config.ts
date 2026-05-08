@@ -7,6 +7,42 @@
  *
  * **Ponto único de sintonia**: ajustar caps/thresholds aqui afeta
  * peer/health/reconnect/rate-limit consistentemente. Sem dupla-fonte.
+ *
+ * ─── Catálogo de Date.now() em webrtc/ (Threat audit T3, 2026-05-08) ──
+ *
+ * Date.now() é input não-confiável quando vem de peer; é input local
+ * confiável quando vem do nosso próprio relógio. Cada call site abaixo
+ * está classificado:
+ *
+ *  (a) sanitizar (peer-supplied)  — já protegido por `policy/clockClamp`:
+ *        - boot.ts:handleSignalingMessage  → clamp msg.ts (peer)
+ *        - health.ts:_handlePong          → clamp pingTs (peer-echoed)
+ *
+ *  (b) trocar por performance.now() (intervalo local monotônico):
+ *        — nenhum elegível. Sliding windows precisam sobreviver a
+ *          sleep/resume (Date.now() avança; performance.now() não no
+ *          mesmo background tab), e o cross-peer wall-clock é o que
+ *          peerScore consome — trocar quebraria semântica.
+ *
+ *  (c) intencional, não-trust-source (local clock, debug/metadata):
+ *        - peer.ts:75 createdAt          (timestamp local de criação)
+ *        - peer.ts:81 lastRefillTs       (caller passa por parâmetro
+ *                                         em consumeRateBudget)
+ *        - peer.ts:95/228/264 outgoing signaling msg.ts (NÓS estampamos)
+ *        - boot.ts:124/148 outgoing hello/bye msg.ts
+ *        - discovery.ts:74 now p/ scorePeer (clock local pra ranking)
+ *        - discovery.ts:140 outgoing hello msg.ts
+ *        - health.ts:90 timer interval now (passado pra _markPing)
+ *        - index.ts:133 health() now (clock local pra _isPeerDegraded)
+ *        - pipeline.ts:45/61/86 caller wrapper de utils puras (now param)
+ *
+ * Total: 14 ocorrências. (a)=2 (sanitizadas). (b)=0. (c)=12.
+ *
+ * Função `consumeRateBudget(peer, now)` permanece pura testável; em
+ * prod o caller passa Date.now(). Documentado como out-of-scope explícito
+ * do threat model (atacante in-process pode forjar Date.now via injeção
+ * JS, mas isso já é game-over — não defendemos contra cliente
+ * comprometido). Audit §T3.
  */
 
 // ─── Caps + thresholds (Fase 6.2-C) ──────────────────────────────────

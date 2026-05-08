@@ -41,6 +41,19 @@ import {
 } from './state'
 import { startHealthCheckTimer, stopHealthCheckTimer } from './health'
 import { _resetReconnectCounter } from './reconnect'
+import { clampPeerTimestamp } from '../policy/clockClamp'
+
+/** fix: T3 Date.now() unprotected (Threat audit) — janela de tolerância
+ *  pra `msg.ts` em SignalingMessage. Peers em timezones diferentes ou
+ *  com clock skew leve (NTP drift) ainda passam; atacante mandando
+ *  ts=now+1e9 (clock forge) ou ts antigo (replay) é dropado.
+ *
+ *  Defense-in-depth: `webrtc-signaling-nostr.ts` já valida shape (`ts`
+ *  finite); aqui adicionamos sanity contra valores absurdos. Mock
+ *  signaling (BroadcastChannel same-origin) não tem ataque externo,
+ *  mas o gate aplica uniformemente pros dois canais. */
+const SIGNALING_TS_MAX_FUTURE_SKEW_MS = 5 * 60_000
+const SIGNALING_TS_MAX_PAST_SKEW_MS = 24 * 60 * 60_000
 // Eager import — Barney 🔴 #2 (regressão pós-split): `closeAll` é
 // chamado em `pagehide` listener e precisa ser síncrono o suficiente
 // pra rodar antes da aba fechar. Antes era `await import('./discovery')`
@@ -155,6 +168,24 @@ function registerPagehideOnce(): void {
 }
 
 function handleSignalingMessage(msg: SignalingMessage): void {
+  // fix: T3 Date.now() unprotected (Threat audit) — clamp peer-supplied
+  // `msg.ts` contra janela ±N do relógio local. Atacante forjando
+  // ts=now+1e9 ou replay de hello antigo é dropado antes de tocar
+  // peer state. Audit §T3 + 2.3 da auditoria 2026-05-08.
+  const clamp = clampPeerTimestamp(msg.ts, Date.now(), {
+    maxFutureSkewMs: SIGNALING_TS_MAX_FUTURE_SKEW_MS,
+    maxPastSkewMs: SIGNALING_TS_MAX_PAST_SKEW_MS,
+  })
+  if (!clamp.ok) {
+    console.warn(
+      '[webrtc] signaling msg dropped — clock skew',
+      clamp.reason,
+      `skew=${clamp.skewMs}ms`,
+      'from',
+      msg.from.slice(0, 8),
+    )
+    return
+  }
   const me = myPeerId()
   switch (msg.type) {
     case 'hello': {
