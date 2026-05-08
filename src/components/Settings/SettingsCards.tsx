@@ -446,10 +446,31 @@ function Alert({
  */
 export function BlobsCard({ onClose }: CardProps) {
   type Stats = { running: boolean; peerCount: number; pinnedCount: number }
+  const useIpfs = usePrefsStore((s) => s.use_ipfs)
   const [stats, setStats] = useState<Stats | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [stopping, setStopping] = useState(false)
+
+  /**
+   * Toggle do use_ipfs pref. Quando user desliga com Helia rodando,
+   * disparamos `disposeHelia()` em background — encerra libp2p e
+   * elimina o WS chatter imediatamente. Não bloqueia o setPref
+   * (UI atualiza sincronamente).
+   */
+  async function handleToggleIpfs(v: boolean) {
+    await setPref('use_ipfs', v)
+    if (!v && stats?.running) {
+      // dispose silencioso — falha não importa, watcher pega depois
+      try {
+        const helia = await import('../../lib/helia')
+        await helia.disposeHelia()
+      } catch {
+        // ignora
+      }
+      setStats(null)
+    }
+  }
 
   async function refresh() {
     setLoading(true)
@@ -515,7 +536,22 @@ export function BlobsCard({ onClose }: CardProps) {
           distribuída).
         </p>
 
-        {!stats && !loading && (
+        <Toggle
+          label="usar IPFS"
+          hint="distribuir blobs via libp2p — banda extra, melhor disponibilidade. Default OFF (manifesto §17 — opt-in vence)."
+          value={useIpfs}
+          onChange={(v) => void handleToggleIpfs(v)}
+        />
+
+        {!useIpfs && (
+          <div className="rounded border border-drift-border bg-drift-surface p-4 font-mono text-[11px] leading-relaxed text-drift-muted">
+            IPFS desativado nas configurações. Imagens continuam sendo
+            servidas via HTTP (host + gateways) — só o path libp2p local
+            está dormindo.
+          </div>
+        )}
+
+        {useIpfs && !stats && !loading && (
           <button
             onClick={() => void refresh()}
             className="w-full rounded border border-drift-accent2 bg-drift-surface px-3 py-3 font-mono text-[11px] uppercase tracking-meta text-drift-accent2 transition-colors hover:bg-drift-accent2/10 focus:outline-none focus:ring-1 focus:ring-drift-accent2 focus:ring-offset-2 focus:ring-offset-drift-bg"
@@ -524,19 +560,19 @@ export function BlobsCard({ onClose }: CardProps) {
           </button>
         )}
 
-        {loading && (
+        {useIpfs && loading && (
           <div className="font-mono text-[11px] text-drift-muted">
             inicializando helia… (~950 KiB no primeiro uso)
           </div>
         )}
 
-        {error && (
+        {useIpfs && error && (
           <div className="rounded border border-red-700/60 bg-red-950/20 p-3 font-mono text-[11px] leading-relaxed text-red-300">
             falha: {error}
           </div>
         )}
 
-        {stats && (
+        {useIpfs && stats && (
           <div className="space-y-2 rounded border border-drift-border bg-drift-surface p-4 font-mono text-[11px]">
             <Row
               label="estado"

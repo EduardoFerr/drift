@@ -625,6 +625,75 @@ describe('CSP paridade Tauri ↔ Vercel (Marshall risco #3)', () => {
   })
 })
 
+// ─── Track C.5 (2026-05-07) — comments NIP-22 conformance ───
+// Origem: peer review adversarial Track C. Três invariantes que fecham
+// gaps de regressão futura no schema de comments:
+//   1. applyCommentReceived (scoring.ts) é puro — futuro refactor não
+//      pode introduzir Date.now/db/random sem quebrar §7 determinismo.
+//   2. INSERT INTO comments só em events.ts — espelha invariante #1
+//      (única porta de INSERT em domínio).
+//   3. commentOnPost (protocol.ts) NÃO emite tag `location` — comments
+//      não vazam geo (§28 privacidade pelo mínimo); só posts kind 9078
+//      podem opt-in em location.
+
+describe('§7 determinismo — applyCommentReceived (Track C.5)', () => {
+  it('applyCommentReceived (scoring.ts) é puro — sem Date.now/random/db/await', () => {
+    const src = readFileSync(join(SRC, 'lib', 'scoring.ts'), 'utf8')
+    const body = extractFunctionBody(src, 'applyCommentReceived')
+    expect(body, 'applyCommentReceived body not extracted').toBeTruthy()
+    const stripped = stripComments(body!)
+    expect(stripped, 'applyCommentReceived must not call Date.now()').not.toMatch(/\bDate\.now\b/)
+    expect(stripped, 'applyCommentReceived must not call performance.now()').not.toMatch(/performance\.now/)
+    expect(stripped, 'applyCommentReceived must not call Math.random()').not.toMatch(/Math\.random/)
+    expect(stripped, 'applyCommentReceived must not construct new Date()').not.toMatch(/new\s+Date\b/)
+    expect(stripped, 'applyCommentReceived must not call db.exec/get/run').not.toMatch(/\bdb\.(exec|get|run)\b/)
+    expect(stripped, 'applyCommentReceived must be sync (no await)').not.toMatch(/\bawait\b/)
+  })
+})
+
+describe('§1 única porta INSERT — comments (Track C.1)', () => {
+  it('INSERT INTO comments aparece apenas em src/lib/events.ts', async () => {
+    const fg = await import('fast-glob')
+    const files = await fg.default('src/**/*.ts', { cwd: ROOT, onlyFiles: true })
+    const offenders: string[] = []
+    // Match SQL INSERT INTO comments — case-insensitive, opcional OR IGNORE.
+    // False positive possível: docstring com SQL de exemplo. Mitigação:
+    // stripComments antes de testar. Tabela de domínio "comments" só
+    // aparece como SQL real em events.ts hoje.
+    const pattern = /INSERT\s+(?:OR\s+IGNORE\s+)?INTO\s+comments\b/i
+    for (const rel of files) {
+      const raw = readFileSync(join(ROOT, rel), 'utf8')
+      const stripped = stripComments(raw)
+      if (pattern.test(stripped)) {
+        const norm = rel.replace(/\\/g, '/')
+        if (norm !== 'src/lib/events.ts') {
+          offenders.push(norm)
+        }
+      }
+    }
+    expect(
+      offenders,
+      `INSERT INTO comments encontrado fora de src/lib/events.ts (viola invariante #1):\n` +
+        offenders.map((f) => `  ${f}`).join('\n'),
+    ).toEqual([])
+  })
+})
+
+describe('§28 privacidade pelo mínimo — comments sem location (Track C.5)', () => {
+  it('commentOnPost (protocol.ts) NÃO emite tag location', () => {
+    const src = readFileSync(join(SRC, 'lib', 'protocol.ts'), 'utf8')
+    const body = extractFunctionBody(src, 'commentOnPost')
+    expect(body, 'commentOnPost body not extracted').toBeTruthy()
+    const stripped = stripComments(body!)
+    // Anti-regressão: tags array literal não pode conter ['location', ...]
+    // ou ["location", ...]. Comments não opt-in em geo (NIP-22 + §28).
+    expect(
+      stripped,
+      "commentOnPost não pode emitir tag 'location' (§28 privacidade pelo mínimo — só kind 9078 opt-in geo)",
+    ).not.toMatch(/\[\s*['"]location['"]/)
+  })
+})
+
 describe('Native dialogs banidos em src/ (UX consistency, V14.2)', () => {
   // Native window.alert/confirm/prompt renderiza em estilo do browser
   // — feio sobre o tema dark Drift, e em Tauri nem sempre disponível.

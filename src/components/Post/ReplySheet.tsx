@@ -35,6 +35,11 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { nip19 } from 'nostr-tools'
 import { commentOnPost, COMMENT_MAX_CHARS } from '../../lib/protocol'
+import { uploadBlob, BlobError } from '../../lib/blobs'
+import { UploadError } from '../../lib/upload'
+import type { BlobMeta } from '../../lib/nip94'
+import { CONTENT_WARNING_VALUES, type ContentWarning } from '../../types/drift'
+import { Image } from '../UI/Image'
 
 // ─── Helper puro (testável) ───────────────────────────────────────────
 
@@ -112,6 +117,12 @@ export function ReplySheet({
   const [text, setText] = useState('')
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // C.6.2 — content-warning escolhido pelo autor (manifesto §27).
+  const [contentWarning, setContentWarning] = useState<ContentWarning | null>(null)
+  // C.6.3 — upload state. Cap convencional: 1 imagem por comment.
+  const [blobMeta, setBlobMeta] = useState<BlobMeta | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
 
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const sheetRef = useRef<HTMLDivElement | null>(null)
@@ -124,11 +135,43 @@ export function ReplySheet({
       setText('')
       setError(null)
       setPending(false)
+      setContentWarning(null)
+      setBlobMeta(null)
+      setUploading(false)
+      setUploadError(null)
       // Captura elemento ativo no momento do open pra restaurar on close.
       restoreFocusRef.current =
         (typeof document !== 'undefined' && (document.activeElement as HTMLElement)) || null
     }
   }, [open])
+
+  // C.6.3 — handler de upload. Mesmo pattern de ComposeOverlay.handleFile.
+  const handleFile = useCallback(async (file: File) => {
+    setUploading(true)
+    setUploadError(null)
+    try {
+      const meta = await uploadBlob(file)
+      setBlobMeta(meta)
+    } catch (err) {
+      const msg =
+        err instanceof UploadError
+          ? `upload falhou: ${err.message}`
+          : err instanceof BlobError
+            ? `upload falhou: ${err.message}`
+            : err instanceof Error
+              ? err.message
+              : String(err)
+      setUploadError(msg)
+      setBlobMeta(null)
+    } finally {
+      setUploading(false)
+    }
+  }, [])
+
+  const clearImage = useCallback(() => {
+    setBlobMeta(null)
+    setUploadError(null)
+  }, [])
 
   // Focus na textarea on open + restaura on close.
   useEffect(() => {
@@ -152,9 +195,18 @@ export function ReplySheet({
   }, [open])
 
   const doPublish = useCallback(async () => {
-    if (pending) return
+    if (pending || uploading) return
+    // Permite reply só-imagem (validation só falha se texto + imagem
+    // ambos vazios). Quando texto vazio mas blob presente, usamos um
+    // espaço como content (NIP-22 não exige específico, mas Drift exige
+    // content non-empty no schema check). Idiomatic: "📎" placeholder.
     const validated = validateCommentText(text)
-    if (!validated.ok) {
+    let publishText = ''
+    if (validated.ok) {
+      publishText = validated.trimmed!
+    } else if (blobMeta && (validated.reason === 'empty' || validated.reason === 'whitespace')) {
+      publishText = '📎' // placeholder mínimo pra schema check passar
+    } else {
       if (validated.reason === 'empty' || validated.reason === 'whitespace') {
         setError('escreve algo antes de publicar')
       } else if (validated.reason === 'too-long') {
@@ -171,9 +223,13 @@ export function ReplySheet({
         replyTo,
         replyToKind: String(replyToKind),
         replyToAuthorPub,
-        text: validated.trimmed!,
+        text: publishText,
+        contentWarning: contentWarning ?? undefined,
+        imetas: blobMeta ? [blobMeta] : undefined,
       })
       setText('')
+      setContentWarning(null)
+      setBlobMeta(null)
       onPublished?.()
       onClose()
     } catch (err) {
@@ -184,12 +240,15 @@ export function ReplySheet({
     }
   }, [
     pending,
+    uploading,
     text,
     postId,
     postAuthorPub,
     replyTo,
     replyToKind,
     replyToAuthorPub,
+    contentWarning,
+    blobMeta,
     onClose,
     onPublished,
   ])
@@ -236,7 +295,8 @@ export function ReplySheet({
 
   const charCount = text.trim().length
   const overLimit = charCount > COMMENT_MAX_CHARS
-  const canPublish = !pending && charCount > 0 && !overLimit
+  // Pode publicar se: tem texto válido OU tem imagem (e não está em upload/pending).
+  const canPublish = !pending && !uploading && !overLimit && (charCount > 0 || !!blobMeta)
 
   // Animação: bottom-sheet (y 100% → 0). Reduced motion: só fade.
   const sheetInitial = reducedMotion ? { opacity: 0 } : { y: '100%', opacity: 0 }
@@ -307,7 +367,7 @@ export function ReplySheet({
             </header>
 
             {/* Body */}
-            <div className="flex flex-1 flex-col gap-2 px-4 pb-3">
+            <div className="flex flex-1 flex-col gap-2 overflow-y-auto px-4 pb-3">
               <textarea
                 ref={textareaRef}
                 value={text}
@@ -322,6 +382,54 @@ export function ReplySheet({
                 aria-invalid={overLimit || !!error}
                 className="min-h-[6rem] w-full resize-y rounded border border-drift-border bg-drift-bg p-2 font-mono text-[12px] text-drift-text placeholder:text-drift-muted/60 focus:border-drift-accent2 focus:outline-none disabled:opacity-60"
               />
+
+              {/* C.6.3 — image upload (cap 1 imagem por comment). */}
+              <ReplyImagePicker
+                blobMeta={blobMeta}
+                uploading={uploading}
+                uploadError={uploadError}
+                disabled={pending}
+                onFile={handleFile}
+                onClear={clearImage}
+              />
+
+              {/* C.6.2 — content warning chips (manifesto §27). */}
+              <div
+                className="mt-1 border-t border-drift-border pt-2"
+                role="radiogroup"
+                aria-label="aviso de conteúdo (opcional)"
+              >
+                <div
+                  className="mb-1 font-mono text-[9px] uppercase tracking-[2px] text-drift-muted"
+                  title="manifesto §27 — autor declara, leitor filtra"
+                >
+                  marcar conteúdo (opcional)
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {CONTENT_WARNING_VALUES.map((cw) => {
+                    const active = contentWarning === cw
+                    return (
+                      <button
+                        key={cw}
+                        type="button"
+                        role="radio"
+                        aria-checked={active}
+                        disabled={pending}
+                        onClick={() => setContentWarning(active ? null : cw)}
+                        className={`rounded-sm border-[1.5px] px-2.5 py-1 font-mono text-[9px] uppercase tracking-meta transition-colors focus:outline-none focus:ring-1 focus:ring-drift-accent2 disabled:opacity-40 ${
+                          active
+                            ? 'border-amber-400 bg-amber-500/15 text-amber-300'
+                            : 'border-drift-border text-drift-muted hover:border-drift-text hover:text-drift-text'
+                        }`}
+                      >
+                        {active ? '✓ ' : ''}
+                        {cw}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
               {error && (
                 <div
                   role="alert"
@@ -355,6 +463,83 @@ export function ReplySheet({
         </motion.div>
       )}
     </AnimatePresence>
+  )
+}
+
+// ─── ReplyImagePicker (C.6.3) ─────────────────────────────────────────
+
+function ReplyImagePicker({
+  blobMeta,
+  uploading,
+  uploadError,
+  disabled,
+  onFile,
+  onClear,
+}: {
+  blobMeta: BlobMeta | null
+  uploading: boolean
+  uploadError: string | null
+  disabled: boolean
+  onFile: (f: File) => void
+  onClear: () => void
+}) {
+  // Preview quando blob carregado; senão drop area.
+  if (blobMeta) {
+    return (
+      <div className="relative h-[110px] w-full overflow-hidden rounded border border-drift-border">
+        <Image
+          src={blobMeta.url ?? ''}
+          meta={blobMeta}
+          className="h-full w-full object-cover"
+          aspect="auto"
+          fit="cover"
+        />
+        <button
+          type="button"
+          onClick={onClear}
+          disabled={disabled}
+          className="absolute right-1 top-1 rounded border border-drift-border bg-drift-bg/80 px-2 py-0.5 font-mono text-[9px] uppercase tracking-meta text-drift-muted hover:text-drift-bury focus:outline-none focus:ring-1 focus:ring-drift-accent2 disabled:opacity-40"
+          aria-label="remover imagem"
+        >
+          remover
+        </button>
+      </div>
+    )
+  }
+  return (
+    <label
+      className={`relative flex h-[70px] w-full cursor-pointer flex-col items-center justify-center gap-1 rounded border-[1.5px] border-dashed transition-colors ${
+        uploading
+          ? 'border-drift-border opacity-60'
+          : 'border-drift-border hover:border-drift-accent'
+      }`}
+    >
+      <span aria-hidden="true" className="text-[18px] opacity-40">
+        🖼
+      </span>
+      <span className="font-mono text-[9px] uppercase tracking-meta text-drift-muted">
+        {uploading ? 'fazendo upload…' : 'anexar imagem (opcional)'}
+      </span>
+      {uploadError && (
+        <span
+          className="px-2 text-center font-mono text-[9px] text-drift-bury"
+          title={uploadError}
+        >
+          {uploadError}
+        </span>
+      )}
+      <input
+        type="file"
+        accept="image/*"
+        className="hidden"
+        disabled={uploading || disabled}
+        onChange={(e) => {
+          const file = e.target.files?.[0]
+          if (file) onFile(file)
+          e.target.value = ''
+        }}
+      />
+    </label>
   )
 }
 

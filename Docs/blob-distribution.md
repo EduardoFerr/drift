@@ -72,6 +72,13 @@ personas LLM (HIMYM round). Não revisitar sem motivo novo:
 - ✅ **"Favorito = mirror automático"** — pin opt-in via ação social existente
 - ✅ **RFC-first** — este doc, antes de spike Helia (B.1)
 
+> **Cross-reference (Track C):** comments NIP-22 (kind 1111) reusam
+> `imeta` com a mesma semântica desta RFC — Track C é consumer
+> adicional da pipeline blob, sem mudança no spec. Cap reduzido a
+> **1 imagem por comment** (vs N por subpost em kind 9078) e sem
+> auto-pin via SPREAD (§3.5.2 fica restrito a kind 9078). Detalhes
+> em [`comments.md` §3.7](comments.md).
+
 ### 3.5 Convenções Drift sobre NIP-94 (o que NIP-94 não diz)
 
 NIP-94 foi pensado pra kind 1063 (1 evento = 1 arquivo, file metadata).

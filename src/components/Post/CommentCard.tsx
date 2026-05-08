@@ -17,6 +17,9 @@
 
 import { useState } from 'react'
 import type { CommentNode } from '../../lib/thread-cursor'
+import { applyContentFiltersComment } from '../../lib/feed'
+import { usePrefsStore } from '../../lib/prefs'
+import { Image } from '../UI/Image'
 
 export interface CommentCardProps {
   node: CommentNode
@@ -41,7 +44,18 @@ export function CommentCard({
   postId,
 }: CommentCardProps) {
   const [overrideHidden, setOverrideHidden] = useState(false)
+  const [overrideBlur, setOverrideBlur] = useState(false)
   const isHidden = node.score <= -999 && !overrideHidden
+
+  // C.6.2 — applyContentFiltersComment: same logic as posts (block/mute
+  // > content-warning > prefs). Determinístico (manifesto §7).
+  const prefs = usePrefsStore()
+  const cwHint = applyContentFiltersComment(
+    { authorPub: node.author_pub, contentWarning: node.content_warning ?? null },
+    prefs,
+  )
+  const cwHide = cwHint.hide && !overrideHidden
+  const cwBlur = cwHint.blur && !overrideBlur
 
   // Title pra debug acessível por screen reader
   const ariaLabel = `comment de ${truncate(node.author_pub)}, nível ${depth}, ${posInSet} de ${setSize}, ${childCount} respostas`
@@ -57,24 +71,75 @@ export function CommentCard({
       data-post-id={postId}
       className="flex h-full w-full flex-col bg-drift-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2"
     >
-      {/* Header: autor + tempo */}
-      <header className="flex items-center justify-between border-b border-drift-border px-4 py-3">
+      {/* Header: autor + tempo + content-warning chip (C.6.2) */}
+      <header className="flex items-center justify-between gap-2 border-b border-drift-border px-4 py-3">
         <span className="font-display text-base font-bold uppercase tracking-tag text-drift-text">
           anon{truncate(node.author_pub)}
         </span>
-        <span className="font-mono text-[10px] uppercase tracking-meta text-drift-muted">
-          {timeAgo(node.created_at)}
-        </span>
+        <div className="flex items-center gap-2">
+          {node.content_warning && (
+            <span
+              className="rounded border border-amber-400/60 bg-amber-500/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-meta text-amber-300"
+              title={`autor marcou: ${node.content_warning}`}
+              aria-label={`aviso de conteúdo: ${node.content_warning}`}
+            >
+              ⚠ {node.content_warning}
+            </span>
+          )}
+          <span className="font-mono text-[10px] uppercase tracking-meta text-drift-muted">
+            {timeAgo(node.created_at)}
+          </span>
+        </div>
       </header>
 
       {/* Body */}
       <div className="flex-1 overflow-y-auto px-5 py-4">
         {isHidden ? (
           <HiddenPlaceholder onReveal={() => setOverrideHidden(true)} />
+        ) : cwHide ? (
+          <CwHiddenPlaceholder
+            warning={cwHint.reason ?? cwHint.modReason ?? 'oculto'}
+            onReveal={() => setOverrideHidden(true)}
+          />
         ) : (
-          <p className="whitespace-pre-wrap break-words font-mono text-[13px] leading-relaxed text-drift-text">
-            {node.content}
-          </p>
+          <div className="flex flex-col gap-3">
+            {/* C.6.3 — imagem anexada (Track B integration). Renderiza
+                via Image c/ hash verify quando meta presente. Blur por
+                CW aplica via filtro CSS. */}
+            {node.meta && (
+              <div
+                className={cwBlur ? 'relative cursor-pointer' : 'relative'}
+                onClick={cwBlur ? () => setOverrideBlur(true) : undefined}
+              >
+                <Image
+                  src={node.meta.url ?? ''}
+                  meta={node.meta}
+                  alt={node.meta.alt ?? ''}
+                  className={`max-h-[40vh] w-full rounded border border-drift-border object-contain transition ${
+                    cwBlur ? 'blur-xl' : ''
+                  }`}
+                  aspect="auto"
+                  fit="contain"
+                />
+                {cwBlur && (
+                  <span
+                    className="pointer-events-none absolute inset-0 flex items-center justify-center font-mono text-[10px] uppercase tracking-meta text-amber-200"
+                    aria-hidden="true"
+                  >
+                    toque pra revelar
+                  </span>
+                )}
+              </div>
+            )}
+            <p
+              className={`whitespace-pre-wrap break-words font-mono text-[13px] leading-relaxed text-drift-text ${
+                cwBlur ? 'blur-sm' : ''
+              }`}
+              onClick={cwBlur ? () => setOverrideBlur(true) : undefined}
+            >
+              {node.content}
+            </p>
+          </div>
         )}
       </div>
 
@@ -94,6 +159,31 @@ export function CommentCard({
         )}
       </footer>
     </article>
+  )
+}
+
+function CwHiddenPlaceholder({
+  warning,
+  onReveal,
+}: {
+  warning: string
+  onReveal: () => void
+}) {
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
+      <span className="font-mono text-[11px] uppercase tracking-meta text-amber-300">
+        ⚠ {warning}
+      </span>
+      <span className="font-mono text-[10px] text-drift-muted">
+        autor marcou — manifesto §27
+      </span>
+      <button
+        onClick={onReveal}
+        className="rounded border border-drift-accent2 px-3 py-1.5 font-mono text-[10px] uppercase tracking-meta text-drift-accent2 hover:bg-drift-accent2/10"
+      >
+        ver mesmo assim
+      </button>
+    </div>
   )
 }
 

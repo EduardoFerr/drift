@@ -377,10 +377,14 @@ async function persistCommentRow(event: SignedEvent): Promise<void> {
   // (Para parent kind=1111, deferimos: parent comment pode não ter chegado
   // ainda — Drift aceita órfãos. buildThread no read path resolve.)
 
+  // C.6.2 — content-warning declarado pelo autor (manifesto §27, NIP-36
+  // reuse). Persistido pra UI aplicar blur/hide via applyContentFilters
+  // sem reparsing do raw_event. imeta tags ficam só no raw_event — read
+  // path (loadThread/addCommentToStore) parseia uma vez.
   await db.run(
     `INSERT OR IGNORE INTO comments
-     (id, post_id, reply_to, author_pub, content, created_at, raw_event, score)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 0)`,
+     (id, post_id, reply_to, author_pub, content, created_at, raw_event, score, content_warning)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)`,
     [
       event.id,
       parsed.rootEventId,
@@ -389,6 +393,7 @@ async function persistCommentRow(event: SignedEvent): Promise<void> {
       event.content,
       event.created_at,
       JSON.stringify(event),
+      getTag(event, 'content-warning'),
     ],
   )
   await updateUserActivity(event.pubkey, event.created_at)

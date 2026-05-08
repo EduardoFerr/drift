@@ -44,6 +44,21 @@ import {
   gatewayUrl,
   type IpfsGateway,
 } from '../config/gateways'
+import { getPrefs } from './prefs'
+
+/**
+ * IPFS pref gate. Quando `use_ipfs=false` (default desde 2026-05),
+ * paths Helia (add local + fetch via libp2p) são pulados — economia
+ * de banda + sem libp2p WS chatter (manifesto §17 opt-in vence §16
+ * disponibilidade distribuída quando user escolheu).
+ *
+ * Gateway HTTP IPFS continua disponível mesmo com `use_ipfs=false`
+ * — é só HTTP request, sem custo contínuo. Permite ler `cid` de
+ * outros users sem rodar libp2p local.
+ */
+function ipfsEnabled(): boolean {
+  return getPrefs().use_ipfs === true
+}
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -161,8 +176,10 @@ export async function uploadBlob(
   const mime = compressed.type || 'application/octet-stream'
 
   // Paralelismo: HTTP é blocker, Helia é optional.
+  // Quando `use_ipfs=false` (default), pulamos `tryHeliaAdd` — sem custo
+  // de inicializar libp2p só pra add um blob que ninguém vai servir local.
   const httpPromise = uploadImage(compressed, options)
-  const heliaPromise = tryHeliaAdd(bytes)
+  const heliaPromise = ipfsEnabled() ? tryHeliaAdd(bytes) : Promise.resolve(undefined)
 
   const [urlResult, cidResult] = await Promise.allSettled([
     httpPromise,
@@ -231,8 +248,11 @@ export async function fetchBlob(
 
   const errors: string[] = []
 
-  // 1. Helia local primeiro (se tem cid)
-  if (meta.cid) {
+  // 1. Helia local primeiro (se tem cid E user habilitou IPFS).
+  // `use_ipfs=false` (default) pula o path libp2p — economia de banda
+  // contínua. Gateway IPFS HTTP (passo 3) ainda é tentado, então
+  // CIDs continuam acessíveis sem rodar Helia local.
+  if (meta.cid && ipfsEnabled()) {
     try {
       const bytes = await fetchViaHelia(meta.cid, options.signal)
       if (await checkHash(bytes, meta.hash)) return bytes
@@ -358,6 +378,10 @@ function describe(err: unknown): string {
  * Idempotente: pinar 2x o mesmo CID é no-op (Helia trata).
  */
 export async function pinBlobsFromMeta(metas: BlobMeta[]): Promise<void> {
+  // Pin exige Helia rodando — pula quando user optou por não usar IPFS.
+  // Manifesto §17 (opt-in vence): "favorite = mirror" só é compromisso
+  // quando user explicitamente quer participar da malha.
+  if (!ipfsEnabled()) return
   const cids = metas.map((m) => m.cid).filter((c): c is string => Boolean(c))
   if (cids.length === 0) return
 

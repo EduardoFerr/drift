@@ -35,6 +35,10 @@ export interface CommentNode {
   created_at: number
   score: number
   replies: CommentNode[]
+  /** C.6.2 — content-warning declarado pelo autor. Propaga de CommentRecord. */
+  content_warning?: string | null
+  /** C.6.3 — metadado NIP-94 da imagem anexada (se houver). */
+  meta?: import('./nip94').BlobMeta
 }
 
 /**

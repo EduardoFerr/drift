@@ -84,6 +84,9 @@ function applyRow(target: UserPrefs, key: string, value: string): void {
     case 'thread_coach_seen':
       target.thread_coach_seen = value === '1'
       return
+    case 'use_ipfs':
+      target.use_ipfs = value === '1'
+      return
     default:
       // chave desconhecida — pode ser de fase futura, ignora silenciosamente
       return

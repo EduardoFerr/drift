@@ -386,6 +386,40 @@ export function applyContentFilters(post: Post, prefs: UserPrefs): RenderHint {
   return { blur: false, hide: false, reason: null }
 }
 
+/**
+ * Track C.6.2 — versão de `applyContentFilters` pra `CommentRecord`. Mesma
+ * lógica determinística (manifesto §7) operando sobre os mesmos sinais
+ * (block/mute do autor + content-warning + prefs locais), apenas com
+ * shape de input diferente. Mantida paralela (em vez de polimórfica
+ * via interface) pra preservar o tipo nominal `Post` no call-site da
+ * feed e evitar refactor cross-cutting.
+ */
+export function applyContentFiltersComment(
+  comment: { authorPub: string; contentWarning?: string | ContentWarning | null },
+  prefs: UserPrefs,
+): RenderHint {
+  const modReason = hiddenReason(comment.authorPub)
+  if (modReason) {
+    return { blur: false, hide: true, reason: null, modReason }
+  }
+  const cw = comment.contentWarning ?? null
+  if (!cw) return { blur: false, hide: false, reason: null }
+  if (!isKnownWarning(cw)) return { blur: false, hide: false, reason: null }
+  if (cw === 'nsfw' && !prefs.show_nsfw_default) {
+    return { blur: true, hide: false, reason: 'nsfw' }
+  }
+  if (cw === 'violence' && !prefs.show_nsfw_default) {
+    return { blur: true, hide: false, reason: 'violence' }
+  }
+  if (cw === 'spoiler' && prefs.hide_spoilers) {
+    return { blur: false, hide: true, reason: 'spoiler' }
+  }
+  if (cw === 'ad' && prefs.hide_ads) {
+    return { blur: false, hide: true, reason: 'ad' }
+  }
+  return { blur: false, hide: false, reason: null }
+}
+
 
 /**
  * @internal — exported pra testes (V4 LOCK_VIA_TEST `layout.fixture-legacy`,

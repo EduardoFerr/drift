@@ -211,8 +211,15 @@ export interface CommentOnPostInput {
   replyToAuthorPub: string
   /** Texto do comentário (≤ 1000 chars). */
   text: string
-  /** Auto-classificação opcional (manifesto §27). */
+  /** Auto-classificação opcional (manifesto §27). C.6.2. */
   contentWarning?: ContentWarning | string
+  /**
+   * C.6.3 — Metadados NIP-94 dos blobs anexados (Track B integration).
+   * Cap convencional Drift: 1 imagem por comment (vs N em POST). Caller
+   * já passa o array com cap aplicado; `commentOnPost` não força — só
+   * emite as tags `imeta` na ordem recebida.
+   */
+  imetas?: BlobMeta[]
 }
 
 /**
@@ -249,6 +256,19 @@ export async function commentOnPost(input: CommentOnPostInput): Promise<SignedEv
     ['client', CLIENT_ID],
   ]
   if (input.contentWarning) tags.push(['content-warning', input.contentWarning])
+
+  // C.6.3 — imeta tags pra blobs anexados (mesmo pattern de createPost).
+  // Tags imeta mal-formadas (sem url/cid ou valor com espaço) são puladas
+  // com warning; comment continua publicável só com texto.
+  if (input.imetas) {
+    for (const meta of input.imetas) {
+      try {
+        tags.push(buildImetaTag(meta))
+      } catch (err) {
+        console.warn('[protocol] imeta inválida pulada (comment):', err)
+      }
+    }
+  }
 
   const event = await signDriftEvent({
     kind: NIP22_COMMENT_KIND,

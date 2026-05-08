@@ -269,6 +269,15 @@ function applyMigrations(schema: string) {
       column: 'location',
       sql: `ALTER TABLE spreads ADD COLUMN location TEXT`,
     },
+    {
+      // Track C.6.2 — content-warning em comments (manifesto §27, NIP-36
+      // reuse). Bancos v8 (Track C.1) criaram comments sem essa coluna;
+      // ALTER idempotente via tableHasColumn no apply loop.
+      name: 'add_content_warning_to_comments',
+      table: 'comments',
+      column: 'content_warning',
+      sql: `ALTER TABLE comments ADD COLUMN content_warning TEXT`,
+    },
   ]
 
   let anyFailed = false
@@ -395,13 +404,17 @@ function applyMigrations(schema: string) {
       }
     }
 
+    // schema_v=9 (Track C.6.2): content_warning em comments. ALTER
+    // idempotente roda no apply loop acima; aqui só bumpa o marker.
+    // Sem rebuild de domínio — coluna nullable, dados antigos seguem.
+
     db.exec({
-      sql: `INSERT INTO user_prefs (key, value) VALUES ('schema_v', '8')
+      sql: `INSERT INTO user_prefs (key, value) VALUES ('schema_v', '9')
             ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
     })
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    log(`migração schema_v=8 FALHOU (continuando): ${msg}`)
+    log(`migração schema_v=9 FALHOU (continuando): ${msg}`)
   }
 
   // Auto-recuperação: se alguma migração falhou, rebuild do schema de

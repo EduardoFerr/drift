@@ -205,6 +205,18 @@ export interface CommentRecord {
   content: string
   createdAt: number
   score: number
+  /**
+   * C.6.2 — Aviso de conteúdo declarado pelo autor do comment (manifesto
+   * §27, NIP-36 reuse). `null` = sem aviso. UI aplica blur/hide via
+   * `applyContentFilters` com mesmo mecanismo de Post.
+   */
+  contentWarning?: ContentWarning | string | null
+  /**
+   * C.6.3 — Metadado NIP-94 da imagem anexada (no máx. 1 por comment, vs
+   * N em Post). Populado em `loadThread`/`addCommentToStore` parsing as
+   * tags `imeta` do `raw_event`. Quando ausente, comment é só-texto.
+   */
+  meta?: import('../lib/nip94').BlobMeta
 }
 
 // ─── Usuário (perfil agregado) ───────────────────────────────────────
@@ -300,6 +312,23 @@ export interface UserPrefs {
    * swipes (~3s); depois desliga até reset.
    */
   thread_coach_seen: boolean
+  /**
+   * Distribuir blobs via IPFS/Helia (libp2p). Default: false.
+   *
+   * Quando OFF (default), uploads vão só pro HTTP host e fetch ignora
+   * o path Helia — sem libp2p WS chatter, sem autodial, sem custo de
+   * banda contínuo. Manifesto §17 (sem chave mestra: opt-in vence).
+   *
+   * Quando ON, blobs locais participam da malha IPFS — mais resiliência
+   * (manifesto §16 "disponibilidade distribuída") em troca de banda
+   * extra contínua. User decide o tradeoff explicitamente em settings.
+   *
+   * Compat retro: users pré-2026-05 tinham Helia auto-init. Migração
+   * para `false` é silenciosa — nas próximas chamadas o path Helia
+   * será pulado; runs antigas que ainda estejam vivas são recolhidas
+   * pelo idle watcher de `helia.ts` (5min default).
+   */
+  use_ipfs: boolean
 }
 
 /** Modo de visualização do mapa de spread. */
@@ -325,4 +354,5 @@ export const DEFAULT_USER_PREFS: UserPrefs = {
   map_view: 'fit-bounds',
   network_mode: 'clearnet',
   thread_coach_seen: false,
+  use_ipfs: false,
 }

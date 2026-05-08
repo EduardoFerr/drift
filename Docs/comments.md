@@ -1,13 +1,18 @@
 # RFC — Threads de Comentários (Track C)
 
-**Status:** v0.2 (C.1 implementado — schema + onNostrEvent + protocol) · **Data:** 2026-05-07
+**Status:** v0.3 (C.6.2 + C.6.3 — content-warning + imeta em comments) · **Data:** 2026-05-07
 **Manifesto:** §22 (score determinístico), §24 (sem afinidade), §26
 (moderação reativa), §27 (auto-classificação), §29 (compat Nostr).
 **License:** CC0 1.0 Universal (manifesto + spec do Drift são domínio público).
 
-> v0.2 incorpora os 6 issues de revisão Ted/Barney listados em
+> v0.3 documenta as extensões de polish do C.6: `content-warning`
+> (NIP-36 reuse) e `imeta` (NIP-94 reuse, integração Track B). Sem
+> mudança no kind nem na pipeline de persist; comentários ganham
+> auto-classificação opcional e suporte a 1 imagem por comment.
+>
+> v0.2 incorporou os 6 issues de revisão Ted/Barney listados em
 > [`design-comments.md`](design-comments.md) §15. C.1 (schema + persist
-> + protocol.commentOnPost + tests) já shipped neste branch.
+> + protocol.commentOnPost + tests) shipped antes deste polish.
 
 ---
 
@@ -180,6 +185,84 @@ Justificativa: 5 níveis cobre 95% das discussões reais. Beyond
 demanda barra de scroll horizontal ou recolhimento — degenerate
 UX. Decisão de UX, não de protocolo.
 
+### 3.6 Content-warning em comments (NIP-36 reuse)
+
+[NIP-36](https://github.com/nostr-protocol/nips/blob/master/36.md)
+define a tag `['content-warning', <reason>?]` como sinal genérico de
+"conteúdo sensível"; não restringe kind. Drift reusa em kind 1111 com
+o **mesmo conjunto fechado de valores** já adotado em kind 9078
+(manifesto §27): `nsfw`, `violence`, `spoiler`, `ad`. A tag é opcional
+e single-valued; segunda tag `content-warning` no mesmo evento é
+ignorada (primeira ocorrência vence).
+
+**Por que não kind 9081 (REPORT) ou outro mecanismo:** REPORT é
+sinalização de **terceiro** (denúncia comunitária, §26). Aqui o
+**autor** auto-classifica (§27); papéis distintos.
+
+**Compat:**
+- Outros clientes NIP-36-aware (Damus, habla.news, alguns Highlighter
+  builds) já aplicam blur/hide em kind 1 e renderiza CW em kind 1111
+  na medida em que o cliente delega o handling pro layer NIP-36
+  genérico (não case-by-kind). Em clientes que não respeitam NIP-36
+  fora de kind 1, comment renderiza sem warning — degradação
+  aceitável (manifesto §29).
+- Valores fora do conjunto Drift (`{nsfw, violence, spoiler, ad}`)
+  são preservados no `raw_event` mas tratados como "warning genérico"
+  pelo `applyContentFilters` local — não derrubam o comment, só
+  deixam de matchar toggle específico do leitor.
+
+**Drift UI:** mesmo `applyContentFilters` de posts (`feed.ts`)
+estende-se a comments. Toggles em `user_prefs` (`filter_nsfw`,
+`filter_violence`, `filter_spoiler`, `filter_ad`) controlam blur
+default por categoria; tap "mostrar mesmo assim" é override local
+(UI-only, não persiste no SQLite, não toca evento).
+
+**Persistência:** valor da tag (se presente) é guardado em coluna
+nova `comments.content_warning TEXT NULL` (migration v3). Apenas
+strings do conjunto Drift são salvas tipadas; outros valores ficam
+no `raw_event` JSON pra round-trip honesto.
+
+### 3.7 Imagens via imeta (Track B integration)
+
+Comments NIP-22 ganham suporte a **1 imagem opcional** via reuso da
+mesma tag `imeta` que Track B já estabeleceu pra posts kind 9078
+(ver [`blob-distribution.md`](blob-distribution.md) §3.5 e §6).
+NIP-22 não fala explicitamente de `imeta` mas a tag é um helper
+genérico de NIP-94 — válido em qualquer kind.
+
+**Diferenças vs post (kind 9078):**
+
+| Aspecto | POST (9078) | COMMENT (1111) |
+|---|---|---|
+| Cap de imagens | N por subpost × M subposts | **1 por comment** |
+| Pipeline upload | `blobs.uploadBlob` (Track B) | mesma `blobs.uploadBlob` |
+| Hash SHA-256 verify | obrigatório | obrigatório |
+| Helia pin opt-in | via SPREAD | **não** — comments não viram pin (§3.5.2 escopo limitado a kind 9078) |
+| HTTP fallback gateway | sim | sim |
+| EXIF strip | já em B.2 | mesma pipeline, herdado |
+
+**Justificativa do cap = 1:** comments são interjeição na thread,
+não publicação. UX de N imagens em comment polui ThreadView (§4.2.1
+do `design-comments.md`). Hard cap no protocolo — múltiplas tags
+`imeta` num mesmo kind 1111 fazem o cliente Drift reter **apenas a
+primeira** (silently drops o resto, igual lógica de
+`content-warning`).
+
+**Compat:** clientes NIP-22-aware sem suporte a `imeta` nesse kind
+renderizam o comment como texto puro; com NIP-94 generic support
+(habla.news, Coracle parcial) renderizam imagem inline. Drift
+extensions (`drift-version`, `client`) ignoradas safely.
+
+**Persistência:** colunas novas em `comments` (migration v3):
+- `image_url TEXT NULL` — URL HTTP ou `ipfs://<cid>`
+- `image_hash TEXT NULL` — SHA-256 hex (obrigatório se image_url
+  presente; rejeita persist se mismatch)
+- `image_mime TEXT NULL`
+- `image_dim TEXT NULL` — `"WxH"` opcional
+
+`raw_event` ainda guarda a tag `imeta` original pra round-trip
+fidedigno se algum cliente futuro quiser re-publicar.
+
 ---
 
 ## 4. Arquitetura proposta
@@ -342,6 +425,68 @@ comments postou.
 **Limite de tamanho:** 1000 chars no `content` (vs 280 do POST). Comments
 podem ser explicações mais longas; cap maior aceitável.
 
+### 6.2 Wire format com `content-warning` (C.6.2)
+
+```json
+{
+  "kind": 1111,
+  "tags": [
+    ["E", "<root_post_id>", "", "<root_pubkey>"],
+    ["K", "9078"],
+    ["P", "<root_author>"],
+    ["e", "<parent_id>", "", "<parent_pubkey>"],
+    ["k", "1111"],
+    ["p", "<parent_author>"],
+    ["drift-version", "1"],
+    ["client", "drift-official"],
+    ["content-warning", "spoiler"]
+  ],
+  "content": "Olha, no final do filme o vilão era o mordomo desde o início.",
+  ...
+}
+```
+
+Valores aceitos pelo cliente Drift: `nsfw | violence | spoiler | ad`.
+Outros são preservados em `raw_event` e tratados como "warning
+genérico" no leitor.
+
+### 6.3 Wire format com `imeta` — 1 imagem (C.6.3)
+
+```json
+{
+  "kind": 1111,
+  "tags": [
+    ["E", "<root_post_id>", "", "<root_pubkey>"],
+    ["K", "9078"],
+    ["P", "<root_author>"],
+    ["e", "<parent_id>", "", "<parent_pubkey>"],
+    ["k", "9078"],
+    ["p", "<parent_author>"],
+    ["drift-version", "1"],
+    ["client", "drift-official"],
+    ["imeta",
+      "url https://nostr.build/i/xyz.jpg",
+      "x e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "m image/jpeg",
+      "size 124301",
+      "dim 1280x720"
+    ]
+  ],
+  "content": "vejam essa screenshot que peguei",
+  ...
+}
+```
+
+Cap: **uma única tag `imeta`** considerada pelo cliente Drift; demais
+ignoradas. Hash `x` obrigatório — fetch verifica e rejeita mismatch
+(igual pipeline de posts, `blob-distribution.md` §5.2).
+
+### 6.4 Combinado: content-warning + imeta
+
+Tags coexistem; tag `content-warning` aplica blur sobre a imagem
+renderizada, igual ao tratamento em kind 9078. Mesma lógica de
+`applyContentFilters`.
+
 ---
 
 ## 7. Failure modes
@@ -396,11 +541,14 @@ podem ser explicações mais longas; cap maior aceitável.
 | **C.3** | useThread hook + lazy subscribe | ~3h | PostViewer abre → REQ; fecha → CLOSE; cache local read OK |
 | **C.4** | UI: ThreadView + CommentNode + ReplyForm + depth cap | ~5-6h | Tree render determinístico; reply form publica; conformance test |
 | **C.5** | scoring.applyCommentReceived + recalc integration | ~1-2h | Score reflete comments com weight; cap funciona; unit tests |
-| **C.6** | Polish: count prefetch, content-warning em comments, imeta em comments | ~2-3h | Feed mostra "42 comentários" sem materializar; comments com imagem suportadas |
+| **C.6.1** | Count prefetch (filter agregado kind 1111 sobre 50 postIds) | ~1h | ✅ Feed mostra "42 comentários" sem materializar threads inteiros |
+| **C.6.2** | `content-warning` em comments (NIP-36 reuse) | ~1h | ✅ Tag opcional persistida; `applyContentFilters` aplica blur por categoria |
+| **C.6.3** | `imeta` em comments (NIP-94 reuse, 1 imagem) | ~1-2h | ✅ Upload via Track B `blobs.uploadBlob`; hash verify; render inline |
 
-**Total: ~16-20h.** Cada fase é shipável independente. C.4 pode shipar
+**Total: ~17-22h.** Cada fase é shipável independente. C.4 pode shipar
 sem C.5 (comments aparecem mas score não é afetado ainda); C.3 sem C.4
-(thread carrega mas UI ainda usa placeholder).
+(thread carrega mas UI ainda usa placeholder). C.6.* são polish
+ortogonais e podem entrar em qualquer ordem após C.4.
 
 ---
 
@@ -435,6 +583,8 @@ sem C.5 (comments aparecem mas score não é afetado ainda); C.3 sem C.4
 ## 12. References
 
 - [NIP-22 — Comments on Anything](https://github.com/nostr-protocol/nips/blob/master/22.md)
+- [NIP-36 — Sensitive Content / Content Warning](https://github.com/nostr-protocol/nips/blob/master/36.md)
+- [NIP-94 — File Metadata (`imeta` tag)](https://github.com/nostr-protocol/nips/blob/master/94.md)
 - [`Docs/manifesto.md` §22, §24, §26, §27, §29](manifesto.md)
 - [`Docs/protocol-spec.md`](protocol-spec.md) (CC0 single source dos kinds)
 - [`Docs/blob-distribution.md`](blob-distribution.md) — modelo de RFC seguido aqui
@@ -443,6 +593,17 @@ sem C.5 (comments aparecem mas score não é afetado ainda); C.3 sem C.4
 ---
 
 ## Histórico
+
+- **2026-05-07 v0.3**: C.6.2 (`content-warning` NIP-36 reuse) + C.6.3
+  (`imeta` NIP-94 reuse, 1 imagem por comment, integração Track B)
+  documentados como polish do C.6. Adicionadas §3.6, §3.7, §6.2, §6.3,
+  §6.4. Migration v3 da tabela `comments` (colunas `content_warning`,
+  `image_url`, `image_hash`, `image_mime`, `image_dim`). C.6.1 (count
+  prefetch) também separado em sub-fase própria. Sem mudança no kind
+  1111, na pipeline de persist (`onNostrEvent` switch case existente)
+  ou na invariante #1 (`persistCommentRow` continua privada). Compat
+  preservada: clientes NIP-22-aware sem suporte a NIP-36/NIP-94 nesse
+  kind degradam pra texto puro sem warning, sem quebrar render.
 
 - **2026-05-07 v0.2**: C.1 implementado (schema + persist + protocol +
   tests). Incorpora fixes da revisão Ted/Barney

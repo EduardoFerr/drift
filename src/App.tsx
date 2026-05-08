@@ -1,4 +1,5 @@
 ﻿import { useCallback, useEffect, useMemo, useState } from 'react'
+import type { ReactElement } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import { OPTIMISTIC_TIMEOUT_MS, CLIENT_VERSION } from './config/constants'
 import { db } from './lib/db'
@@ -48,6 +49,17 @@ import {
   SlidersIcon,
   UserIcon,
   WarningIcon,
+  KeyIcon,
+  UsersIcon,
+  ServerIcon,
+  GlobeIcon,
+  PinIcon,
+  ListIcon,
+  ActivityIcon,
+  BoxIcon,
+  RefreshIcon,
+  InfoIcon,
+  TrashIcon,
 } from './components/UI/Icons'
 import { SpreadMap } from './components/Feed/SpreadMap'
 import type {
@@ -1404,16 +1416,23 @@ function SettingsRoot({
       label: string
       danger?: boolean
       hint: string
+      icon: (props: { size?: number; className?: string }) => ReactElement
     }[]
   }[] = [
     {
       title: 'identidade',
       items: [
-        { target: 'chave', label: 'chave', hint: 'backup/import nsec' },
+        {
+          target: 'chave',
+          label: 'chave',
+          hint: 'backup/import nsec',
+          icon: KeyIcon,
+        },
         {
           target: 'identidades',
           label: 'identidades',
           hint: 'múltiplas identidades — manifesto §4',
+          icon: UsersIcon,
         },
       ],
     },
@@ -1424,11 +1443,13 @@ function SettingsRoot({
           target: 'relays',
           label: 'relays',
           hint: 'gerenciar relays + NIP-65',
+          icon: ServerIcon,
         },
         {
           target: 'rede',
           label: 'modo de rede',
           hint: 'clearnet / tor / onion-only — manifesto §15',
+          icon: GlobeIcon,
         },
       ],
     },
@@ -1439,21 +1460,25 @@ function SettingsRoot({
           target: 'filtros',
           label: 'filtros',
           hint: 'NSFW / spoilers / anúncios',
+          icon: SlidersIcon,
         },
         {
           target: 'location',
           label: 'location',
           hint: 'granularidade nos meus posts — §28',
+          icon: PinIcon,
         },
         {
           target: 'mapa',
           label: 'mapa de spread',
           hint: 'enquadramento fechado / aberto',
+          icon: MapIcon,
         },
         {
           target: 'listas',
           label: 'listas',
           hint: 'pinned, blocked, muted (filtros locais)',
+          icon: ListIcon,
         },
       ],
     },
@@ -1464,27 +1489,32 @@ function SettingsRoot({
           target: 'status',
           label: 'status',
           hint: 'painel de diagnóstico em tempo real',
+          icon: ActivityIcon,
         },
         {
           target: 'blobs',
           label: 'blobs (ipfs)',
           hint: 'servindo blobs a peers — manifesto §16',
+          icon: BoxIcon,
         },
         {
           target: 'diagnostico',
           label: 'redefinir cache',
           hint: 'reconstrói banco local sem apagar identidade',
+          icon: RefreshIcon,
         },
         {
           target: 'sobre',
           label: `versão ${CLIENT_VERSION}`,
           hint: 'cliente Drift, manifesto + licença',
+          icon: InfoIcon,
         },
         {
           target: 'limpar',
           label: 'limpar local',
           danger: true,
           hint: 'apaga banco local — destrutivo',
+          icon: TrashIcon,
         },
       ],
     },
@@ -1511,33 +1541,46 @@ function SettingsRoot({
               {group.title}
             </h3>
             <ul className="divide-y divide-drift-border border-y border-drift-border">
-              {group.items.map((item) => (
-                <li key={item.target}>
-                  <button
-                    onClick={() => onSelect(item.target)}
-                    className={`group flex w-full items-center justify-between gap-3 px-1 py-[14px] text-left transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2 focus-visible:ring-offset-2 focus-visible:ring-offset-drift-bg ${
-                      item.danger
-                        ? 'text-drift-bury hover:text-[#ff6b6b]'
-                        : 'text-drift-text hover:text-drift-accent'
-                    }`}
-                  >
-                    <div className="flex min-w-0 flex-col gap-[2px]">
-                      <span className="font-mono text-[11px] uppercase tracking-[2px]">
-                        {item.label}
-                      </span>
-                      <span className="truncate font-mono text-[10px] normal-case tracking-normal text-drift-muted">
-                        {item.hint}
-                      </span>
-                    </div>
-                    <span
-                      aria-hidden="true"
-                      className="shrink-0 font-mono text-[12px] text-drift-muted transition-colors group-hover:text-current"
+              {group.items.map((item) => {
+                const Icon = item.icon
+                return (
+                  <li key={item.target}>
+                    <button
+                      onClick={() => onSelect(item.target)}
+                      className={`group flex w-full items-center gap-3 px-1 py-[14px] text-left transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2 focus-visible:ring-offset-2 focus-visible:ring-offset-drift-bg ${
+                        item.danger
+                          ? 'text-drift-bury hover:text-[#ff6b6b]'
+                          : 'text-drift-text hover:text-drift-accent'
+                      }`}
                     >
-                      →
-                    </span>
-                  </button>
-                </li>
-              ))}
+                      <span
+                        aria-hidden="true"
+                        className={`shrink-0 transition-colors ${
+                          item.danger
+                            ? 'text-drift-bury'
+                            : 'text-drift-muted group-hover:text-drift-accent'
+                        }`}
+                      >
+                        <Icon size={18} />
+                      </span>
+                      <div className="flex min-w-0 flex-1 flex-col gap-[2px]">
+                        <span className="font-mono text-[11px] uppercase tracking-[2px]">
+                          {item.label}
+                        </span>
+                        <span className="truncate font-mono text-[10px] normal-case tracking-normal text-drift-muted">
+                          {item.hint}
+                        </span>
+                      </div>
+                      <span
+                        aria-hidden="true"
+                        className="shrink-0 font-mono text-[12px] text-drift-muted transition-colors group-hover:text-current"
+                      >
+                        →
+                      </span>
+                    </button>
+                  </li>
+                )
+              })}
             </ul>
           </section>
         ))}

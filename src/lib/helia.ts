@@ -59,37 +59,102 @@ interface HeliaBundle {
 let heliaPromise: Promise<HeliaBundle> | null = null
 
 /**
+ * Idle auto-dispose (Robin/Lily fix 2026-05-08).
+ *
+ * Problema diagnosticado: libp2p autodial mantém WS connections abertas
+ * indefinidamente, gerando ruído de rede contínuo (~1033 reqs/3min no
+ * boot reportado pelo user). Mesmo com `use_ipfs=false` evitando
+ * inicialização nova, runs antigas permaneciam ativas.
+ *
+ * Solução: track `lastAccessAt` em CADA chamada que toca o singleton.
+ * Watcher checa periodicamente; se o singleton não foi usado em
+ * `IDLE_TIMEOUT_MS`, chama `disposeHelia()` automaticamente.
+ *
+ * Trade-off: timeout curto (5min) é resource-friendly mas re-init custa
+ * ~1-3s na próxima chamada (libp2p handshake + IDB open). Aceitável —
+ * uploads/downloads de blob são ações deliberadas, não hot path.
+ *
+ * Manifesto §17 (sem chave mestra): user controla custo de banda;
+ * runtime não fica gastando CPU/rede sem propósito explícito.
+ */
+export const IDLE_TIMEOUT_MS = 5 * 60_000 // 5 min
+const IDLE_CHECK_INTERVAL_MS = 60_000 // 1 min — granularidade boa o suficiente
+let lastAccessAt = 0
+let idleWatcher: ReturnType<typeof setInterval> | null = null
+
+function touch(): void {
+  lastAccessAt = Date.now()
+}
+
+function startIdleWatcher(): void {
+  if (idleWatcher) return
+  idleWatcher = setInterval(() => {
+    if (!heliaPromise) {
+      stopIdleWatcher()
+      return
+    }
+    const idleFor = Date.now() - lastAccessAt
+    if (idleFor >= IDLE_TIMEOUT_MS) {
+      // fire-and-forget; disposeHelia é idempotente e silencia erros internos
+      void disposeHelia()
+    }
+  }, IDLE_CHECK_INTERVAL_MS)
+}
+
+function stopIdleWatcher(): void {
+  if (!idleWatcher) return
+  clearInterval(idleWatcher)
+  idleWatcher = null
+}
+
+/**
  * Inicializa Helia uma vez por aba. Idempotente — chamadas concorrentes
  * recebem a mesma promise. Caller que pegar a rejection deve assumir
  * fallback HTTP.
  *
  * Custo: ~1-3s no init (libp2p + blockstore IDB open). Por isso é lazy
  * e singleton; não chamar em hot path.
+ *
+ * Inicia o idle watcher na primeira chamada — auto-dispose após
+ * `IDLE_TIMEOUT_MS` sem novo touch.
  */
 export function getHelia(): Promise<HeliaBundle> {
+  touch()
   if (heliaPromise) return heliaPromise
   heliaPromise = initHelia().catch((err) => {
     // Permite retry após falha — não cacheia rejection permanentemente.
     heliaPromise = null
+    stopIdleWatcher()
     throw err
   })
+  startIdleWatcher()
   return heliaPromise
 }
 
 /**
- * Limpa o singleton — útil em tests ou quando user reseta identidade.
+ * Limpa o singleton — útil em tests, quando user reseta identidade,
+ * ou auto-disparado pelo idle watcher após `IDLE_TIMEOUT_MS`.
+ *
  * NÃO apaga blocos persistidos (IDB sobrevive); só dropa a referência
  * em memória pra próxima `getHelia()` reabrir.
+ *
+ * Edge case: chamada in-flight durante dispose. `getHelia()` retornaria
+ * a promise antiga (que vai resolver com node já parado). É tolerável
+ * porque (a) o consumer chama `addBlob`/`getBlob` etc. logo em seguida,
+ * que vão re-touch + re-init via novo `getHelia()` se a promise foi
+ * limpa antes; (b) operação no node parado falha graciosamente (caller
+ * trata como Helia indisponível, cai pro HTTP fallback).
  */
 export async function disposeHelia(): Promise<void> {
+  stopIdleWatcher()
   if (!heliaPromise) return
+  const promise = heliaPromise
+  heliaPromise = null
   try {
-    const { node } = await heliaPromise
+    const { node } = await promise
     await node.stop()
   } catch {
-    // ignora — pode estar em estado meio-pronto
-  } finally {
-    heliaPromise = null
+    // ignora — pode estar em estado meio-pronto ou já parado
   }
 }
 

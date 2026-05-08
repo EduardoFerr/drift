@@ -32,6 +32,7 @@ import {
   type CommentNode,
   type ThreadIndex,
 } from './thread-cursor'
+import { parseImetaTags } from './nip94'
 
 // ─── Constantes ──────────────────────────────────────────────────────
 
@@ -62,9 +63,30 @@ interface CommentRow {
   content: string
   created_at: number
   score: number
+  /** C.6.2 — content_warning. NULL em rows v8 pré-migração. */
+  content_warning: string | null
+  /**
+   * C.6.3 — JSON do evento original (sempre presente em v8+). Usado pra
+   * extrair imeta tags no read path. Coluna existe desde Track C.1; se
+   * por qualquer motivo vier null/inválido, comment continua só-texto.
+   */
+  raw_event: string | null
 }
 
 function rowToRecord(r: CommentRow): CommentRecord {
+  // C.6.3 — parsing imeta best-effort. Cap convencional: 1 imagem por
+  // comment (vs N em Post). Se autor publicou múltiplas imetas (cliente
+  // alternativo ou bug), pega só a primeira.
+  let meta: import('./nip94').BlobMeta | undefined
+  if (r.raw_event) {
+    try {
+      const ev = JSON.parse(r.raw_event) as SignedEvent
+      const metas = parseImetaTags(ev)
+      if (metas.length > 0) meta = metas[0]
+    } catch {
+      // raw_event corrompido — ignora, comment renderiza só-texto.
+    }
+  }
   return {
     id: r.id,
     postId: r.post_id,
@@ -73,6 +95,8 @@ function rowToRecord(r: CommentRow): CommentRecord {
     content: r.content,
     createdAt: r.created_at,
     score: r.score,
+    contentWarning: r.content_warning,
+    meta,
   }
 }
 
@@ -103,6 +127,8 @@ export function buildThread(rows: CommentRecord[]): CommentNode[] {
       created_at: r.createdAt,
       score: r.score,
       replies: [],
+      content_warning: r.contentWarning ?? null,
+      meta: r.meta,
     })
   }
 
@@ -206,7 +232,7 @@ export async function loadThread(postId: string): Promise<void> {
   })
 
   const rows = await db.exec<CommentRow>(
-    `SELECT id, post_id, reply_to, author_pub, content, created_at, score
+    `SELECT id, post_id, reply_to, author_pub, content, created_at, score, content_warning, raw_event
        FROM comments
       WHERE post_id = ?
       ORDER BY created_at ASC, id ASC

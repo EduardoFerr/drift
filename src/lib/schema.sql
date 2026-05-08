@@ -127,8 +127,9 @@ CREATE TABLE IF NOT EXISTS comments (
   author_pub      TEXT NOT NULL,            -- pubkey hex 64 do autor do comment
   content         TEXT NOT NULL,            -- texto plain UTF-8 (NIP-22 content)
   created_at      INTEGER NOT NULL,         -- unix seconds
-  raw_event       TEXT NOT NULL,            -- JSON do evento original
-  score           REAL DEFAULT 0            -- moderação: -999 esconde
+  raw_event       TEXT NOT NULL,            -- JSON do evento original (imetas parsed daqui no read path — C.6.3)
+  score           REAL DEFAULT 0,           -- moderação: -999 esconde
+  content_warning TEXT                      -- C.6.2: 'nsfw'|'violence'|'spoiler'|'ad'|string livre, NIP-36 reuse
 );
 CREATE INDEX IF NOT EXISTS idx_comments_post  ON comments(post_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_comments_reply ON comments(reply_to);

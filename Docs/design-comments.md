@@ -1,7 +1,7 @@
 # Design — ThreadView com navegação swipe (Track C)
 
-**Status:** Draft v0.1 · **Data:** 2026-05-07
-**Companion:** [`comments.md`](comments.md) (RFC do protocolo)
+**Status:** Draft v0.2 · **Data:** 2026-05-07
+**Companion:** [`comments.md`](comments.md) (RFC do protocolo, v0.3)
 **Personas:** arquitetura por Ted, UX/a11y por Barney
 **License:** CC0
 
@@ -180,6 +180,55 @@ de contexto):
 
 Header é shrink-0 ~56px. Card central recebe restante do espaço.
 
+### 4.2.1 CommentCard com mídia (C.6.2 + C.6.3)
+
+Quando o evento kind 1111 carrega `content-warning` e/ou `imeta`, o
+card recebe affordances dedicadas:
+
+```
+┌─────────────────────────────────────────────┐
+│ [⚠ spoiler]   ← badge fixo, topo do card    │
+│                                             │
+│ @alice · 2h                                 │
+│                                             │
+│ ┌─────────────────────────────────────────┐ │
+│ │                                         │ │
+│ │   [imagem renderizada via <Image/>]     │ │
+│ │   (blurred se filter ativo)             │ │
+│ │                                         │ │
+│ └─────────────────────────────────────────┘ │
+│                                             │
+│ texto do comment, max 1000 chars...         │
+│                                             │
+│  ↵ responder                                │
+└─────────────────────────────────────────────┘
+```
+
+**Badge content-warning (topo do card):**
+- Pill compacto, cor depende do tipo (`nsfw` rosa, `violence`
+  vermelho, `spoiler` âmbar, `ad` cinza).
+- `aria-label="aviso de conteúdo: spoiler"`.
+- Tap → toast com explicação + atalho pro toggle correspondente
+  em `user_prefs`.
+
+**Imagem (`<Image/>` reuso de Track B):**
+- Componente `<Image meta={{ url, hash, mime, dim }} />` (Track B,
+  `src/components/UI/Image.tsx`) é reusado sem mudanças. Hash
+  verify SHA-256 obrigatório acontece dentro do componente.
+- Cap visual: `max-height` 60% do card; `object-fit: contain`. Tap
+  expande pra fullscreen viewer (mesmo padrão do PostViewer).
+- `applyContentFilters` aciona blur quando filter da categoria
+  ativo; overlay "tap pra mostrar" é override local UI-only (não
+  toca SQLite).
+
+**Combinado CW + imagem:** badge sempre visível; imagem blurred se
+filter ativo. Texto fica abaixo, sem blur (texto não herda warning
+— só a mídia visual).
+
+**Determinismo:** mesma tree + mesmo `user_prefs` → mesmo conjunto
+de cards visíveis vs blurred (manifesto §7). Toggle local "mostrar
+mesmo assim" é `useState` efêmero, não persiste.
+
 ### 4.3. Reply button
 
 Botão fixo bottom-right (FAB-like): `↵ responder`. Tap abre **bottom
@@ -351,6 +400,80 @@ Bottom sheet dedicada (não card-stack):
 
 Keyboard automaticamente abre quando textarea recebe focus.
 
+### 10.1 ReplySheet com imagem + content-warning (C.6.2 + C.6.3)
+
+Sheet ganha duas affordances opcionais alinhadas com `comments.md`
+v0.3 §3.6 e §3.7:
+
+```
+┌──────────────────────────── ReplySheet ────┐
+│  responder a @alice                    ✕   │
+│                                            │
+│ ┌────────────────────────────────────────┐ │
+│ │  [textarea max 1000 chars]             │ │
+│ │                                        │ │
+│ └────────────────────────────────────────┘ │
+│                                            │
+│  ⚠ aviso:  [nsfw] [violence] [spoiler] [ad]│
+│            ↑ chips toggle, single-select   │
+│                                            │
+│  📎 anexar imagem  (cap 1)                 │
+│  ┌────────────┐                            │
+│  │ [preview]  │  remover ✕                 │
+│  └────────────┘                            │
+│                                            │
+│              [cancelar]  [publicar]        │
+└────────────────────────────────────────────┘
+```
+
+**Picker de content-warning (4 chips):**
+- `nsfw | violence | spoiler | ad` — single-select (toggle 1 de 4
+  ou nenhum). Espelha o picker já presente em ComposeOverlay (kind
+  9078); reuso de `<ContentWarningPicker/>` com props idênticos.
+- Default: nenhum selecionado (tag `content-warning` omitida).
+- Aplica em ambas as camadas: ao texto e à imagem (se houver).
+- Persistência: zero — pré-publish é estado local; pós-publish é
+  serializado na tag `content-warning` do evento.
+
+**Image upload (cap 1):**
+- Reusa **mesmo flow** do ComposeOverlay (`uploadBlob` de Track B):
+  compressão local → SHA-256 → tenta Helia + HTTP, retorna
+  `{ url, hash, mime, size, dim }`.
+- UI única slot (vs N slots no compose de post). Botão "📎 anexar
+  imagem" desabilita após 1 imagem; user precisa remover pra trocar.
+- Preview thumbnail no sheet com botão `✕ remover` (limpa local
+  state, não publica nada ainda).
+- EXIF strip + hash verify herdados sem código novo.
+- Spinner "garantindo cópias..." durante upload (mesma cópia da
+  ComposeOverlay).
+
+**Estado pré-publish (local React state em `<ReplySheet>`):**
+```typescript
+interface ReplyDraft {
+  text: string                     // max 1000 chars
+  contentWarning: 'nsfw'|'violence'|'spoiler'|'ad'|null
+  image: { url: string, hash: string, mime: string, dim?: string }|null
+}
+```
+
+Submit chama `protocol.commentOnPost({ postId, replyTo, text,
+contentWarning, blobs })` (signature já definida em `comments.md`
+§4.2). Sheet fecha após publish OK; reply aparece via subscribe →
+`onNostrEvent` → `useThreadStore` invalidate (mesmo loop de
+qualquer comment).
+
+**Falhas:**
+- Upload falha → toast "falha ao subir imagem"; user pode tentar
+  de novo ou remover anexo e publicar text-only.
+- 2-confirmação de cópias não bate (Track B §5.5) → mesma UX da
+  ComposeOverlay: "apenas 1 cópia disponível, publicar?".
+
+**A11y:**
+- Chip group com `role="radiogroup"` + `aria-label="aviso de
+  conteúdo"`; cada chip `role="radio"`.
+- Image input com `aria-label="anexar uma imagem ao comentário"`.
+- Sheet mantém focus trap (já implementado no `<BottomSheet/>`).
+
 ---
 
 ## 11. Componentes
@@ -422,21 +545,26 @@ it('cursor ops são funções puras (sem Date.now, sem random)')
 
 ---
 
-## 13. Phasing (sub-fases dentro de C.4)
+## 13. Phasing (sub-fases dentro de C.4 + extensões C.6.x)
 
 A spec do protocolo (`comments.md`) define C.0..C.6. Esta UI é o
-escopo de **C.4** (~5-6h estimado). Sub-fases internas:
+escopo de **C.4** (~5-6h estimado) + extensões UI dos polish C.6.2
+e C.6.3. Sub-fases internas:
 
-| Sub | Scope | Esforço |
-|---|---|---|
-| **C.4.1** | `useThreadStore` + buildThread + cursor ops puras + 20 testes | ~1.5h |
-| **C.4.2** | `<ThreadView>` shell + `<CommentCard>` + SwipeHandler estendido | ~1.5h |
-| **C.4.3** | `<ThreadHeader>` (breadcrumb + counter + new-badge) | ~1h |
-| **C.4.4** | `<ReplySheet>` + publish flow | ~1h |
-| **C.4.5** | A11y (keyboard, ARIA, reduced-motion) + coach-mark + integration | ~1h |
+| Sub | Scope | Esforço | Status |
+|---|---|---|---|
+| **C.4.1** | `useThreadStore` + buildThread + cursor ops puras + 20 testes | ~1.5h | ✅ |
+| **C.4.2** | `<ThreadView>` shell + `<CommentCard>` + SwipeHandler estendido | ~1.5h | ✅ |
+| **C.4.3** | `<ThreadHeader>` (breadcrumb + counter + new-badge) | ~1h | ✅ |
+| **C.4.4** | `<ReplySheet>` + publish flow (text-only) | ~1h | ✅ |
+| **C.4.5** | A11y (keyboard, ARIA, reduced-motion) + coach-mark + integration | ~1h | ✅ |
+| **C.6.1** | Count prefetch (filter agregado) | ~1h | ✅ |
+| **C.6.2** | `<CommentCard>` badge CW + `applyContentFilters` blur + `<ReplySheet>` chip group (§4.2.1, §10.1) | ~1h | ✅ |
+| **C.6.3** | `<CommentCard>` `<Image meta>` render + `<ReplySheet>` upload slot (cap 1) (§4.2.1, §10.1) | ~1-2h | ✅ |
 
-Cada sub é shippável independente — C.4.1 ships com tests verdes mas
-sem UI; C.4.2 + C.4.1 já dá thread navegável (sem header); etc.
+Cada sub é shippável independente. C.6.2 e C.6.3 são ortogonais: ship
+um sem o outro funciona (cards sem CW renderizam normal; cards com
+CW mas sem imagem só mostram badge).
 
 ---
 
@@ -494,6 +622,16 @@ Estes vão pra `comments.md` v0.2 antes de qualquer código de C.1.
 ---
 
 ## 16. Histórico
+
+- **2026-05-07 v0.2**: Extensões UI pra C.6.2 + C.6.3:
+  - §4.2.1 `CommentCard` com badge `content-warning` + render
+    `<Image/>` reusado de Track B + blur via `applyContentFilters`.
+  - §10.1 `ReplySheet` com chip group de CW (single-select de
+    `nsfw|violence|spoiler|ad`) + upload slot (cap 1 imagem,
+    pipeline `uploadBlob` reusada).
+  - §13 phasing atualizado pra incluir C.6.1/6.2/6.3 com status ✅.
+  - Companion bumped pra `comments.md` v0.3.
+  - Sem mudança nas decisões de cursor, swipe, ou ARIA.
 
 - **2026-05-07 v0.1**: Draft inicial. Sintetizou:
   - Spec swipe do user (LEFT/RIGHT siblings, UP/DOWN hierarquia)
