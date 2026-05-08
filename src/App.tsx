@@ -571,6 +571,7 @@ function App() {
         onOpenStatus={() => setShowStatusCard(true)}
         onOpenIdentity={() => setShowIdentity(true)}
         onOpenProfile={() => setShowProfile(true)}
+        onActiveTabTap={() => setCurrentIdx(0)}
       />
 
       {/* Banners empilhados acima do stack. Layout flex-shrink-0 garante
@@ -1079,6 +1080,7 @@ function HomeHeader({
   onOpenStatus,
   onOpenIdentity,
   onOpenProfile,
+  onActiveTabTap,
 }: {
   identity: DriftIdentity | null
   userWeight: { weight: number; engagement: number; antiquity: number; maxSubposts: number }
@@ -1090,6 +1092,8 @@ function HomeHeader({
   onOpenStatus: () => void
   onOpenIdentity: () => void
   onOpenProfile: () => void
+  /** Tap-on-active-tab handler (Twitter/Bluesky pattern, scroll-to-top). */
+  onActiveTabTap?: () => void
 }) {
   // Suprime "unused" warning — callbacks reservados pra long-press
   // futuro (V11+ avatar/logo abrirá IdentityPanel via gesture).
@@ -1120,7 +1124,7 @@ function HomeHeader({
         </div>
       </div>
       <div className="border-b border-drift-border">
-        <FeedTabs />
+        <FeedTabs {...(onActiveTabTap ? { onActiveTabTap } : {})} />
       </div>
     </header>
   )

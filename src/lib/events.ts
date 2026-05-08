@@ -26,7 +26,7 @@ import { db } from './db'
 import { verifyDriftEvent, getTag } from './nostr'
 import { DRIFT_KIND, DRIFT_KIND_SET, SCORE_RECALC_DEBOUNCE_MS } from '../config/constants'
 import { calculateScoreNow } from './scoring'
-import { invalidateFeed } from './feed'
+import { bumpUnseenCount, invalidateFeed } from './feed'
 import { getReportWeight, maybeModerate } from './moderation'
 import { calculateUserWeight, calculateWeight } from './weight'
 import type { ReportReason } from '../types/drift'
@@ -206,12 +206,30 @@ export function passesNip22SchemaCheck(event: SignedEvent): boolean {
 
 // ─── Persist handlers ────────────────────────────────────────────────
 
+/**
+ * Set de event.id de POSTs já vistos pelo onNostrEvent — usado pra
+ * detectar insert genuíno (cross-relay dedup) sem requerer change-count
+ * do db.run. INSERT OR IGNORE não expõe se realmente inseriu, então
+ * gate-amos o `bumpUnseenCount` por este set local.
+ *
+ * Cresce monotonicamente durante a sessão. Em cenário típico (1k posts
+ * por sessão), ~64 bytes × 1000 = 64KB — desprezível. Reset implícito
+ * em reload da app (`location.reload()`).
+ *
+ * Cap defensivo de 10k entries: posts além disso são raros mas
+ * possíveis em rebuild full; limit evita crescimento ilimitado em
+ * sessions de horas. FIFO drop quando atinge cap (re-incrementa OK).
+ */
+const SEEN_POST_IDS_CAP = 10_000
+const seenPostIds = new Set<string>()
+
 async function persistPost(event: SignedEvent): Promise<void> {
   // posts.id = event.id (hex 64). Antes usávamos uma UUID na tag `d`,
   // mas isso violava NIP-01 quando o id era referenciado em `e` por
   // SPREAD/BURY/REPORT (tag `e` exige hex 64). Agora `event.id` é a
   // identidade canônica do post — local e na rede.
   const postId = event.id
+  const isFirstSeen = !seenPostIds.has(postId)
   await db.run(
     `INSERT OR IGNORE INTO posts
      (id, author_pub, content, created_at, category, location, client, content_warning, raw_event, score, spreads, buries)
@@ -228,6 +246,15 @@ async function persistPost(event: SignedEvent): Promise<void> {
       JSON.stringify(event),
     ],
   )
+  if (isFirstSeen) {
+    if (seenPostIds.size >= SEEN_POST_IDS_CAP) {
+      // FIFO drop — Set preserva ordem de inserção
+      const oldest = seenPostIds.values().next().value
+      if (oldest) seenPostIds.delete(oldest)
+    }
+    seenPostIds.add(postId)
+    bumpUnseenCount()
+  }
   await updateUserActivity(event.pubkey, event.created_at)
   // post novo: feed precisa aparecer no topo (score 0 + recente)
   invalidateFeed()

@@ -15,25 +15,52 @@
 
 import { useState, type ReactNode } from 'react'
 import { motion } from 'framer-motion'
-import { refreshFeed, setFeedTab, useFeedStore } from '../../lib/feed'
+import { markFeedSeen, refreshFeed, setFeedTab, useFeedStore } from '../../lib/feed'
 
 type FeedTab = 'global' | 'following' | 'trending'
 
-export function FeedTabs() {
+export interface FeedTabsProps {
+  /**
+   * Callback opcional disparado quando user toca na tab que JÁ está
+   * ativa — gesto "voltar pro topo" (Twitter/Bluesky pattern).
+   * App.tsx usa pra resetar `idxByTab[tab]` pra 0. Manifesto §24:
+   * default é preservar posição por tab; este gesto é opt-in explícito.
+   */
+  onActiveTabTap?: () => void
+}
+
+export function FeedTabs({ onActiveTabTap }: FeedTabsProps = {}) {
   const tab = useFeedStore((s) => s.tab)
+  const unseenByTab = useFeedStore((s) => s.unseenByTab)
   const [refreshing, setRefreshing] = useState(false)
+  const unseenCount = unseenByTab[tab]
 
   // User feedback 2026-05-08: ter botão pra refresh manual além do
   // automático via invalidateFeed (debounced 150ms quando relay
   // entrega evento). Útil pra confirmar visualmente que feed atualiza.
+  // Refresh manual também limpa contador "+N novos" da tab atual via
+  // markFeedSeen — auto-invalidate NÃO limpa (preserva acúmulo idle).
   async function handleRefresh() {
     if (refreshing) return
     setRefreshing(true)
     try {
       await refreshFeed()
+      markFeedSeen()
     } finally {
       // Pequeno delay pra animação ser perceptível mesmo em refresh fast
       setTimeout(() => setRefreshing(false), 400)
+    }
+  }
+
+  /**
+   * Click handler pra cada tab. Se já é ativa, dispara `onActiveTabTap`
+   * (volta pro topo via App.tsx). Senão, troca pra essa tab.
+   */
+  function handleTabClick(targetTab: FeedTab) {
+    if (targetTab === tab) {
+      onActiveTabTap?.()
+    } else {
+      void setFeedTab(targetTab)
     }
   }
 
@@ -42,24 +69,42 @@ export function FeedTabs() {
   // (inline width baseado no texto, alinhamento à esquerda).
   return (
     <div className="flex items-stretch font-mono text-[10px] uppercase tracking-[2px]">
-      <FeedTabBtn active={tab === 'global'} onClick={() => void setFeedTab('global')}>
+      <FeedTabBtn
+        active={tab === 'global'}
+        onClick={() => handleTabClick('global')}
+        title={tab === 'global' ? 'voltar ao topo' : undefined}
+      >
         global
       </FeedTabBtn>
-      <FeedTabBtn active={tab === 'following'} onClick={() => void setFeedTab('following')}>
+      <FeedTabBtn
+        active={tab === 'following'}
+        onClick={() => handleTabClick('following')}
+        title={tab === 'following' ? 'voltar ao topo' : undefined}
+      >
         seguindo
       </FeedTabBtn>
-      <FeedTabBtn active={tab === 'trending'} onClick={() => void setFeedTab('trending')}>
+      <FeedTabBtn
+        active={tab === 'trending'}
+        onClick={() => handleTabClick('trending')}
+        title={tab === 'trending' ? 'voltar ao topo' : undefined}
+      >
         trending
       </FeedTabBtn>
       <button
         onClick={() => void handleRefresh()}
         disabled={refreshing}
-        title="atualizar feed"
+        title={
+          unseenCount > 0
+            ? `${unseenCount} ${unseenCount === 1 ? 'post novo' : 'posts novos'} — atualizar`
+            : 'atualizar feed'
+        }
         aria-label="atualizar feed"
-        className="flex shrink-0 items-center justify-center px-3 text-drift-muted transition-colors hover:text-drift-text disabled:opacity-40 focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2 focus-visible:ring-offset-1 focus-visible:ring-offset-drift-bg"
+        className="relative flex shrink-0 items-center justify-center px-3 text-drift-muted transition-colors hover:text-drift-text disabled:opacity-40 focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2 focus-visible:ring-offset-1 focus-visible:ring-offset-drift-bg"
       >
         <span
-          className={`text-[14px] ${refreshing ? 'animate-spin' : ''}`}
+          className={`text-[14px] ${refreshing ? 'animate-spin' : ''} ${
+            unseenCount > 0 ? 'text-drift-accent' : ''
+          }`}
           style={{
             display: 'inline-block',
             transformOrigin: 'center',
@@ -67,6 +112,14 @@ export function FeedTabs() {
         >
           ↻
         </span>
+        {unseenCount > 0 && (
+          <span
+            aria-hidden="true"
+            className="absolute -right-0.5 -top-0.5 min-w-[16px] rounded-full bg-drift-accent px-1 text-center text-[8px] font-bold leading-[14px] text-drift-bg"
+          >
+            {unseenCount > 99 ? '99+' : unseenCount}
+          </span>
+        )}
       </button>
     </div>
   )
@@ -76,14 +129,17 @@ function FeedTabBtn({
   active,
   onClick,
   children,
+  title,
 }: {
   active: boolean
   onClick: () => void
   children: ReactNode
+  title?: string
 }) {
   return (
     <button
       onClick={onClick}
+      title={title}
       className={`relative flex-1 px-2 py-[10px] text-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2 focus-visible:ring-offset-1 focus-visible:ring-offset-drift-bg ${
         active
           ? 'text-drift-text'

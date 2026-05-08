@@ -151,6 +151,17 @@ interface FeedStore {
   limit: number
   /** Tab ativa do feed. Default 'global'. */
   tab: FeedTab
+  /**
+   * Contador de POSTs novos recebidos via subscribe desde a última vez
+   * que o user "marcou como visto" (refresh manual ou tab change).
+   * Por tab — cada um conta separadamente. UI mostra badge "+N novos"
+   * no botão refresh quando > 0. Reset em `markFeedSeen()`.
+   *
+   * Increment em `bumpUnseenCount()` chamado de `events.ts:persistPost`
+   * APÓS detectar insert genuíno (`seenPostIds` set local descarta
+   * duplicatas cross-relay). Manifesto §6 — verdade por eventos.
+   */
+  unseenByTab: Record<FeedTab, number>
 }
 
 export const useFeedStore = create<FeedStore>(() => ({
@@ -158,7 +169,41 @@ export const useFeedStore = create<FeedStore>(() => ({
   loaded: false,
   limit: 50,
   tab: 'global',
+  unseenByTab: { global: 0, following: 0, trending: 0 },
 }))
+
+/**
+ * Incrementa contador "novos não-vistos" de TODOS os tabs.
+ * Chamado por `events.ts:persistPost` quando um POST genuinamente novo
+ * (não duplicate cross-relay) entra no SQLite.
+ *
+ * Conservador: incrementa em todas as tabs porque na hora de receber
+ * o evento não sabemos qual filter (global/following/trending) ele vai
+ * passar. Trade-off: badge pode aparecer em "seguindo" mesmo se autor
+ * não é seguido — refresh limpa, user vê que de fato nada novo
+ * apareceu lá. Aceitável; alternativa exigia consultar prefs/follows
+ * por evento (custo > valor).
+ */
+export function bumpUnseenCount(): void {
+  useFeedStore.setState((s) => ({
+    unseenByTab: {
+      global: s.unseenByTab.global + 1,
+      following: s.unseenByTab.following + 1,
+      trending: s.unseenByTab.trending + 1,
+    },
+  }))
+}
+
+/**
+ * Marca a tab ATUAL como "vista" — zera o contador. Chamado pelo botão
+ * refresh manual e por tap-on-active-tab (FeedTabs). NÃO chamado por
+ * `invalidateFeed` automático (preserva acúmulo entre boot/idle).
+ */
+export function markFeedSeen(): void {
+  useFeedStore.setState((s) => ({
+    unseenByTab: { ...s.unseenByTab, [s.tab]: 0 },
+  }))
+}
 
 /**
  * Troca a tab do feed. Dispara refresh imediato pra a nova query
