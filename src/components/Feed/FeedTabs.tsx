@@ -13,20 +13,35 @@
  * animar position/size — não há re-render flicker.
  */
 
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { motion } from 'framer-motion'
-import { setFeedTab, useFeedStore } from '../../lib/feed'
+import { refreshFeed, setFeedTab, useFeedStore } from '../../lib/feed'
 
 type FeedTab = 'global' | 'following' | 'trending'
 
 export function FeedTabs() {
   const tab = useFeedStore((s) => s.tab)
+  const [refreshing, setRefreshing] = useState(false)
+
+  // User feedback 2026-05-08: ter botão pra refresh manual além do
+  // automático via invalidateFeed (debounced 150ms quando relay
+  // entrega evento). Útil pra confirmar visualmente que feed atualiza.
+  async function handleRefresh() {
+    if (refreshing) return
+    setRefreshing(true)
+    try {
+      await refreshFeed()
+    } finally {
+      // Pequeno delay pra animação ser perceptível mesmo em refresh fast
+      setTimeout(() => setRefreshing(false), 400)
+    }
+  }
 
   // V9.3c — flex-1 + text-center (mockup .tab pattern). Cada tab ocupa
   // 1/3 da largura da row, texto centralizado. Antes: gap-1 + px-2
   // (inline width baseado no texto, alinhamento à esquerda).
   return (
-    <div className="flex font-mono text-[10px] uppercase tracking-[2px]">
+    <div className="flex items-stretch font-mono text-[10px] uppercase tracking-[2px]">
       <FeedTabBtn active={tab === 'global'} onClick={() => void setFeedTab('global')}>
         global
       </FeedTabBtn>
@@ -36,6 +51,23 @@ export function FeedTabs() {
       <FeedTabBtn active={tab === 'trending'} onClick={() => void setFeedTab('trending')}>
         trending
       </FeedTabBtn>
+      <button
+        onClick={() => void handleRefresh()}
+        disabled={refreshing}
+        title="atualizar feed"
+        aria-label="atualizar feed"
+        className="flex shrink-0 items-center justify-center px-3 text-drift-muted transition-colors hover:text-drift-text disabled:opacity-40 focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2 focus-visible:ring-offset-1 focus-visible:ring-offset-drift-bg"
+      >
+        <span
+          className={`text-[14px] ${refreshing ? 'animate-spin' : ''}`}
+          style={{
+            display: 'inline-block',
+            transformOrigin: 'center',
+          }}
+        >
+          ↻
+        </span>
+      </button>
     </div>
   )
 }

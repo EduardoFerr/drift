@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from 'react'
+﻿import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import { OPTIMISTIC_TIMEOUT_MS, CLIENT_VERSION } from './config/constants'
 import { db } from './lib/db'
@@ -11,7 +11,7 @@ import {
 import { restartSync, useSyncStore } from './lib/sync'
 import { createPost, spreadPost, buryPost } from './lib/protocol'
 import { getMyAction, refreshFeed, useFeedStore } from './lib/feed'
-import { FeedTabs } from './components/Feed/FeedTabs'
+import { FeedTabs, type FeedTab } from './components/Feed/FeedTabs'
 import {
   startBoot,
   useBootStore,
@@ -278,12 +278,29 @@ function App() {
   // Default 0 (post mais recente). Ao chegar no fim da fila, mantém
   // último post e swipe ↑/↓ vira no-op de avanço (mas spread/sink
   // continuam funcionando). useMemo evita findIndex desnecessário.
-  const [currentIdx, setCurrentIdx] = useState(0)
   const [exitDir, setExitDir] = useState<'up' | 'down'>('up')
-  // Subscreve `tab` pra resetar idx ao trocar Global/Seguindo/Trending —
-  // user reportou "feed bagunça" ao trocar tab porque idx ficava no
-  // valor antigo (3) mas array de posts era totalmente diferente.
+  // Subscreve `tab` pra que cada tab tenha sua sequência independente —
+  // user feedback 2026-05-08: "Global/Seguindo/Trending cada um deveria
+  // ter sua própria sequência". `idxByTab` persiste posição por tab;
+  // trocar e voltar mantém onde parou. Manifesto §24 — feeds são views
+  // distintas, navegação é local de cada view.
   const feedTab = useFeedStore((s) => s.tab)
+  const [idxByTab, setIdxByTab] = useState<Record<FeedTab, number>>({
+    global: 0,
+    following: 0,
+    trending: 0,
+  })
+  const currentIdx = idxByTab[feedTab]
+  const setCurrentIdx = useCallback(
+    (updater: number | ((i: number) => number)) => {
+      setIdxByTab((prev) => {
+        const cur = prev[feedTab]
+        const next = typeof updater === 'function' ? updater(cur) : updater
+        return { ...prev, [feedTab]: next }
+      })
+    },
+    [feedTab],
+  )
   // Range válido pra navegação: [0..posts.length]. posts.length é o
   // sentinel "fim do feed" — renderiza EndOfFeed em vez de PostViewer.
   // User feedback 2026-05-08: card "trava" no último post sem feedback;
@@ -297,20 +314,13 @@ function App() {
       nextHomePost: safeIdx + 1 < posts.length ? posts[safeIdx + 1]! : null,
     }
   }, [currentIdx, posts, atEnd])
-  // Quando posts muda significativamente (post atual sumiu — moderado,
-  // muted), CLAMP até posts.length (sentinel atEnd permitido).
+  // Clamp do idx do tab ATUAL se posts mudou (moderação, refresh) e
+  // posição fica out-of-bounds. Não toca outros tabs.
   useEffect(() => {
     if (currentIdx > posts.length) {
       setCurrentIdx(Math.max(0, posts.length))
     }
-  }, [posts.length, currentIdx])
-  // Tab changed → start no top do novo feed. Sem isso, user troca de
-  // Global pra Trending e vê "post[3]" do trending em vez do mais
-  // relevante (post[0]). Manifesto §24 — feeds são views distintas
-  // sobre os dados, idx deve ser local de cada view.
-  useEffect(() => {
-    setCurrentIdx(0)
-  }, [feedTab])
+  }, [posts.length, currentIdx, setCurrentIdx])
 
   // V8: openViewer + advanceViewer (modal viewer queue) deletados —
   // home view embedded substituiu o paradigma. viewerPostId/viewerExitDir
