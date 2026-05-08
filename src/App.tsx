@@ -316,11 +316,20 @@ function App() {
   }, [currentIdx, posts, atEnd])
   // Clamp do idx do tab ATUAL se posts mudou (moderação, refresh) e
   // posição fica out-of-bounds. Não toca outros tabs.
+  //
+  // CRÍTICO: só dispara quando feedLoaded === true. Durante transição
+  // de tab (setFeedTab → store loaded=false → refreshFeed async →
+  // store loaded=true), posts contém RESIDUAL da tab anterior. Se
+  // user volta pra Global no idx=5 mas posts ainda é [] do Seguindo
+  // vazio, sem este guard o clamp pisotearia idxByTab.global = 0.
+  // User feedback 2026-05-08: "ir pra tab vazia força outras tabs ao
+  // topo".
   useEffect(() => {
+    if (!feedLoaded) return
     if (currentIdx > posts.length) {
       setCurrentIdx(Math.max(0, posts.length))
     }
-  }, [posts.length, currentIdx, setCurrentIdx])
+  }, [posts.length, currentIdx, setCurrentIdx, feedLoaded])
 
   // V8: openViewer + advanceViewer (modal viewer queue) deletados —
   // home view embedded substituiu o paradigma. viewerPostId/viewerExitDir
