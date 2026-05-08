@@ -1,6 +1,6 @@
 /**
  * onNostrEvent — o ÚNICO ponto de escrita em tabelas de domínio
- * (posts, spreads, buries, reports).
+ * (posts, spreads, buries, reports, comments).
  *
  * Recebe eventos do subscribe (que inclui os próprios eventos publicados
  * pelo cliente, devolvidos pelos relays) e materializa estado local.
@@ -10,21 +10,23 @@
  *
  * ─── Pipeline (ordem importa para performance) ──────────────────────
  *
- *   1. Cheap kind check       (Set lookup)
- *   2. Cheap schema check     (tag lookup, JSON.parse só para POST)
+ *   1. Cheap kind check       (KIND_DISPATCH lookup, O(1))
+ *   2. Cheap schema check     (handler.validate — tag lookup, JSON.parse só p/ POST)
  *   3. Caro: verify Schnorr   (~1ms/evento — só rodar no que vai ficar)
- *   4. Persist (INSERT OR IGNORE)
- *   5. Schedule recalc        (debounced, fire-and-forget)
- *   6. Invalidar feed         (debounced, dispara re-query do SQLite)
+ *   4. Persist (handler.persist — INSERT OR IGNORE + invalidateFeed + scheduleScoreRecalc)
  *
  * Em situações onde N% do tráfego é não-Drift, descartamos antes do
  * verify — economia significativa.
+ *
+ * Despacho via `KIND_DISPATCH` (lookup table estática). Adicionar kind
+ * novo: registra entry em `KIND_DISPATCH` + escreve `validate*` +
+ * `persist*` corresponding (todos neste arquivo, invariante #1).
  */
 
 import type { SignedEvent } from '../types/nostr'
 import { db } from './db'
 import { verifyDriftEvent, getTag } from './nostr'
-import { DRIFT_KIND, DRIFT_KIND_SET, SCORE_RECALC_DEBOUNCE_MS } from '../config/constants'
+import { DRIFT_KIND, SCORE_RECALC_DEBOUNCE_MS } from '../config/constants'
 import { applyCommentReceived, calculateScoreNow } from './scoring'
 import { bumpUnseenCount, invalidateFeed } from './feed'
 import { getReportWeight, maybeModerate } from './moderation'
@@ -32,46 +34,107 @@ import { calculateUserWeight, calculateWeight } from './weight'
 import { bumpCommentCount } from './comment-counts'
 import type { ReportReason } from '../types/drift'
 
-export async function onNostrEvent(event: SignedEvent): Promise<void> {
-  // 1. Kind check (cheapest). NIP-22 comment (kind 1111) NÃO está em
-  //    DRIFT_KIND_SET (kinds proprietários Drift) mas é aceito como
-  //    extensão NIP-22 (manifesto §29 compat). Track C.1.
-  const isDriftKind = DRIFT_KIND_SET.has(event.kind)
-  const isNip22Comment = event.kind === NIP22_COMMENT_KIND
-  if (!isDriftKind && !isNip22Comment) return
-
-  // 2. Schema check (cheap)
-  if (!passesSchemaCheck(event)) return
-
-  // 3. Signature check (expensive — only after schema check passes)
-  if (!verifyDriftEvent(event)) return
-
-  // 4. Persist
-  if (isNip22Comment) {
-    await persistCommentRow(event)
-    return
-  }
-  switch (event.kind) {
-    case DRIFT_KIND.POST:
-      await persistPost(event)
-      return
-    case DRIFT_KIND.SPREAD:
-      await persistSpread(event)
-      return
-    case DRIFT_KIND.BURY:
-      await persistBury(event)
-      return
-    case DRIFT_KIND.REPORT:
-      await persistReport(event)
-      return
-  }
-}
-
 /**
  * Kind 1111 — NIP-22 comments. Não vive em DRIFT_KIND porque não é
  * proprietário; Drift reusa pra threads (Track C, manifesto §29).
  */
 export const NIP22_COMMENT_KIND = 1111
+
+/**
+ * KIND_DISPATCH — lookup table que separa "qual handler usar" de
+ * "código do handler" (Ted contraproposta middle-ground ao RFC do
+ * Robin sobre registry pluggable, sessão 2026-05-08).
+ *
+ * Ganho central: elimina os DOIS switches paralelos (`passesSchemaCheck`
+ * + `switch` no `onNostrEvent`) que precisavam ficar em sync. Adicionar
+ * kind novo agora exige tocar 1 entrada nesta tabela em vez de 2 cases
+ * em arquivos diferentes do mesmo módulo. Drift entre máquinas de
+ * dispatch desaparece por construção.
+ *
+ * Restrições deliberadas (NÃO é registry pluggable):
+ *  - Tabela ESTÁTICA. Sem `register()` em runtime. Sem hot-loading.
+ *    Manifesto §17 (sem chave mestra disfarçada): cliente oficial não
+ *    aceita plugin de moderação/scan; por extensão, dispatcher é
+ *    fechado.
+ *  - Handlers vivem TODOS dentro deste arquivo (`src/lib/events.ts`).
+ *    CLAUDE.md invariante #1 (única porta SQLite domínio) + conformance
+ *    test em `tests/manifesto-conformance.test.ts:655-679` validam path
+ *    literal — extrair handler pra outro arquivo viola conformance.
+ *  - Pipeline cheap→expensive→persist→recalc→invalidate (CLAUDE.md
+ *    invariante #5) preservado em `onNostrEvent`. Handler só implementa
+ *    seus passos; pipeline é centralizado.
+ *
+ * Migração futura pra registry full (RFC Robin §2): trivial. Quando
+ * kind 9082 (boost pago, manifesto §18) entrar e a tabela tiver 6+
+ * entries com pipeline idêntico, trocar `Record<number, KindHandler>`
+ * por `new Map<number, KindHandler>` + `register()` é alteração local
+ * sem tocar handlers ou pipeline. Primeira separação ("qual handler"
+ * vs "código do handler") já está feita aqui.
+ */
+interface KindHandler {
+  /** Nome legível pra debugging — corresponde ao kind do protocolo. */
+  name: string
+  /**
+   * Validação cheap, ANTES de `verifyDriftEvent`. Sem db, sem await
+   * (CLAUDE.md invariante #5 — manter ordem cheap→expensive). Pode ler
+   * tags + `JSON.parse(content)`. Retorna `false` pra rejeitar
+   * silenciosamente (manifesto §29 — cliente não fala com atacante).
+   */
+  validate(event: SignedEvent): boolean
+  /**
+   * Persiste no SQLite. Roda APÓS `verifyDriftEvent` ter passado.
+   * DEVE ser idempotente (`INSERT OR IGNORE`). Responsável por chamar
+   * `invalidateFeed()` e `scheduleScoreRecalc(postId)` quando aplicável
+   * (cada handler decide a semântica — REPORT chama `maybeModerate`,
+   * COMMENT propaga score do post recebedor, etc.).
+   */
+  persist(event: SignedEvent): Promise<void>
+}
+
+const KIND_DISPATCH: Readonly<Record<number, KindHandler>> = {
+  [DRIFT_KIND.POST]: {
+    name: 'POST',
+    validate: validatePostShape,
+    persist: persistPost,
+  },
+  [DRIFT_KIND.SPREAD]: {
+    name: 'SPREAD',
+    validate: validateSpreadShape,
+    persist: persistSpread,
+  },
+  [DRIFT_KIND.BURY]: {
+    name: 'BURY',
+    validate: validateBuryShape,
+    persist: persistBury,
+  },
+  [DRIFT_KIND.REPORT]: {
+    name: 'REPORT',
+    validate: validateReportShape,
+    persist: persistReport,
+  },
+  [NIP22_COMMENT_KIND]: {
+    name: 'COMMENT',
+    validate: validateCommentShape,
+    persist: persistCommentRow,
+  },
+}
+
+export async function onNostrEvent(event: SignedEvent): Promise<void> {
+  // 1. Cheap: kind check (Record lookup, O(1)). Kinds desconhecidos
+  //    (incluindo qualquer non-Drift, non-NIP-22-comment) são noop.
+  const handler = KIND_DISPATCH[event.kind]
+  if (!handler) return
+
+  // 2. Cheap: schema check (sem db, sem crypto)
+  if (!handler.validate(event)) return
+
+  // 3. Expensive: signature check (~1ms — só agora que sabemos que vale)
+  if (!verifyDriftEvent(event)) return
+
+  // 4. Persist (handler decide INSERT + invalidateFeed + recalc).
+  //    Pipeline preservado: invariantes #1, #5, #6 do CLAUDE.md.
+  await handler.persist(event)
+}
 
 // ─── Schema check (cheap, before verify) ─────────────────────────────
 
@@ -83,40 +146,64 @@ function isHex64(v: string | null): boolean {
 
 /**
  * Cheap schema check antes de verify. Exportado pra teste — em runtime
- * só `onNostrEvent` usa.
+ * só `onNostrEvent` usa (via `KIND_DISPATCH[kind].validate`).
+ *
+ * Mantida como API pública pra preservar tests existentes (`tests/
+ * schemaCheck.test.ts` + `tests/comments-persist.test.ts`). Internamente
+ * delega pra `KIND_DISPATCH` — fonte única de verdade pós-refactor.
  */
 export function passesSchemaCheck(event: SignedEvent): boolean {
-  switch (event.kind) {
-    case DRIFT_KIND.POST: {
-      // NIP-01: kind 9078 é regular event (faixa 1..9999). `d` tag não tem
-      // semântica protocolar aqui — identificador é `event.id`. Drift exige
-      // apenas `drift-version` pra distinguir do resto do tráfego Nostr.
-      if (!getTag(event, 'drift-version')) return false
-      try {
-        const parsed = JSON.parse(event.content) as { subposts?: unknown }
-        if (!Array.isArray(parsed.subposts)) return false
-      } catch {
-        return false
-      }
-      return true
-    }
-    case DRIFT_KIND.SPREAD:
-    case DRIFT_KIND.BURY:
-      // NIP-01: tag `e` é event.id em hex 64. nostr-tools rejeita formato
-      // errado já no _onmessage do relay; descartamos aqui também por
-      // defesa-em-profundidade (relay sem validação não derruba o cliente).
-      return isHex64(getTag(event, 'e'))
-    case DRIFT_KIND.REPORT:
-      return isHex64(getTag(event, 'e')) && getTag(event, 'reason') !== null
-    case NIP22_COMMENT_KIND:
-      // NIP-22 exige: tag E maiúscula (root) + e minúscula (parent direto)
-      // ambas com event.id hex 64. content é texto plain (NIP-22 não exige
-      // formato; cap de 1000 chars é convenção Drift — comentário maior é
-      // rejeitado pra evitar inflar relays e atacar UI).
-      return passesNip22SchemaCheck(event)
-    default:
-      return false
+  return KIND_DISPATCH[event.kind]?.validate(event) ?? false
+}
+
+// ─── Validators (cheap, sync, sem db nem crypto) ────────────────────
+
+/**
+ * NIP-01: kind 9078 é regular event (faixa 1..9999). `d` tag não tem
+ * semântica protocolar aqui — identificador é `event.id`. Drift exige
+ * apenas `drift-version` pra distinguir do resto do tráfego Nostr.
+ */
+function validatePostShape(event: SignedEvent): boolean {
+  if (!getTag(event, 'drift-version')) return false
+  try {
+    const parsed = JSON.parse(event.content) as { subposts?: unknown }
+    if (!Array.isArray(parsed.subposts)) return false
+  } catch {
+    return false
   }
+  return true
+}
+
+/**
+ * NIP-01: tag `e` é event.id em hex 64. nostr-tools rejeita formato
+ * errado já no _onmessage do relay; descartamos aqui também por
+ * defesa-em-profundidade (relay sem validação não derruba o cliente).
+ */
+function validateSpreadShape(event: SignedEvent): boolean {
+  return isHex64(getTag(event, 'e'))
+}
+
+/** Mesma regra de SPREAD — kind 9080 também referencia post via tag `e`. */
+function validateBuryShape(event: SignedEvent): boolean {
+  return isHex64(getTag(event, 'e'))
+}
+
+/**
+ * REPORT exige `e` hex 64 + tag `reason`. Reason inválida cai no
+ * fallback `'spam'` em `persistReport` — schema só rejeita se ausente.
+ */
+function validateReportShape(event: SignedEvent): boolean {
+  return isHex64(getTag(event, 'e')) && getTag(event, 'reason') !== null
+}
+
+/**
+ * NIP-22 exige: tag E maiúscula (root) + e minúscula (parent direto)
+ * ambas com event.id hex 64. content é texto plain (NIP-22 não exige
+ * formato; cap de 1000 chars é convenção Drift — comentário maior é
+ * rejeitado pra evitar inflar relays e atacar UI).
+ */
+function validateCommentShape(event: SignedEvent): boolean {
+  return passesNip22SchemaCheck(event)
 }
 
 // ─── NIP-22 schema/parse (puro, testável) ───────────────────────────
