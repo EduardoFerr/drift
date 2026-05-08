@@ -50,6 +50,20 @@ export const ENGAGEMENT_POINTS = {
   DAILY_INACTIVE: -1,
 } as const
 
+/**
+ * Cap absoluto da contribuição agregada de comments ao score de um post.
+ *
+ * Track C.5 (`Docs/comments.md` §3.4 + §11). Sem cap, posts com milhares
+ * de commenters viralizariam só por engajamento textual (Sybil de comments
+ * + replies cross-talk inflam SUM(weight) sem refletir qualidade real).
+ *
+ * 30 espelha SPREADS_SCORE_CAP de spreads (manifesto §22 — score
+ * determinístico, anti-Sybil). Aplicado em `applyCommentReceived`
+ * (scoring.ts) — capa o weighted total ANTES de multiplicar por
+ * `ENGAGEMENT_POINTS.COMMENT_RECEIVED`.
+ */
+export const COMMENTS_SCORE_CAP = 30
+
 export const CLIENT_ID = 'drift-official'
 export const DRIFT_VERSION = '1'
 /**
