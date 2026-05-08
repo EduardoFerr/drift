@@ -64,3 +64,58 @@ export function calculateScoreNow(
     now: Math.floor(Date.now() / 1000),
   })
 }
+
+// ─── Comments contribution (Track C.5) ────────────────────────────────
+//
+// `Docs/comments.md` v0.2 §3.4 + §11 — comments contribuem pro score do
+// post recebedor, mas com cap (`COMMENTS_SCORE_CAP`) e ponderação por
+// weight do commenter (igual SPREAD; anti-Sybil).
+//
+// Issue Ted #3 (design-comments.md §15) — **weight semantics**:
+//   Optamos por **weight CURRENT** (no momento do recalc), espelhando o
+//   pipeline de spreads em `events.ts:recalculateScore` que faz
+//   `calculateWeight(...)` no `recalcNow`. Snapshot temporal (weight no
+//   `comment.created_at`) seria mais "fiel histórico" mas exigiria
+//   armazenar weight historicizado por usuário — complexidade alta sem
+//   ganho prático. Trade-off documentado: score se ajusta retroativamente
+//   quando commenter ganha weight (efeito chicotada conhecido), mas
+//   permanece **determinístico** (mesmo state SQLite → mesmo score em
+//   qualquer cliente). Manifesto §7 OK.
+//
+// Issue Barney HIGH #3 — **exclude self-comments**: autor não pode
+// boostar próprio post via auto-comment. Aplicado na query SQL em
+// `events.ts:recalculateScore` (`WHERE c.author_pub != p.author_pub`).
+// Esta função pura recebe o `weightedTotal` já filtrado.
+
+import { COMMENTS_SCORE_CAP, ENGAGEMENT_POINTS } from '../config/constants'
+
+export interface CommentReceivedInput {
+  /**
+   * Quantos commenters distinct contribuíram (já dedup por `author_pub`,
+   * já excluindo self-comments do autor do post). Mantido no input por
+   * legibilidade/debug — não afeta a fórmula diretamente porque a
+   * contribuição é função de `weightedTotal` (SUM weight), não de count.
+   */
+  distinctCommenters: number
+  /**
+   * SUM dos weights dos commenters distinct (já filtrado contra
+   * self-comment). NÃO capped pelo caller — esta função aplica o cap.
+   */
+  weightedTotal: number
+  /** Score base atual do post (resultado de `calculateScore`). */
+  currentScore: number
+}
+
+/**
+ * Adiciona a contribuição de comments ao score base do post.
+ *
+ * Fórmula:
+ *   delta = min(weightedTotal, COMMENTS_SCORE_CAP) * COMMENT_RECEIVED
+ *   newScore = currentScore + delta
+ *
+ * Pura. Sem leitura de relógio, sem db. Manifesto §7.
+ */
+export function applyCommentReceived(input: CommentReceivedInput): number {
+  const capped = Math.min(input.weightedTotal, COMMENTS_SCORE_CAP)
+  return input.currentScore + capped * ENGAGEMENT_POINTS.COMMENT_RECEIVED
+}

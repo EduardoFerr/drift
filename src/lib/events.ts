@@ -25,7 +25,7 @@ import type { SignedEvent } from '../types/nostr'
 import { db } from './db'
 import { verifyDriftEvent, getTag } from './nostr'
 import { DRIFT_KIND, DRIFT_KIND_SET, SCORE_RECALC_DEBOUNCE_MS } from '../config/constants'
-import { calculateScoreNow } from './scoring'
+import { applyCommentReceived, calculateScoreNow } from './scoring'
 import { bumpUnseenCount, invalidateFeed } from './feed'
 import { getReportWeight, maybeModerate } from './moderation'
 import { calculateUserWeight, calculateWeight } from './weight'
@@ -391,9 +391,13 @@ async function persistCommentRow(event: SignedEvent): Promise<void> {
     ],
   )
   await updateUserActivity(event.pubkey, event.created_at)
-  // Não invalidateFeed nem scheduleScoreRecalc aqui em C.1 —
-  // applyCommentReceived em scoring é trabalho de C.5. Threads são
-  // lidos lazy via useThread (C.3); feed atual ignora comments.
+  // Track C.5: comments alimentam score do post recebedor via
+  // `applyCommentReceived` em `recalculateScore`. Igual spreads/buries,
+  // usa debounce de SCORE_RECALC_DEBOUNCE_MS pra rajadas (post viral
+  // recebendo dezenas de replies em sequência → 1 recálculo no fim).
+  // Self-comments e moderation (score = -999) são filtrados na query
+  // SQL dentro de recalculateScore (Barney HIGH #3).
+  scheduleScoreRecalc(parsed.rootEventId)
 }
 
 async function persistReport(event: SignedEvent): Promise<void> {
@@ -534,6 +538,12 @@ function scheduleScoreRecalc(postId: string): void {
 
 interface PostRow {
   created_at: number
+  /** Pubkey do autor — usado pra excluir self-comments (Barney HIGH #3). */
+  author_pub: string
+}
+
+interface CommenterRow {
+  author_pub: string
 }
 
 export interface ActionRow {
@@ -619,9 +629,9 @@ interface UserAggRow {
  *      líquida) — preserva semântica UI ("3 espalharam").
  */
 async function recalculateScore(postId: string): Promise<void> {
-  // 1. Post info (existência + created_at)
+  // 1. Post info (existência + created_at + author_pub pra Barney HIGH #3)
   const postRow = await db.get<PostRow>(
-    `SELECT created_at FROM posts WHERE id = ?`,
+    `SELECT created_at, author_pub FROM posts WHERE id = ?`,
     [postId],
   )
   if (!postRow) return
@@ -641,11 +651,18 @@ async function recalculateScore(postId: string): Promise<void> {
   const latestActionByUser = selectLatestActionByUser(actions)
 
   if (latestActionByUser.size === 0) {
-    // Nenhuma ação — score puro por idade.
-    const score = calculateScoreNow(0, 0, postRow.created_at)
+    // Nenhuma ação — score puro por idade + contribuição de comments
+    // (post pode ter comments mas zero spread/bury ainda — C.5).
+    const baseScore = calculateScoreNow(0, 0, postRow.created_at)
+    const withComments = await applyCommentsContribution(
+      postId,
+      postRow.author_pub,
+      baseScore,
+      Date.now(),
+    )
     await db.run(
       `UPDATE posts SET score = ?, spreads = 0, buries = 0 WHERE id = ?`,
-      [score, postId],
+      [withComments, postId],
     )
     invalidateFeed()
     return
@@ -693,12 +710,85 @@ async function recalculateScore(postId: string): Promise<void> {
   }
 
   // 7+8. Persistir. UI conta pessoas (count); score usa pesos somados.
-  const score = calculateScoreNow(spreadWeight, buryWeight, postRow.created_at)
+  // Track C.5: aplicar contribuição de comments ANTES de persistir.
+  // Reaproveita `userWeightMap` pra comenters que também são spreaders/
+  // buriers — evita double-fetch de weight.
+  const baseScore = calculateScoreNow(spreadWeight, buryWeight, postRow.created_at)
+  const score = await applyCommentsContribution(
+    postId,
+    postRow.author_pub,
+    baseScore,
+    recalcNow,
+    userWeightMap,
+  )
   await db.run(
     `UPDATE posts SET score = ?, spreads = ?, buries = ? WHERE id = ?`,
     [score, spreadCount, buryCount, postId],
   )
   invalidateFeed()
+}
+
+/**
+ * Track C.5 — agrega contribuição de comments ao score base.
+ *
+ * Issue Barney HIGH #3: SELECT exclui self-comments (`author_pub !=
+ * post.author_pub`) e comments moderados (`score > -999`).
+ *
+ * Issue Ted #3: weight é current (no `now` passado), espelhando o
+ * pipeline de spreads. Se commenter já estava no `userWeightMap`
+ * (pré-calculado pra spread/bury do mesmo recalc), reusa — evita
+ * fetch duplicado.
+ *
+ * Distinct commenters: dedup por `author_pub`. 100 comments do mesmo
+ * user contam 1× weight (manifesto §22 anti-Sybil; design-comments §15).
+ */
+async function applyCommentsContribution(
+  postId: string,
+  postAuthorPub: string,
+  baseScore: number,
+  recalcNow: number,
+  prefetchedWeights?: Map<string, number>,
+): Promise<number> {
+  // SELECT DISTINCT author_pub: já dedup. Filtros: !=author (Barney H#3)
+  // e score > -999 (moderação esconde commenter inteiro do agregado).
+  const commenterRows = await db.exec<CommenterRow>(
+    `SELECT DISTINCT author_pub FROM comments
+     WHERE post_id = ? AND author_pub != ? AND score > -999`,
+    [postId, postAuthorPub],
+  )
+  if (commenterRows.length === 0) return baseScore
+
+  // Buscar weights de commenters que ainda não estão no map prefetched.
+  const missing: string[] = []
+  for (const row of commenterRows) {
+    if (!prefetchedWeights || !prefetchedWeights.has(row.author_pub)) {
+      missing.push(row.author_pub)
+    }
+  }
+  const commenterWeights = new Map<string, number>(prefetchedWeights ?? [])
+  if (missing.length > 0) {
+    const userRows = await fetchUserAggsInChunks(missing)
+    for (const row of userRows) {
+      const weight = calculateWeight({
+        createdAt: row.user_created_at * 1000,
+        spreadsReceived: row.spreads_received,
+        lastActive: row.last_active !== null ? row.last_active * 1000 : null,
+        now: recalcNow,
+      })
+      commenterWeights.set(row.npub, weight)
+    }
+  }
+
+  let weightedTotal = 0
+  for (const row of commenterRows) {
+    weightedTotal += commenterWeights.get(row.author_pub) ?? 0
+  }
+
+  return applyCommentReceived({
+    distinctCommenters: commenterRows.length,
+    weightedTotal,
+    currentScore: baseScore,
+  })
 }
 
 /**
