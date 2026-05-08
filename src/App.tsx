@@ -555,7 +555,12 @@ function App() {
   // [Header (logo + DERIVA + tabs)] [Stack flex-1] [NavBar fixo bottom]
   // Stack mostra 1 card por vez (PostViewer embedded), navegação via swipe.
   return (
-    <div className="flex h-[100dvh] flex-col font-mono text-sm">
+    // Drift é mobile-first PWA. Em telas largas (>448px), o app cap-eia
+    // em max-w-md e centra. Sem isso, o card stack estica até 1920px+
+    // ficando absurdo. NavBar e FullPageOverlay têm seus próprios
+    // max-w-md mx-auto pra ficarem alinhados com o app centrado.
+    // User feedback 2026-05-08.
+    <div className="mx-auto flex h-[100dvh] max-w-md flex-col border-drift-border font-mono text-sm sm:border-x">
       <HomeHeader
         identity={boot.identity}
         userWeight={userWeight}

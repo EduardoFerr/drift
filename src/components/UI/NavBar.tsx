@@ -66,9 +66,12 @@ export function NavBar({
     <nav
       role="navigation"
       aria-label="navegação principal"
-      className="fixed inset-x-0 bottom-0 z-30 border-t border-drift-border bg-drift-bg/95 px-3 py-3 backdrop-blur-sm"
+      // mx-auto + max-w-md alinha com o app centrado (App.tsx root).
+      // Em mobile, max-w-md > viewport → ocupa toda largura
+      // (comportamento original preservado). User feedback 2026-05-08.
+      className="fixed inset-x-0 bottom-0 z-30 mx-auto max-w-md border-t border-drift-border bg-drift-bg/95 px-3 py-3 backdrop-blur-sm sm:border-x"
     >
-      <div className="mx-auto flex max-w-md items-center justify-between gap-2">
+      <div className="flex items-center justify-between gap-2">
         <div className="flex flex-1 items-center justify-around gap-2">
           {left.map((a, i) => (
             <NavBtn key={`l-${i}`} action={a} />

@@ -88,7 +88,10 @@ export function FullPageOverlay({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 22 }}
       transition={{ duration: 0.25, ease: 'easeOut' }}
-      className="fixed inset-0 z-40 flex flex-col bg-drift-bg"
+      // mx-auto + max-w-md alinha com o app centrado em telas largas
+      // (App.tsx root). Em mobile (< 448px) ocupa toda largura.
+      // User feedback 2026-05-08.
+      className="fixed inset-0 z-40 mx-auto flex max-w-md flex-col border-drift-border bg-drift-bg sm:border-x"
       role="dialog"
       aria-modal="true"
       aria-label={ariaLabel ?? title}
