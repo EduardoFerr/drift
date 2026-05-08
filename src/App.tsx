@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useState } from 'react'
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import { OPTIMISTIC_TIMEOUT_MS, CLIENT_VERSION } from './config/constants'
@@ -60,6 +60,10 @@ import {
   RefreshIcon,
   InfoIcon,
   TrashIcon,
+  DownloadIcon,
+  OnionIcon,
+  ShieldIcon,
+  PinOffIcon,
 } from './components/UI/Icons'
 import { SpreadMap } from './components/Feed/SpreadMap'
 import type {
@@ -76,6 +80,11 @@ function App() {
   const feedLoaded = useFeedStore((s) => s.loaded)
   const userWeight = useUserWeight(boot.identity?.npub ?? null)
   const installPrompt = useInstallPrompt()
+
+  // V10b — install vira modal. Auto-abre 1x quando disponível (ainda
+  // não dismissed nem instalado). User dispensa via X ou via botão
+  // "instalar"; reaparece via item dedicado em SettingsRoot.
+  const installAutoOpenedRef = useRef(false)
 
   const onboardingDone = usePrefsStore((s) => s.onboarding_done)
   const locationGranularity = usePrefsStore((s) => s.location_granularity)
@@ -120,6 +129,14 @@ function App() {
   // Location/MapView/NetworkMode/Diagnostic) substituem o "settings"
   // monolítico — UX mais limpa, menos overflow.
   const [showSettingsRoot, setShowSettingsRoot] = useState(false)
+  const [showInstallModal, setShowInstallModal] = useState(false)
+
+  useEffect(() => {
+    if (installPrompt.available && !installAutoOpenedRef.current) {
+      installAutoOpenedRef.current = true
+      setShowInstallModal(true)
+    }
+  }, [installPrompt.available])
   const [showFilters, setShowFilters] = useState(false)
   const [showLocation, setShowLocation] = useState(false)
   const [showMapView, setShowMapView] = useState(false)
@@ -622,19 +639,30 @@ function App() {
         {/* V9.2e: DiagnosticPanel não renderiza mais inline aqui —
             agora é card próprio (StatusCard) acionado via SettingsRoot. */}
 
-        {installPrompt.available && (
-          <InstallBanner
-            kind={installPrompt.kind}
-            onInstall={async () => {
-              await installPrompt.install()
-            }}
-            onDismiss={() => installPrompt.setDismissed(true)}
-          />
-        )}
+        {/* InstallBanner inline removido — agora vira modal/dialog
+            (auto-abre 1x via showInstallModal) e item dedicado em
+            SettingsRoot quando ainda instalável. */}
       </div>
 
       <UpdatePrompt />
       <DialogHost />
+
+      <AnimatePresence>
+        {showInstallModal && installPrompt.kind !== 'unavailable' && (
+          <InstallModal
+            kind={installPrompt.kind}
+            onInstall={async () => {
+              await installPrompt.install()
+              setShowInstallModal(false)
+            }}
+            onClose={() => setShowInstallModal(false)}
+            onDismiss={() => {
+              installPrompt.setDismissed(true)
+              setShowInstallModal(false)
+            }}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Stack — área central que contém o card atual. flex:1 expande
           até a navbar bottom. Card visual = PostViewer embedded.
@@ -779,6 +807,7 @@ function App() {
         {showSettingsRoot && (
           <SettingsRoot
             onClose={() => setShowSettingsRoot(false)}
+            installAvailable={installPrompt.available}
             escDismissible={
               !showFilters &&
               !showLocation &&
@@ -836,6 +865,11 @@ function App() {
                   break
                 case 'sobre':
                   setShowAboutCard(true)
+                  break
+                case 'instalar':
+                  // Reabre modal mesmo se previamente dispensado.
+                  installPrompt.setDismissed(false)
+                  setShowInstallModal(true)
                   break
                 case 'limpar':
                   void handleClearLocal()
@@ -1034,13 +1068,42 @@ function App() {
 function StatusIndicators({
   onOpenStatus,
   onOpenProfile,
+  onOpenNetworkMode,
+  onOpenLocation,
 }: {
   onOpenStatus: () => void
   onOpenProfile: () => void
+  onOpenNetworkMode: () => void
+  onOpenLocation: () => void
 }) {
   const events = useSyncStore((s) => s.eventsReceived)
   const active = useSyncStore((s) => s.active)
   const degradedCount = useBootStore((s) => s.degradedReasons.length)
+  const networkMode = usePrefsStore((s) => s.network_mode)
+  const locationGranularity = usePrefsStore((s) => s.location_granularity)
+
+  // Network icon reflete modo ativo (clearnet/tor/onion-only).
+  // Manifesto §15 — anti-censura auditável (user vê transporte ativo).
+  const NetIcon =
+    networkMode === 'tor'
+      ? OnionIcon
+      : networkMode === 'onion-only'
+      ? ShieldIcon
+      : GlobeIcon
+  const netLabel =
+    networkMode === 'tor'
+      ? 'rede: tor'
+      : networkMode === 'onion-only'
+      ? 'rede: onion-only'
+      : 'rede: clearnet'
+
+  // GPS icon reflete granularidade (off = riscado).
+  // Manifesto §28 — privacidade visível.
+  const gpsOff = locationGranularity === 'off'
+  const GpsIcon = gpsOff ? PinOffIcon : PinIcon
+  const gpsLabel = gpsOff
+    ? 'gps: desativado'
+    : `gps: ${locationGranularity}`
 
   return (
     <div className="flex items-center gap-[10px] text-[12px] leading-none">
@@ -1052,6 +1115,33 @@ function StatusIndicators({
         aria-label="abrir perfil"
       >
         <UserIcon size={14} />
+      </button>
+
+      {/* Network indicator — abre NetworkModeCard. Cor reflete status:
+          clearnet muted, tor/onion-only chartreuse pra destacar
+          transporte protegido. Manifesto §15. */}
+      <button
+        onClick={onOpenNetworkMode}
+        className={`transition-opacity hover:opacity-80 focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2 ${
+          networkMode === 'clearnet' ? 'text-drift-muted' : 'text-drift-accent'
+        }`}
+        title={netLabel}
+        aria-label={`${netLabel} — abrir modo de rede`}
+      >
+        <NetIcon size={14} />
+      </button>
+
+      {/* GPS indicator — abre LocationCard. Riscado quando off
+          (default privacidade). Manifesto §28. */}
+      <button
+        onClick={onOpenLocation}
+        className={`transition-opacity hover:opacity-80 focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2 ${
+          gpsOff ? 'text-drift-muted' : 'text-drift-accent'
+        }`}
+        title={gpsLabel}
+        aria-label={`${gpsLabel} — abrir granularidade de gps`}
+      >
+        <GpsIcon size={14} />
       </button>
 
       {/* Degraded badge — reserva espaço sempre (invisible) pra não
@@ -1118,8 +1208,6 @@ function HomeHeader({
   void userWeight
   void onOpenIdentity
   void locationGranularity
-  void onOpenLocation
-  void onOpenNetworkMode
 
   return (
     <header className="shrink-0 px-5 pt-4">
@@ -1131,6 +1219,8 @@ function HomeHeader({
           <StatusIndicators
             onOpenStatus={onOpenStatus}
             onOpenProfile={onOpenProfile}
+            onOpenNetworkMode={onOpenNetworkMode}
+            onOpenLocation={onOpenLocation}
           />
           <div className="font-mono text-[10px] uppercase tracking-meta text-drift-muted">
             deriva{' '}
@@ -1385,12 +1475,14 @@ type SettingsTarget =
   | 'diagnostico'
   | 'status'
   | 'sobre'
+  | 'instalar'
   | 'limpar'
 
 function SettingsRoot({
   onClose,
   onSelect,
   escDismissible = true,
+  installAvailable = false,
 }: {
   onClose: () => void
   onSelect: (target: SettingsTarget) => void
@@ -1400,6 +1492,12 @@ function SettingsRoot({
    * ambos). App.tsx passa false quando algum sub-card está aberto.
    */
   escDismissible?: boolean
+  /**
+   * V10b — quando PWA ainda é instalável (não-standalone, prompt
+   * disponível), expõe item "instalar app" no grupo sistema. Some
+   * automaticamente após instalação (evento `appinstalled`).
+   */
+  installAvailable?: boolean
 }) {
   // V9: agrupado por categoria visual (mockup s-row pattern). Identidade
   // primeiro pq é o caminho mais comum; Sistema (status/limpar) por
@@ -1509,6 +1607,16 @@ function SettingsRoot({
           hint: 'cliente Drift, manifesto + licença',
           icon: InfoIcon,
         },
+        ...(installAvailable
+          ? [
+              {
+                target: 'instalar' as SettingsTarget,
+                label: 'instalar app',
+                hint: 'PWA na tela inicial — manifesto §1',
+                icon: DownloadIcon,
+              },
+            ]
+          : []),
         {
           target: 'limpar',
           label: 'limpar local',
@@ -1536,7 +1644,7 @@ function SettingsRoot({
           >
             <h3
               id={`settings-group-${gi}`}
-              className="mb-2 font-mono text-[9px] uppercase tracking-tag text-drift-muted"
+              className="mb-2 font-mono text-[9px] uppercase tracking-tag text-drift-accent"
             >
               {group.title}
             </h3>
@@ -1547,33 +1655,37 @@ function SettingsRoot({
                   <li key={item.target}>
                     <button
                       onClick={() => onSelect(item.target)}
-                      className={`group flex w-full items-center gap-3 px-1 py-[14px] text-left transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2 focus-visible:ring-offset-2 focus-visible:ring-offset-drift-bg ${
-                        item.danger
-                          ? 'text-drift-bury hover:text-[#ff6b6b]'
-                          : 'text-drift-text hover:text-drift-accent'
-                      }`}
+                      className="group flex w-full items-center gap-3 px-1 py-[14px] text-left transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2 focus-visible:ring-offset-2 focus-visible:ring-offset-drift-bg"
                     >
                       <span
                         aria-hidden="true"
                         className={`shrink-0 transition-colors ${
-                          item.danger
-                            ? 'text-drift-bury'
-                            : 'text-drift-muted group-hover:text-drift-accent'
+                          item.danger ? 'text-drift-bury' : 'text-drift-accent'
                         }`}
                       >
                         <Icon size={18} />
                       </span>
                       <div className="flex min-w-0 flex-1 flex-col gap-[2px]">
-                        <span className="font-mono text-[11px] uppercase tracking-[2px]">
+                        <span
+                          className={`font-mono text-[11px] uppercase tracking-[2px] ${
+                            item.danger ? 'text-drift-bury' : 'text-drift-text'
+                          }`}
+                        >
                           {item.label}
                         </span>
-                        <span className="truncate font-mono text-[10px] normal-case tracking-normal text-drift-muted">
+                        <span
+                          className={`truncate font-mono text-[10px] normal-case tracking-normal ${
+                            item.danger ? 'text-drift-bury/80' : 'text-drift-accent2'
+                          }`}
+                        >
                           {item.hint}
                         </span>
                       </div>
                       <span
                         aria-hidden="true"
-                        className="shrink-0 font-mono text-[12px] text-drift-muted transition-colors group-hover:text-current"
+                        className={`shrink-0 font-mono text-[12px] transition-colors ${
+                          item.danger ? 'text-drift-bury' : 'text-drift-accent'
+                        }`}
                       >
                         →
                       </span>
@@ -1594,90 +1706,110 @@ function SettingsRoot({
 
 // ─── Install Banner ──────────────────────────────────────────────────
 
-function InstallBanner({
+function InstallModal({
   kind,
   onInstall,
+  onClose,
   onDismiss,
 }: {
   kind: 'native' | 'ios-safari' | 'unavailable'
   onInstall: () => void
+  /** Fecha o modal sem persistir dispensa (reaparece via Settings). */
+  onClose: () => void
+  /** Persiste dispensa em localStorage (não reaparece em auto-open). */
   onDismiss: () => void
 }) {
-  const [showIosHelp, setShowIosHelp] = useState(false)
+  const [showIosHelp, setShowIosHelp] = useState(kind === 'ios-safari')
 
-  if (kind === 'ios-safari') {
-    return (
-      <div className="mb-4 rounded border border-drift-accent/30 bg-drift-accent/5 p-3">
-        <div className="flex items-center gap-3">
-          <span className="text-base">📥</span>
-          <div className="flex-1 text-[11px]">
-            <div className="text-slate-200">instalar Drift no iOS</div>
-            <div className="text-[10px] text-drift-muted">
-              Safari não tem botão de instalar — segue o passo a passo.
-            </div>
+  // ESC fecha (sem persist).
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="instalar Drift"
+      className="fixed inset-0 z-50 flex items-center justify-center px-4"
+    >
+      {/* Backdrop — clique fecha sem persistir. */}
+      <div
+        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        onClick={onClose}
+        aria-hidden="true"
+      />
+      <div className="relative w-full max-w-sm rounded border border-drift-accent/40 bg-drift-surface p-5 shadow-xl">
+        <div className="mb-3 flex items-start gap-3">
+          <span className="text-xl" aria-hidden="true">📥</span>
+          <div className="flex-1">
+            <h2 className="font-mono text-[11px] uppercase tracking-[2px] text-drift-accent">
+              instalar Drift
+            </h2>
+            <p className="mt-1 font-mono text-[10px] text-drift-muted">
+              {kind === 'ios-safari'
+                ? 'Safari iOS não tem botão de instalar — segue o passo a passo abaixo.'
+                : 'PWA — instala sem app store. Manifesto §1 (existência autônoma).'}
+            </p>
           </div>
           <button
-            onClick={() => setShowIosHelp((v) => !v)}
-            className="rounded border border-drift-accent px-3 py-1 text-[10px] uppercase tracking-widest text-drift-accent hover:bg-drift-accent/10"
-          >
-            {showIosHelp ? 'fechar' : 'como'}
-          </button>
-          <button
-            onClick={onDismiss}
+            onClick={onClose}
             className="text-drift-muted hover:text-drift-text"
-            aria-label="dispensar"
-            title="dispensar"
+            aria-label="fechar"
+            title="fechar"
           >
             ✕
           </button>
         </div>
-        {showIosHelp && (
-          <ol className="mt-3 list-decimal space-y-1 pl-5 text-[11px] text-slate-300">
-            <li>
-              Toque no botão <strong>Compartilhar</strong> (ícone de quadrado
-              com seta apontando pra cima) na barra do Safari
-            </li>
-            <li>
-              Role e toque em{' '}
-              <strong>&ldquo;Adicionar à Tela de Início&rdquo;</strong>
-            </li>
-            <li>Confirme em &ldquo;Adicionar&rdquo;</li>
-            <li>
-              Drift aparece na tela inicial como app — abre fullscreen, sem
-              barra do Safari
-            </li>
-          </ol>
-        )}
-      </div>
-    )
-  }
 
-  // kind === 'native' (Chrome Android, Edge, desktop Chrome com prompt
-  // disponível). 'unavailable' nem chega aqui — banner é gated por
-  // `available` em useInstallPrompt.
-  return (
-    <div className="mb-4 flex items-center gap-3 rounded border border-drift-accent/30 bg-drift-accent/5 p-3">
-      <span className="text-base">📥</span>
-      <div className="flex-1 text-[11px]">
-        <div className="text-slate-200">instalar Drift como app</div>
-        <div className="text-[10px] text-drift-muted">
-          PWA — instala sem app store. Manifesto §1 (existência autônoma).
-        </div>
+        {kind === 'ios-safari' ? (
+          <>
+            {showIosHelp && (
+              <ol className="mb-4 list-decimal space-y-2 pl-5 text-[12px] text-slate-300">
+                <li>
+                  Toque no botão <strong>Compartilhar</strong> (quadrado com
+                  seta) na barra do Safari
+                </li>
+                <li>
+                  Role e toque em{' '}
+                  <strong>&ldquo;Adicionar à Tela de Início&rdquo;</strong>
+                </li>
+                <li>Confirme em &ldquo;Adicionar&rdquo;</li>
+                <li>
+                  Drift aparece na tela inicial — abre fullscreen, sem barra
+                  do Safari
+                </li>
+              </ol>
+            )}
+            {!showIosHelp && (
+              <button
+                onClick={() => setShowIosHelp(true)}
+                className="mb-3 w-full rounded border border-drift-accent px-3 py-2 text-[11px] uppercase tracking-widest text-drift-accent hover:bg-drift-accent/10"
+              >
+                como instalar
+              </button>
+            )}
+          </>
+        ) : (
+          <button
+            onClick={onInstall}
+            className="mb-3 w-full rounded border border-drift-accent bg-drift-accent/10 px-3 py-2 text-[11px] uppercase tracking-widest text-drift-accent hover:bg-drift-accent/20"
+          >
+            instalar agora
+          </button>
+        )}
+
+        <button
+          onClick={onDismiss}
+          className="w-full font-mono text-[10px] uppercase tracking-widest text-drift-muted hover:text-drift-text"
+        >
+          não mostrar de novo
+        </button>
       </div>
-      <button
-        onClick={onInstall}
-        className="rounded border border-drift-accent px-3 py-1 text-[10px] uppercase tracking-widest text-drift-accent hover:bg-drift-accent/10"
-      >
-        instalar
-      </button>
-      <button
-        onClick={onDismiss}
-        className="text-drift-muted hover:text-drift-text"
-        aria-label="dispensar"
-        title="dispensar"
-      >
-        ✕
-      </button>
     </div>
   )
 }

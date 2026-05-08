@@ -73,7 +73,7 @@ export function FullPageOverlay({
     headerRight === undefined ? (
       <button
         onClick={onClose}
-        className="rounded border border-drift-border px-3 py-[5px] font-mono text-[10px] uppercase tracking-[2px] text-drift-muted transition-colors hover:text-drift-text focus:outline-none focus:ring-1 focus:ring-drift-accent2 focus:ring-offset-2 focus:ring-offset-drift-bg"
+        className="rounded border border-drift-accent px-3 py-[5px] font-mono text-[10px] uppercase tracking-[2px] text-drift-accent2 transition-colors hover:bg-drift-accent2/10 focus:outline-none focus:ring-1 focus:ring-drift-accent2 focus:ring-offset-2 focus:ring-offset-drift-bg"
         aria-label={`fechar ${ariaLabel ?? title}`}
       >
         fechar
@@ -97,7 +97,7 @@ export function FullPageOverlay({
       aria-label={ariaLabel ?? title}
     >
       <header className="flex shrink-0 items-center justify-between border-b border-drift-border px-5 py-[15px]">
-        <h2 className="font-display text-[19px] font-extrabold leading-none text-drift-text">
+        <h2 className="font-display text-[19px] font-extrabold leading-none text-drift-accent">
           {title}
         </h2>
         {right}

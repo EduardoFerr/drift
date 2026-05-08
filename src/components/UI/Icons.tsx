@@ -58,6 +58,17 @@ export function PinIcon({ size = 14, className = '' }: IconProps) {
   )
 }
 
+/** Pin riscado — GPS off / location desativada. */
+export function PinOffIcon({ size = 14, className = '' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" className={className} {...base}>
+      <path d="M5.43 5.43A8.06 8.06 0 0 0 3 10c0 7 9 13 9 13a30.36 30.36 0 0 0 4.51-3.92" />
+      <path d="M9.84 4.18A8 8 0 0 1 12 3.95a9 9 0 0 1 9 9 8 8 0 0 1-.42 2.62" />
+      <line x1="2" y1="2" x2="22" y2="22" />
+    </svg>
+  )
+}
+
 export function GlobeIcon({ size = 14, className = '' }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" className={className} {...base}>
@@ -196,6 +207,17 @@ export function InfoIcon({ size = 18, className = '' }: IconProps) {
       <circle cx="12" cy="12" r="10" />
       <line x1="12" y1="16" x2="12" y2="12" />
       <line x1="12" y1="8" x2="12.01" y2="8" />
+    </svg>
+  )
+}
+
+/** Download / instalar PWA. */
+export function DownloadIcon({ size = 18, className = '' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" className={className} {...base}>
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <polyline points="7 10 12 15 17 10" />
+      <line x1="12" y1="15" x2="12" y2="3" />
     </svg>
   )
 }
