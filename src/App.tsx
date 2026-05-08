@@ -284,19 +284,24 @@ function App() {
   // user reportou "feed bagunça" ao trocar tab porque idx ficava no
   // valor antigo (3) mas array de posts era totalmente diferente.
   const feedTab = useFeedStore((s) => s.tab)
+  // Range válido pra navegação: [0..posts.length]. posts.length é o
+  // sentinel "fim do feed" — renderiza EndOfFeed em vez de PostViewer.
+  // User feedback 2026-05-08: card "trava" no último post sem feedback;
+  // permitir avançar pra fim explícito comunica "fim, recarregue".
+  const atEnd = posts.length > 0 && currentIdx >= posts.length
   const { currentPost, nextHomePost } = useMemo(() => {
-    if (posts.length === 0) return { currentPost: null, nextHomePost: null }
+    if (posts.length === 0 || atEnd) return { currentPost: null, nextHomePost: null }
     const safeIdx = Math.max(0, Math.min(currentIdx, posts.length - 1))
     return {
       currentPost: posts[safeIdx]!,
       nextHomePost: safeIdx + 1 < posts.length ? posts[safeIdx + 1]! : null,
     }
-  }, [currentIdx, posts])
+  }, [currentIdx, posts, atEnd])
   // Quando posts muda significativamente (post atual sumiu — moderado,
-  // muted), volta pra index 0 pra não quebrar a navegação.
+  // muted), CLAMP até posts.length (sentinel atEnd permitido).
   useEffect(() => {
-    if (posts.length > 0 && currentIdx >= posts.length) {
-      setCurrentIdx(Math.max(0, posts.length - 1))
+    if (currentIdx > posts.length) {
+      setCurrentIdx(Math.max(0, posts.length))
     }
   }, [posts.length, currentIdx])
   // Tab changed → start no top do novo feed. Sem isso, user troca de
@@ -314,14 +319,14 @@ function App() {
   // (nenhum em V8). Track futura limpa o resíduo.
 
   /**
-   * V8 home stack advance. Avança currentIdx pra próximo post se houver.
-   * Fim da fila = no-op de avanço (spread/sink já executaram, só não
-   * troca o card visível). UX: card "trava" no último post até novos
-   * chegarem via subscribe.
+   * V8 home stack advance. Avança currentIdx pra próximo post.
+   * Última posição válida = `posts.length` (sentinel "fim do feed",
+   * renderiza EndOfFeed em vez de travar no último post). User
+   * feedback 2026-05-08: travar gera ambiguidade ("acabou? travou?").
    */
   function advanceHome(dir: 'up' | 'down') {
     setExitDir(dir)
-    setCurrentIdx((i) => (i + 1 < posts.length ? i + 1 : i))
+    setCurrentIdx((i) => Math.min(i + 1, posts.length))
   }
 
   // Ações ──────────────────────────────────────────────────────────────
@@ -605,6 +610,16 @@ function App() {
       <main className="relative min-h-0 flex-1 overflow-hidden px-4 pt-3 pb-[88px]">
         {posts.length === 0 ? (
           <HomeEmpty tab={useFeedStore.getState().tab} />
+        ) : atEnd ? (
+          <EndOfFeed
+            tab={feedTab}
+            onBack={() => setCurrentIdx((i) => Math.max(0, i - 1))}
+            onTop={() => setCurrentIdx(0)}
+            onRefresh={() => {
+              void refreshFeed()
+              setCurrentIdx(0)
+            }}
+          />
         ) : currentPost ? (
           <>
             {/* Shadow cards atrás (mockup .card-shadow). */}
@@ -1120,6 +1135,75 @@ function HomeEmpty({ tab }: { tab: 'global' | 'following' | 'trending' }) {
       <p className="max-w-prose text-center font-mono text-[11px] leading-relaxed text-drift-muted">
         {msg}
       </p>
+    </div>
+  )
+}
+
+// ─── EndOfFeed (V8.1) ────────────────────────────────────────────────
+
+/**
+ * Card sentinel quando user passa do último post da fila atual.
+ *
+ * User feedback 2026-05-08: travar no último post sem feedback gera
+ * ambiguidade — "acabou? travou? bug?". Permitir avançar pra um card
+ * de "fim" comunica explicitamente o estado, oferece ações (atualizar,
+ * voltar pro topo, voltar 1).
+ *
+ * Visual: mesmo container de card que PostViewer (border + bg
+ * drift-surface) pra continuidade visual, mas com layout centrado e
+ * sem swipe handlers — só botões.
+ */
+function EndOfFeed({
+  tab,
+  onBack,
+  onTop,
+  onRefresh,
+}: {
+  tab: 'global' | 'following' | 'trending'
+  /** Voltar 1 post (o último que o user viu). */
+  onBack: () => void
+  /** Voltar pro topo do feed (post mais recente). */
+  onTop: () => void
+  /** Re-query SQLite + reset pro topo. */
+  onRefresh: () => void
+}) {
+  const tabLabel =
+    tab === 'following' ? 'seguindo' : tab === 'trending' ? 'trending' : 'global'
+  return (
+    <div className="relative h-full w-full overflow-hidden rounded border border-drift-border bg-drift-surface">
+      <div className="flex h-full flex-col items-center justify-center gap-6 px-8 text-center">
+        <div className="font-mono text-[10px] uppercase tracking-tag text-drift-muted">
+          fim do feed · {tabLabel}
+        </div>
+        <h2 className="font-display text-xl font-bold leading-title tracking-title text-drift-text">
+          Você viu tudo por aqui.
+        </h2>
+        <p className="max-w-prose font-mono text-[11px] leading-relaxed text-slate-400">
+          Posts novos chegam continuamente via relays. Toque atualizar
+          pra recarregar agora, ou volte pro topo pra reler — manifesto
+          §6 (verdade por eventos).
+        </p>
+        <div className="flex w-full max-w-xs flex-col gap-2">
+          <button
+            onClick={onRefresh}
+            className="rounded bg-drift-accent px-4 py-2.5 font-mono text-[11px] font-bold uppercase tracking-meta text-drift-bg transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2 focus-visible:ring-offset-2 focus-visible:ring-offset-drift-bg"
+          >
+            ↻ atualizar feed
+          </button>
+          <button
+            onClick={onTop}
+            className="rounded border border-drift-border px-4 py-2.5 font-mono text-[10px] uppercase tracking-meta text-slate-400 transition-colors hover:border-drift-text hover:text-drift-text focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2"
+          >
+            ↑ voltar pro topo
+          </button>
+          <button
+            onClick={onBack}
+            className="font-mono text-[10px] uppercase tracking-meta text-drift-muted transition-colors hover:text-drift-text focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2"
+          >
+            ← voltar 1 post
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
