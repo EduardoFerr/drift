@@ -46,6 +46,18 @@ export interface PeerState {
    *  cross-protocol injection threshold. Após CROSS_PROTO_THRESHOLD,
    *  peer é killed e (futuramente) blacklisted via peerRegistry. */
   crossProtoCount?: number
+  /** fix: B1 — handle do setTimeout do grace period de 5s pós
+   *  `disconnected`. Cancelado em transições out-of-disconnected
+   *  (connected, failed, closed) e em `cleanupPeer` pra evitar
+   *  empilhar timers em redes flakey (Wi-Fi handover). Ver
+   *  Docs/sessions/webrtc-architecture-audit-2026-05-08.md §B1. */
+  disconnectGraceTimer?: ReturnType<typeof setTimeout> | null
+  /** fix: B3 — handle do setTimeout do ICE connect timeout (30s).
+   *  Cancelado em `cleanupPeer` pra liberar a referência ao PeerState
+   *  antigo (RTCPeerConnection já fechada + outboundQueue) antes do
+   *  GC natural ao fim dos 30s. Ver
+   *  Docs/sessions/webrtc-architecture-audit-2026-05-08.md §B3. */
+  iceConnectTimer?: ReturnType<typeof setTimeout> | null
 }
 
 export interface SubscriptionRecord {

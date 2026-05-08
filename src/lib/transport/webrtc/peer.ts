@@ -93,6 +93,16 @@ export function getOrCreatePeer(remoteId: string): PeerState | null {
 
   pc.onconnectionstatechange = () => {
     const s = pc.connectionState
+    // fix: B1 — qualquer transição out-of-disconnected (connected, failed,
+    // closed) cancela o grace timer pendente. Sem isso, oscilações
+    // disconnected↔connected empilham N setTimeouts cujos guards (status,
+    // hasPeer) não cobrem o caso de N callbacks chamando _scheduleReconnect
+    // em sequência rápida — counter avança N vezes, atinge cap=5 prematuro.
+    // Audit: Docs/sessions/webrtc-architecture-audit-2026-05-08.md §B1.
+    if (s !== 'disconnected' && peer.disconnectGraceTimer) {
+      clearTimeout(peer.disconnectGraceTimer)
+      peer.disconnectGraceTimer = null
+    }
     if (s === 'connected') {
       // status='open' depende de dc.onopen — não setar aqui.
     } else if (s === 'failed') {
@@ -114,7 +124,12 @@ export function getOrCreatePeer(remoteId: string): PeerState | null {
       // de oscilação real. Espera 5s antes de schedulear; se voltou pra
       // connected antes, cancela. Closed = manual close, sem reconnect.
       if (s === 'disconnected' && useNostrSignaling()) {
-        setTimeout(() => {
+        // fix: B1 — guard contra empilhar grace timers em oscilação rápida.
+        // Se já existe um timer pendente, mantém ele (não substitui — o
+        // primeiro disconnected ainda é o relevante). Audit §B1.
+        if (peer.disconnectGraceTimer) return
+        peer.disconnectGraceTimer = setTimeout(() => {
+          peer.disconnectGraceTimer = null
           // Se peer voltou pra connected (status='open'), cancela.
           if (peer.status === 'open') return
           // Se peer foi limpo (cleanupPeer), também não reconectar.
@@ -130,7 +145,13 @@ export function getOrCreatePeer(remoteId: string): PeerState | null {
 
   // ICE timeout — Barney audit #1 (HIGH). Se ICE não resolver em 30s,
   // peer fica zombie em 'connecting' e vaza RAM. Mata e remove do map.
-  setTimeout(() => {
+  // fix: B3 — armazena handle pra cancelar em cleanupPeer e liberar
+  // a referência ao PeerState antigo (RTCPeerConnection já fechada +
+  // outboundQueue) antes do GC natural ao fim dos 30s. Em sessão longa
+  // com churn de peers (random walk a cada 30min), evita acumular
+  // 8×30s = 240s de timers vivos. Audit §B3.
+  peer.iceConnectTimer = setTimeout(() => {
+    peer.iceConnectTimer = null
     const current = getPeer(remoteId)
     if (!current || current !== peer) return
     if (peer.status === 'connecting') {
@@ -276,6 +297,16 @@ export function cleanupPeer(remoteId: string): void {
   // ICE timeout, o counter ficava inflado pra reconexões futuras
   // (não era leak — Map vive até pagehide — mas semanticamente errado).
   _resetReconnectCounter(remoteId)
+  // fix: B1 / B3 — cancelar timers pendentes pra liberar referências
+  // ao PeerState antes do GC natural. Audit §B1 / §B3.
+  if (peer.disconnectGraceTimer) {
+    clearTimeout(peer.disconnectGraceTimer)
+    peer.disconnectGraceTimer = null
+  }
+  if (peer.iceConnectTimer) {
+    clearTimeout(peer.iceConnectTimer)
+    peer.iceConnectTimer = null
+  }
   peer.status = 'closing'
   try {
     peer.dc?.close()

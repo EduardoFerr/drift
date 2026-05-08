@@ -73,19 +73,36 @@ export function _scheduleReconnect(peerId: string): number | null {
 
   const timer = setTimeout(() => {
     reconnectTimers.delete(peerId)
-    console.info(
-      '[webrtc] reconnect attempt',
-      attempt + 1,
-      'pra',
-      peerId.slice(0, 8),
-    )
-    // Lazy dynamic import pra evitar circular reconnect ↔ discovery
-    // top-level. setTimeout já é assíncrono — custo é zero perceptível.
-    void import('./discovery').then(({ connectTo }) =>
-      connectTo(peerId).catch(() => {
-        /* falha já vai re-trigger reconnect via onconnectionstatechange */
-      }),
-    )
+    // fix: B2 — guard de idempotência: se peer já reconectou
+    // (status==='open') no meio-tempo (outro caller chamou connectTo,
+    // ou random walk reabriu), abortar pra não criar datachannel
+    // duplicado dentro do mesmo RTCPeerConnection. getOrCreatePeer é
+    // idempotente, mas initiateOffer não é — chamaria de novo se
+    // shouldInitiateOffer===true. Audit §B2.
+    // Docs/sessions/webrtc-architecture-audit-2026-05-08.md §B2.
+    void import('./state').then(({ getPeer }) => {
+      const existing = getPeer(peerId)
+      if (existing && existing.status === 'open') {
+        console.info(
+          '[webrtc] reconnect skip — peer já open',
+          peerId.slice(0, 8),
+        )
+        return
+      }
+      console.info(
+        '[webrtc] reconnect attempt',
+        attempt + 1,
+        'pra',
+        peerId.slice(0, 8),
+      )
+      // Lazy dynamic import pra evitar circular reconnect ↔ discovery
+      // top-level. setTimeout já é assíncrono — custo é zero perceptível.
+      void import('./discovery').then(({ connectTo }) =>
+        connectTo(peerId).catch(() => {
+          /* falha já vai re-trigger reconnect via onconnectionstatechange */
+        }),
+      )
+    })
   }, delay)
   reconnectTimers.set(peerId, timer)
   return delay
