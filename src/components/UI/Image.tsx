@@ -71,20 +71,34 @@ export function Image({
   // via blobs.fetchBlobUrl (Helia + verify). Senão, usa src direto.
   const [resolvedSrc, setResolvedSrc] = useState<string>(src)
 
+  // Stable refs pra useEffect deps — meta é object, recriado a cada
+  // refresh do feed (rowToPost sempre cria novo subpost). Sem isso,
+  // useEffect re-roda a cada render → fetchBlobUrl loop.
+  // User diagnóstico 2026-05-08 confirmou: re-fetch infinito vinha
+  // daqui. Comparar por `meta.cid`/`meta.hash` resolve — referência
+  // do object pode mudar mas chaves estáveis não.
+  const metaCid = meta?.cid
+  const metaHash = meta?.hash
+
   useEffect(() => {
     // Sem meta com cid/hash — usa src direto (legacy ou só url).
-    if (!meta || (!meta.cid && !meta.hash)) {
+    if (!metaCid && !metaHash) {
       setResolvedSrc(src)
       return
     }
 
+    // Reconstrói meta minimal a partir das chaves estáveis pra
+    // passar a fetchBlobUrl. Mime/size/dim viriam do object original
+    // mas só cid/hash são necessárias pro fetch (mime usado na
+    // construção do Blob, default ok).
+    const stableMeta = { cid: metaCid, hash: metaHash, mime: meta?.mime }
     let canceled = false
     const ctrl = new AbortController()
 
     void (async () => {
       try {
         const { fetchBlobUrl } = await import('../../lib/blobs')
-        const url = await fetchBlobUrl(meta, { signal: ctrl.signal })
+        const url = await fetchBlobUrl(stableMeta, { signal: ctrl.signal })
         if (!canceled) setResolvedSrc(url)
       } catch (err) {
         // Falha total (incluindo hash mismatch em todas as rotas) — cai
@@ -101,7 +115,8 @@ export function Image({
       canceled = true
       ctrl.abort()
     }
-  }, [src, meta])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [src, metaCid, metaHash])
 
   return (
     <div
