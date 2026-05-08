@@ -1,0 +1,358 @@
+/**
+ * ReplySheet — bottom sheet pra publicar reply (kind 1111 NIP-22).
+ *
+ * Track C.4.4 (Ted). Acionada pelo FAB "↵ responder" em ThreadView
+ * (Lily, C.4.2-3). Renderizada como overlay separado fora do card
+ * stack — gestos do ThreadView (swipe up/down) NÃO conflitam com
+ * input/keyboard da sheet (Barney HIGH #6 design-comments §10).
+ *
+ * Spec: design-comments.md §10 (Reply form).
+ *
+ * Comportamento:
+ *  - Sheet sobe de baixo (translateY 100% → 0) com framer-motion;
+ *    backdrop drift-bg/60 backdrop-blur fica atrás (toca pra fechar).
+ *  - Drag-down dismiss (>= 80px) com `dragConstraints` framer-motion.
+ *  - Esc fecha; Cmd/Ctrl+Enter publica.
+ *  - prefers-reduced-motion: desabilita translate, mantém fade.
+ *  - role="dialog" aria-modal="true"; focus na textarea on open;
+ *    restaura focus pro último elemento ativo on close.
+ *  - Trap simples de focus dentro da sheet via key handler em Tab.
+ *
+ * Publish flow:
+ *  1. User digita → click "publicar"
+ *  2. Disable input + show "publicando…"
+ *  3. Chama `protocol.commentOnPost({...})`
+ *  4. Sucesso: limpa textarea, chama `onPublished?()`, `onClose()`
+ *  5. Erro: mostra inline error + permite retry (não fecha)
+ *
+ * Padrão arquitetural (Ted): cliente NÃO escreve em SQLite. O evento
+ * volta pelo subscribe ativo e onNostrEvent persiste (invariante #1).
+ * `onPublished` callback existe pra Lily fazer otimistic UI / dismiss
+ * de coach mark / refresh, NÃO pra side-effect em domínio.
+ */
+
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
+import { nip19 } from 'nostr-tools'
+import { commentOnPost, COMMENT_MAX_CHARS } from '../../lib/protocol'
+
+// ─── Helper puro (testável) ───────────────────────────────────────────
+
+export interface ValidateCommentResult {
+  ok: boolean
+  /** Texto trimado pronto pra publish (só presente quando ok=true). */
+  trimmed?: string
+  /** Razão pra ok=false. Strings estáveis pra UI lookup. */
+  reason?: 'empty' | 'whitespace' | 'too-long'
+}
+
+/**
+ * Valida content de comment ANTES de chamar commentOnPost. Função pura
+ * pra ser testável sem montar React + protocol mock.
+ *
+ *  - empty       → string vazia
+ *  - whitespace  → só whitespace (após trim fica vazio)
+ *  - too-long    → trimmed > COMMENT_MAX_CHARS
+ *
+ * Trim é aplicado: comentário "  oi  " vira "oi". Cap aplica em
+ * cima do trim (consistente com `commentOnPost` que rejeita > cap).
+ */
+export function validateCommentText(raw: string): ValidateCommentResult {
+  if (typeof raw !== 'string' || raw.length === 0) {
+    return { ok: false, reason: 'empty' }
+  }
+  const trimmed = raw.trim()
+  if (trimmed.length === 0) return { ok: false, reason: 'whitespace' }
+  if (trimmed.length > COMMENT_MAX_CHARS) return { ok: false, reason: 'too-long' }
+  return { ok: true, trimmed }
+}
+
+// ─── Component ────────────────────────────────────────────────────────
+
+export interface ReplySheetProps {
+  /** Post root (kind 9078) — passa pra commentOnPost.postId */
+  postId: string
+  /** Author do post root (P tag NIP-22). */
+  postAuthorPub: string
+  /** Direct parent (= postId se top-level reply, = comment.id se aninhado) */
+  replyTo: string
+  /** Kind do parent direto: 9078 (post) ou 1111 (comment). */
+  replyToKind: number
+  /** Author do parent direto (p tag NIP-22). */
+  replyToAuthorPub: string
+  /** Aberto/fechado. Lily controla via state local em ThreadView. */
+  open: boolean
+  onClose: () => void
+  /** Callback após publish bem-sucedido. */
+  onPublished?: () => void
+}
+
+function shortNpub(pubHex: string): string {
+  try {
+    const npub = nip19.npubEncode(pubHex)
+    // npub1abc...xyz (8+5 chars, comum no ecossistema Nostr)
+    return `${npub.slice(0, 12)}…${npub.slice(-5)}`
+  } catch {
+    return pubHex.slice(0, 8) + '…' + pubHex.slice(-4)
+  }
+}
+
+const HEADER_ID = 'drift-reply-sheet-header'
+
+export function ReplySheet({
+  postId,
+  postAuthorPub,
+  replyTo,
+  replyToKind,
+  replyToAuthorPub,
+  open,
+  onClose,
+  onPublished,
+}: ReplySheetProps) {
+  const [text, setText] = useState('')
+  const [pending, setPending] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null)
+  const sheetRef = useRef<HTMLDivElement | null>(null)
+  const restoreFocusRef = useRef<HTMLElement | null>(null)
+  const reducedMotion = useReducedMotion()
+
+  // Reset state quando reabre (evita flash do estado anterior).
+  useEffect(() => {
+    if (open) {
+      setText('')
+      setError(null)
+      setPending(false)
+      // Captura elemento ativo no momento do open pra restaurar on close.
+      restoreFocusRef.current =
+        (typeof document !== 'undefined' && (document.activeElement as HTMLElement)) || null
+    }
+  }, [open])
+
+  // Focus na textarea on open + restaura on close.
+  useEffect(() => {
+    if (open) {
+      // requestAnimationFrame pra dar tempo da sheet montar antes de focar.
+      const id = requestAnimationFrame(() => {
+        textareaRef.current?.focus()
+      })
+      return () => cancelAnimationFrame(id)
+    } else {
+      const prev = restoreFocusRef.current
+      if (prev && typeof prev.focus === 'function') {
+        // Tenta restaurar focus; ignora se elemento foi desmontado.
+        try {
+          prev.focus()
+        } catch {
+          /* noop */
+        }
+      }
+    }
+  }, [open])
+
+  const doPublish = useCallback(async () => {
+    if (pending) return
+    const validated = validateCommentText(text)
+    if (!validated.ok) {
+      if (validated.reason === 'empty' || validated.reason === 'whitespace') {
+        setError('escreve algo antes de publicar')
+      } else if (validated.reason === 'too-long') {
+        setError(`máximo ${COMMENT_MAX_CHARS} caracteres`)
+      }
+      return
+    }
+    setPending(true)
+    setError(null)
+    try {
+      await commentOnPost({
+        postId,
+        postAuthorPub,
+        replyTo,
+        replyToKind: String(replyToKind),
+        replyToAuthorPub,
+        text: validated.trimmed!,
+      })
+      setText('')
+      onPublished?.()
+      onClose()
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'erro publicando'
+      setError(msg)
+    } finally {
+      setPending(false)
+    }
+  }, [
+    pending,
+    text,
+    postId,
+    postAuthorPub,
+    replyTo,
+    replyToKind,
+    replyToAuthorPub,
+    onClose,
+    onPublished,
+  ])
+
+  // Esc fecha; Cmd/Ctrl+Enter publica. Listener no document level só
+  // enquanto open.
+  useEffect(() => {
+    if (!open) return
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        if (pending) return
+        e.preventDefault()
+        onClose()
+      } else if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+        e.preventDefault()
+        void doPublish()
+      }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [open, pending, onClose, doPublish])
+
+  // Focus trap simples: Tab/Shift+Tab restritos ao container da sheet.
+  function handleTrapKey(e: React.KeyboardEvent<HTMLDivElement>) {
+    if (e.key !== 'Tab') return
+    const root = sheetRef.current
+    if (!root) return
+    const focusables = root.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    )
+    if (focusables.length === 0) return
+    const first = focusables[0]
+    const last = focusables[focusables.length - 1]
+    if (!first || !last) return
+    const active = document.activeElement
+    if (e.shiftKey && active === first) {
+      e.preventDefault()
+      last.focus()
+    } else if (!e.shiftKey && active === last) {
+      e.preventDefault()
+      first.focus()
+    }
+  }
+
+  const charCount = text.trim().length
+  const overLimit = charCount > COMMENT_MAX_CHARS
+  const canPublish = !pending && charCount > 0 && !overLimit
+
+  // Animação: bottom-sheet (y 100% → 0). Reduced motion: só fade.
+  const sheetInitial = reducedMotion ? { opacity: 0 } : { y: '100%', opacity: 0 }
+  const sheetAnimate = reducedMotion ? { opacity: 1 } : { y: 0, opacity: 1 }
+  const sheetExit = reducedMotion ? { opacity: 0 } : { y: '100%', opacity: 0 }
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.18 }}
+          className="fixed inset-0 z-50 flex items-end justify-center bg-drift-bg/60 backdrop-blur-sm"
+          onClick={() => {
+            if (!pending) onClose()
+          }}
+        >
+          <motion.div
+            ref={sheetRef}
+            initial={sheetInitial}
+            animate={sheetAnimate}
+            exit={sheetExit}
+            transition={{ duration: 0.22, ease: 'easeOut' }}
+            // Drag pra baixo dismissa. dragElastic baixo pra feel preso;
+            // onDragEnd avalia threshold de 80px pra fechar.
+            drag={reducedMotion ? false : 'y'}
+            dragConstraints={{ top: 0, bottom: 0 }}
+            dragElastic={{ top: 0, bottom: 0.4 }}
+            onDragEnd={(_, info) => {
+              if (info.offset.y > 80 && !pending) onClose()
+            }}
+            className="flex max-h-[85dvh] w-full max-w-md flex-col overflow-hidden rounded-t-2xl border border-b-0 border-drift-border bg-drift-surface"
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={handleTrapKey}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={HEADER_ID}
+          >
+            {/* Drag handle visual */}
+            <div className="flex justify-center pt-2 pb-1">
+              <div className="h-1 w-10 rounded-full bg-drift-border" aria-hidden="true" />
+            </div>
+
+            {/* Header */}
+            <header className="flex items-start justify-between gap-3 px-4 pb-3">
+              <div className="min-w-0 flex-1">
+                <h2
+                  id={HEADER_ID}
+                  className="font-display text-xs font-bold uppercase tracking-[0.2em] text-drift-accent"
+                >
+                  responder
+                </h2>
+                <p className="mt-1 truncate font-mono text-[10px] text-drift-muted">
+                  para {shortNpub(replyToAuthorPub)}
+                </p>
+              </div>
+              <button
+                onClick={onClose}
+                disabled={pending}
+                className="shrink-0 rounded border border-drift-border px-2 py-1 text-[10px] text-drift-muted transition-colors hover:border-drift-accent hover:text-drift-accent focus:border-drift-accent focus:text-drift-accent focus:outline-none disabled:opacity-40"
+                aria-label="fechar"
+              >
+                ✕
+              </button>
+            </header>
+
+            {/* Body */}
+            <div className="flex flex-1 flex-col gap-2 px-4 pb-3">
+              <textarea
+                ref={textareaRef}
+                value={text}
+                onChange={(e) => {
+                  setText(e.target.value)
+                  if (error) setError(null)
+                }}
+                disabled={pending}
+                placeholder="sua resposta…"
+                rows={4}
+                aria-label="texto da resposta"
+                aria-invalid={overLimit || !!error}
+                className="min-h-[6rem] w-full resize-y rounded border border-drift-border bg-drift-bg p-2 font-mono text-[12px] text-drift-text placeholder:text-drift-muted/60 focus:border-drift-accent2 focus:outline-none disabled:opacity-60"
+              />
+              {error && (
+                <div
+                  role="alert"
+                  className="rounded border border-drift-bury/60 bg-drift-bury/10 px-2 py-1 text-[10px] text-drift-bury"
+                >
+                  {error}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <footer className="flex items-center justify-between gap-3 border-t border-drift-border bg-drift-bg/40 px-4 py-3">
+              <span
+                className={`font-mono text-[10px] ${
+                  overLimit ? 'text-drift-bury' : 'text-slate-400'
+                }`}
+                aria-live="polite"
+              >
+                {charCount}/{COMMENT_MAX_CHARS}
+              </span>
+              <button
+                onClick={doPublish}
+                disabled={!canPublish}
+                className="rounded bg-drift-accent px-4 py-1.5 text-[11px] font-semibold uppercase tracking-widest text-drift-bg transition-opacity hover:opacity-90 focus:outline-none focus:ring-1 focus:ring-drift-accent2 disabled:cursor-not-allowed disabled:opacity-30"
+              >
+                {pending ? 'publicando…' : 'publicar'}
+              </button>
+            </footer>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  )
+}
+

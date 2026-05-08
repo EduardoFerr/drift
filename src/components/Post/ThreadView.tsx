@@ -40,13 +40,16 @@ import { siblingPosition } from '../../lib/thread-header'
 import { SwipeHandler } from './SwipeHandler'
 import { CommentCard } from './CommentCard'
 import { ThreadHeader } from './ThreadHeader'
+import { ReplySheet } from './ReplySheet'
 
 export interface ThreadViewProps {
   postId: string
+  /** Author do post root (P tag NIP-22). Repassa pra ReplySheet. */
+  postAuthorPub: string
   onClose: () => void
 }
 
-export function ThreadView({ postId, onClose }: ThreadViewProps) {
+export function ThreadView({ postId, postAuthorPub, onClose }: ThreadViewProps) {
   const { index, loading } = useThread(postId)
   const coachSeen = usePrefsStore((s) => s.thread_coach_seen)
 
@@ -292,17 +295,28 @@ export function ThreadView({ postId, onClose }: ThreadViewProps) {
           )}
         </AnimatePresence>
 
-        {/* ReplySheet placeholder — Track Ted vai entregar
-            <ReplySheet>. Aqui só renderizamos overlay simples pra
-            cobrir UX enquanto o componente real chega. */}
-        <AnimatePresence>
-          {replyOpen && (
-            <ReplyPlaceholder
-              targetId={cursor?.path.at(-1) ?? null}
+        {/* ReplySheet (Track C.4.4 Ted). Substitui ReplyPlaceholder
+            quando user toca FAB ↵. Reply targetId default = current
+            comment (cursor.path.at(-1)); top-level = postId. */}
+        {(() => {
+          const currentNodeId = cursor?.path.at(-1) ?? null
+          const currentNode = currentNodeId ? index.byId.get(currentNodeId) : null
+          // Determine reply target: current comment se navegando, post se tree vazia
+          const replyTo = currentNodeId ?? postId
+          const replyToKind = currentNode ? 1111 : 9078
+          const replyToAuthorPub = currentNode?.author_pub ?? postAuthorPub
+          return (
+            <ReplySheet
+              postId={postId}
+              postAuthorPub={postAuthorPub}
+              replyTo={replyTo}
+              replyToKind={replyToKind}
+              replyToAuthorPub={replyToAuthorPub}
+              open={replyOpen}
               onClose={() => setReplyOpen(false)}
             />
-          )}
-        </AnimatePresence>
+          )
+        })()}
       </div>
     </motion.div>
   )
@@ -364,50 +378,5 @@ function CoachContent() {
   )
 }
 
-/**
- * Placeholder do `<ReplySheet>` — Ted entrega o sheet real em outra
- * task da Track C. Aqui mantemos um overlay mínimo pra que o fluxo
- * (FAB → sheet → Esc/dismiss) seja exercitável.
- */
-function ReplyPlaceholder({
-  targetId,
-  onClose,
-}: {
-  targetId: string | null
-  onClose: () => void
-}) {
-  return (
-    <motion.div
-      initial={{ y: '100%' }}
-      animate={{ y: 0 }}
-      exit={{ y: '100%' }}
-      transition={{ duration: 0.28, ease: [0.32, 0.72, 0, 1] }}
-      role="dialog"
-      aria-modal="true"
-      aria-label="responder comentário"
-      className="absolute inset-x-0 bottom-0 z-50 flex flex-col gap-3 rounded-t-lg border-t border-drift-border bg-drift-surface px-5 py-5 motion-reduce:transition-none"
-    >
-      <div className="flex items-center justify-between">
-        <span className="font-display text-sm font-bold uppercase tracking-tag text-drift-text">
-          responder
-        </span>
-        <button
-          onClick={onClose}
-          className="rounded border border-drift-border px-2 py-1 font-mono text-[10px] text-drift-muted hover:border-drift-accent hover:text-drift-accent"
-          aria-label="cancelar resposta"
-        >
-          ✕
-        </button>
-      </div>
-      <p className="font-mono text-[11px] text-drift-muted">
-        respondendo a{' '}
-        <span className="text-drift-text">
-          {targetId ? '…' + targetId.slice(-8) : '—'}
-        </span>
-      </p>
-      <p className="font-mono text-[10px] italic text-drift-muted">
-        ReplySheet em construção. UI completa chega em C.4.4.
-      </p>
-    </motion.div>
-  )
-}
+// (ReplyPlaceholder removido — substituído por <ReplySheet> de Ted no
+// merge C.4.4. Importado de './ReplySheet' no topo do arquivo.)

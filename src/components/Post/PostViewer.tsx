@@ -594,6 +594,7 @@ export function PostViewer({
         {showThread && (
           <ThreadView
             postId={post.id}
+            postAuthorPub={post.authorPub}
             onClose={() => setShowThread(false)}
           />
         )}
