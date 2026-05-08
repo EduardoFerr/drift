@@ -22,6 +22,9 @@ import {
   recordHandshake as registryHandshake,
 } from '../../peerRegistry'
 import {
+  CROSS_PROTO_VIOLATION_CAP,
+  CROSS_PROTO_VIOLATION_THRESHOLD,
+  CROSS_PROTO_VIOLATION_WINDOW_MS,
   ICE_CONNECT_TIMEOUT_MS,
   RATE_BURST,
   WEBRTC_LIMITS,
@@ -76,6 +79,8 @@ export function getOrCreatePeer(remoteId: string): PeerState | null {
     rateBudget: RATE_BURST,
     lastRefillTs: Date.now(),
     rateViolations: [],
+    crossProtoViolations: [], // fix: T1 cross-proto window (Threat audit)
+    pendingPings: [], // fix: T2 ping/pong 1:1 (Threat audit)
   }
   setPeer(peer)
 
@@ -93,6 +98,16 @@ export function getOrCreatePeer(remoteId: string): PeerState | null {
 
   pc.onconnectionstatechange = () => {
     const s = pc.connectionState
+    // fix: B1 — qualquer transição out-of-disconnected (connected, failed,
+    // closed) cancela o grace timer pendente. Sem isso, oscilações
+    // disconnected↔connected empilham N setTimeouts cujos guards (status,
+    // hasPeer) não cobrem o caso de N callbacks chamando _scheduleReconnect
+    // em sequência rápida — counter avança N vezes, atinge cap=5 prematuro.
+    // Audit: Docs/sessions/webrtc-architecture-audit-2026-05-08.md §B1.
+    if (s !== 'disconnected' && peer.disconnectGraceTimer) {
+      clearTimeout(peer.disconnectGraceTimer)
+      peer.disconnectGraceTimer = null
+    }
     if (s === 'connected') {
       // status='open' depende de dc.onopen — não setar aqui.
     } else if (s === 'failed') {
@@ -114,7 +129,12 @@ export function getOrCreatePeer(remoteId: string): PeerState | null {
       // de oscilação real. Espera 5s antes de schedulear; se voltou pra
       // connected antes, cancela. Closed = manual close, sem reconnect.
       if (s === 'disconnected' && useNostrSignaling()) {
-        setTimeout(() => {
+        // fix: B1 — guard contra empilhar grace timers em oscilação rápida.
+        // Se já existe um timer pendente, mantém ele (não substitui — o
+        // primeiro disconnected ainda é o relevante). Audit §B1.
+        if (peer.disconnectGraceTimer) return
+        peer.disconnectGraceTimer = setTimeout(() => {
+          peer.disconnectGraceTimer = null
           // Se peer voltou pra connected (status='open'), cancela.
           if (peer.status === 'open') return
           // Se peer foi limpo (cleanupPeer), também não reconectar.
@@ -130,7 +150,13 @@ export function getOrCreatePeer(remoteId: string): PeerState | null {
 
   // ICE timeout — Barney audit #1 (HIGH). Se ICE não resolver em 30s,
   // peer fica zombie em 'connecting' e vaza RAM. Mata e remove do map.
-  setTimeout(() => {
+  // fix: B3 — armazena handle pra cancelar em cleanupPeer e liberar
+  // a referência ao PeerState antigo (RTCPeerConnection já fechada +
+  // outboundQueue) antes do GC natural ao fim dos 30s. Em sessão longa
+  // com churn de peers (random walk a cada 30min), evita acumular
+  // 8×30s = 240s de timers vivos. Audit §B3.
+  peer.iceConnectTimer = setTimeout(() => {
+    peer.iceConnectTimer = null
     const current = getPeer(remoteId)
     if (!current || current !== peer) return
     if (peer.status === 'connecting') {
@@ -276,6 +302,16 @@ export function cleanupPeer(remoteId: string): void {
   // ICE timeout, o counter ficava inflado pra reconexões futuras
   // (não era leak — Map vive até pagehide — mas semanticamente errado).
   _resetReconnectCounter(remoteId)
+  // fix: B1 / B3 — cancelar timers pendentes pra liberar referências
+  // ao PeerState antes do GC natural. Audit §B1 / §B3.
+  if (peer.disconnectGraceTimer) {
+    clearTimeout(peer.disconnectGraceTimer)
+    peer.disconnectGraceTimer = null
+  }
+  if (peer.iceConnectTimer) {
+    clearTimeout(peer.iceConnectTimer)
+    peer.iceConnectTimer = null
+  }
   peer.status = 'closing'
   try {
     peer.dc?.close()
@@ -290,6 +326,58 @@ export function cleanupPeer(remoteId: string): void {
   peer.outboundQueue.length = 0
   peer.status = 'closed'
   deletePeer(remoteId)
+}
+
+// ─── Cross-proto violation recording (T1 — Threat audit, M3 dedup) ──
+
+/**
+ * fix: T1 cross-proto window (Threat audit) — função canônica chamada
+ * pelo pipeline.ts (porta runtime real) e por `_simulateCrossProtoForTest`
+ * (porta Vitest). Antes do fix, lógica duplicava em 2 lugares (M3 do
+ * audit) com semântica monotônica — atacante paciente burlava threshold.
+ *
+ * Comportamento:
+ *  - Push timestamp em `peer.crossProtoViolations[]`, prune fora da janela,
+ *    cap em CROSS_PROTO_VIOLATION_CAP (defesa contra spammer extremo).
+ *  - Counter monotônico `crossProtoCount` segue incrementando — telemetria
+ *    histórica (peerScore/peerRegistry consomem).
+ *  - Se violações em janela ≥ THRESHOLD: peer.status='failed', cleanup +
+ *    blacklist persistido (TTL 1h).
+ */
+export function recordCrossProtoViolation(peer: PeerState, now: number): void {
+  if (peer.status === 'failed' || peer.status === 'closed') return
+  peer.crossProtoCount = (peer.crossProtoCount ?? 0) + 1
+  // Garante array existe mesmo em PeerStates legacy criados antes do fix.
+  if (!Array.isArray(peer.crossProtoViolations)) {
+    peer.crossProtoViolations = []
+  }
+  peer.crossProtoViolations.push(now)
+  if (peer.crossProtoViolations.length > CROSS_PROTO_VIOLATION_CAP) {
+    peer.crossProtoViolations.splice(
+      0,
+      peer.crossProtoViolations.length - CROSS_PROTO_VIOLATION_CAP,
+    )
+  }
+  const cutoff = now - CROSS_PROTO_VIOLATION_WINDOW_MS
+  while (
+    peer.crossProtoViolations.length &&
+    peer.crossProtoViolations[0]! < cutoff
+  ) {
+    peer.crossProtoViolations.shift()
+  }
+  if (peer.crossProtoViolations.length >= CROSS_PROTO_VIOLATION_THRESHOLD) {
+    console.warn(
+      '[webrtc] cross-proto threshold (',
+      peer.crossProtoViolations.length,
+      'in window) — blacklist',
+      peer.id.slice(0, 8),
+    )
+    peer.status = 'failed'
+    cleanupPeer(peer.id)
+    void registryBlacklist(peer.id, WEBRTC_LIMITS.BLACKLIST_TTL_MS).catch(() => {
+      /* swallow — blacklist em memória já protegeu; persist é bonus */
+    })
+  }
 }
 
 // ─── Test-only helpers ───────────────────────────────────────────────
@@ -313,6 +401,8 @@ export function _createPeerStateForTest(id: string, now0?: number): PeerState {
     rateBudget: RATE_BURST,
     lastRefillTs: t,
     rateViolations: [],
+    crossProtoViolations: [], // fix: T1 cross-proto window (Threat audit)
+    pendingPings: [], // fix: T2 ping/pong 1:1 (Threat audit)
   }
 }
 
@@ -331,15 +421,9 @@ export function _getOrCreatePeerForTest(remoteId: string): PeerState | null {
  *  Aqui mora porque o helper toca `peer.crossProtoCount` + chama
  *  `cleanupPeer` — alinhado com peer lifecycle, não com pipeline.
  *  (Marshall tradeoff: peer.ts ou pipeline.ts; escolhido peer.ts.) */
-export function _simulateCrossProtoForTest(peer: PeerState): void {
-  peer.crossProtoCount = (peer.crossProtoCount ?? 0) + 1
-  if (peer.crossProtoCount >= WEBRTC_LIMITS.CROSS_PROTO_THRESHOLD) {
-    peer.status = 'failed'
-    cleanupPeer(peer.id)
-    // Fase 6.2 integration: persiste blacklist no SQLite pra próxima
-    // sessão também rejeitar este npub. TTL 1h (WEBRTC_LIMITS).
-    void registryBlacklist(peer.id, WEBRTC_LIMITS.BLACKLIST_TTL_MS).catch(() => {
-      /* swallow */
-    })
-  }
+export function _simulateCrossProtoForTest(peer: PeerState, now?: number): void {
+  // fix: T1 cross-proto window (Threat audit) — delega pro helper canônico.
+  // M3 do audit: dedup pipeline.ts ↔ _simulate. Default `now=Date.now()`
+  // preserva chamadas legadas sem timeline sintética.
+  recordCrossProtoViolation(peer, now ?? Date.now())
 }

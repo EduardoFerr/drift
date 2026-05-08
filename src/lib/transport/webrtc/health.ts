@@ -22,10 +22,33 @@ import type { PeerState } from './types'
 
 let healthTimer: ReturnType<typeof setInterval> | null = null
 
+/** Janela máxima de pings pendentes (2× interval). Pings mais antigos
+ *  são pruned em cada `_markPing`. Threat audit T2. */
+const PENDING_PINGS_MAX_AGE_MS = HEALTH_PING_INTERVAL_MS * 2
+/** Cap defensivo no array — evita atacante enviar pings forjados pra
+ *  inflar memória (não temos write side externo, mas defesa em
+ *  profundidade). */
+const PENDING_PINGS_CAP = 16
+
 /** Test-only: registra que enviamos ping.
+ *  fix: T2 ping/pong 1:1 (Threat audit) — adiciona timestamp em
+ *  `pendingPings[]` pra futura validação no pong. Prune pings >2×
+ *  interval pra evitar leak.
  *  Re-exportado em `webrtc/index.ts` como `_markPing`. */
 export function _markPing(peer: PeerState, now: number): void {
   peer.lastPingSentAt = now
+  // Garante array existe (PeerStates legacy podem não ter).
+  if (!Array.isArray(peer.pendingPings)) peer.pendingPings = []
+  peer.pendingPings.push(now)
+  // Prune pings antigos.
+  const cutoff = now - PENDING_PINGS_MAX_AGE_MS
+  while (peer.pendingPings.length && peer.pendingPings[0]! < cutoff) {
+    peer.pendingPings.shift()
+  }
+  // Cap defensivo (mais novos sobrevivem).
+  if (peer.pendingPings.length > PENDING_PINGS_CAP) {
+    peer.pendingPings.splice(0, peer.pendingPings.length - PENDING_PINGS_CAP)
+  }
 }
 
 /** Test-only: processa pong recebido, atualiza RTT.
@@ -34,11 +57,18 @@ export function _handlePong(peer: PeerState, pingTs: number, now: number): void 
   // Drop pong stale (>5min) — defesa contra replay
   if (now - pingTs > HEALTH_PONG_MAX_AGE_MS) return
   if (pingTs > now) return // pong com timestamp futuro — drop
-  // Barney R1: drop pong sem ping correspondente (atacante manda pong
-  // fake pra fingir saudável e atrasar transição pra degraded). Tolera
-  // 1s de skew pra lidar com pings em flight quando lastPingSentAt
-  // acabou de ser atualizado.
-  if (peer.lastPingSentAt === null || pingTs < peer.lastPingSentAt - 1000) return
+  // fix: T2 ping/pong 1:1 (Threat audit) — pong só é aceito se
+  // corresponde a um ping efetivamente enviado por nós. Antes do fix,
+  // qualquer pong com TS plausível era aceito; atacante mandava pong
+  // forjado com `pingTs ≈ now` e fingia RTT≈0 (peer parecia
+  // superhealthy → nunca degraded → nunca reconectado).
+  if (!Array.isArray(peer.pendingPings) || peer.pendingPings.length === 0) {
+    return
+  }
+  const idx = peer.pendingPings.indexOf(pingTs)
+  if (idx === -1) return
+  // Consome o ping (1:1) — pongs duplicados subsequentes serão dropados.
+  peer.pendingPings.splice(idx, 1)
   peer.lastPingMs = now - pingTs
   peer.lastPongAt = now
 }

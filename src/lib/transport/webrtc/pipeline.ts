@@ -22,10 +22,9 @@ import { DRIFT_KIND_SET } from '../../../config/constants'
 import { verifyDriftEvent } from '../../nostr'
 import type { SignedEvent } from '../../../types/nostr'
 import { matchFilter } from '../matchFilter'
-import { blacklist as registryBlacklist } from '../../peerRegistry'
-import { PING_PREFIX, PONG_PREFIX, SEEN_IDS_CAP, WEBRTC_LIMITS } from './config'
+import { PING_PREFIX, PONG_PREFIX, SEEN_IDS_CAP } from './config'
 import { _handlePong } from './health'
-import { cleanupPeer } from './peer'
+import { recordCrossProtoViolation } from './peer'
 import { consumeRateBudget } from './rateLimit'
 import { iterSubscriptions } from './state'
 import type { PeerState } from './types'
@@ -78,26 +77,13 @@ export function handleDataChannelMessage(peer: PeerState, raw: string): void {
 
   // 2.5. KIND CHECK pré-verify (Barney peer review #1, invariantes #5/#14)
   if (!DRIFT_KIND_SET.has(event.kind)) {
-    // Cross-protocol injection threshold (Fase 6.2-C).
-    // Bot tentando empurrar kinds não-Drift (e.g., kind:1, 30023) é um
-    // tell forte de probe/abuse. Após CROSS_PROTO_THRESHOLD eventos,
-    // mata o peer. Manifesto §15.
-    peer.crossProtoCount = (peer.crossProtoCount ?? 0) + 1
-    if (peer.crossProtoCount >= WEBRTC_LIMITS.CROSS_PROTO_THRESHOLD) {
-      console.warn(
-        '[webrtc] cross-proto threshold (',
-        peer.crossProtoCount,
-        ') — blacklist',
-        peer.id.slice(0, 8),
-      )
-      peer.status = 'failed'
-      cleanupPeer(peer.id)
-      // Fase 6.2 integration: persiste blacklist no SQLite pra próxima
-      // sessão também rejeitar este npub. TTL 1h (WEBRTC_LIMITS).
-      void registryBlacklist(peer.id, WEBRTC_LIMITS.BLACKLIST_TTL_MS).catch(() => {
-        /* swallow — blacklist em memória já protegeu; persist é bonus */
-      })
-    }
+    // fix: T1 cross-proto window (Threat audit) — janela deslizante
+    // substitui counter monotônico. Bot tentando empurrar kinds
+    // não-Drift (e.g., kind:1, 30023) ainda é killed, mas atacante
+    // paciente que distribui violações ao longo de >24h não acumula
+    // pra threshold. M3 (audit): kill canônico vive em peer.ts —
+    // pipeline.ts e _simulateCrossProtoForTest chamam o mesmo helper.
+    recordCrossProtoViolation(peer, Date.now())
     return
   }
 
