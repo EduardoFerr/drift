@@ -34,6 +34,7 @@ import { db } from '../../lib/db'
 import { SwipeHandler } from './SwipeHandler'
 import { SubpostCarousel } from './SubpostCarousel'
 import { ReportModal } from './ReportModal'
+import { ThreadView } from './ThreadView'
 import { SpreadMap } from '../Feed/SpreadMap'
 import { SlideUpOverlay } from '../UI/SlideUpOverlay'
 import { ModalHeader } from '../UI/ModalHeader'
@@ -130,6 +131,8 @@ export function PostViewer({
   // header bulky pré-V8). Acionado pelo botão ⋮ no canto top-right
   // do card. Lista pin/map/follow/mute/block/report.
   const [showActionsMenu, setShowActionsMenu] = useState(false)
+  // Track C.4.2 — ThreadView overlay (lazy mount, on-demand)
+  const [showThread, setShowThread] = useState(false)
   const isFollowing = useFollowsStore((s) => s.following.has(post.authorPub))
   const total = post.subposts.length
 
@@ -408,17 +411,31 @@ export function PostViewer({
             com swipe gesture. Mockup-aligned: ícone discreto, abre
             SlideUpOverlay com lista de ações. */}
         {embedded && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              setShowActionsMenu(true)
-            }}
-            className="absolute right-6 top-6 z-30 flex h-7 w-7 items-center justify-center rounded-full border border-drift-border bg-drift-surface/80 text-drift-muted backdrop-blur-sm transition-colors hover:border-drift-accent hover:text-drift-accent focus:outline-none focus:ring-1 focus:ring-drift-accent2"
-            aria-label="abrir menu de ações"
-            title="ações do post"
-          >
-            <span className="text-[14px] leading-none">⋮</span>
-          </button>
+          <>
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                setShowActionsMenu(true)
+              }}
+              className="absolute right-6 top-6 z-30 flex h-7 w-7 items-center justify-center rounded-full border border-drift-border bg-drift-surface/80 text-drift-muted backdrop-blur-sm transition-colors hover:border-drift-accent hover:text-drift-accent focus:outline-none focus:ring-1 focus:ring-drift-accent2"
+              aria-label="abrir menu de ações"
+              title="ações do post"
+            >
+              <span className="text-[14px] leading-none">⋮</span>
+            </button>
+            {/* Track C.4.2 — trigger pra ThreadView (comments) */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                setShowThread(true)
+              }}
+              className="absolute right-16 top-6 z-30 flex h-7 items-center gap-1 rounded-full border border-drift-border bg-drift-surface/80 px-2 text-drift-muted backdrop-blur-sm transition-colors hover:border-drift-accent2 hover:text-drift-accent2 focus:outline-none focus:ring-1 focus:ring-drift-accent2"
+              aria-label="abrir comentários"
+              title="comentários (thread)"
+            >
+              <span className="text-[12px] leading-none">💬</span>
+            </button>
+          </>
         )}
         {queue && queue.next && (
           <>
@@ -506,6 +523,15 @@ export function PostViewer({
           )}
         </div>
         <div className="flex gap-2">
+          {/* Track C.4.2 — comments trigger (modal mode) */}
+          <button
+            onClick={() => setShowThread(true)}
+            className="rounded border border-drift-border px-2 py-1 text-drift-muted hover:border-drift-accent2 hover:text-drift-accent2"
+            title="abrir comentários"
+            aria-label="Comentários"
+          >
+            💬
+          </button>
           <button
             onClick={onSpread}
             disabled={pendingAction !== null}
@@ -557,6 +583,18 @@ export function PostViewer({
             pending={reporting}
             onSubmit={handleReport}
             onClose={() => setShowReport(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Track C.4.2 — ThreadView overlay (acima de tudo, z-60).
+          Lazy mount: só renderiza quando showThread=true. Cleanup ao
+          fechar libera subscribe (refcount em comments.ts). */}
+      <AnimatePresence>
+        {showThread && (
+          <ThreadView
+            postId={post.id}
+            onClose={() => setShowThread(false)}
           />
         )}
       </AnimatePresence>

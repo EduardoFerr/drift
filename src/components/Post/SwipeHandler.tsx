@@ -32,6 +32,14 @@ export interface SwipeHandlerProps {
   onPrev?: () => void
   onNext?: () => void
   onTap?: () => void
+  /**
+   * Track C.4.2 — gesto vertical genérico, opt-in. Usado pelo ThreadView
+   * onde ↑ = descend (filho) e ↓ = ascend (parent). Non-breaking: se
+   * `onSpread`/`onBury` estiverem presentes, eles têm precedência (uso
+   * atual do PostViewer não muda).
+   */
+  onUp?: () => void
+  onDown?: () => void
   /** Desabilita gestos verticais (ex: post de só 1 subpost com gestos h opcionais). */
   disableVertical?: boolean
   /** Desabilita gestos horizontais (ex: post de 1 subpost — não há onde navegar). */
@@ -45,10 +53,17 @@ export function SwipeHandler({
   onPrev,
   onNext,
   onTap,
+  onUp,
+  onDown,
   disableVertical = false,
   disableHorizontal = false,
   children,
 }: SwipeHandlerProps) {
+  // Track C.4.2 — handlers verticais efetivos. onSpread/onBury (usados
+  // pelo PostViewer) têm precedência; onUp/onDown são fallback opt-in
+  // (ThreadView).
+  const fireUp = onSpread ?? onUp
+  const fireDown = onBury ?? onDown
   const x = useMotionValue(0)
   const y = useMotionValue(0)
 
@@ -102,12 +117,12 @@ export function SwipeHandler({
       const passed =
         ay > SWIPE_THRESHOLD_PX || Math.abs(velocity.y) > SWIPE_VELOCITY_PXS
       if (!passed) return
-      if (offset.y < 0 && onSpread) {
-        showHint('spread')
-        onSpread()
-      } else if (offset.y > 0 && onBury) {
-        showHint('bury')
-        onBury()
+      if (offset.y < 0 && fireUp) {
+        if (onSpread) showHint('spread')
+        fireUp()
+      } else if (offset.y > 0 && fireDown) {
+        if (onBury) showHint('bury')
+        fireDown()
       }
       return
     }
@@ -138,20 +153,26 @@ export function SwipeHandler({
       }
       switch (e.key) {
         case 'ArrowUp':
-          if (!disableVertical && onSpread) {
+        case 'k':
+        case 'K':
+          if (!disableVertical && fireUp) {
             e.preventDefault()
-            showHint('spread')
-            onSpread()
+            if (onSpread) showHint('spread')
+            fireUp()
           }
           break
         case 'ArrowDown':
-          if (!disableVertical && onBury) {
+        case 'j':
+        case 'J':
+          if (!disableVertical && fireDown) {
             e.preventDefault()
-            showHint('bury')
-            onBury()
+            if (onBury) showHint('bury')
+            fireDown()
           }
           break
         case 'ArrowLeft':
+        case 'h':
+        case 'H':
           if (!disableHorizontal && onPrev) {
             e.preventDefault()
             showHint('prev')
@@ -159,6 +180,8 @@ export function SwipeHandler({
           }
           break
         case 'ArrowRight':
+        case 'l':
+        case 'L':
           if (!disableHorizontal && onNext) {
             e.preventDefault()
             showHint('next')
@@ -169,7 +192,16 @@ export function SwipeHandler({
     }
     window.addEventListener('keydown', handleKey)
     return () => window.removeEventListener('keydown', handleKey)
-  }, [onSpread, onBury, onPrev, onNext, disableVertical, disableHorizontal])
+  }, [
+    onSpread,
+    onBury,
+    onPrev,
+    onNext,
+    fireUp,
+    fireDown,
+    disableVertical,
+    disableHorizontal,
+  ])
 
   return (
     <motion.div

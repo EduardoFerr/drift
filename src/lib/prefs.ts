@@ -81,6 +81,9 @@ function applyRow(target: UserPrefs, key: string, value: string): void {
     case 'network_mode':
       if (isNetworkMode(value)) target.network_mode = value
       return
+    case 'thread_coach_seen':
+      target.thread_coach_seen = value === '1'
+      return
     default:
       // chave desconhecida — pode ser de fase futura, ignora silenciosamente
       return

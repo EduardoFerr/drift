@@ -294,6 +294,12 @@ export interface UserPrefs {
   map_view: MapView
   /** Modo de rede pro tráfego (Fase 6.4). Default 'clearnet'. */
   network_mode: NetworkMode
+  /**
+   * Track C.4.2 — coach-mark do ThreadView visto. Default: false.
+   * Primeira vez que user abre ThreadView mostra overlay com os 4
+   * swipes (~3s); depois desliga até reset.
+   */
+  thread_coach_seen: boolean
 }
 
 /** Modo de visualização do mapa de spread. */
@@ -318,4 +324,5 @@ export const DEFAULT_USER_PREFS: UserPrefs = {
   onboarding_done: false,
   map_view: 'fit-bounds',
   network_mode: 'clearnet',
+  thread_coach_seen: false,
 }
