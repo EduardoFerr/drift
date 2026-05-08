@@ -449,6 +449,7 @@ export function BlobsCard({ onClose }: CardProps) {
   const [stats, setStats] = useState<Stats | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [stopping, setStopping] = useState(false)
 
   async function refresh() {
     setLoading(true)
@@ -464,14 +465,41 @@ export function BlobsCard({ onClose }: CardProps) {
     }
   }
 
-  // Auto-refresh a cada 5s enquanto o card está aberto E Helia já foi
-  // inicializado pelo menos uma vez. Sem isso, peer count fica
-  // desatualizado em conexões instáveis. Para quando user fecha.
+  /**
+   * Desliga Helia explicitamente. User feedback 2026-05-08 (Robin
+   * diagnóstico): libp2p autodial mantém WS connections abertas
+   * indefinidamente, gerando ruído de rede mesmo quando user não
+   * está usando o Drift ativamente. Botão "desligar" dá controle
+   * — manifesto §17 (sem chave mestra: opt-in vence).
+   *
+   * NÃO afeta blobs já pinados localmente (IndexedDB persiste).
+   * Próxima vez que user upar/fetcher um blob com cid, Helia
+   * re-inicializa (lazy via getHelia singleton).
+   */
+  async function handleStop() {
+    if (stopping) return
+    setStopping(true)
+    setError(null)
+    try {
+      const helia = await import('../../lib/helia')
+      await helia.disposeHelia()
+      setStats(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setStopping(false)
+    }
+  }
+
+  // Auto-refresh a cada 5s enquanto card está aberto E Helia rodando.
+  // Cleanup quando user fecha o card OU quando stats muda. NÃO chama
+  // disposeHelia — outros call sites (Image fetchBlobUrl, uploadBlob)
+  // podem ainda estar usando o singleton. User desliga via botão.
   useEffect(() => {
-    if (!stats) return
+    if (!stats?.running) return
     const id = setInterval(() => void refresh(), 5_000)
     return () => clearInterval(id)
-  }, [stats])
+  }, [stats?.running])
 
   return (
     <FullPageOverlay
@@ -525,12 +553,24 @@ export function BlobsCard({ onClose }: CardProps) {
               value={String(stats.pinnedCount)}
               valueClass="text-drift-text"
             />
-            <button
-              onClick={() => void refresh()}
-              className="mt-2 w-full rounded border border-drift-border px-3 py-2 text-[10px] uppercase tracking-meta text-drift-muted transition-colors hover:text-drift-text focus:outline-none focus:ring-1 focus:ring-drift-accent2"
-            >
-              ↻ atualizar
-            </button>
+            <div className="mt-2 flex gap-2">
+              <button
+                onClick={() => void refresh()}
+                className="flex-1 rounded border border-drift-border px-3 py-2 text-[10px] uppercase tracking-meta text-drift-muted transition-colors hover:text-drift-text focus:outline-none focus:ring-1 focus:ring-drift-accent2"
+              >
+                ↻ atualizar
+              </button>
+              {stats.running && (
+                <button
+                  onClick={() => void handleStop()}
+                  disabled={stopping}
+                  title="encerra libp2p — para WS chatter; blobs pinados ficam no disco"
+                  className="flex-1 rounded border border-drift-bury/60 bg-drift-bury/5 px-3 py-2 text-[10px] uppercase tracking-meta text-drift-bury transition-colors hover:bg-drift-bury/10 disabled:opacity-40 focus:outline-none focus:ring-1 focus:ring-drift-bury"
+                >
+                  {stopping ? 'desligando…' : '⊗ desligar'}
+                </button>
+              )}
+            </div>
           </div>
         )}
       </div>
