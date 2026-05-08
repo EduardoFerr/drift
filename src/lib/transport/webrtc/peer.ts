@@ -22,6 +22,9 @@ import {
   recordHandshake as registryHandshake,
 } from '../../peerRegistry'
 import {
+  CROSS_PROTO_VIOLATION_CAP,
+  CROSS_PROTO_VIOLATION_THRESHOLD,
+  CROSS_PROTO_VIOLATION_WINDOW_MS,
   ICE_CONNECT_TIMEOUT_MS,
   RATE_BURST,
   WEBRTC_LIMITS,
@@ -76,6 +79,8 @@ export function getOrCreatePeer(remoteId: string): PeerState | null {
     rateBudget: RATE_BURST,
     lastRefillTs: Date.now(),
     rateViolations: [],
+    crossProtoViolations: [], // fix: T1 cross-proto window (Threat audit)
+    pendingPings: [], // fix: T2 ping/pong 1:1 (Threat audit)
   }
   setPeer(peer)
 
@@ -323,6 +328,58 @@ export function cleanupPeer(remoteId: string): void {
   deletePeer(remoteId)
 }
 
+// ─── Cross-proto violation recording (T1 — Threat audit, M3 dedup) ──
+
+/**
+ * fix: T1 cross-proto window (Threat audit) — função canônica chamada
+ * pelo pipeline.ts (porta runtime real) e por `_simulateCrossProtoForTest`
+ * (porta Vitest). Antes do fix, lógica duplicava em 2 lugares (M3 do
+ * audit) com semântica monotônica — atacante paciente burlava threshold.
+ *
+ * Comportamento:
+ *  - Push timestamp em `peer.crossProtoViolations[]`, prune fora da janela,
+ *    cap em CROSS_PROTO_VIOLATION_CAP (defesa contra spammer extremo).
+ *  - Counter monotônico `crossProtoCount` segue incrementando — telemetria
+ *    histórica (peerScore/peerRegistry consomem).
+ *  - Se violações em janela ≥ THRESHOLD: peer.status='failed', cleanup +
+ *    blacklist persistido (TTL 1h).
+ */
+export function recordCrossProtoViolation(peer: PeerState, now: number): void {
+  if (peer.status === 'failed' || peer.status === 'closed') return
+  peer.crossProtoCount = (peer.crossProtoCount ?? 0) + 1
+  // Garante array existe mesmo em PeerStates legacy criados antes do fix.
+  if (!Array.isArray(peer.crossProtoViolations)) {
+    peer.crossProtoViolations = []
+  }
+  peer.crossProtoViolations.push(now)
+  if (peer.crossProtoViolations.length > CROSS_PROTO_VIOLATION_CAP) {
+    peer.crossProtoViolations.splice(
+      0,
+      peer.crossProtoViolations.length - CROSS_PROTO_VIOLATION_CAP,
+    )
+  }
+  const cutoff = now - CROSS_PROTO_VIOLATION_WINDOW_MS
+  while (
+    peer.crossProtoViolations.length &&
+    peer.crossProtoViolations[0]! < cutoff
+  ) {
+    peer.crossProtoViolations.shift()
+  }
+  if (peer.crossProtoViolations.length >= CROSS_PROTO_VIOLATION_THRESHOLD) {
+    console.warn(
+      '[webrtc] cross-proto threshold (',
+      peer.crossProtoViolations.length,
+      'in window) — blacklist',
+      peer.id.slice(0, 8),
+    )
+    peer.status = 'failed'
+    cleanupPeer(peer.id)
+    void registryBlacklist(peer.id, WEBRTC_LIMITS.BLACKLIST_TTL_MS).catch(() => {
+      /* swallow — blacklist em memória já protegeu; persist é bonus */
+    })
+  }
+}
+
 // ─── Test-only helpers ───────────────────────────────────────────────
 
 /** Test-only: cria um PeerState mínimo sem RTCPeerConnection real.
@@ -344,6 +401,8 @@ export function _createPeerStateForTest(id: string, now0?: number): PeerState {
     rateBudget: RATE_BURST,
     lastRefillTs: t,
     rateViolations: [],
+    crossProtoViolations: [], // fix: T1 cross-proto window (Threat audit)
+    pendingPings: [], // fix: T2 ping/pong 1:1 (Threat audit)
   }
 }
 
@@ -362,15 +421,9 @@ export function _getOrCreatePeerForTest(remoteId: string): PeerState | null {
  *  Aqui mora porque o helper toca `peer.crossProtoCount` + chama
  *  `cleanupPeer` — alinhado com peer lifecycle, não com pipeline.
  *  (Marshall tradeoff: peer.ts ou pipeline.ts; escolhido peer.ts.) */
-export function _simulateCrossProtoForTest(peer: PeerState): void {
-  peer.crossProtoCount = (peer.crossProtoCount ?? 0) + 1
-  if (peer.crossProtoCount >= WEBRTC_LIMITS.CROSS_PROTO_THRESHOLD) {
-    peer.status = 'failed'
-    cleanupPeer(peer.id)
-    // Fase 6.2 integration: persiste blacklist no SQLite pra próxima
-    // sessão também rejeitar este npub. TTL 1h (WEBRTC_LIMITS).
-    void registryBlacklist(peer.id, WEBRTC_LIMITS.BLACKLIST_TTL_MS).catch(() => {
-      /* swallow */
-    })
-  }
+export function _simulateCrossProtoForTest(peer: PeerState, now?: number): void {
+  // fix: T1 cross-proto window (Threat audit) — delega pro helper canônico.
+  // M3 do audit: dedup pipeline.ts ↔ _simulate. Default `now=Date.now()`
+  // preserva chamadas legadas sem timeline sintética.
+  recordCrossProtoViolation(peer, now ?? Date.now())
 }

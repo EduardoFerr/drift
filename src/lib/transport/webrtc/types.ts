@@ -42,10 +42,27 @@ export interface PeerState {
   /** Timestamps recentes (ms) de violação de rate limit, capped em
    *  RATE_VIOLATION_CAP. 3 violações em RATE_VIOLATION_WINDOW_MS → kill. */
   rateViolations: number[]
-  /** Contador de eventos de kind fora de DRIFT_KIND_SET — Fase 6.2-C
-   *  cross-protocol injection threshold. Após CROSS_PROTO_THRESHOLD,
-   *  peer é killed e (futuramente) blacklisted via peerRegistry. */
+  /** Contador monotônico de eventos de kind fora de DRIFT_KIND_SET —
+   *  Fase 6.2-C. Mantido pra telemetria / peerScore / peerRegistry (que
+   *  consomem como sinal histórico). NÃO usado mais pra decisão de
+   *  kill — substituído por `crossProtoViolations[]` com janela
+   *  deslizante (Threat audit T1, 2026-05-08). */
   crossProtoCount?: number
+  /** fix: T1 cross-proto window (Threat audit) — timestamps recentes
+   *  (ms) de violação cross-proto, capped em CROSS_PROTO_VIOLATION_CAP.
+   *  Análogo a `rateViolations[]`: violações fora de
+   *  CROSS_PROTO_VIOLATION_WINDOW_MS são pruned, threshold é
+   *  CROSS_PROTO_VIOLATION_THRESHOLD em janela. Antes do fix, atacante
+   *  paciente acumulava 49 violações ao longo de meses e nunca era
+   *  killed; agora violações antigas decaem. */
+  crossProtoViolations: number[]
+  /** fix: T2 ping/pong 1:1 (Threat audit) — timestamps de pings enviados
+   *  esperando pong. Pong só é aceito se `pingTs ∈ pendingPings`; após
+   *  aceito, removido. Pings mais antigos que 2× HEALTH_PING_INTERVAL_MS
+   *  são pruned em cada `_markPing` pra evitar leak.
+   *  Antes do fix: atacante mandava pong com timestamp plausível e fingia
+   *  RTT≈0 (peer parecia superhealthy → nunca degraded). */
+  pendingPings: number[]
   /** fix: B1 — handle do setTimeout do grace period de 5s pós
    *  `disconnected`. Cancelado em transições out-of-disconnected
    *  (connected, failed, closed) e em `cleanupPeer` pra evitar

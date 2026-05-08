@@ -61,38 +61,45 @@ describe('webrtc caps — MAX_PEERS hard cap', () => {
 })
 
 describe('webrtc caps — cross-protocol kind injection threshold', () => {
-  it('CROSS_PROTO_THRESHOLD = 50 (sanity)', () => {
+  // fix: T1 cross-proto window (Threat audit) — threshold mudou de
+  // monotônico (50) pra janela deslizante (10 em 24h). Tests refletem
+  // o novo contrato; counter monotônico continua sendo incrementado
+  // pra telemetria (peerScore/peerRegistry).
+  it('CROSS_PROTO_THRESHOLD = 50 (sanity, legacy constant preservada)', () => {
     expect(WEBRTC_LIMITS.CROSS_PROTO_THRESHOLD).toBe(50)
   })
 
-  it('incrementar 49× NÃO mata o peer', () => {
-    const peer = _createPeerStateForTest('peer-cross-49')
+  it('9 violações instantâneas NÃO matam o peer (abaixo do threshold em janela)', () => {
+    const t0 = 1_700_000_000_000
+    const peer = _createPeerStateForTest('peer-cross-9', t0)
     _injectPeerForTest(peer)
-    for (let i = 0; i < WEBRTC_LIMITS.CROSS_PROTO_THRESHOLD - 1; i++) {
-      _simulateCrossProtoForTest(peer)
+    for (let i = 0; i < 9; i++) {
+      _simulateCrossProtoForTest(peer, t0 + i)
     }
     expect(peer.status).toBe('connecting')
-    expect(peer.crossProtoCount).toBe(WEBRTC_LIMITS.CROSS_PROTO_THRESHOLD - 1)
+    expect(peer.crossProtoCount).toBe(9)
+    expect(peer.crossProtoViolations.length).toBe(9)
   })
 
-  it('incrementar 50× marca peer.status=failed e cleanup', () => {
-    const peer = _createPeerStateForTest('peer-cross-50')
+  it('10 violações instantâneas MATAM o peer (threshold em janela atingido)', () => {
+    const t0 = 1_700_000_000_000
+    const peer = _createPeerStateForTest('peer-cross-10', t0)
     _injectPeerForTest(peer)
-    for (let i = 0; i < WEBRTC_LIMITS.CROSS_PROTO_THRESHOLD; i++) {
-      _simulateCrossProtoForTest(peer)
+    for (let i = 0; i < 10; i++) {
+      _simulateCrossProtoForTest(peer, t0 + i)
     }
-    // cleanupPeer marca status='closed' no fim (overwrite do 'failed'
-    // que foi setado antes do cleanup). O importante é que NÃO é mais
-    // 'connecting' ou 'open' — peer está morto. Manifesto §15.
+    // cleanupPeer overwrites status='failed' → 'closed'. Important: not
+    // 'connecting'/'open'. Manifesto §15.
     expect(peer.status).toBe('closed')
   })
 
-  it('counter persiste entre invocações do mesmo peer', () => {
-    const peer = _createPeerStateForTest('peer-cross-incr')
+  it('contador persiste entre invocações do mesmo peer (monotônico, telemetria)', () => {
+    const t0 = 1_700_000_000_000
+    const peer = _createPeerStateForTest('peer-cross-incr', t0)
     _injectPeerForTest(peer)
-    _simulateCrossProtoForTest(peer)
-    _simulateCrossProtoForTest(peer)
-    _simulateCrossProtoForTest(peer)
+    _simulateCrossProtoForTest(peer, t0)
+    _simulateCrossProtoForTest(peer, t0 + 1)
+    _simulateCrossProtoForTest(peer, t0 + 2)
     expect(peer.crossProtoCount).toBe(3)
     expect(peer.status).toBe('connecting')
   })

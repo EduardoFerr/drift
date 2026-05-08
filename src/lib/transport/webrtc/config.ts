@@ -26,11 +26,31 @@ export const WEBRTC_LIMITS = {
   RATE_LIMIT_MSG_PER_SEC: 100,
   /** Burst rate por peer (já implementado em RATE_BURST). */
   RATE_LIMIT_BURST: 200,
-  /** Após N eventos de kind fora de DRIFT_KIND_SET, peer é killed. */
+  /** [legado] Após N eventos de kind fora de DRIFT_KIND_SET, peer era
+   *  killed sem janela. Substituído por janela deslizante (Threat audit
+   *  T1 — 2026-05-08): violações fora de
+   *  CROSS_PROTO_VIOLATION_WINDOW_MS são descartadas; threshold real é
+   *  CROSS_PROTO_VIOLATION_THRESHOLD em janela. Mantido como constante
+   *  pública pra preservar API histórica (peerScore/peerRegistry consomem
+   *  o counter monotônico só pra telemetria). */
   CROSS_PROTO_THRESHOLD: 50,
   /** TTL de blacklist quando peer cruza um threshold. */
   BLACKLIST_TTL_MS: 60 * 60 * 1000,
 } as const
+
+// ─── Cross-protocol violations (Threat audit T1, 2026-05-08) ────────
+// Janela deslizante substitui counter monotônico. Atacante paciente
+// (49 violações + espera + mais 49) não bypassa: violações fora da
+// janela decaem. Mesmo padrão de `rateViolations[]`.
+
+/** Janela de 24h pra contar violações cross-proto. Fora da janela
+ *  são pruned automaticamente. */
+export const CROSS_PROTO_VIOLATION_WINDOW_MS = 24 * 60 * 60 * 1000
+/** Hard cap do array (defesa contra atacante spammar mais que isso
+ *  numa janela e estourar memória). */
+export const CROSS_PROTO_VIOLATION_CAP = 32
+/** Threshold em violações dentro da janela → kill + blacklist. */
+export const CROSS_PROTO_VIOLATION_THRESHOLD = 10
 
 // ─── Subscription dedup ──────────────────────────────────────────────
 
