@@ -29,6 +29,7 @@ import {
   RATE_BURST,
   WEBRTC_LIMITS,
 } from './config'
+import { recordViolation } from '../policy/violationWindow'
 import { getICEServers } from './ice'
 import {
   deletePeer,
@@ -351,24 +352,17 @@ export function recordCrossProtoViolation(peer: PeerState, now: number): void {
   if (!Array.isArray(peer.crossProtoViolations)) {
     peer.crossProtoViolations = []
   }
-  peer.crossProtoViolations.push(now)
-  if (peer.crossProtoViolations.length > CROSS_PROTO_VIOLATION_CAP) {
-    peer.crossProtoViolations.splice(
-      0,
-      peer.crossProtoViolations.length - CROSS_PROTO_VIOLATION_CAP,
-    )
-  }
-  const cutoff = now - CROSS_PROTO_VIOLATION_WINDOW_MS
-  while (
-    peer.crossProtoViolations.length &&
-    peer.crossProtoViolations[0]! < cutoff
-  ) {
-    peer.crossProtoViolations.shift()
-  }
-  if (peer.crossProtoViolations.length >= CROSS_PROTO_VIOLATION_THRESHOLD) {
+  // S2 refactor (Ted/Barney audit 2026-05-08): delega push/cap/prune/threshold
+  // pra util pura compartilhada `transport/policy/violationWindow`.
+  const { count, tripped } = recordViolation(peer.crossProtoViolations, now, {
+    windowMs: CROSS_PROTO_VIOLATION_WINDOW_MS,
+    cap: CROSS_PROTO_VIOLATION_CAP,
+    threshold: CROSS_PROTO_VIOLATION_THRESHOLD,
+  })
+  if (tripped) {
     console.warn(
       '[webrtc] cross-proto threshold (',
-      peer.crossProtoViolations.length,
+      count,
       'in window) — blacklist',
       peer.id.slice(0, 8),
     )

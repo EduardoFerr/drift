@@ -20,6 +20,7 @@ import {
 } from './config'
 import { cleanupPeer } from './peer'
 import type { PeerState } from './types'
+import { recordViolation } from '../policy/violationWindow'
 
 const lastRateWarnAt = new Map<string, number>()
 
@@ -58,15 +59,13 @@ export function consumeRateBudget(peer: PeerState, now: number): boolean {
     peer.rateBudget -= 1
     return true
   }
-  // Violation. Push timestamp, cap, prune fora da janela.
-  peer.rateViolations.push(now)
-  if (peer.rateViolations.length > RATE_VIOLATION_CAP) {
-    peer.rateViolations.splice(0, peer.rateViolations.length - RATE_VIOLATION_CAP)
-  }
-  const cutoff = now - RATE_VIOLATION_WINDOW_MS
-  while (peer.rateViolations.length && peer.rateViolations[0]! < cutoff) {
-    peer.rateViolations.shift()
-  }
+  // Violation. S2 refactor (Ted/Barney audit 2026-05-08): delega
+  // push/cap/prune/threshold pra util pura `transport/policy/violationWindow`.
+  const { count, tripped } = recordViolation(peer.rateViolations, now, {
+    windowMs: RATE_VIOLATION_WINDOW_MS,
+    cap: RATE_VIOLATION_CAP,
+    threshold: RATE_VIOLATION_THRESHOLD,
+  })
   // Throttled warn.
   const last = lastRateWarnAt.get(peer.id) ?? 0
   if (now - last > RATE_WARN_THROTTLE_MS) {
@@ -74,10 +73,10 @@ export function consumeRateBudget(peer: PeerState, now: number): boolean {
     console.warn(
       '[webrtc] rate-limit drop',
       peer.id.slice(0, 8),
-      `violations=${peer.rateViolations.length}`,
+      `violations=${count}`,
     )
   }
-  if (peer.rateViolations.length >= RATE_VIOLATION_THRESHOLD) {
+  if (tripped) {
     console.warn('[webrtc] peer killed (rate abuse)', peer.id.slice(0, 8))
     peer.status = 'failed'
     // Sprint 4 + Lily/Barney: import eager (não circular real —

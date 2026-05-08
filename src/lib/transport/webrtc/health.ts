@@ -19,6 +19,7 @@ import {
 } from './config'
 import { iterPeers } from './state'
 import type { PeerState } from './types'
+import { markPing, validatePong } from '../policy/pingPongTracker'
 
 let healthTimer: ReturnType<typeof setInterval> | null = null
 
@@ -39,22 +40,20 @@ export function _markPing(peer: PeerState, now: number): void {
   peer.lastPingSentAt = now
   // Garante array existe (PeerStates legacy podem não ter).
   if (!Array.isArray(peer.pendingPings)) peer.pendingPings = []
-  peer.pendingPings.push(now)
-  // Prune pings antigos.
-  const cutoff = now - PENDING_PINGS_MAX_AGE_MS
-  while (peer.pendingPings.length && peer.pendingPings[0]! < cutoff) {
-    peer.pendingPings.shift()
-  }
-  // Cap defensivo (mais novos sobrevivem).
-  if (peer.pendingPings.length > PENDING_PINGS_CAP) {
-    peer.pendingPings.splice(0, peer.pendingPings.length - PENDING_PINGS_CAP)
-  }
+  // S2 refactor (Ted/Barney audit 2026-05-08): delega push/prune/cap pra util
+  // pura compartilhada `transport/policy/pingPongTracker`.
+  markPing(peer.pendingPings, now, {
+    capStale: PENDING_PINGS_CAP,
+    staleMs: PENDING_PINGS_MAX_AGE_MS,
+  })
 }
 
 /** Test-only: processa pong recebido, atualiza RTT.
  *  Re-exportado em `webrtc/index.ts` como `_handlePong`. */
 export function _handlePong(peer: PeerState, pingTs: number, now: number): void {
-  // Drop pong stale (>5min) — defesa contra replay
+  // Defense-in-depth (herdado): defesa contra replay e timestamps futuros.
+  // Permanece aqui porque é específico do transporte (HEALTH_PONG_MAX_AGE_MS),
+  // não do pareamento 1:1 — util pura cobre só o tracking.
   if (now - pingTs > HEALTH_PONG_MAX_AGE_MS) return
   if (pingTs > now) return // pong com timestamp futuro — drop
   // fix: T2 ping/pong 1:1 (Threat audit) — pong só é aceito se
@@ -62,14 +61,12 @@ export function _handlePong(peer: PeerState, pingTs: number, now: number): void 
   // qualquer pong com TS plausível era aceito; atacante mandava pong
   // forjado com `pingTs ≈ now` e fingia RTT≈0 (peer parecia
   // superhealthy → nunca degraded → nunca reconectado).
-  if (!Array.isArray(peer.pendingPings) || peer.pendingPings.length === 0) {
-    return
-  }
-  const idx = peer.pendingPings.indexOf(pingTs)
-  if (idx === -1) return
-  // Consome o ping (1:1) — pongs duplicados subsequentes serão dropados.
-  peer.pendingPings.splice(idx, 1)
-  peer.lastPingMs = now - pingTs
+  if (!Array.isArray(peer.pendingPings)) return
+  // S2 refactor (Ted/Barney audit 2026-05-08): delega membership+consume
+  // pra util pura compartilhada `transport/policy/pingPongTracker`.
+  const result = validatePong(peer.pendingPings, pingTs, now)
+  if (!result.ok) return
+  peer.lastPingMs = result.rttMs
   peer.lastPongAt = now
 }
 
