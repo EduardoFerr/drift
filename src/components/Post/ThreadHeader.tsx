@@ -86,17 +86,22 @@ export function ThreadHeader({
               <span className="ml-2 uppercase">nível {depth}</span>
             </span>
           )}
-          {newCount > 0 && (
-            <button
-              onClick={onRefreshNew}
-              disabled={!onRefreshNew}
-              className="rounded border border-drift-accent2 px-2 py-0.5 uppercase tracking-meta text-drift-accent2 hover:bg-drift-accent2/10 disabled:opacity-50"
-              title="comments novos chegaram durante a navegação"
-              aria-label={`${newCount} comentários novos chegaram`}
-            >
-              ↑ {newCount} novo{newCount === 1 ? '' : 's'}
-            </button>
-          )}
+          {/* polish: TH-P2 aria-live "+N novos" (Track C P1) — screen reader
+              anuncia chegada de comments novos durante navegação. polite pra
+              não interromper leitura corrente. */}
+          <div aria-live="polite" aria-atomic="true">
+            {newCount > 0 && (
+              <button
+                onClick={onRefreshNew}
+                disabled={!onRefreshNew}
+                className="rounded border border-drift-accent2 px-2 py-0.5 uppercase tracking-meta text-drift-accent2 hover:bg-drift-accent2/10 disabled:opacity-50"
+                title="comments novos chegaram durante a navegação"
+                aria-label={`${newCount} comentários novos chegaram`}
+              >
+                ↑ {newCount} novo{newCount === 1 ? '' : 's'}
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

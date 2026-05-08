@@ -81,6 +81,9 @@ export function ThreadView({ postId, postAuthorPub, onClose }: ThreadViewProps) 
 
   const [replyOpen, setReplyOpen] = useState(false)
   const [coachVisible, setCoachVisible] = useState(!coachSeen)
+  // polish: TV-P1 swipe-down feedback (Track C P1) — shake breve antes
+  // de exit quando user faz swipe ↓ no root, em vez de close abrupto.
+  const [exitShake, setExitShake] = useState(false)
 
   // Snapshot timestamp pra contar "novos durante navegação"
   // fix: TH-B1 dead UI (Track C debt) — openedAt agora é state pra refresh
@@ -141,7 +144,14 @@ export function ThreadView({ postId, postAuthorPub, onClose }: ThreadViewProps) 
     if (!cursor) return
     const r = ascend(cursor)
     if (r === 'exit') {
-      onClose()
+      // polish: TV-P1 swipe-down feedback (Track C P1) — micro-shake
+      // confirma que ↓ no root vai fechar, em vez de exit abrupto.
+      if (reducedMotion) {
+        onClose()
+        return
+      }
+      setExitShake(true)
+      setTimeout(() => onClose(), 220)
       return
     }
     setCursor(r)
@@ -203,9 +213,15 @@ export function ThreadView({ postId, postAuthorPub, onClose }: ThreadViewProps) 
       tabIndex={-1}
       className="fixed inset-0 z-[60] flex flex-col bg-drift-bg/90 backdrop-blur-sm focus:outline-none motion-reduce:backdrop-blur-none"
       initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
+      // polish: TV-P1 swipe-down feedback (Track C P1) — shake quando
+      // exitShake=true antes de onClose dispara fade-out final.
+      animate={
+        exitShake && !reducedMotion
+          ? { opacity: 1, y: [0, 6, -3, 4, 0] }
+          : { opacity: 1 }
+      }
       exit={{ opacity: 0 }}
-      transition={{ duration: 0.28, ease: [0.32, 0.72, 0, 1] }}
+      transition={{ duration: exitShake ? 0.22 : 0.28, ease: [0.32, 0.72, 0, 1] }}
     >
       <ThreadHeader
         cursor={cursor}

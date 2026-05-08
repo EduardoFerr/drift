@@ -16,6 +16,7 @@
  */
 
 import { useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import type { CommentNode } from '../../lib/thread-cursor'
 import { applyContentFiltersComment } from '../../lib/feed'
 import { usePrefsStore } from '../../lib/prefs'
@@ -106,16 +107,45 @@ export function CommentCard({
       </header>
 
       {/* Body */}
+      {/* polish: CC-P1 transition reveal (Track C P1) — fade suave quando
+          troca placeholder ↔ conteúdo revelado, em vez de pop abrupto.
+          motion-reduce respeitado via Framer (useReducedMotion global). */}
       <div className="flex-1 overflow-y-auto px-5 py-4">
+        <AnimatePresence mode="wait" initial={false}>
         {isHidden ? (
-          <HiddenPlaceholder onReveal={() => setOverrideMod(true)} />
+          <motion.div
+            key="hidden-mod"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            className="h-full"
+          >
+            <HiddenPlaceholder onReveal={() => setOverrideMod(true)} />
+          </motion.div>
         ) : cwHide ? (
-          <CwHiddenPlaceholder
-            warning={cwHint.reason ?? cwHint.modReason ?? 'oculto'}
-            onReveal={() => setOverrideCw(true)}
-          />
+          <motion.div
+            key="hidden-cw"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            className="h-full"
+          >
+            <CwHiddenPlaceholder
+              warning={cwHint.reason ?? cwHint.modReason ?? 'oculto'}
+              onReveal={() => setOverrideCw(true)}
+            />
+          </motion.div>
         ) : (
-          <div className="flex flex-col gap-3">
+          <motion.div
+            key="content"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.22 }}
+            className="flex flex-col gap-3"
+          >
             {/* C.6.3 — imagem anexada (Track B integration). Renderiza
                 via Image c/ hash verify quando meta presente. Blur por
                 CW aplica via filtro CSS. */}
@@ -152,8 +182,9 @@ export function CommentCard({
             >
               {node.content}
             </p>
-          </div>
+          </motion.div>
         )}
+        </AnimatePresence>
       </div>
 
       {/* Footer meta — childCount = hint pra descend */}

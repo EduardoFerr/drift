@@ -123,6 +123,9 @@ export function ReplySheet({
   const [blobMeta, setBlobMeta] = useState<BlobMeta | null>(null)
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
+  // polish: RS-P3 alt input (Track C P1) — descrição opcional pra
+  // imagem. Injetada no imeta NIP-94 antes de commentOnPost.
+  const [imageAlt, setImageAlt] = useState('')
 
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const sheetRef = useRef<HTMLDivElement | null>(null)
@@ -155,6 +158,7 @@ export function ReplySheet({
       setBlobMeta(null)
       setUploading(false)
       setUploadError(null)
+      setImageAlt('')
       // Captura elemento ativo no momento do open pra restaurar on close.
       restoreFocusRef.current =
         (typeof document !== 'undefined' && (document.activeElement as HTMLElement)) || null
@@ -191,6 +195,7 @@ export function ReplySheet({
   const clearImage = useCallback(() => {
     setBlobMeta(null)
     setUploadError(null)
+    setImageAlt('')
   }, [])
 
   // Focus na textarea on open + restaura on close.
@@ -237,6 +242,11 @@ export function ReplySheet({
     setPending(true)
     setError(null)
     try {
+      // polish: RS-P3 alt input (Track C P1) — merge alt do user no
+      // BlobMeta antes de publicar (NIP-94 alt tag).
+      const finalImeta = blobMeta
+        ? { ...blobMeta, ...(imageAlt.trim() ? { alt: imageAlt.trim() } : {}) }
+        : null
       await commentOnPost({
         postId,
         postAuthorPub,
@@ -245,11 +255,12 @@ export function ReplySheet({
         replyToAuthorPub,
         text: publishText,
         contentWarning: contentWarning ?? undefined,
-        imetas: blobMeta ? [blobMeta] : undefined,
+        imetas: finalImeta ? [finalImeta] : undefined,
       })
       setText('')
       setContentWarning(null)
       setBlobMeta(null)
+      setImageAlt('')
       onPublished?.()
       onClose()
     } catch (err) {
@@ -269,6 +280,7 @@ export function ReplySheet({
     replyToAuthorPub,
     contentWarning,
     blobMeta,
+    imageAlt,
     onClose,
     onPublished,
   ])
@@ -411,6 +423,8 @@ export function ReplySheet({
                 disabled={pending}
                 onFile={handleFile}
                 onClear={clearImage}
+                imageAlt={imageAlt}
+                onAltChange={setImageAlt}
               />
 
               {/* C.6.2 — content warning chips (manifesto §27). */}
@@ -471,13 +485,25 @@ export function ReplySheet({
               >
                 {charCount}/{COMMENT_MAX_CHARS}
               </span>
-              <button
-                onClick={doPublish}
-                disabled={!canPublish}
-                className="rounded bg-drift-accent px-4 py-1.5 text-[11px] font-semibold uppercase tracking-widest text-drift-bg transition-opacity hover:opacity-90 focus:outline-none focus:ring-1 focus:ring-drift-accent2 disabled:cursor-not-allowed disabled:opacity-30"
-              >
-                {pending ? 'publicando…' : 'publicar'}
-              </button>
+              {/* polish: RS-P1 shortcut hint (Track C P1) — torna ⌘↵ visível
+                  na UI; antes só estava em comentário de código. */}
+              <div className="flex items-center gap-2">
+                <span
+                  className="hidden font-mono text-[9px] uppercase tracking-meta text-drift-muted sm:inline"
+                  aria-hidden="true"
+                >
+                  ⌘↵
+                </span>
+                <button
+                  onClick={doPublish}
+                  disabled={!canPublish}
+                  className="rounded bg-drift-accent px-4 py-1.5 text-[11px] font-semibold uppercase tracking-widest text-drift-bg transition-opacity hover:opacity-90 focus:outline-none focus:ring-1 focus:ring-drift-accent2 disabled:cursor-not-allowed disabled:opacity-30"
+                  aria-keyshortcuts="Meta+Enter Control+Enter"
+                  title="publicar (⌘/Ctrl + Enter)"
+                >
+                  {pending ? 'publicando…' : 'publicar'}
+                </button>
+              </div>
             </footer>
           </motion.div>
         </motion.div>
@@ -495,6 +521,8 @@ function ReplyImagePicker({
   disabled,
   onFile,
   onClear,
+  imageAlt,
+  onAltChange,
 }: {
   blobMeta: BlobMeta | null
   uploading: boolean
@@ -502,27 +530,43 @@ function ReplyImagePicker({
   disabled: boolean
   onFile: (f: File) => void
   onClear: () => void
+  /** polish: RS-P3 alt input (Track C P1) — descrição opcional. */
+  imageAlt: string
+  onAltChange: (v: string) => void
 }) {
   // Preview quando blob carregado; senão drop area.
   if (blobMeta) {
     return (
-      <div className="relative h-[110px] w-full overflow-hidden rounded border border-drift-border">
-        <Image
-          src={blobMeta.url ?? ''}
-          meta={blobMeta}
-          className="h-full w-full object-cover"
-          aspect="auto"
-          fit="cover"
-        />
-        <button
-          type="button"
-          onClick={onClear}
+      <div className="flex flex-col gap-1.5">
+        <div className="relative h-[110px] w-full overflow-hidden rounded border border-drift-border">
+          <Image
+            src={blobMeta.url ?? ''}
+            meta={blobMeta}
+            className="h-full w-full object-cover"
+            aspect="auto"
+            fit="cover"
+          />
+          <button
+            type="button"
+            onClick={onClear}
+            disabled={disabled}
+            className="absolute right-1 top-1 rounded border border-drift-border bg-drift-bg/80 px-2 py-0.5 font-mono text-[9px] uppercase tracking-meta text-drift-muted hover:text-drift-bury focus:outline-none focus:ring-1 focus:ring-drift-accent2 disabled:opacity-40"
+            aria-label="remover imagem"
+          >
+            remover
+          </button>
+        </div>
+        {/* polish: RS-P3 alt input (Track C P1) — a11y; opcional, NIP-94 alt. */}
+        <input
+          type="text"
+          value={imageAlt}
+          onChange={(e) => onAltChange(e.target.value)}
           disabled={disabled}
-          className="absolute right-1 top-1 rounded border border-drift-border bg-drift-bg/80 px-2 py-0.5 font-mono text-[9px] uppercase tracking-meta text-drift-muted hover:text-drift-bury focus:outline-none focus:ring-1 focus:ring-drift-accent2 disabled:opacity-40"
-          aria-label="remover imagem"
-        >
-          remover
-        </button>
+          maxLength={280}
+          placeholder="descrição da imagem (alt) — opcional"
+          aria-label="descrição da imagem para acessibilidade"
+          className="w-full rounded border border-drift-border bg-drift-bg px-2 py-1 font-mono text-[10px] text-drift-text placeholder:text-drift-muted/60 focus:border-drift-accent2 focus:outline-none disabled:opacity-60"
+        />
       </div>
     )
   }
