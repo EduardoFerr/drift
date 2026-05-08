@@ -26,7 +26,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { useThread } from '../../hooks/useThread'
 import { usePrefsStore, setPref } from '../../lib/prefs'
 import {
@@ -52,6 +52,7 @@ export interface ThreadViewProps {
 export function ThreadView({ postId, postAuthorPub, onClose }: ThreadViewProps) {
   const { index, loading } = useThread(postId)
   const coachSeen = usePrefsStore((s) => s.thread_coach_seen)
+  const reducedMotion = useReducedMotion()
 
   // Cursor: começa no primeiro root quando tree disponível
   const [cursor, setCursor] = useState<ThreadCursor | null>(null)
@@ -154,6 +155,10 @@ export function ThreadView({ postId, postAuthorPub, onClose }: ThreadViewProps) 
           setReplyOpen(false)
           return
         }
+        if (coachVisible) {
+          dismissCoach()
+          return
+        }
         onClose()
       } else if (e.key === 'Enter' && !replyOpen) {
         e.preventDefault()
@@ -162,7 +167,7 @@ export function ThreadView({ postId, postAuthorPub, onClose }: ThreadViewProps) 
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onClose, replyOpen])
+  }, [onClose, replyOpen, coachVisible])
 
   // ─── Render ────────────────────────────────────────────────────────
   const currentNode = cursor ? index.byId.get(cursor.path.at(-1)!) : null
@@ -248,9 +253,9 @@ export function ThreadView({ postId, postAuthorPub, onClose }: ThreadViewProps) 
               <AnimatePresence mode="popLayout">
                 <motion.div
                   key={currentNode.id}
-                  initial={{ opacity: 0, scale: 0.98 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.98 }}
+                  initial={reducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.98 }}
+                  animate={reducedMotion ? { opacity: 1 } : { opacity: 1, scale: 1 }}
+                  exit={reducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.98 }}
                   transition={{ duration: 0.32, ease: [0.32, 0.72, 0, 1] }}
                   className="relative h-full w-full"
                 >
@@ -271,8 +276,9 @@ export function ThreadView({ postId, postAuthorPub, onClose }: ThreadViewProps) 
         {/* FAB Reply */}
         <button
           onClick={() => setReplyOpen(true)}
-          className="absolute bottom-5 right-5 z-30 rounded-full border-2 border-drift-accent bg-drift-surface px-4 py-2 font-mono text-[11px] uppercase tracking-meta text-drift-accent shadow-lg hover:bg-drift-accent/10 focus:outline-none focus:ring-2 focus:ring-drift-accent2"
+          className="absolute bottom-5 right-5 z-30 rounded-full border-2 border-drift-accent bg-drift-surface px-4 py-2 font-mono text-[11px] uppercase tracking-meta text-drift-accent shadow-lg hover:bg-drift-accent/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2"
           aria-label="responder este comentário"
+          aria-keyshortcuts="Enter"
           title="responder (Enter)"
         >
           ↵ responder
@@ -287,8 +293,10 @@ export function ThreadView({ postId, postAuthorPub, onClose }: ThreadViewProps) 
               exit={{ opacity: 0 }}
               transition={{ duration: 0.24 }}
               onClick={dismissCoach}
-              className="absolute inset-0 z-40 flex items-center justify-center bg-drift-bg/80 backdrop-blur-sm"
-              role="presentation"
+              className="absolute inset-0 z-40 flex items-center justify-center bg-drift-bg/80 backdrop-blur-sm motion-reduce:backdrop-blur-none"
+              role="dialog"
+              aria-modal="false"
+              aria-label="dica de navegação por swipe — toque ou pressione Esc pra fechar"
             >
               <CoachContent />
             </motion.div>
@@ -326,7 +334,11 @@ export function ThreadView({ postId, postAuthorPub, onClose }: ThreadViewProps) 
 
 function EmptyState({ onReply }: { onReply: () => void }) {
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-4 text-center">
+    <div
+      className="flex h-full flex-col items-center justify-center gap-4 text-center"
+      role="status"
+      aria-live="polite"
+    >
       <span className="font-display text-base font-bold uppercase tracking-tag text-drift-muted">
         sem comentários ainda
       </span>
@@ -335,7 +347,7 @@ function EmptyState({ onReply }: { onReply: () => void }) {
       </span>
       <button
         onClick={onReply}
-        className="rounded border-2 border-drift-accent px-4 py-2 font-mono text-[11px] uppercase tracking-meta text-drift-accent hover:bg-drift-accent/10 focus:outline-none focus:ring-1 focus:ring-drift-accent2"
+        className="rounded border-2 border-drift-accent px-4 py-2 font-mono text-[11px] uppercase tracking-meta text-drift-accent hover:bg-drift-accent/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2"
       >
         ↵ comentar
       </button>
@@ -345,7 +357,11 @@ function EmptyState({ onReply }: { onReply: () => void }) {
 
 function LoadingState() {
   return (
-    <div className="flex h-full items-center justify-center">
+    <div
+      className="flex h-full items-center justify-center"
+      role="status"
+      aria-live="polite"
+    >
       <span className="font-mono text-[11px] uppercase tracking-meta text-drift-muted">
         carregando comentários…
       </span>

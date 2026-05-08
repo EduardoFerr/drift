@@ -35,6 +35,7 @@ import { SwipeHandler } from './SwipeHandler'
 import { SubpostCarousel } from './SubpostCarousel'
 import { ReportModal } from './ReportModal'
 import { ThreadView } from './ThreadView'
+import { useCommentCountsStore } from '../../lib/comment-counts'
 import { SpreadMap } from '../Feed/SpreadMap'
 import { SlideUpOverlay } from '../UI/SlideUpOverlay'
 import { ModalHeader } from '../UI/ModalHeader'
@@ -133,6 +134,11 @@ export function PostViewer({
   const [showActionsMenu, setShowActionsMenu] = useState(false)
   // Track C.4.2 — ThreadView overlay (lazy mount, on-demand)
   const [showThread, setShowThread] = useState(false)
+  // Track C.6.1 — count prefetch reativo. 0 default; reage a
+  // `bumpCommentCount` em events.ts quando comments novos chegam.
+  const commentCount = useCommentCountsStore(
+    (s) => s.countByPost[post.id] ?? 0,
+  )
   const isFollowing = useFollowsStore((s) => s.following.has(post.authorPub))
   const total = post.subposts.length
 
@@ -430,10 +436,15 @@ export function PostViewer({
                 setShowThread(true)
               }}
               className="absolute right-16 top-6 z-30 flex h-7 items-center gap-1 rounded-full border border-drift-border bg-drift-surface/80 px-2 text-drift-muted backdrop-blur-sm transition-colors hover:border-drift-accent2 hover:text-drift-accent2 focus:outline-none focus:ring-1 focus:ring-drift-accent2"
-              aria-label="abrir comentários"
+              aria-label={`abrir comentários${commentCount > 0 ? ` (${commentCount})` : ''}`}
               title="comentários (thread)"
             >
               <span className="text-[12px] leading-none">💬</span>
+              {commentCount > 0 && (
+                <span className="text-[10px] leading-none font-mono tabular-nums">
+                  {commentCount}
+                </span>
+              )}
             </button>
           </>
         )}
@@ -528,9 +539,9 @@ export function PostViewer({
             onClick={() => setShowThread(true)}
             className="rounded border border-drift-border px-2 py-1 text-drift-muted hover:border-drift-accent2 hover:text-drift-accent2"
             title="abrir comentários"
-            aria-label="Comentários"
+            aria-label={`Comentários${commentCount > 0 ? ` (${commentCount})` : ''}`}
           >
-            💬
+            💬{commentCount > 0 ? ` ${commentCount}` : ''}
           </button>
           <button
             onClick={onSpread}

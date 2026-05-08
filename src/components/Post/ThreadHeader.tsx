@@ -102,8 +102,9 @@ export function ThreadHeader({
 
       <button
         onClick={onClose}
-        className="shrink-0 rounded border border-drift-border px-2 py-1 font-mono text-[12px] text-drift-muted hover:border-drift-accent hover:text-drift-accent focus:outline-none focus:ring-1 focus:ring-drift-accent2"
+        className="shrink-0 rounded border border-drift-border px-2 py-1 font-mono text-[12px] text-drift-muted hover:border-drift-accent hover:text-drift-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2"
         aria-label="fechar thread"
+        aria-keyshortcuts="Escape"
         title="fechar thread (Esc)"
       >
         ✕

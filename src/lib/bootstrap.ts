@@ -28,6 +28,7 @@ import { loadModLocal } from './moderation-local'
 import { isPasskeyEnabled, verifyPasskey } from './passkey'
 import { startProbe } from './probe'
 import { evictOldPosts } from './cache'
+import { loadCommentCounts } from './comment-counts'
 import { wssTransport } from './transport/wss'
 import { webrtcTransport } from './transport/webrtc'
 import { registerTransport } from './transport/orchestrator'
@@ -277,6 +278,13 @@ async function doBootstrap(): Promise<void> {
     registerTransport(webrtcTransport, { weight: 5 })
 
     await startSync()
+
+    // Track C.6.1 — prefetch contagens de comments do banco local pra
+    // UI mostrar "💬 N" sem materializar threads. Fire-and-forget: query
+    // agregada COUNT(*) GROUP BY post_id é barata mas não bloqueia boot.
+    void loadCommentCounts().catch((err) => {
+      console.warn('[bootstrap] loadCommentCounts falhou (degraded):', err)
+    })
 
     // Boot completo — UI renderiza imediatamente.
     // checkRelayConnectivity abre WebSockets DEDICADOS por relay

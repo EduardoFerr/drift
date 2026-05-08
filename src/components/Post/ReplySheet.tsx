@@ -298,8 +298,9 @@ export function ReplySheet({
               <button
                 onClick={onClose}
                 disabled={pending}
-                className="shrink-0 rounded border border-drift-border px-2 py-1 text-[10px] text-drift-muted transition-colors hover:border-drift-accent hover:text-drift-accent focus:border-drift-accent focus:text-drift-accent focus:outline-none disabled:opacity-40"
+                className="shrink-0 rounded border border-drift-border px-2 py-1 text-[10px] text-drift-muted transition-colors hover:border-drift-accent hover:text-drift-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2 disabled:opacity-40"
                 aria-label="fechar"
+                aria-keyshortcuts="Escape"
               >
                 ✕
               </button>
@@ -337,7 +338,8 @@ export function ReplySheet({
                 className={`font-mono text-[10px] ${
                   overLimit ? 'text-drift-bury' : 'text-slate-400'
                 }`}
-                aria-live="polite"
+                aria-live={overLimit ? 'assertive' : 'off'}
+                aria-label={`${charCount} de ${COMMENT_MAX_CHARS} caracteres`}
               >
                 {charCount}/{COMMENT_MAX_CHARS}
               </span>

@@ -52,11 +52,10 @@ export function CommentCard({
       aria-level={depth}
       aria-posinset={posInSet}
       aria-setsize={setSize}
-      aria-expanded={childCount > 0 ? 'false' : undefined}
       aria-label={ariaLabel}
       tabIndex={0}
       data-post-id={postId}
-      className="flex h-full w-full flex-col bg-drift-surface focus:outline-none focus:ring-1 focus:ring-drift-accent2"
+      className="flex h-full w-full flex-col bg-drift-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2"
     >
       {/* Header: autor + tempo */}
       <header className="flex items-center justify-between border-b border-drift-border px-4 py-3">

@@ -29,6 +29,7 @@ import { applyCommentReceived, calculateScoreNow } from './scoring'
 import { bumpUnseenCount, invalidateFeed } from './feed'
 import { getReportWeight, maybeModerate } from './moderation'
 import { calculateUserWeight, calculateWeight } from './weight'
+import { bumpCommentCount } from './comment-counts'
 import type { ReportReason } from '../types/drift'
 
 export async function onNostrEvent(event: SignedEvent): Promise<void> {
@@ -391,6 +392,9 @@ async function persistCommentRow(event: SignedEvent): Promise<void> {
     ],
   )
   await updateUserActivity(event.pubkey, event.created_at)
+  // Track C.6.1: count prefetch. Idempotente cross-relay via dedup
+  // interno por commentId. UI consome via `useCommentCountsStore`.
+  bumpCommentCount(parsed.rootEventId, event.id)
   // Track C.5: comments alimentam score do post recebedor via
   // `applyCommentReceived` em `recalculateScore`. Igual spreads/buries,
   // usa debounce de SCORE_RECALC_DEBOUNCE_MS pra rajadas (post viral
