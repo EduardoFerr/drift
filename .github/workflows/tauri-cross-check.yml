@@ -1,0 +1,134 @@
+name: tauri-cross-check
+
+# Track A.1 — cross-platform `cargo check --features arti` em PR e push,
+# pra capturar regressões Windows/macOS ANTES da tag (que só aciona
+# tauri-distribution.yml com bundle full ~30min).
+#
+# Diferença pros outros workflows Tauri:
+#   - ci.yml (rust-check job)      → Linux only, default + --features arti
+#   - tauri-distribution.yml       → 3 OS, full bundle, só em tag push
+#   - reproducible-build.yml       → Linux Docker, audit-grade, só em tag
+#   - tauri-cross-check.yml (este) → 3 OS, cargo check apenas (~4min cold,
+#                                     ~10s warm), em todo push/PR que
+#                                     toca src-tauri/
+#
+# Por que separar de ci.yml?
+#   - ubuntu-latest cobre Linux. Adicionar mac/win via matrix em ci.yml
+#     dobra/triplica tempo de TODO PR (mesmo PRs frontend-only). Esta
+#     separação roda mac/win SÓ quando src-tauri/** ou Cargo.lock muda.
+#   - Permite skip em forks (mac runners são caros: 10x Linux).
+#
+# Compromisso de manifesto:
+#   §15 anti-censura por país (Tor real só roda em Tauri+arti, então
+#       quebrar build mac/win = quebrar §15 nessas plataformas)
+#   §17 build reproduzível (capacidade técnica em todas plataformas
+#       que cliente nativo suporta)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src-tauri/**'
+      - '.github/workflows/tauri-cross-check.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src-tauri/**'
+      - '.github/workflows/tauri-cross-check.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: tauri-cross-check-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: cargo check (${{ matrix.platform }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux
+            os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+          - platform: macos
+            os: macos-latest
+            target: aarch64-apple-darwin
+          - platform: windows
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust stable
+        # `stable` em vez de pin (ver comentário em ci.yml — MSRV das deps
+        # arti escala rápido). Reprodutibilidade auditável vive em
+        # Dockerfile.reproducible (Linux); aqui é detecção de drift.
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cargo cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          shared-key: tauri-cross-check-${{ matrix.platform }}
+
+      - name: Install Linux WebKit + Tauri deps
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libxdo-dev \
+            libsoup-3.0-dev \
+            pkg-config \
+            file
+
+      # macOS: Xcode CLT já presente em macos-latest runner. arti+rustls
+      # não exige libs nativas extras (preferimos rustls justamente pra
+      # evitar openssl/nativetls). libsqlite3-sys = bundled (Cargo.toml)
+      # compila SQLite from source, então não precisa de libsqlite3 do
+      # sistema.
+
+      # Windows: MSVC toolchain vem com windows-latest runner. WiX só
+      # entra em build full (tauri-distribution usa --bundles nsis pra
+      # contornar pre-release semver). Pra `cargo check` puro, nada
+      # adicional. libsqlite3-sys bundled cobre o LNK1181 documentado
+      # em Cargo.toml.
+
+      - name: cargo check (default — stub IPC, sem arti)
+        working-directory: src-tauri
+        run: cargo check --locked
+
+      - name: cargo check (--features arti)
+        # Cumpre §15: se arti não compila em mac/win, Tor real não roda
+        # em cliente nativo nessas plataformas → manifesto fura.
+        working-directory: src-tauri
+        run: cargo check --locked --features arti
+
+  summary:
+    name: cross-check summary
+    needs: check
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report
+        run: |
+          if [ "${{ needs.check.result }}" = "success" ]; then
+            echo "✓ Tauri builds OK em Linux + macOS + Windows (default + --features arti)"
+            echo "  §15 anti-censura por país: capacidade técnica preservada cross-platform."
+          else
+            echo "::error::Cross-platform check falhou. Manifesto §15 em risco em pelo menos uma plataforma."
+            exit 1
+          fi
