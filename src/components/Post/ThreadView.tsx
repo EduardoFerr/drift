@@ -25,9 +25,10 @@
  * `prefers-reduced-motion` desabilita translate/scale (mantém fade).
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { useThread } from '../../hooks/useThread'
+import { loadThread } from '../../lib/comments'
 import { usePrefsStore, setPref } from '../../lib/prefs'
 import {
   ascend,
@@ -82,7 +83,16 @@ export function ThreadView({ postId, postAuthorPub, onClose }: ThreadViewProps) 
   const [coachVisible, setCoachVisible] = useState(!coachSeen)
 
   // Snapshot timestamp pra contar "novos durante navegação"
-  const openedAt = useMemo(() => Math.floor(Date.now() / 1000), [])
+  // fix: TH-B1 dead UI (Track C debt) — openedAt agora é state pra refresh
+  // resetar a baseline quando user clica "+N novos" no header.
+  const [openedAt, setOpenedAt] = useState(() => Math.floor(Date.now() / 1000))
+
+  // fix: TH-B1 dead UI (Track C debt) — handler real do badge "+N novos".
+  // Re-carrega snapshot do thread + reseta baseline de "novos".
+  const handleRefreshNew = () => {
+    void loadThread(postId)
+    setOpenedAt(Math.floor(Date.now() / 1000))
+  }
 
   // Focus management — restaura focus ao trigger button quando fecha
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -202,6 +212,7 @@ export function ThreadView({ postId, postAuthorPub, onClose }: ThreadViewProps) 
         index={index}
         openedAt={openedAt}
         onClose={onClose}
+        onRefreshNew={handleRefreshNew}
       />
 
       <div className="relative flex-1 overflow-hidden">

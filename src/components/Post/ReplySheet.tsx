@@ -128,6 +128,22 @@ export function ReplySheet({
   const sheetRef = useRef<HTMLDivElement | null>(null)
   const restoreFocusRef = useRef<HTMLElement | null>(null)
   const reducedMotion = useReducedMotion()
+  // fix: RS-B2 upload leak (Track C debt) — flag pra ignorar setState de
+  // upload depois que sheet fechou/desmontou. Sem isso, React loga
+  // "state update on unmounted" + leak curto.
+  const mountedRef = useRef(true)
+  // Tracks whether sheet is currently open — uploads completing after
+  // close são silenciosamente descartados.
+  const openRef = useRef(open)
+  useEffect(() => {
+    openRef.current = open
+  }, [open])
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
 
   // Reset state quando reabre (evita flash do estado anterior).
   useEffect(() => {
@@ -146,13 +162,17 @@ export function ReplySheet({
   }, [open])
 
   // C.6.3 — handler de upload. Mesmo pattern de ComposeOverlay.handleFile.
+  // fix: RS-B2 upload leak (Track C debt) — abort se sheet fechar /
+  // componente desmontar durante o async (mountedRef + openRef).
   const handleFile = useCallback(async (file: File) => {
     setUploading(true)
     setUploadError(null)
     try {
       const meta = await uploadBlob(file)
+      if (!mountedRef.current || !openRef.current) return
       setBlobMeta(meta)
     } catch (err) {
+      if (!mountedRef.current || !openRef.current) return
       const msg =
         err instanceof UploadError
           ? `upload falhou: ${err.message}`
@@ -164,7 +184,7 @@ export function ReplySheet({
       setUploadError(msg)
       setBlobMeta(null)
     } finally {
-      setUploading(false)
+      if (mountedRef.current && openRef.current) setUploading(false)
     }
   }, [])
 

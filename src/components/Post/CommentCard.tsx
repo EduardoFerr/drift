@@ -43,18 +43,31 @@ export function CommentCard({
   childCount,
   postId,
 }: CommentCardProps) {
-  const [overrideHidden, setOverrideHidden] = useState(false)
+  // fix: CC-B2 moderation override (Track C debt) — states separados pra
+  // moderação (score<=-999) e CW. Compartilhar um mesmo override fazia o
+  // "ver mesmo assim" do CW desbloquear acidentalmente comment moderado.
+  const [overrideMod, setOverrideMod] = useState(false)
+  const [overrideCw, setOverrideCw] = useState(false)
   const [overrideBlur, setOverrideBlur] = useState(false)
-  const isHidden = node.score <= -999 && !overrideHidden
+  const isHidden = node.score <= -999 && !overrideMod
 
   // C.6.2 — applyContentFiltersComment: same logic as posts (block/mute
   // > content-warning > prefs). Determinístico (manifesto §7).
-  const prefs = usePrefsStore()
+  // fix: CC-B1 render thrash (Track C debt) — selectors granulares pra evitar
+  // re-render quando prefs irrelevantes (relays, theme) mudam. Os 4 campos
+  // abaixo são os únicos que applyContentFiltersComment lê.
+  const showNsfwDefault = usePrefsStore((s) => s.show_nsfw_default)
+  const hideSpoilers = usePrefsStore((s) => s.hide_spoilers)
+  const hideAds = usePrefsStore((s) => s.hide_ads)
   const cwHint = applyContentFiltersComment(
     { authorPub: node.author_pub, contentWarning: node.content_warning ?? null },
-    prefs,
+    {
+      show_nsfw_default: showNsfwDefault,
+      hide_spoilers: hideSpoilers,
+      hide_ads: hideAds,
+    } as Parameters<typeof applyContentFiltersComment>[1],
   )
-  const cwHide = cwHint.hide && !overrideHidden
+  const cwHide = cwHint.hide && !overrideCw
   const cwBlur = cwHint.blur && !overrideBlur
 
   // Title pra debug acessível por screen reader
@@ -95,11 +108,11 @@ export function CommentCard({
       {/* Body */}
       <div className="flex-1 overflow-y-auto px-5 py-4">
         {isHidden ? (
-          <HiddenPlaceholder onReveal={() => setOverrideHidden(true)} />
+          <HiddenPlaceholder onReveal={() => setOverrideMod(true)} />
         ) : cwHide ? (
           <CwHiddenPlaceholder
             warning={cwHint.reason ?? cwHint.modReason ?? 'oculto'}
-            onReveal={() => setOverrideHidden(true)}
+            onReveal={() => setOverrideCw(true)}
           />
         ) : (
           <div className="flex flex-col gap-3">

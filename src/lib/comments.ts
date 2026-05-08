@@ -267,11 +267,15 @@ export function addCommentToStore(
   const filtered = entry.rows.filter((r) => r.id !== row.id)
   filtered.push(row)
   filtered.sort(compareComments)
-  // Aplica cap (mantém os mais antigos pra preservar ordering estável,
-  // descarta cauda — sync continua entregando, só não infla memória).
+  // fix: CM-B2 viral threads regression (Track C debt) — política antiga
+  // (`slice(0, CAP)`) descartava a CAUDA, então novos comments chegando
+  // via subscribe em threads cheias eram dropped antes de aparecer pro
+  // user. Trade-off: comments mais antigos saem do store quando lotamos
+  // (ring buffer pelo final), mas user vê o que está vivo agora. SELECT
+  // inicial permanece com cap (paginação de história fica pra futuro).
   const capped =
     filtered.length > COMMENTS_LOAD_CAP
-      ? filtered.slice(0, COMMENTS_LOAD_CAP)
+      ? filtered.slice(-COMMENTS_LOAD_CAP)
       : filtered
   const forest = buildThread(capped)
   const index = buildThreadIndex(forest)
