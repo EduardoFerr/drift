@@ -10,7 +10,7 @@ import {
 } from './lib/geolocation'
 import { restartSync, useSyncStore } from './lib/sync'
 import { createPost, spreadPost, buryPost } from './lib/protocol'
-import { getMyAction, refreshFeed, useFeedStore } from './lib/feed'
+import { getMyAction, markFeedSeen, refreshFeed, useFeedStore } from './lib/feed'
 import { FeedTabs, type FeedTab } from './components/Feed/FeedTabs'
 import {
   startBoot,
@@ -639,11 +639,7 @@ function App() {
           <EndOfFeed
             tab={feedTab}
             onBack={() => setCurrentIdx((i) => Math.max(0, i - 1))}
-            onTop={() => setCurrentIdx(0)}
-            onRefresh={() => {
-              void refreshFeed()
-              setCurrentIdx(0)
-            }}
+            onJumpToTop={() => setCurrentIdx(0)}
           />
         ) : currentPost ? (
           <>
@@ -1184,19 +1180,52 @@ function HomeEmpty({ tab }: { tab: 'global' | 'following' | 'trending' }) {
 function EndOfFeed({
   tab,
   onBack,
-  onTop,
-  onRefresh,
+  onJumpToTop,
 }: {
   tab: 'global' | 'following' | 'trending'
   /** Voltar 1 post (o último que o user viu). */
   onBack: () => void
-  /** Voltar pro topo do feed (post mais recente). */
-  onTop: () => void
-  /** Re-query SQLite + reset pro topo. */
-  onRefresh: () => void
+  /** Jump explícito pra idx=0 (instant, sem network). */
+  onJumpToTop: () => void
 }) {
   const tabLabel =
     tab === 'following' ? 'seguindo' : tab === 'trending' ? 'trending' : 'global'
+  const [refreshing, setRefreshing] = useState(false)
+  const [statusMsg, setStatusMsg] = useState<string | null>(null)
+
+  /**
+   * Atualizar feed: re-query SQLite + mark seen + decide o que fazer
+   * com o idx baseado em CRESCIMENTO da fila.
+   * - Posts novos chegaram (length cresceu) → jump pra topo (user vê
+   *   o conteúdo novo)
+   * - Sem mudança → STAY no EndOfFeed + msg "nada de novo no momento"
+   *   (user feedback 2026-05-08: "atualizar e voltar pro topo tinham
+   *   o mesmo efeito" — agora se diferenciam por comportamento)
+   */
+  async function handleRefresh() {
+    if (refreshing) return
+    setRefreshing(true)
+    setStatusMsg(null)
+    const oldLength = useFeedStore.getState().posts.length
+    try {
+      await refreshFeed()
+      markFeedSeen()
+      const newLength = useFeedStore.getState().posts.length
+      if (newLength > oldLength) {
+        const delta = newLength - oldLength
+        onJumpToTop()
+        setStatusMsg(
+          `${delta} ${delta === 1 ? 'post novo' : 'posts novos'}`,
+        )
+      } else {
+        setStatusMsg('nada de novo no momento')
+      }
+    } finally {
+      setTimeout(() => setRefreshing(false), 400)
+      setTimeout(() => setStatusMsg(null), 3500)
+    }
+  }
+
   return (
     <div className="relative h-full w-full overflow-hidden rounded border border-drift-border bg-drift-surface">
       <div className="flex h-full flex-col items-center justify-center gap-6 px-8 text-center">
@@ -1207,19 +1236,20 @@ function EndOfFeed({
           Você viu tudo por aqui.
         </h2>
         <p className="max-w-prose font-mono text-[11px] leading-relaxed text-slate-400">
-          Posts novos chegam continuamente via relays. Toque atualizar
-          pra recarregar agora, ou volte pro topo pra reler — manifesto
-          §6 (verdade por eventos).
+          Posts novos chegam continuamente via relays. Atualize pra
+          checar agora, ou volte pro topo pra reler o feed atual —
+          manifesto §6 (verdade por eventos).
         </p>
         <div className="flex w-full max-w-xs flex-col gap-2">
           <button
-            onClick={onRefresh}
-            className="rounded bg-drift-accent px-4 py-2.5 font-mono text-[11px] font-bold uppercase tracking-meta text-drift-bg transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2 focus-visible:ring-offset-2 focus-visible:ring-offset-drift-bg"
+            onClick={() => void handleRefresh()}
+            disabled={refreshing}
+            className="rounded bg-drift-accent px-4 py-2.5 font-mono text-[11px] font-bold uppercase tracking-meta text-drift-bg transition-opacity hover:opacity-90 disabled:cursor-wait disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2 focus-visible:ring-offset-2 focus-visible:ring-offset-drift-bg"
           >
-            ↻ atualizar feed
+            {refreshing ? '⟳ verificando…' : '↻ atualizar feed'}
           </button>
           <button
-            onClick={onTop}
+            onClick={onJumpToTop}
             className="rounded border border-drift-border px-4 py-2.5 font-mono text-[10px] uppercase tracking-meta text-slate-400 transition-colors hover:border-drift-text hover:text-drift-text focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2"
           >
             ↑ voltar pro topo
@@ -1230,6 +1260,15 @@ function EndOfFeed({
           >
             ← voltar 1 post
           </button>
+        </div>
+        {/* Feedback inline pós-refresh — diferencia visualmente
+            "atualizar" de "voltar pro topo" mesmo quando posts
+            não mudou. h-4 fixo evita layout shift. */}
+        <div
+          className="h-4 font-mono text-[10px] tracking-meta text-drift-accent2"
+          aria-live="polite"
+        >
+          {statusMsg ?? ''}
         </div>
       </div>
     </div>
