@@ -18,7 +18,7 @@
  */
 
 import { useState } from 'react'
-import { FullPageOverlay } from '../UI/FullPageOverlay'
+import { FullPageCard } from '../UI/FullPageCard'
 import { dialog } from '../../lib/dialog'
 import {
   createNewIdentity,
@@ -194,7 +194,7 @@ export function IdentitySwitcher({ onRequestExport, onClose }: IdentitySwitcherP
   }
 
   return (
-    <FullPageOverlay onClose={onClose} title="identidades" ariaLabel="identidades">
+    <FullPageCard onClose={onClose} title="identidades" ariaLabel="identidades">
       <div className="p-5">
         <p className="mb-4 text-[11px] leading-relaxed text-slate-500">
           Manifesto §4 — anonimato por design. Múltiplas identidades
@@ -510,6 +510,6 @@ export function IdentitySwitcher({ onRequestExport, onClose }: IdentitySwitcherP
           </>
         )}
       </div>
-    </FullPageOverlay>
+    </FullPageCard>
   )
 }

@@ -12,7 +12,7 @@
  */
 
 import { useEffect, useState } from 'react'
-import { FullPageOverlay } from '../UI/FullPageOverlay'
+import { FullPageCard } from '../UI/FullPageCard'
 import { listPinned, unpinPost } from '../../lib/cache'
 import {
   listBlocked,
@@ -51,7 +51,7 @@ export function LocalListsSettings({ onClose }: LocalListsSettingsProps) {
   }
 
   return (
-    <FullPageOverlay onClose={onClose} title="listas locais" ariaLabel="settings · listas locais">
+    <FullPageCard onClose={onClose} title="listas locais" ariaLabel="settings · listas locais">
       <div className="p-5">
 
         {/* Tabs */}
@@ -97,7 +97,7 @@ export function LocalListsSettings({ onClose }: LocalListsSettingsProps) {
           />
         )}
       </div>
-    </FullPageOverlay>
+    </FullPageCard>
   )
 }
 

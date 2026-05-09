@@ -51,7 +51,7 @@ import { UpdatePrompt } from './components/UI/UpdatePrompt'
 import { DialogHost } from './components/UI/DialogHost'
 import { dialog } from './lib/dialog'
 import { NavBar } from './components/UI/NavBar'
-import { FullPageOverlay } from './components/UI/FullPageOverlay'
+import { FullPageCard } from './components/UI/FullPageCard'
 import {
   MapIcon,
   SlidersIcon,
@@ -659,7 +659,7 @@ function App() {
   return (
     // Drift é mobile-first PWA. Em telas largas (>448px), o app cap-eia
     // em max-w-md e centra. Sem isso, o card stack estica até 1920px+
-    // ficando absurdo. NavBar e FullPageOverlay têm seus próprios
+    // ficando absurdo. NavBar e FullPageCard têm seus próprios
     // max-w-md mx-auto pra ficarem alinhados com o app centrado.
     // User feedback 2026-05-08.
     <div className="mx-auto flex h-[100dvh] max-w-md flex-col border-drift-border font-mono text-sm sm:border-x">
@@ -955,7 +955,7 @@ function App() {
       </AnimatePresence>
 
       {/* V9.2d — cards focados (substituem routing pra ContentSettings
-          monolítica). Cada um abre como FullPageOverlay próprio. */}
+          monolítica). Cada um abre como FullPageCard próprio. */}
       <AnimatePresence>
         {showFilters && <FiltersCard onClose={() => setShowFilters(false)} />}
       </AnimatePresence>
@@ -984,7 +984,7 @@ function App() {
       {/* V9.2e — Status card (substitui inline DiagnosticPanel). */}
       <AnimatePresence>
         {showStatusCard && (
-          <FullPageOverlay
+          <FullPageCard
             onClose={() => setShowStatusCard(false)}
             title="status"
             ariaLabel="painel de diagnóstico"
@@ -992,14 +992,14 @@ function App() {
             <div className="p-5">
               <DiagnosticPanel boot={boot} />
             </div>
-          </FullPageOverlay>
+          </FullPageCard>
         )}
       </AnimatePresence>
 
       {/* V9.2e — Sobre card (versão + manifesto link). */}
       <AnimatePresence>
         {showAboutCard && (
-          <FullPageOverlay
+          <FullPageCard
             onClose={() => setShowAboutCard(false)}
             title="sobre"
             ariaLabel="sobre o cliente Drift"
@@ -1038,7 +1038,7 @@ function App() {
                 via nsec1.
               </p>
             </div>
-          </FullPageOverlay>
+          </FullPageCard>
         )}
       </AnimatePresence>
 
@@ -1498,7 +1498,7 @@ function MapOverlay({
   const postId = mapMode === 'post' ? (currentPost?.id ?? null) : null
 
   return (
-    <FullPageOverlay
+    <FullPageCard
       onClose={onClose}
       title="propagação"
       headerRight={headerRight}
@@ -1514,7 +1514,7 @@ function MapOverlay({
           {...(currentPost ? { currentPostId: currentPost.id } : {})}
         />
       </div>
-    </FullPageOverlay>
+    </FullPageCard>
   )
 }
 
@@ -1703,7 +1703,7 @@ function SettingsRoot({
   ]
 
   return (
-    <FullPageOverlay
+    <FullPageCard
       onClose={onClose}
       title="configurações"
       ariaLabel="configurações"
@@ -1774,7 +1774,7 @@ function SettingsRoot({
             viewports curtos (anti-overflow V9.3). */}
         <div className="h-6" aria-hidden="true" />
       </div>
-    </FullPageOverlay>
+    </FullPageCard>
   )
 }
 

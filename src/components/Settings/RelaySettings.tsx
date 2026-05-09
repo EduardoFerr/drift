@@ -10,7 +10,7 @@
  */
 
 import { useState } from 'react'
-import { FullPageOverlay } from '../UI/FullPageOverlay'
+import { FullPageCard } from '../UI/FullPageCard'
 import { addRelay, removeRelay, setRelayEnabled, useRelaysStore } from '../../lib/relays'
 import { entriesFromRecords, fetchRelayList, publishRelayList } from '../../lib/nip65'
 import { nip19 } from 'nostr-tools'
@@ -99,7 +99,7 @@ export function RelaySettings({ onClose }: RelaySettingsProps) {
   }
 
   return (
-    <FullPageOverlay onClose={onClose} title="relays" ariaLabel="settings · relays">
+    <FullPageCard onClose={onClose} title="relays" ariaLabel="settings · relays">
       <div className="p-5">
         <p className="mb-4 text-[11px] leading-relaxed text-slate-500">
           Manifesto §14 — bootstrap distribuído. Relays são intercambiáveis;
@@ -221,7 +221,7 @@ export function RelaySettings({ onClose }: RelaySettingsProps) {
           )}
         </section>
       </div>
-    </FullPageOverlay>
+    </FullPageCard>
   )
 }
 
