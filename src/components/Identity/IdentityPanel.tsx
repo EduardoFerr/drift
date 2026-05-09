@@ -48,7 +48,7 @@ export function IdentityPanel({ identity, onClose }: Props) {
             className={`flex-1 rounded border px-3 py-1.5 ${
               tab === 'backup'
                 ? 'border-drift-accent text-drift-accent'
-                : 'border-drift-border text-slate-500 hover:text-slate-300'
+                : 'border-drift-border text-drift-muted hover:text-drift-text'
             }`}
           >
             backup
@@ -58,7 +58,7 @@ export function IdentityPanel({ identity, onClose }: Props) {
             className={`flex-1 rounded border px-3 py-1.5 ${
               tab === 'import'
                 ? 'border-drift-accent text-drift-accent'
-                : 'border-drift-border text-slate-500 hover:text-slate-300'
+                : 'border-drift-border text-drift-muted hover:text-drift-text'
             }`}
           >
             importar
@@ -68,7 +68,7 @@ export function IdentityPanel({ identity, onClose }: Props) {
             className={`flex-1 rounded border px-3 py-1.5 ${
               tab === 'passkey'
                 ? 'border-drift-accent text-drift-accent'
-                : 'border-drift-border text-slate-500 hover:text-slate-300'
+                : 'border-drift-border text-drift-muted hover:text-drift-text'
             }`}
             title="WebAuthn opt-in"
           >
@@ -147,10 +147,10 @@ function BackupTab({ identity }: { identity: DriftIdentity }) {
   return (
     <div className="space-y-4">
       <div>
-        <div className="mb-1 text-[10px] uppercase tracking-widest text-slate-500">
+        <div className="mb-1 text-[10px] uppercase tracking-widest text-drift-muted">
           npub público
         </div>
-        <div className="break-all rounded border border-drift-border bg-black/30 p-2 text-[11px] text-slate-300">
+        <div className="break-all rounded border border-drift-border bg-black/30 p-2 text-[11px] text-drift-text">
           {identity.npubBech32}
         </div>
       </div>
@@ -162,7 +162,7 @@ function BackupTab({ identity }: { identity: DriftIdentity }) {
           </span>
           <button
             onClick={() => setReveal((r) => !r)}
-            className="text-[10px] uppercase tracking-widest text-slate-500 hover:text-slate-300"
+            className="text-[10px] uppercase tracking-widest text-drift-muted hover:text-drift-text"
           >
             {reveal ? 'ocultar' : 'revelar'}
           </button>
@@ -184,7 +184,7 @@ function BackupTab({ identity }: { identity: DriftIdentity }) {
                   height={240}
                 />
               ) : (
-                <div className="grid h-[240px] w-[240px] place-items-center rounded border border-drift-border text-[10px] text-slate-600">
+                <div className="grid h-[240px] w-[240px] place-items-center rounded border border-drift-border text-[10px] text-drift-muted">
                   gerando QR…
                 </div>
               )}
@@ -193,7 +193,7 @@ function BackupTab({ identity }: { identity: DriftIdentity }) {
             <div className="flex gap-2">
               <button
                 onClick={handleCopy}
-                className="flex-1 rounded border border-drift-border px-3 py-2 text-[11px] uppercase tracking-widest text-slate-400 transition-colors hover:border-drift-accent hover:text-drift-accent"
+                className="flex-1 rounded border border-drift-border px-3 py-2 text-[11px] uppercase tracking-widest text-drift-muted transition-colors hover:border-drift-accent hover:text-drift-accent"
               >
                 {copied ? 'copiado ✓' : 'copiar nsec'}
               </button>
@@ -207,14 +207,14 @@ function BackupTab({ identity }: { identity: DriftIdentity }) {
             </div>
           </div>
         ) : (
-          <div className="rounded border border-drift-border bg-black/30 p-2 text-[11px] text-slate-700">
+          <div className="rounded border border-drift-border bg-black/30 p-2 text-[11px] text-drift-muted">
             ••••••••••••••••••••••••••••••••••••••••••••••••••••••••
           </div>
         )}
       </div>
 
       {reveal && (
-        <label className="flex cursor-pointer items-start gap-3 rounded border border-drift-border p-3 text-[11px] leading-relaxed text-slate-300 transition-colors hover:border-drift-accent2/40">
+        <label className="flex cursor-pointer items-start gap-3 rounded border border-drift-border p-3 text-[11px] leading-relaxed text-drift-text transition-colors hover:border-drift-accent2/40">
           <input
             type="checkbox"
             checked={confirmed}
@@ -339,14 +339,14 @@ function ImportTab({ onClose }: { onClose: () => void }) {
 
       <div className="flex items-center gap-3">
         <div className="h-px flex-1 bg-drift-border" />
-        <span className="font-mono text-[9px] uppercase tracking-widest text-slate-600">
+        <span className="font-mono text-[9px] uppercase tracking-widest text-drift-muted">
           ou cole manual
         </span>
         <div className="h-px flex-1 bg-drift-border" />
       </div>
 
       <div>
-        <div className="mb-1 text-[10px] uppercase tracking-widest text-slate-500">
+        <div className="mb-1 text-[10px] uppercase tracking-widest text-drift-muted">
           chave nsec
         </div>
         <textarea
@@ -357,7 +357,7 @@ function ImportTab({ onClose }: { onClose: () => void }) {
           spellCheck={false}
           autoCapitalize="off"
           autoCorrect="off"
-          className="w-full break-all rounded border border-drift-border bg-black/30 p-2 font-mono text-[11px] text-slate-300 placeholder:text-drift-muted/60 focus:border-drift-accent focus:outline-none"
+          className="w-full break-all rounded border border-drift-border bg-black/30 p-2 font-mono text-[11px] text-drift-text placeholder:text-drift-muted/60 focus:border-drift-accent focus:outline-none"
         />
       </div>
 
@@ -377,7 +377,7 @@ function ImportTab({ onClose }: { onClose: () => void }) {
         <button
           onClick={onClose}
           disabled={busy}
-          className="flex-1 rounded border border-drift-border px-3 py-2 text-[11px] uppercase tracking-widest text-slate-500 hover:text-slate-300 disabled:opacity-40"
+          className="flex-1 rounded border border-drift-border px-3 py-2 text-[11px] uppercase tracking-widest text-drift-muted hover:text-drift-text disabled:opacity-40"
         >
           cancelar
         </button>
@@ -459,12 +459,12 @@ function PasskeyTab({ npub }: { npub: string }) {
 
   return (
     <div>
-      <p className="mb-3 text-[11px] leading-relaxed text-slate-400">
+      <p className="mb-3 text-[11px] leading-relaxed text-drift-muted">
         Passkey opt-in (WebAuthn) — adiciona um gate de autenticação local
         ao boot do app. Usa biometria (Touch ID, Face ID, Windows Hello)
         ou security key (YubiKey, etc.).
       </p>
-      <p className="mb-3 text-[10px] leading-relaxed text-slate-500">
+      <p className="mb-3 text-[10px] leading-relaxed text-drift-muted">
         ⚠ Passkey NÃO é a sua identidade — sua identidade é o nsec. Passkey
         só é gate local pra abrir o app aqui. Se você perder o device + nunca
         fez backup do nsec1, identidade some. Manifesto §3.
@@ -477,10 +477,10 @@ function PasskeyTab({ npub }: { npub: string }) {
       )}
 
       {enabled === null ? (
-        <div className="text-[11px] text-slate-600">verificando…</div>
+        <div className="text-[11px] text-drift-muted">verificando…</div>
       ) : enabled ? (
         <div>
-          <div className="mb-3 rounded border border-emerald-700/60 bg-emerald-950/20 p-2 text-[11px] text-emerald-300">
+          <div className="mb-3 rounded border border-emerald-700/60 bg-emerald-950/20 p-2 text-[11px] text-drift-spread">
             ✓ Passkey ativo. Boot do app pede autenticação.
           </div>
           <button

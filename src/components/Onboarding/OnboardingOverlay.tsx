@@ -43,7 +43,7 @@ export function OnboardingOverlay({ onClose, onOpenIdentity }: OnboardingOverlay
           <p>
             Sem servidor central, sem feed personalizado, sem bolha. Posts imutáveis, identidade portável.
           </p>
-          <p className="text-slate-500">
+          <p className="text-drift-muted">
             Sem censura — nem pelo fundador.
           </p>
         </>
@@ -56,20 +56,20 @@ export function OnboardingOverlay({ onClose, onOpenIdentity }: OnboardingOverlay
           <ul className="space-y-2">
             <li>
               <span className="text-drift-spread">↑</span> swipe pra cima ·{' '}
-              <span className="text-slate-300">DRIFT (drifta o post)</span>
-              <span className="ml-1 text-slate-600">(empurra a deriva)</span>
+              <span className="text-drift-text">DRIFT (drifta o post)</span>
+              <span className="ml-1 text-drift-muted">(empurra a deriva)</span>
             </li>
             <li>
               <span className="text-drift-bury">↓</span> swipe pra baixo ·{' '}
-              <span className="text-slate-300">SINK (afunda o post)</span>
-              <span className="ml-1 text-slate-600">(reduz, não pune o autor)</span>
+              <span className="text-drift-text">SINK (afunda o post)</span>
+              <span className="ml-1 text-drift-muted">(reduz, não pune o autor)</span>
             </li>
             <li>
               <span className="text-drift-accent">← →</span> swipe horizontal ·{' '}
-              <span className="text-slate-300">navega subposts</span>
+              <span className="text-drift-text">navega subposts</span>
             </li>
           </ul>
-          <p className="text-slate-500">
+          <p className="text-drift-muted">
             Sem like, sem follow obrigatório. O score é determinístico — todos veem a mesma ordem.
           </p>
         </>
@@ -102,10 +102,10 @@ export function OnboardingOverlay({ onClose, onOpenIdentity }: OnboardingOverlay
         <>
           <p>
             Se ativar em <code>Settings → location</code>, seus spreads aparecem no
-            mapa de outros posts. Default é <span className="text-slate-300">off</span>{' '}
+            mapa de outros posts. Default é <span className="text-drift-text">off</span>{' '}
             por privacidade (manifesto §28).
           </p>
-          <p className="text-slate-500">
+          <p className="text-drift-muted">
             Pode ativar depois — granularidade é sua (country, city ou precise).
           </p>
         </>
@@ -117,7 +117,7 @@ export function OnboardingOverlay({ onClose, onOpenIdentity }: OnboardingOverlay
         <>
           <ul className="space-y-2">
             <li>
-              <span className="text-drift-spread">✓</span> Posts são <span className="text-slate-300">imutáveis</span>.
+              <span className="text-drift-spread">✓</span> Posts são <span className="text-drift-text">imutáveis</span>.
               Nem o fundador apaga.
             </li>
             <li>
@@ -125,15 +125,15 @@ export function OnboardingOverlay({ onClose, onOpenIdentity }: OnboardingOverlay
             </li>
             <li>
               <span className="text-drift-spread">✓</span> Auto-classificação (NSFW, spoiler) é{' '}
-              <span className="text-slate-300">do autor</span>; filtros são{' '}
-              <span className="text-slate-300">do leitor</span>.
+              <span className="text-drift-text">do autor</span>; filtros são{' '}
+              <span className="text-drift-text">do leitor</span>.
             </li>
             <li>
               <span className="text-drift-spread">✓</span> Conteúdo problemático é moderado pela comunidade via reports
               + threshold dinâmico.
             </li>
           </ul>
-          <p className="text-slate-500">
+          <p className="text-drift-muted">
             Detalhes completos em <code>Docs/manifesto.md</code>.
           </p>
         </>
@@ -196,7 +196,7 @@ export function OnboardingOverlay({ onClose, onOpenIdentity }: OnboardingOverlay
             <h2 className="mb-3 text-xs uppercase tracking-[0.2em] text-drift-accent">
               {currentStep?.title}
             </h2>
-            <div className="space-y-3 text-sm text-slate-300 [&_code]:text-[11px] [&_p]:leading-relaxed">
+            <div className="space-y-3 text-sm text-drift-text [&_code]:text-[11px] [&_p]:leading-relaxed">
               {currentStep?.body}
             </div>
           </motion.div>
@@ -205,7 +205,7 @@ export function OnboardingOverlay({ onClose, onOpenIdentity }: OnboardingOverlay
         <div className="mt-6 flex items-center justify-between">
           <button
             onClick={skip}
-            className="text-[10px] uppercase tracking-widest text-slate-600 hover:text-slate-400"
+            className="text-[10px] uppercase tracking-widest text-drift-muted hover:text-drift-muted"
           >
             pular
           </button>
@@ -213,7 +213,7 @@ export function OnboardingOverlay({ onClose, onOpenIdentity }: OnboardingOverlay
             {step > 0 && (
               <button
                 onClick={() => setStep((s) => s - 1)}
-                className="rounded border border-drift-border px-3 py-1 text-xs uppercase tracking-widest text-slate-500 hover:border-drift-accent hover:text-drift-accent"
+                className="rounded border border-drift-border px-3 py-1 text-xs uppercase tracking-widest text-drift-muted hover:border-drift-accent hover:text-drift-accent"
               >
                 ←
               </button>
