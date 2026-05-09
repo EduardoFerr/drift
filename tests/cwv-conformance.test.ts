@@ -127,19 +127,24 @@ describe('CWV conformance — bundle size budget + dist artifacts', () => {
         const heliaPreloads = inspection.modulepreloads.filter((p) =>
           /^helia(-deps)?-/.test(p),
         )
-        if (heliaPreloads.length > 0) {
-          // Soft warn — log mas não falha. Vira hard quando bundle
-          // patchear. Marker S0 pra grep.
-          // eslint-disable-next-line no-console
-          console.warn(
-            `[cwv-conformance][S0] helia chunks em modulepreload: ${heliaPreloads.join(', ')}\n` +
-              `  Esperado: helia carrega só sob demanda (pin/blob).\n` +
-              `  Fix: ajustar manualChunks em vite.config.ts ou usar dynamic import.\n` +
-              `  Quando resolver, trocar este warn por expect().toEqual([]).`,
-          )
-        }
-        // SOFT — TODO(cwv-1): trocar pra `expect(heliaPreloads).toEqual([])`
-        expect(heliaPreloads.length).toBeGreaterThanOrEqual(0)
+        // HARD desde Round CWV-2 (2026-05-09): vite.config.ts
+        // build.modulePreload.resolveDependencies filtra helia-deps
+        // (+ maplibre-gl, tesselator, rebroadcast). Regression aqui
+        // significa que o filter quebrou — investigar antes de relaxar.
+        expect(heliaPreloads).toEqual([])
+      },
+    )
+
+    it.skipIf(!inspection.hasDist)(
+      'maplibre-gl/tesselator/rebroadcast NÃO aparecem em modulepreload (lazy)',
+      () => {
+        // Mesma família de filter (CWV-2 §3.1). MapLibre + Deck.gl
+        // tesselator são 1.5+ MB combinados — regression aqui
+        // detonaria LCP em mobile.
+        const lazyPreloads = inspection.modulepreloads.filter((p) =>
+          /^(?:maplibre-gl|tesselator|rebroadcast)-/.test(p),
+        )
+        expect(lazyPreloads).toEqual([])
       },
     )
   })
@@ -156,17 +161,11 @@ describe('CWV conformance — bundle size budget + dist artifacts', () => {
       `entry chunk ≤ ${ENTRY_CHUNK_BUDGET_HARD / 1024} KB (hard ceiling)`,
       () => {
         const chunk = inspection.entryChunk!
-        const sizeKB = (chunk.size / 1024).toFixed(1)
-        if (chunk.size > ENTRY_CHUNK_BUDGET_HARD) {
-          // eslint-disable-next-line no-console
-          console.warn(
-            `[cwv-conformance][S1] entry chunk ${chunk.name} = ${sizeKB} KB ` +
-              `excede HARD budget de ${ENTRY_CHUNK_BUDGET_HARD / 1024} KB.\n` +
-              `  Use rollup-plugin-visualizer (npm run build:analyze) pra inspecionar.`,
-          )
-        }
-        // SOFT até stabilizar — TODO(cwv-1): trocar pra `expect(chunk.size).toBeLessThanOrEqual(ENTRY_CHUNK_BUDGET_HARD)`
-        expect(chunk.size).toBeGreaterThan(0)
+        // HARD desde Round CWV-2: vendor-react/vendor-nostr/vendor-motion
+        // splits + lazy modals tiram ~86 KB do entry. Esperado <= 300 KB.
+        // Regression aqui = algum modal voltou eager ou vendor split
+        // quebrou.
+        expect(chunk.size).toBeLessThanOrEqual(ENTRY_CHUNK_BUDGET_HARD)
       },
     )
 
