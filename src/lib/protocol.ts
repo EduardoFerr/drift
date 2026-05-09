@@ -192,8 +192,11 @@ export interface ReportPostInput {
  */
 const NIP22_COMMENT_KIND = 1111
 
-/** Cap em chars de content de comment (Drift convention). */
-export const COMMENT_MAX_CHARS = 1000
+/** Cap em chars de content de comment (Drift convention).
+ *  Uniformizado com DRIFT_LIMITS.TEXT_MAX_CHARS (post text limit) em
+ *  2026-05-08 (user feedback): mesma constante pra ambos previne
+ *  divergência visual + força brevidade Twitter-like. */
+export const COMMENT_MAX_CHARS = 250
 
 /**
  * Placeholder mínimo usado quando reply é só-imagem (texto vazio + blob).

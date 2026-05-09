@@ -238,19 +238,21 @@ function CardText({
 
   // Body line-clamp:
   // - inset/overlay: clamp-3 (cards menores no feed)
-  // - centered: clamp-6 (text-only cards, mais espaço, mas evita overflow
-  //   em viewport pequeno com content longo — user feedback 2026-05-08
-  //   "alguns cards o texto está fazendo o card ficar maior que a area
-  //   reservada", caso típico SPOILER/NSFW posts longos).
-  const bodyClamp = variant === 'centered' ? 'line-clamp-6' : 'line-clamp-3'
+  // - centered: NO CLAMP — com TEXT_MAX_CHARS=250 unified (user feedback
+  //   2026-05-08), body cabe naturalmente em viewport mobile sem truncar.
+  //   Defesa real é o limite na origem (Compose + Reply). splitTitleBody
+  //   geralmente quebra em "." → title curto (1-10 chars) + body resto;
+  //   no pior caso (sem split natural), title='' e body inteiro renderiza
+  //   em fluid-xs italic — fit confortável.
+  const bodyClamp = variant === 'centered' ? '' : 'line-clamp-3'
   // Title size:
-  // - centered: text-fluid-hero (clamp 20-30px) — escala com viewport,
-  //   evita 30px static estourar em mobile narrow combinado com content longo
+  // - centered: text-fluid-display (clamp 13-16px) — text-3xl static (30px)
+  //   estourava em mobile narrow. Display 16px max preserva hierarquia
+  //   visual sem romper grid. Pra titles legítimos curtos (1-2 sentenças
+  //   pré-period split), display é generoso o suficiente.
   // - outros: text-xl (mantém)
-  const titleSize = variant === 'centered' ? 'text-fluid-hero' : 'text-xl'
-  // Title clamp em centered pra title curto extremo não estourar (ex: post
-  // com primeira linha de 80 chars). 4 lines = ~70 chars em fluid-hero.
-  const titleClamp = variant === 'centered' ? 'line-clamp-4' : ''
+  const titleSize = variant === 'centered' ? 'text-fluid-display' : 'text-xl'
+  const titleClamp = ''
 
   return (
     <div className={`relative ${wrapperBg} ${padding} ${flex}`}>

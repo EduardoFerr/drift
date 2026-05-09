@@ -33,7 +33,12 @@ export type DriftKind = (typeof DRIFT_KIND)[keyof typeof DRIFT_KIND]
 export const DRIFT_KIND_SET: ReadonlySet<number> = new Set(Object.values(DRIFT_KIND))
 
 export const DRIFT_LIMITS = {
-  TEXT_MAX_CHARS: 280,
+  // 250 chars uniformiza posts E comments (user feedback 2026-05-08:
+  // "limite é 250 caracteres" para ambos). Limite curto previne
+  // overflow visual em cards (substitui line-clamp band-aid) e força
+  // brevidade — alinha com Twitter-like density. Antes: 280 posts /
+  // 1000 comments — divergente, comments podiam estourar card.
+  TEXT_MAX_CHARS: 250,
   MAX_SUBPOSTS_ABS: 8,
   MAX_POSTS_CACHE: 10_000,
   CACHE_CLEANUP_MS: 6 * 60 * 60 * 1000, // 6h
