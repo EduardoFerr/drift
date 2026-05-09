@@ -27,6 +27,13 @@ export interface ThreadHeaderProps {
   onClose: () => void
   /** Callback opcional do badge "+N novos" — recarrega snapshot. */
   onRefreshNew?: () => void
+  /**
+   * UX-9 (Robin audit 2026-05-08) — abre ReplySheet em modo "top-level"
+   * (parent = post root). Sem este callback, EmptyState é o único
+   * caminho user-discoverable pra criar top-level novo, e ele só
+   * aparece em thread vazia. Sempre visível quando passado.
+   */
+  onNewTopLevelComment?: () => void
 }
 
 export function ThreadHeader({
@@ -35,6 +42,7 @@ export function ThreadHeader({
   openedAt,
   onClose,
   onRefreshNew,
+  onNewTopLevelComment,
 }: ThreadHeaderProps) {
   const breadcrumb = cursor ? buildBreadcrumb(cursor, index) : []
   const { position, total } = cursor
@@ -122,15 +130,31 @@ export function ThreadHeader({
         </div>
       </div>
 
-      <button
-        onClick={onClose}
-        className="shrink-0 rounded border border-drift-border px-2 py-1 font-mono text-[12px] text-drift-muted hover:border-drift-accent hover:text-drift-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2"
-        aria-label="fechar thread"
-        aria-keyshortcuts="Escape"
-        title="fechar thread (Esc)"
-      >
-        ✕
-      </button>
+      <div className="flex shrink-0 items-center gap-1.5">
+        {/* UX-9 (Robin audit) — CTA top-level sempre visível, em vez de
+            depender só do EmptyState (que só aparece com thread vazia)
+            ou do FAB "↵ responder" (que sempre vira sibling do current).
+            Click → ReplySheet modo top-level (parent = post root). */}
+        {onNewTopLevelComment && (
+          <button
+            onClick={onNewTopLevelComment}
+            className="shrink-0 rounded border border-drift-accent px-2 py-1 font-mono text-[10px] uppercase tracking-meta text-drift-accent hover:bg-drift-accent/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2"
+            aria-label="comentar no post (top-level)"
+            title="comentar no post (top-level)"
+          >
+            + no post
+          </button>
+        )}
+        <button
+          onClick={onClose}
+          className="shrink-0 rounded border border-drift-border px-2 py-1 font-mono text-[12px] text-drift-muted hover:border-drift-accent hover:text-drift-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2"
+          aria-label="fechar thread"
+          aria-keyshortcuts="Escape"
+          title="fechar thread (Esc)"
+        >
+          ✕
+        </button>
+      </div>
     </header>
   )
 }

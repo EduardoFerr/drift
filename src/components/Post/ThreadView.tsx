@@ -80,6 +80,12 @@ export function ThreadView({ postId, postAuthorPub, onClose }: ThreadViewProps) 
   }, [cursor, index.byId, onClose])
 
   const [replyOpen, setReplyOpen] = useState(false)
+  // UX-9 (Robin audit 2026-05-08) — modo de abertura da ReplySheet:
+  //   'cursor'   → reply ao comment do cursor atual (FAB ↵ default)
+  //   'topLevel' → comment top-level no post (botão "+ no post" header,
+  //                ou EmptyState se thread vazia)
+  // Lido pelo IIFE de render do ReplySheet pra decidir replyTo/Kind/Pub.
+  const [replyMode, setReplyMode] = useState<'cursor' | 'topLevel'>('cursor')
   const [coachVisible, setCoachVisible] = useState(!coachSeen)
   // polish: TV-P1 swipe-down feedback (Track C P1) — shake breve antes
   // de exit quando user faz swipe ↓ no root, em vez de close abrupto.
@@ -122,6 +128,18 @@ export function ThreadView({ postId, postAuthorPub, onClose }: ThreadViewProps) 
     if (!coachVisible) return
     setCoachVisible(false)
     void setPref('thread_coach_seen', true)
+  }
+
+  // UX-9 (Robin audit) — helpers de abertura da sheet. ReplySheet faz
+  // snapshot dos targets ao open=true→x (UX-3, defesa contra mudança
+  // silenciosa do cursor durante typing).
+  function openReplyToCursor() {
+    setReplyMode('cursor')
+    setReplyOpen(true)
+  }
+  function openReplyTopLevel() {
+    setReplyMode('topLevel')
+    setReplyOpen(true)
   }
 
   // ─── Cursor ops ────────────────────────────────────────────────────
@@ -182,7 +200,7 @@ export function ThreadView({ postId, postAuthorPub, onClose }: ThreadViewProps) 
         onClose()
       } else if (e.key === 'Enter' && !replyOpen) {
         e.preventDefault()
-        setReplyOpen(true)
+        openReplyToCursor()
       }
     }
     window.addEventListener('keydown', onKey)
@@ -229,11 +247,14 @@ export function ThreadView({ postId, postAuthorPub, onClose }: ThreadViewProps) 
         openedAt={openedAt}
         onClose={onClose}
         onRefreshNew={handleRefreshNew}
+        onNewTopLevelComment={openReplyTopLevel}
       />
 
       <div className="relative flex-1 overflow-hidden">
         {/* Empty / loading state */}
-        {!loading && index.roots.length === 0 && <EmptyState onReply={() => setReplyOpen(true)} />}
+        {!loading && index.roots.length === 0 && (
+          <EmptyState onReply={openReplyTopLevel} />
+        )}
         {loading && index.roots.length === 0 && <LoadingState />}
 
         {currentNode && (
@@ -293,6 +314,13 @@ export function ThreadView({ postId, postAuthorPub, onClose }: ThreadViewProps) 
                     setSize={total}
                     childCount={childCount}
                     postId={postId}
+                    // UX-5 (Robin audit) — sinaliza "chegou desde a abertura"
+                    // (ou último refresh). openedAt avança quando user clica
+                    // "+N novos", então o border-left some no próximo render.
+                    isNew={currentNode.created_at >= openedAt}
+                    // UX-11 (Robin audit) — tap no footer "↳ N respostas"
+                    // dispara descend; mantém swipe ↑ como gesture primário.
+                    onDescend={hasChild ? handleDescend : undefined}
                   />
                 </motion.div>
               </AnimatePresence>
@@ -300,9 +328,10 @@ export function ThreadView({ postId, postAuthorPub, onClose }: ThreadViewProps) 
           </SwipeHandler>
         )}
 
-        {/* FAB Reply */}
+        {/* FAB Reply — sempre responde ao cursor atual (UX-9: top-level
+            agora tem botão dedicado no header). */}
         <button
-          onClick={() => setReplyOpen(true)}
+          onClick={openReplyToCursor}
           className="absolute bottom-5 right-5 z-30 rounded-full border-2 border-drift-accent bg-drift-surface px-4 py-2 font-mono text-[11px] uppercase tracking-meta text-drift-accent shadow-lg hover:bg-drift-accent/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2"
           aria-label="responder este comentário"
           aria-keyshortcuts="Enter"
@@ -332,14 +361,24 @@ export function ThreadView({ postId, postAuthorPub, onClose }: ThreadViewProps) 
 
         {/* ReplySheet (Track C.4.4 Ted). Substitui ReplyPlaceholder
             quando user toca FAB ↵. Reply targetId default = current
-            comment (cursor.path.at(-1)); top-level = postId. */}
+            comment (cursor.path.at(-1)); top-level = postId.
+            UX-9 (Robin audit) — replyMode 'topLevel' força target = post
+            mesmo que cursor esteja em algum nó.
+            UX-3 (Robin audit) — ReplySheet faz snapshot interno desses
+            props ao abrir; mudanças de cursor durante typing não trocam
+            o destinatário silenciosamente. */}
         {(() => {
           const currentNodeId = cursor?.path.at(-1) ?? null
           const currentNodeForReply = currentNodeId ? index.byId.get(currentNodeId) : null
-          // Determine reply target: current comment se navegando, post se tree vazia
-          const replyTo = currentNodeId ?? postId
-          const replyToKind = currentNodeForReply ? 1111 : 9078
-          const replyToAuthorPub = currentNodeForReply?.author_pub ?? postAuthorPub
+          // Resolve target conforme modo:
+          //   'topLevel' → sempre o post
+          //   'cursor'   → comment atual (ou post se tree vazia)
+          const useTopLevel = replyMode === 'topLevel' || !currentNodeForReply
+          const replyTo = useTopLevel ? postId : currentNodeId!
+          const replyToKind = useTopLevel ? 9078 : 1111
+          const replyToAuthorPub = useTopLevel
+            ? postAuthorPub
+            : currentNodeForReply.author_pub
           return (
             <ReplySheet
               postId={postId}
@@ -348,7 +387,12 @@ export function ThreadView({ postId, postAuthorPub, onClose }: ThreadViewProps) 
               replyToKind={replyToKind}
               replyToAuthorPub={replyToAuthorPub}
               open={replyOpen}
-              onClose={() => setReplyOpen(false)}
+              onClose={() => {
+                setReplyOpen(false)
+                // UX-9: reset modo pra default 'cursor' no próximo abrir,
+                // a menos que call site explicite o contrário.
+                setReplyMode('cursor')
+              }}
             />
           )
         })()}

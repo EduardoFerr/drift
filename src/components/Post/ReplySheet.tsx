@@ -77,6 +77,37 @@ export function validateCommentText(raw: string): ValidateCommentResult {
   return { ok: true, trimmed }
 }
 
+// ─── UX-3 helper (testável) ──────────────────────────────────────────
+
+/**
+ * Snapshot do destinatário do reply. Capturado ao **abrir** a sheet
+ * (open false→true) e mantido até o **fechamento**, mesmo que o cursor
+ * pai mude live (ex: comment moderado → cursor truncate; navegação
+ * acidental do user). UX-3 (Robin audit 2026-05-08).
+ */
+export interface ReplyTargetSnapshot {
+  replyTo: string
+  replyToKind: number
+  replyToAuthorPub: string
+}
+
+/**
+ * Resolve qual target o `commentOnPost` vai usar.
+ *
+ * Regra (UX-3): se o snapshot existe (sheet está aberta com captura),
+ * usa o snapshot. Senão (sheet fechada / nunca abriu / falha defensiva)
+ * cai pros props live.
+ *
+ * Pura, sem React, sem effects. Test cobre o invariante: snapshot
+ * vence sobre live mesmo quando os 3 campos divergem completamente.
+ */
+export function resolveReplyTarget(
+  snapshot: ReplyTargetSnapshot | null,
+  live: ReplyTargetSnapshot,
+): ReplyTargetSnapshot {
+  return snapshot ?? live
+}
+
 // ─── Component ────────────────────────────────────────────────────────
 
 export interface ReplySheetProps {
@@ -135,6 +166,16 @@ export function ReplySheet({
   // imagem. Injetada no imeta NIP-94 antes de commentOnPost.
   const [imageAlt, setImageAlt] = useState('')
 
+  // UX-3 (Robin audit 2026-05-08) — snapshot do destinatário capturado
+  // ao abrir. Defesa contra mudança silenciosa do cursor pai durante
+  // typing (comment moderado → cursor truncate; navegação acidental).
+  // Sem isso, user que digitou 200 chars de reply pra @alice pode
+  // descobrir, ao publicar, que respondeu pro parent de @alice.
+  // Reset → null toda vez que sheet fecha (open=false).
+  // State (não ref) pq o header "para X" precisa re-renderizar quando
+  // o snapshot é capturado.
+  const [targetSnapshot, setTargetSnapshot] =
+    useState<ReplyTargetSnapshot | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const sheetRef = useRef<HTMLDivElement | null>(null)
   const restoreFocusRef = useRef<HTMLElement | null>(null)
@@ -157,6 +198,9 @@ export function ReplySheet({
   }, [])
 
   // Reset state quando reabre (evita flash do estado anterior).
+  // UX-3 (Robin audit) — captura snapshot dos targets ao abrir; limpa
+  // ao fechar. Effect roda em ambas transitions (open=true e open=false)
+  // pra manter a invariante "sheet fechada = snapshot null".
   useEffect(() => {
     if (open) {
       setText('')
@@ -167,10 +211,22 @@ export function ReplySheet({
       setUploading(false)
       setUploadError(null)
       setImageAlt('')
+      // UX-3: snapshot agora. Lê props NOW e congela; doPublish + header
+      // usam isso até o close. NB: deps do useEffect são só [open], então
+      // mudanças nos props não disparam re-snapshot (intencional).
+      setTargetSnapshot({
+        replyTo,
+        replyToKind,
+        replyToAuthorPub,
+      })
       // Captura elemento ativo no momento do open pra restaurar on close.
       restoreFocusRef.current =
         (typeof document !== 'undefined' && (document.activeElement as HTMLElement)) || null
+    } else {
+      // UX-3: limpa snapshot pra próximo abrir capturar fresh.
+      setTargetSnapshot(null)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
   // C.6.3 — handler de upload. Mesmo pattern de ComposeOverlay.handleFile.
@@ -255,12 +311,20 @@ export function ReplySheet({
       const finalImeta = blobMeta
         ? { ...blobMeta, ...(imageAlt.trim() ? { alt: imageAlt.trim() } : {}) }
         : null
+      // UX-3 (Robin audit) — usa snapshot capturado ao open. Se snapshot
+      // é null (defesa: open=true mas effect ainda não rodou), cai pros
+      // props live. resolveReplyTarget é puro + testado.
+      const target = resolveReplyTarget(targetSnapshot, {
+        replyTo,
+        replyToKind,
+        replyToAuthorPub,
+      })
       await commentOnPost({
         postId,
         postAuthorPub,
-        replyTo,
-        replyToKind: String(replyToKind),
-        replyToAuthorPub,
+        replyTo: target.replyTo,
+        replyToKind: String(target.replyToKind),
+        replyToAuthorPub: target.replyToAuthorPub,
         text: publishText,
         contentWarning: contentWarning ?? undefined,
         imetas: finalImeta ? [finalImeta] : undefined,
@@ -286,6 +350,7 @@ export function ReplySheet({
     replyTo,
     replyToKind,
     replyToAuthorPub,
+    targetSnapshot,
     contentWarning,
     blobMeta,
     imageAlt,
@@ -392,7 +457,16 @@ export function ReplySheet({
                   responder
                 </h2>
                 <p className="mt-1 truncate font-mono text-[10px] text-drift-muted">
-                  para {shortNpub(replyToAuthorPub)}
+                  para {shortNpub(
+                    /* UX-3: header reflete o snapshot, não o cursor live.
+                       Mantém consistência com o destinatário que vai ser
+                       usado no doPublish. */
+                    (targetSnapshot ?? {
+                      replyTo,
+                      replyToKind,
+                      replyToAuthorPub,
+                    }).replyToAuthorPub,
+                  )}
                 </p>
               </div>
               <button

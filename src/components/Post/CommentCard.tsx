@@ -35,6 +35,21 @@ export interface CommentCardProps {
   childCount: number
   /** ID do post raiz — só pra debug/title. */
   postId: string
+  /**
+   * UX-5 (Robin audit 2026-05-08) — `true` se este comment chegou desde
+   * que ThreadView abriu (ou desde último refresh do "+N novos"). Quando
+   * `true`, render border-left mint. Some naturalmente quando `openedAt`
+   * avança no próximo refresh/reabertura.
+   */
+  isNew?: boolean
+  /**
+   * UX-11 (Robin audit 2026-05-08) — callback opcional pro footer
+   * "↳ N respostas" virar tap-to-descend. Mantém swipe ↑ como input
+   * primário; este só adiciona alternativa pra users que não conhecem
+   * o gesto. Quando `undefined`, footer renderiza como texto estático
+   * (compat com qualquer caller que não esteja em ThreadView).
+   */
+  onDescend?: () => void
 }
 
 export function CommentCard({
@@ -44,6 +59,8 @@ export function CommentCard({
   setSize,
   childCount,
   postId,
+  isNew = false,
+  onDescend,
 }: CommentCardProps) {
   // fix: CC-B2 moderation override (Track C debt) — states separados pra
   // moderação (score<=-999) e CW. Compartilhar um mesmo override fazia o
@@ -87,7 +104,13 @@ export function CommentCard({
       aria-label={ariaLabel}
       tabIndex={0}
       {...debugProps}
-      className="flex h-full w-full flex-col bg-drift-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2"
+      // UX-5 (Robin audit) — border-left mint quando isNew sinaliza
+      // "chegou desde abertura/refresh". Aplicado via classe condicional
+      // pra evitar shift do conteúdo (border-l-2 sempre presente: cor
+      // alterna entre transparente e drift-accent2).
+      className={`flex h-full w-full flex-col bg-drift-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2 border-l-2 ${
+        isNew ? 'border-l-drift-accent2' : 'border-l-transparent'
+      }`}
     >
       {/* Header: autor + tempo + content-warning chip (C.6.2) */}
       <header className="flex items-center justify-between gap-2 border-b border-drift-border px-4 py-3">
@@ -191,19 +214,42 @@ export function CommentCard({
         </AnimatePresence>
       </div>
 
-      {/* Footer meta — childCount = hint pra descend */}
+      {/* Footer meta — childCount = hint pra descend.
+          UX-11 (Robin audit) — vira <button> tappable quando há filhos
+          E o caller passou onDescend. Mantém swipe ↑ (gesto primário);
+          tap é input alternativo pra users que não conhecem o gesto. */}
       <footer className="flex items-center justify-between border-t border-drift-border px-4 py-2.5">
-        <span className="font-mono text-[10px] uppercase tracking-meta text-drift-muted">
-          ↳ {childCount} {childCount === 1 ? 'resposta' : 'respostas'}
-        </span>
-        {childCount > 0 && (
-          <span
-            className="font-mono text-[10px] uppercase tracking-meta text-drift-accent2"
-            title="swipe ↑ pra descer na thread"
-            aria-hidden="true"
+        {childCount > 0 && onDescend ? (
+          <button
+            type="button"
+            onClick={onDescend}
+            className="flex items-center gap-2 rounded font-mono text-[10px] uppercase tracking-meta text-drift-accent2 hover:text-drift-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2"
+            aria-label={`ver ${childCount} ${childCount === 1 ? 'resposta' : 'respostas'} (ou swipe para cima)`}
+            aria-keyshortcuts="ArrowUp"
+            title="ver respostas (toque ou swipe ↑)"
           >
-            ↑ ver
-          </span>
+            <span>
+              ↳ {childCount} {childCount === 1 ? 'resposta' : 'respostas'}
+            </span>
+            <span aria-hidden="true" className="text-drift-accent2/80">
+              ↑ ver
+            </span>
+          </button>
+        ) : (
+          <>
+            <span className="font-mono text-[10px] uppercase tracking-meta text-drift-muted">
+              ↳ {childCount} {childCount === 1 ? 'resposta' : 'respostas'}
+            </span>
+            {childCount > 0 && (
+              <span
+                className="font-mono text-[10px] uppercase tracking-meta text-drift-accent2"
+                title="swipe ↑ pra descer na thread"
+                aria-hidden="true"
+              >
+                ↑ ver
+              </span>
+            )}
+          </>
         )}
       </footer>
     </article>
