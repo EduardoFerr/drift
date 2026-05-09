@@ -27,7 +27,9 @@
  *
  * HEURISTIC title/body split: subpost.text não tem campo title
  * separado. Synthesis determinística (§7):
- *   - text vazio          → title='(sem texto)', body=''
+ *   - text vazio          → title='', body='' (subpost só com imagem
+ *                           não mostra label "(sem texto)" — UX preserva
+ *                           card limpo, deixa só a imagem falar)
  *   - text 1 linha curta  → title=text, body=''
  *   - text com '\n'       → title=primeira linha, body=resto
  *   - text long sem \n    → title=primeira frase (split '. '),
@@ -125,7 +127,11 @@ export function splitTitleBody(text: string | null): {
   title: string
   body: string
 } {
-  if (!text || !text.trim()) return { title: '(sem texto)', body: '' }
+  // Subpost sem texto (só imagem, p.ex.) — retorna empty pra que
+  // SubpostLayout não renderize título placeholder. User feedback
+  // 2026-05-08: "Quando tiver imagem mas não houver texto, nao deve
+  // aparecer essa label (sem texto)".
+  if (!text || !text.trim()) return { title: '', body: '' }
   const trimmed = text.trim()
 
   // 1. Newline divide?
@@ -314,6 +320,7 @@ function PortraitLayout({
           position="top"
           className="block h-full w-full"
           aspect="auto"
+          lightbox
         />
       </div>
 
@@ -384,6 +391,7 @@ function LandscapeLayout({
           position="top"
           className="block h-full w-full"
           aspect="auto"
+          lightbox
         />
       </div>
       {/* Card de cima: gradient é o bg do card de texto — dots e texto

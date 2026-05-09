@@ -67,29 +67,34 @@ export function FeedTabs({ onActiveTabTap }: FeedTabsProps = {}) {
   // V9.3c — flex-1 + text-center (mockup .tab pattern). Cada tab ocupa
   // 1/3 da largura da row, texto centralizado. Antes: gap-1 + px-2
   // (inline width baseado no texto, alinhamento à esquerda).
+  // User feedback 2026-05-08: "para cada aba" — indicador de unseen
+  // visível em CADA tab (não só na ativa via botão ↻). Permite user
+  // saber que Following/Trending tem novo sem switchar pra confirmar.
+  const tabs: { id: FeedTab; label: string }[] = [
+    { id: 'global', label: 'global' },
+    { id: 'following', label: 'seguindo' },
+    { id: 'trending', label: 'trending' },
+  ]
+
   return (
     <div className="flex items-stretch font-mono text-[10px] uppercase tracking-[2px]">
-      <FeedTabBtn
-        active={tab === 'global'}
-        onClick={() => handleTabClick('global')}
-        title={tab === 'global' ? 'voltar ao topo' : undefined}
-      >
-        global
-      </FeedTabBtn>
-      <FeedTabBtn
-        active={tab === 'following'}
-        onClick={() => handleTabClick('following')}
-        title={tab === 'following' ? 'voltar ao topo' : undefined}
-      >
-        seguindo
-      </FeedTabBtn>
-      <FeedTabBtn
-        active={tab === 'trending'}
-        onClick={() => handleTabClick('trending')}
-        title={tab === 'trending' ? 'voltar ao topo' : undefined}
-      >
-        trending
-      </FeedTabBtn>
+      {tabs.map((t) => (
+        <FeedTabBtn
+          key={t.id}
+          active={tab === t.id}
+          unseen={unseenByTab[t.id]}
+          onClick={() => handleTabClick(t.id)}
+          title={
+            tab === t.id
+              ? 'voltar ao topo'
+              : unseenByTab[t.id] > 0
+              ? `${unseenByTab[t.id]} ${unseenByTab[t.id] === 1 ? 'novo' : 'novos'}`
+              : undefined
+          }
+        >
+          {t.label}
+        </FeedTabBtn>
+      ))}
       <button
         onClick={() => void handleRefresh()}
         disabled={refreshing}
@@ -127,11 +132,14 @@ export function FeedTabs({ onActiveTabTap }: FeedTabsProps = {}) {
 
 function FeedTabBtn({
   active,
+  unseen = 0,
   onClick,
   children,
   title,
 }: {
   active: boolean
+  /** Count de posts novos na tab (qualquer tab — ativa ou não). */
+  unseen?: number
   onClick: () => void
   children: ReactNode
   title?: string
@@ -147,7 +155,19 @@ function FeedTabBtn({
       }`}
       aria-pressed={active}
     >
-      {children}
+      <span className="relative inline-block">
+        {children}
+        {/* Dot indicator pra unseen — visível em qualquer tab que tenha
+            novo (ativa ou não). Posicionado top-right do label sem
+            empurrar layout. Cor chartreuse pra contrastar com muted/text. */}
+        {unseen > 0 && (
+          <span
+            aria-hidden="true"
+            aria-label={`${unseen} ${unseen === 1 ? 'novo' : 'novos'}`}
+            className="absolute -right-2 -top-1 h-[6px] w-[6px] rounded-full bg-drift-accent"
+          />
+        )}
+      </span>
       {active && (
         <motion.span
           layoutId="feed-tab-indicator"
