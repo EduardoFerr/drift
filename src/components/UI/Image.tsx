@@ -17,8 +17,8 @@
  * fica leve (sem importar Helia até hover/scroll-into-view).
  */
 
-import { useEffect, useState } from 'react'
-import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import type { KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent } from 'react'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import type { BlobMeta } from '../../lib/nip94'
 import {
@@ -83,6 +83,31 @@ export function Image({
 }: ImageProps) {
   const [state, setState] = useState<'loading' | 'loaded' | 'error'>('loading')
   const [lightboxOpen, setLightboxOpen] = useState(false)
+  // Manual double-tap detection — `ondblclick` em mobile é não-confiável
+  // (varia por engine/keyboard show, fica preso no 300ms tap delay e
+  // alguns browsers não disparam quando os 2 taps usam pointers
+  // distintos). User feedback 2026-05-09: "no mobile o duplo click
+  // parece nao funcionar". Solução: trackeio o timestamp do último
+  // pointerup; se o próximo cair dentro de 350ms na mesma região,
+  // abro lightbox. Funciona em desktop + touch sem depender de dblclick.
+  const lastTapRef = useRef<{ t: number; x: number; y: number } | null>(null)
+  const DOUBLE_TAP_MS = 350
+  const DOUBLE_TAP_SLOP_PX = 32
+  function handlePointerUp(e: ReactPointerEvent<HTMLElement>) {
+    const now = performance.now()
+    const last = lastTapRef.current
+    if (
+      last &&
+      now - last.t <= DOUBLE_TAP_MS &&
+      Math.abs(e.clientX - last.x) <= DOUBLE_TAP_SLOP_PX &&
+      Math.abs(e.clientY - last.y) <= DOUBLE_TAP_SLOP_PX
+    ) {
+      lastTapRef.current = null
+      setLightboxOpen(true)
+      return
+    }
+    lastTapRef.current = { t: now, x: e.clientX, y: e.clientY }
+  }
   // Track B.2 — quando meta está presente e tem cid|hash, tenta resolver
   // via blobs.fetchBlobUrl (Helia + verify). Senão, usa src direto.
   const [resolvedSrc, setResolvedSrc] = useState<string>(src)
@@ -155,6 +180,11 @@ export function Image({
     lightbox && state === 'loaded'
       ? {
           type: 'button' as const,
+          onPointerUp: handlePointerUp,
+          // onDoubleClick mantido como fallback pra desktop em casos
+          // onde pointerup não dispara (drag-then-release fora do
+          // elemento) — não conflita pq nosso handler manual já abre
+          // antes em cenário normal.
           onDoubleClick: () => setLightboxOpen(true),
           onKeyDown: (e: ReactKeyboardEvent) => {
             if (e.key === 'Enter' || e.key === ' ') {
