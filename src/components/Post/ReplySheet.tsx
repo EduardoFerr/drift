@@ -11,7 +11,8 @@
  * Comportamento:
  *  - Sheet sobe de baixo (translateY 100% → 0) com framer-motion;
  *    backdrop drift-bg/60 backdrop-blur fica atrás (toca pra fechar).
- *  - Drag-down dismiss (>= 80px) com `dragConstraints` framer-motion.
+ *  - Drag-down dismiss (>= DRAG_DISMISS_THRESHOLD_PX) com
+ *    `dragConstraints` framer-motion.
  *  - Esc fecha; Cmd/Ctrl+Enter publica.
  *  - prefers-reduced-motion: desabilita translate, mantém fade.
  *  - role="dialog" aria-modal="true"; focus na textarea on open;
@@ -34,7 +35,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { nip19 } from 'nostr-tools'
-import { commentOnPost, COMMENT_MAX_CHARS } from '../../lib/protocol'
+import {
+  commentOnPost,
+  COMMENT_MAX_CHARS,
+  COMMENT_IMAGE_ONLY_PLACEHOLDER,
+} from '../../lib/protocol'
 import { uploadBlob, BlobError } from '../../lib/blobs'
 import { UploadError } from '../../lib/upload'
 import type { BlobMeta } from '../../lib/nip94'
@@ -103,6 +108,9 @@ function shortNpub(pubHex: string): string {
 }
 
 const HEADER_ID = 'drift-reply-sheet-header'
+
+/** Threshold pra drag-down dismissar sheet — design-comments.md §10. */
+const DRAG_DISMISS_THRESHOLD_PX = 80
 
 export function ReplySheet({
   postId,
@@ -222,15 +230,15 @@ export function ReplySheet({
   const doPublish = useCallback(async () => {
     if (pending || uploading) return
     // Permite reply só-imagem (validation só falha se texto + imagem
-    // ambos vazios). Quando texto vazio mas blob presente, usamos um
-    // espaço como content (NIP-22 não exige específico, mas Drift exige
-    // content non-empty no schema check). Idiomatic: "📎" placeholder.
+    // ambos vazios). Quando texto vazio mas blob presente, usamos
+    // COMMENT_IMAGE_ONLY_PLACEHOLDER (NIP-22 não exige content
+    // específico, mas Drift schema check exige non-empty).
     const validated = validateCommentText(text)
     let publishText = ''
     if (validated.ok) {
       publishText = validated.trimmed!
     } else if (blobMeta && (validated.reason === 'empty' || validated.reason === 'whitespace')) {
-      publishText = '📎' // placeholder mínimo pra schema check passar
+      publishText = COMMENT_IMAGE_ONLY_PLACEHOLDER
     } else {
       if (validated.reason === 'empty' || validated.reason === 'whitespace') {
         setError('escreve algo antes de publicar')
@@ -355,12 +363,12 @@ export function ReplySheet({
             exit={sheetExit}
             transition={{ duration: 0.22, ease: 'easeOut' }}
             // Drag pra baixo dismissa. dragElastic baixo pra feel preso;
-            // onDragEnd avalia threshold de 80px pra fechar.
+            // onDragEnd avalia DRAG_DISMISS_THRESHOLD_PX pra fechar.
             drag={reducedMotion ? false : 'y'}
             dragConstraints={{ top: 0, bottom: 0 }}
             dragElastic={{ top: 0, bottom: 0.4 }}
             onDragEnd={(_, info) => {
-              if (info.offset.y > 80 && !pending) onClose()
+              if (info.offset.y > DRAG_DISMISS_THRESHOLD_PX && !pending) onClose()
             }}
             className="flex max-h-[85dvh] w-full max-w-md flex-col overflow-hidden rounded-t-2xl border border-b-0 border-drift-border bg-drift-surface"
             onClick={(e) => e.stopPropagation()}

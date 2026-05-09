@@ -22,7 +22,7 @@
 
 import { create } from 'zustand'
 import { db } from './db'
-import { onNostrEvent } from './events'
+import { onNostrEvent, NIP22_COMMENT_KIND } from './events'
 import { orchestrator } from './transport/orchestrator'
 import type { Unsubscribe } from './transport'
 import type { CommentRecord } from '../types/drift'
@@ -35,12 +35,6 @@ import {
 import { parseImetaTags } from './nip94'
 
 // ─── Constantes ──────────────────────────────────────────────────────
-
-/**
- * Kind NIP-22 — duplicado aqui pra evitar import circular com events.ts.
- * Single source of truth segue em events.ts:NIP22_COMMENT_KIND.
- */
-const NIP22_COMMENT_KIND = 1111
 
 /**
  * Hard cap no SELECT inicial — Barney HIGH #2 (design-comments §5.2).
@@ -353,11 +347,18 @@ function makeReleaseFn(postId: string): Unsubscribe {
   }
 }
 
+// ─── Test helpers (DEV/test only) ─────────────────────────────────────
+// Gate de body via `import.meta.env.DEV` — em build de produção (`vite
+// build` com NODE_ENV=production) o body vira no-op e Terser elimina
+// `activeSubs.size`/`Map.values()` mortos. Tests rodam em `vitest` que
+// força DEV=true, então `tests/comments-store.test.ts` continua igual.
+
 /**
  * Test helper — número de REQs ativas. Não usar em produção.
  * Exposto pra `tests/comments-store.test.ts` validar refcount.
  */
 export function _activeSubCount(): number {
+  if (!import.meta.env.DEV) return 0
   return activeSubs.size
 }
 
@@ -366,6 +367,7 @@ export function _activeSubCount(): number {
  * tem REQ ativa.
  */
 export function _refcountOf(postId: string): number | undefined {
+  if (!import.meta.env.DEV) return undefined
   return activeSubs.get(postId)?.refcount
 }
 
@@ -374,6 +376,7 @@ export function _refcountOf(postId: string): number | undefined {
  * tests pra isolamento. Chama unsubscribe de cada uma.
  */
 export function _resetSubsForTest(): void {
+  if (!import.meta.env.DEV) return
   for (const ref of activeSubs.values()) {
     try {
       ref.unsubscribe()

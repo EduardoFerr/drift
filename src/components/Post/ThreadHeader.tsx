@@ -61,20 +61,37 @@ export function ThreadHeader({
           {breadcrumb.length === 0 ? (
             <span className="text-drift-muted">comentários</span>
           ) : (
-            breadcrumb.map((label, i) => (
-              <span key={i} className="flex items-center gap-1">
-                {i > 0 && <span className="text-drift-muted/60">›</span>}
-                <span
-                  className={
-                    i === breadcrumb.length - 1
-                      ? 'text-drift-text'
-                      : 'text-drift-muted'
-                  }
-                >
-                  {label}
+            breadcrumb.map((label, i) => {
+              // TH-T1 cleanup: chave por id estável quando possível.
+              // Caso truncado (path > 4 → [first, …, second-last, last]):
+              // separator '…' não tem path correspondente → fallback id.
+              const path = cursor?.path ?? []
+              const truncated = path.length > 4
+              const stableId = truncated
+                ? i === 0
+                  ? path[0]
+                  : i === 1
+                    ? '__sep__'
+                    : i === 2
+                      ? path[path.length - 2]
+                      : path[path.length - 1]
+                : path[i]
+              const key = `${stableId ?? i}:${i}`
+              return (
+                <span key={key} className="flex items-center gap-1">
+                  {i > 0 && <span className="text-drift-muted/60">›</span>}
+                  <span
+                    className={
+                      i === breadcrumb.length - 1
+                        ? 'text-drift-text'
+                        : 'text-drift-muted'
+                    }
+                  >
+                    {label}
+                  </span>
                 </span>
-              </span>
-            ))
+              )
+            })
           )}
         </div>
 

@@ -31,6 +31,7 @@ import { pinPost, unpinPost } from '../../lib/cache'
 import { block, mute } from '../../lib/moderation-local'
 import { follow, unfollow, useFollowsStore } from '../../lib/follows'
 import { db } from '../../lib/db'
+import { timeAgo } from '../../lib/format'
 import { SwipeHandler } from './SwipeHandler'
 import { SubpostCarousel } from './SubpostCarousel'
 import { ReportModal } from './ReportModal'
@@ -849,11 +850,3 @@ const EXIT_VARIANTS = {
   down: { y: '110%', opacity: 0, scale: 0.95 },
   none: { opacity: 0 },
 } as const
-
-function timeAgo(unixSeconds: number): string {
-  const diff = Math.floor(Date.now() / 1000) - unixSeconds
-  if (diff < 60) return `${diff}s`
-  if (diff < 3600) return `${Math.floor(diff / 60)}min`
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h`
-  return `${Math.floor(diff / 86400)}d`
-}

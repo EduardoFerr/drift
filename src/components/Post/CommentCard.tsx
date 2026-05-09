@@ -20,6 +20,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import type { CommentNode } from '../../lib/thread-cursor'
 import { applyContentFiltersComment } from '../../lib/feed'
 import { usePrefsStore } from '../../lib/prefs'
+import { timeAgo } from '../../lib/format'
 import { Image } from '../UI/Image'
 
 export interface CommentCardProps {
@@ -74,6 +75,9 @@ export function CommentCard({
   // Title pra debug acessível por screen reader
   const ariaLabel = `comment de ${truncate(node.author_pub)}, nível ${depth}, ${posInSet} de ${setSize}, ${childCount} respostas`
 
+  // CC-T2 cleanup: data-post-id é só pra debug; só anexa em DEV.
+  const debugProps = import.meta.env.DEV ? { 'data-post-id': postId } : {}
+
   return (
     <article
       role="treeitem"
@@ -82,7 +86,7 @@ export function CommentCard({
       aria-setsize={setSize}
       aria-label={ariaLabel}
       tabIndex={0}
-      data-post-id={postId}
+      {...debugProps}
       className="flex h-full w-full flex-col bg-drift-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2"
     >
       {/* Header: autor + tempo + content-warning chip (C.6.2) */}
@@ -253,12 +257,4 @@ function HiddenPlaceholder({ onReveal }: { onReveal: () => void }) {
 function truncate(pub: string): string {
   if (pub.length <= 8) return pub
   return '…' + pub.slice(-6)
-}
-
-function timeAgo(unixSeconds: number): string {
-  const diff = Math.floor(Date.now() / 1000) - unixSeconds
-  if (diff < 60) return `${diff}s`
-  if (diff < 3600) return `${Math.floor(diff / 60)}min`
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h`
-  return `${Math.floor(diff / 86400)}d`
 }

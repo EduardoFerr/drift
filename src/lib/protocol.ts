@@ -195,6 +195,14 @@ const NIP22_COMMENT_KIND = 1111
 /** Cap em chars de content de comment (Drift convention). */
 export const COMMENT_MAX_CHARS = 1000
 
+/**
+ * Placeholder mínimo usado quando reply é só-imagem (texto vazio + blob).
+ * NIP-22 não exige content específico, mas o Drift schema check exige
+ * content non-empty. Este símbolo passa o check e é convencionalmente
+ * exibido pra leitores como "anexo" — comportamento idiomático.
+ */
+export const COMMENT_IMAGE_ONLY_PLACEHOLDER = '📎'
+
 export interface CommentOnPostInput {
   /** event.id hex 64 do post raiz (kind 9078 Drift). */
   postId: string

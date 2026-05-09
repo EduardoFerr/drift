@@ -66,11 +66,16 @@ export function compareComments(
   return a.id < b.id ? -1 : a.id > b.id ? 1 : 0
 }
 
-/** Lista de irmãos do nó atual no contexto do `postId`. */
+/**
+ * Lista de irmãos do nó atual.
+ *
+ * NB: `postId` foi removido — em práticа o lookup é puramente local ao
+ * `index` (parent → children). Cross-post sibling não existe na spec
+ * atual; se algum dia introduzirmos, basta reintroduzir o param.
+ */
 function siblingsOf(
   cursor: ThreadCursor,
   index: ThreadIndex,
-  postId: string,
 ): string[] {
   if (cursor.path.length === 1) {
     // top-level: siblings = roots
@@ -78,9 +83,6 @@ function siblingsOf(
   }
   const parentId = cursor.path[cursor.path.length - 2]!
   return index.childrenOf.get(parentId) ?? []
-  // postId não usado aqui — preservado na assinatura pra futura expansão
-  // (ex.: validação cross-post). Silencia lint:
-  void postId
 }
 
 // ─── Operations ──────────────────────────────────────────────────────
@@ -92,10 +94,11 @@ function siblingsOf(
 export function nextSibling(
   cursor: ThreadCursor,
   index: ThreadIndex,
-  postId: string,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _postId?: string, // reserved for future cross-post sibling — see siblingsOf
 ): ThreadCursor | null {
   if (cursor.path.length === 0) return null
-  const siblings = siblingsOf(cursor, index, postId)
+  const siblings = siblingsOf(cursor, index)
   const currentId = cursor.path[cursor.path.length - 1]!
   const i = siblings.indexOf(currentId)
   if (i < 0 || i >= siblings.length - 1) return null
@@ -110,10 +113,11 @@ export function nextSibling(
 export function prevSibling(
   cursor: ThreadCursor,
   index: ThreadIndex,
-  postId: string,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _postId?: string, // reserved for future cross-post sibling — see siblingsOf
 ): ThreadCursor | null {
   if (cursor.path.length === 0) return null
-  const siblings = siblingsOf(cursor, index, postId)
+  const siblings = siblingsOf(cursor, index)
   const currentId = cursor.path[cursor.path.length - 1]!
   const i = siblings.indexOf(currentId)
   if (i <= 0) return null

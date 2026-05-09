@@ -16,22 +16,7 @@
  */
 
 import type { Post } from '../../types/drift'
-
-/**
- * Helper local — formatador "tempo atrás" simples (s/min/h/d).
- *
- * Drift tem ≥3 cópias de timeAgo (App.tsx, PostViewer.tsx,
- * LocalListsSettings.tsx) com signatures diferentes (segundos vs ms).
- * Consolidar é trabalho separado (Lily débito documentado);
- * este componente mantém versão segundos compatível com Post.createdAt.
- */
-function timeAgo(unixSeconds: number): string {
-  const diff = Math.floor(Date.now() / 1000) - unixSeconds
-  if (diff < 60) return `${diff}s`
-  if (diff < 3600) return `${Math.floor(diff / 60)}min`
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h`
-  return `${Math.floor(diff / 86400)}d`
-}
+import { timeAgo } from '../../lib/format'
 
 export function PostCard({
   post,

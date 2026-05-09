@@ -30,8 +30,10 @@ vi.mock('../src/lib/transport/orchestrator', () => ({
 }))
 
 // Mock onNostrEvent — isolamos o store do pipeline real.
+// NIP22_COMMENT_KIND re-exposto pq comments.ts agora importa daqui (CM-T1 dedupe).
 vi.mock('../src/lib/events', () => ({
   onNostrEvent: vi.fn(async () => {}),
+  NIP22_COMMENT_KIND: 1111,
 }))
 
 import {

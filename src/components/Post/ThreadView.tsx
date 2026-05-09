@@ -335,11 +335,11 @@ export function ThreadView({ postId, postAuthorPub, onClose }: ThreadViewProps) 
             comment (cursor.path.at(-1)); top-level = postId. */}
         {(() => {
           const currentNodeId = cursor?.path.at(-1) ?? null
-          const currentNode = currentNodeId ? index.byId.get(currentNodeId) : null
+          const currentNodeForReply = currentNodeId ? index.byId.get(currentNodeId) : null
           // Determine reply target: current comment se navegando, post se tree vazia
           const replyTo = currentNodeId ?? postId
-          const replyToKind = currentNode ? 1111 : 9078
-          const replyToAuthorPub = currentNode?.author_pub ?? postAuthorPub
+          const replyToKind = currentNodeForReply ? 1111 : 9078
+          const replyToAuthorPub = currentNodeForReply?.author_pub ?? postAuthorPub
           return (
             <ReplySheet
               postId={postId}
@@ -420,6 +420,3 @@ function CoachContent() {
     </div>
   )
 }
-
-// (ReplyPlaceholder removido — substituído por <ReplySheet> de Ted no
-// merge C.4.4. Importado de './ReplySheet' no topo do arquivo.)
