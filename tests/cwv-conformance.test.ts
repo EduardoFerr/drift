@@ -216,8 +216,10 @@ describe('CWV conformance — bundle size budget + dist artifacts', () => {
               `  Assets contados: ${[...initialAssets].join(', ')}`,
           )
         }
-        // SOFT — TODO(cwv-1): hard expect.
+        // HARD desde Round Cleanup (Robin CWV-3 final): medido 761 KB ≤ 800 KB.
+        // Regression aqui = vendor split quebrou ou novo asset eager entrou.
         expect(total).toBeGreaterThan(0)
+        expect(total).toBeLessThanOrEqual(TOTAL_INITIAL_TRANSFER_BUDGET)
       },
     )
   })
@@ -235,19 +237,10 @@ describe('CWV conformance — bundle size budget + dist artifacts', () => {
 
     // robots.txt: bom-ter pra crawlers (Googlebot indexa app, mas
     // /api e /assets podem ser disallowed pra economizar crawl budget).
-    // SOFT por enquanto — adicionar `public/robots.txt` é trivial mas
-    // não é blocker.
-    it.skipIf(!inspection.hasDist)('robots.txt presente em dist/ (soft — informativo)', () => {
-      const hasRobots = existsSync(join(DIST, 'robots.txt'))
-      if (!hasRobots) {
-        // eslint-disable-next-line no-console
-        console.warn(
-          '[cwv-conformance][S3-soft] dist/robots.txt ausente. ' +
-            'Adicionar `public/robots.txt` pra explicitar policy de crawl.',
-        )
-      }
-      // SOFT — TODO(cwv-1): hard expect quando public/robots.txt landed.
-      expect(true).toBe(true)
+    // HARD desde Round Cleanup (Robin CWV-3 final): public/robots.txt
+    // shippado por Marshall, copiado pra dist/ pelo Vite public dir.
+    it.skipIf(!inspection.hasDist)('robots.txt presente em dist/', () => {
+      expect(existsSync(join(DIST, 'robots.txt'))).toBe(true)
     })
   })
 })

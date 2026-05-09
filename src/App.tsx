@@ -1487,7 +1487,7 @@ function EndOfFeed({
         <h2 className="font-display text-xl font-bold leading-title tracking-title text-drift-text">
           Você viu tudo por aqui.
         </h2>
-        <p className="max-w-prose font-mono text-[11px] leading-relaxed text-slate-400">
+        <p className="max-w-prose font-mono text-[11px] leading-relaxed text-drift-muted">
           Posts novos chegam continuamente via relays. Atualize pra
           checar agora, ou volte pro topo pra reler o feed atual —
           manifesto §6 (verdade por eventos).
@@ -1502,7 +1502,7 @@ function EndOfFeed({
           </button>
           <button
             onClick={onJumpToTop}
-            className="rounded border border-drift-border px-4 py-2.5 font-mono text-[10px] uppercase tracking-meta text-slate-400 transition-colors hover:border-drift-text hover:text-drift-text focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2"
+            className="rounded border border-drift-border px-4 py-2.5 font-mono text-[10px] uppercase tracking-meta text-drift-muted transition-colors hover:border-drift-text hover:text-drift-text focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2"
           >
             ↑ voltar pro topo
           </button>
@@ -1921,7 +1921,7 @@ function InstallModal({
         {kind === 'ios-safari' ? (
           <>
             {showIosHelp && (
-              <ol className="mb-4 list-decimal space-y-2 pl-5 text-[12px] text-slate-300">
+              <ol className="mb-4 list-decimal space-y-2 pl-5 text-[12px] text-drift-text">
                 <li>
                   Toque no botão <strong>Compartilhar</strong> (quadrado com
                   seta) na barra do Safari
@@ -2226,7 +2226,7 @@ function DiagnosticPanel({ boot }: { boot: BootState }) {
   const relaysTotal = boot.relays?.length ?? '?'
   return (
     <div className="space-y-4">
-      <p className="font-mono text-[11px] leading-relaxed text-slate-400">
+      <p className="font-mono text-[11px] leading-relaxed text-drift-muted">
         Estado do cliente em tempo real. Use os botões abaixo se UI parecer
         stale ou eventos pararem de chegar.
       </p>
@@ -2236,7 +2236,7 @@ function DiagnosticPanel({ boot }: { boot: BootState }) {
         <Row
           label="sync"
           value={`${sync.active ? '● ativo' : '○ inativo'} · cursor ${sync.cursor}`}
-          valueClass={sync.active ? 'text-drift-spread' : 'text-slate-400'}
+          valueClass={sync.active ? 'text-drift-spread' : 'text-drift-muted'}
         />
         <Row label="eventos recebidos" value={String(sync.eventsReceived)} />
         <Row label="relays ok" value={`${relaysOk}/${relaysTotal}`} />
@@ -2255,7 +2255,7 @@ function DiagnosticPanel({ boot }: { boot: BootState }) {
         <button
           onClick={handleRefresh}
           disabled={refreshing}
-          className="flex-1 rounded border border-drift-border px-3 py-2 font-mono text-[10px] uppercase tracking-meta text-slate-400 transition-colors hover:border-drift-accent hover:text-drift-accent disabled:opacity-50 focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2"
+          className="flex-1 rounded border border-drift-border px-3 py-2 font-mono text-[10px] uppercase tracking-meta text-drift-muted transition-colors hover:border-drift-accent hover:text-drift-accent disabled:opacity-50 focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2"
           title="re-query SQLite e atualiza o feed local — útil se UI parece stale"
         >
           {refreshing ? '…' : '↻ atualizar feed'}
@@ -2263,7 +2263,7 @@ function DiagnosticPanel({ boot }: { boot: BootState }) {
         <button
           onClick={handleResync}
           disabled={resyncing}
-          className="flex-1 rounded border border-drift-border px-3 py-2 font-mono text-[10px] uppercase tracking-meta text-slate-400 transition-colors hover:border-drift-accent hover:text-drift-accent disabled:opacity-50 focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2"
+          className="flex-1 rounded border border-drift-border px-3 py-2 font-mono text-[10px] uppercase tracking-meta text-drift-muted transition-colors hover:border-drift-accent hover:text-drift-accent disabled:opacity-50 focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2"
           title="re-subscrever em todos os relays do zero — útil se eventos pararam de chegar"
         >
           {resyncing ? '…' : '↻ re-subscribe'}
@@ -2276,19 +2276,19 @@ function DiagnosticPanel({ boot }: { boot: BootState }) {
           (relay/network) e não rendering. */}
       {sync.recent.length > 0 && (
         <details className="rounded border border-drift-border bg-drift-surface p-3">
-          <summary className="cursor-pointer font-mono text-[11px] text-slate-400 hover:text-drift-text">
+          <summary className="cursor-pointer font-mono text-[11px] text-drift-muted hover:text-drift-text">
             últimos eventos ({sync.recent.length})
           </summary>
           <div className="mt-2 max-h-48 overflow-y-auto font-mono text-[10px]">
             {sync.recent.map((e, i) => (
               <div key={`${e.id}-${i}`} className="flex gap-2 py-0.5">
-                <span className="text-slate-500">
+                <span className="text-drift-muted">
                   {new Date(e.receivedAt).toLocaleTimeString()}
                 </span>
                 <span className={kindColor(e.kind)}>{kindLabel(e.kind)}</span>
-                <span className="text-slate-500">{e.id.slice(0, 8)}</span>
+                <span className="text-drift-muted">{e.id.slice(0, 8)}</span>
                 {e.ref && (
-                  <span className="truncate text-slate-500">
+                  <span className="truncate text-drift-muted">
                     → {e.ref.slice(0, 12)}
                   </span>
                 )}
@@ -2299,7 +2299,7 @@ function DiagnosticPanel({ boot }: { boot: BootState }) {
       )}
 
       <div className="overflow-hidden rounded border border-drift-border bg-drift-surface p-3">
-        <div className="mb-1 font-mono text-[10px] uppercase tracking-meta text-slate-400">
+        <div className="mb-1 font-mono text-[10px] uppercase tracking-meta text-drift-muted">
           minha npub
         </div>
         {/* whitespace-pre-wrap necessário porque <pre> tem white-space:
@@ -2328,7 +2328,7 @@ function Row({
 }) {
   return (
     <div className="flex items-center justify-between">
-      <span className="text-[10px] uppercase tracking-meta text-slate-400">
+      <span className="text-[10px] uppercase tracking-meta text-drift-muted">
         {label}
       </span>
       <span className={valueClass}>{value}</span>

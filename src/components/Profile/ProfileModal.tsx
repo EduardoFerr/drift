@@ -76,13 +76,13 @@ export function ProfileModal({ identity, onClose }: ProfileModalProps) {
 
       <section className="mb-4 rounded border border-drift-border bg-drift-bg/30 p-3">
           {label && (
-            <div className="mb-1 text-[12px] text-slate-200">{label}</div>
+            <div className="mb-1 text-[12px] text-drift-text">{label}</div>
           )}
-          <div className="break-all font-mono text-[10px] text-slate-500">
+          <div className="break-all font-mono text-[10px] text-drift-muted">
             {identity.npubBech32}
           </div>
           <div className="mt-2 flex items-center justify-between">
-            <span className="text-[10px] text-slate-600">
+            <span className="text-[10px] text-drift-muted">
               criada: {new Date(identity.createdAt).toLocaleString()}
             </span>
             <TierBadge tier={getWeightTier(userWeight.weight)} />
@@ -111,7 +111,7 @@ export function ProfileModal({ identity, onClose }: ProfileModalProps) {
         )}
 
         {(aggregate?.pinned_count || blockedCount || mutedCount) ? (
-          <section className="mb-2 flex flex-wrap gap-2 border-t border-drift-border pt-3 text-[10px] text-slate-500">
+          <section className="mb-2 flex flex-wrap gap-2 border-t border-drift-border pt-3 text-[10px] text-drift-muted">
             {aggregate && aggregate.pinned_count > 0 && (
               <span>📌 {aggregate.pinned_count} fixados</span>
             )}
@@ -135,7 +135,7 @@ function TierBadge({ tier }: { tier: WeightTier | null }) {
     tier === 'established'
       ? { emoji: '🏆', label: 'estabelecido', color: 'text-amber-300 border-amber-300/40' }
       : tier === 'active'
-      ? { emoji: '⭐', label: 'ativo', color: 'text-slate-300 border-slate-300/40' }
+      ? { emoji: '⭐', label: 'ativo', color: 'text-drift-text border-slate-300/40' }
       : { emoji: '🌱', label: 'novo', color: 'text-green-300 border-green-300/40' }
   return (
     <span
@@ -166,11 +166,11 @@ function Stat({
       ? 'text-drift-spread'
       : tone === 'bury'
       ? 'text-drift-bury'
-      : 'text-slate-200'
+      : 'text-drift-text'
   return (
     <div className="rounded border border-drift-border/60 bg-drift-bg/30 p-2" title={tooltip}>
       <div className={`text-lg font-semibold tabular-nums ${color}`}>{value}</div>
-      <div className="text-[9px] uppercase tracking-widest text-slate-600">{label}</div>
+      <div className="text-[9px] uppercase tracking-widest text-drift-muted">{label}</div>
     </div>
   )
 }

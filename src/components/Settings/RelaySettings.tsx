@@ -101,7 +101,7 @@ export function RelaySettings({ onClose }: RelaySettingsProps) {
   return (
     <FullPageCard onClose={onClose} title="relays" ariaLabel="settings · relays">
       <div className="p-5">
-        <p className="mb-4 text-[11px] leading-relaxed text-slate-500">
+        <p className="mb-4 text-[11px] leading-relaxed text-drift-muted">
           Manifesto §14 — bootstrap distribuído. Relays são intercambiáveis;
           remover um não tira você da rede. Cliente sempre mantém ao
           menos um seed externo se sua lista ficar muito pequena (anti-eclipse §20).
@@ -109,9 +109,9 @@ export function RelaySettings({ onClose }: RelaySettingsProps) {
 
         {/* Lista atual */}
         <section className="mb-4 max-h-64 space-y-1 overflow-y-auto">
-          {!loaded && <div className="text-[11px] text-slate-600">carregando…</div>}
+          {!loaded && <div className="text-[11px] text-drift-muted">carregando…</div>}
           {loaded && list.length === 0 && (
-            <div className="text-[11px] text-slate-600">nenhum relay configurado</div>
+            <div className="text-[11px] text-drift-muted">nenhum relay configurado</div>
           )}
           {list.map((r) => {
             const status = r.lastErr
@@ -122,8 +122,8 @@ export function RelaySettings({ onClose }: RelaySettingsProps) {
             const tone = r.lastErr
               ? 'text-red-400'
               : r.lastOkAt
-              ? 'text-emerald-400'
-              : 'text-slate-600'
+              ? 'text-drift-spread'
+              : 'text-drift-muted'
             return (
               <div
                 key={r.url}
@@ -132,7 +132,7 @@ export function RelaySettings({ onClose }: RelaySettingsProps) {
                 }`}
               >
                 <span className={`${tone} text-base leading-none`}>{status}</span>
-                <span className="flex-1 truncate text-slate-300" title={r.lastErr ?? ''}>
+                <span className="flex-1 truncate text-drift-text" title={r.lastErr ?? ''}>
                   {r.url}
                 </span>
                 <span className="rounded bg-drift-border/40 px-1 text-[9px] text-drift-muted">
@@ -140,7 +140,7 @@ export function RelaySettings({ onClose }: RelaySettingsProps) {
                 </span>
                 <button
                   onClick={() => void setRelayEnabled(r.url, !r.enabled)}
-                  className="rounded border border-drift-border px-1 py-0.5 text-slate-500 hover:border-drift-accent hover:text-drift-accent"
+                  className="rounded border border-drift-border px-1 py-0.5 text-drift-muted hover:border-drift-accent hover:text-drift-accent"
                 >
                   {r.enabled ? 'pausar' : 'ativar'}
                 </button>
@@ -157,7 +157,7 @@ export function RelaySettings({ onClose }: RelaySettingsProps) {
 
         {/* Adicionar */}
         <section className="mb-4 border-t border-drift-border pt-3">
-          <div className="mb-2 text-[10px] uppercase tracking-widest text-slate-600">
+          <div className="mb-2 text-[10px] uppercase tracking-widest text-drift-muted">
             adicionar relay
           </div>
           <div className="flex gap-2">
@@ -166,7 +166,7 @@ export function RelaySettings({ onClose }: RelaySettingsProps) {
               value={newUrl}
               onChange={(e) => setNewUrl(e.target.value)}
               placeholder="wss://relay.exemplo.com"
-              className="flex-1 rounded border border-drift-border bg-drift-bg px-2 py-1 text-[11px] text-slate-200 placeholder:text-drift-muted/60 focus:border-drift-accent focus:outline-none"
+              className="flex-1 rounded border border-drift-border bg-drift-bg px-2 py-1 text-[11px] text-drift-text placeholder:text-drift-muted/60 focus:border-drift-accent focus:outline-none"
             />
             <button
               onClick={handleAdd}
@@ -184,7 +184,7 @@ export function RelaySettings({ onClose }: RelaySettingsProps) {
         {/* NIP-65 */}
         <section className="mb-4 border-t border-drift-border pt-3">
           <div
-            className="mb-2 text-[10px] uppercase tracking-widest text-slate-600"
+            className="mb-2 text-[10px] uppercase tracking-widest text-drift-muted"
             title="NIP-65 — Relay List Metadata"
           >
             descobrir relays via NIP-65
@@ -195,7 +195,7 @@ export function RelaySettings({ onClose }: RelaySettingsProps) {
               value={importNpub}
               onChange={(e) => setImportNpub(e.target.value)}
               placeholder="npub1... — buscar lista de relays desse user"
-              className="flex-1 rounded border border-drift-border bg-drift-bg px-2 py-1 text-[11px] text-slate-200 placeholder:text-drift-muted/60 focus:border-drift-accent focus:outline-none"
+              className="flex-1 rounded border border-drift-border bg-drift-bg px-2 py-1 text-[11px] text-drift-text placeholder:text-drift-muted/60 focus:border-drift-accent focus:outline-none"
             />
             <button
               onClick={handleImport}
@@ -206,18 +206,18 @@ export function RelaySettings({ onClose }: RelaySettingsProps) {
             </button>
           </div>
           {importMsg && (
-            <div className="text-[10px] text-slate-400">{importMsg}</div>
+            <div className="text-[10px] text-drift-muted">{importMsg}</div>
           )}
 
           <button
             onClick={handlePublish}
             disabled={publishing || list.filter((r) => r.enabled).length === 0}
-            className="mt-2 w-full rounded border border-drift-border px-3 py-1 text-[11px] text-slate-400 hover:border-drift-accent hover:text-drift-accent disabled:opacity-30"
+            className="mt-2 w-full rounded border border-drift-border px-3 py-1 text-[11px] text-drift-muted hover:border-drift-accent hover:text-drift-accent disabled:opacity-30"
           >
             {publishing ? 'publicando…' : '↗ publicar minha lista (NIP-65)'}
           </button>
           {publishMsg && (
-            <div className="mt-1 text-[10px] text-slate-400">{publishMsg}</div>
+            <div className="mt-1 text-[10px] text-drift-muted">{publishMsg}</div>
           )}
         </section>
       </div>
