@@ -285,7 +285,7 @@ export function PostViewer({
           card já entregam contexto; ações secundárias migram pra menu
           3-dots futuro. */}
       {!embedded && (
-      <div className="flex items-center justify-between border-b border-drift-border px-4 py-3 text-[10px] text-drift-muted">
+      <div className="flex items-center justify-between border-b border-drift-border px-4 py-3 text-fluid-xs text-drift-muted">
         <span className="font-mono">
           <span className="font-display font-bold uppercase tracking-wider text-drift-text">
             {isMine ? 'você' : 'anon'}…{post.authorPub.slice(-8)}

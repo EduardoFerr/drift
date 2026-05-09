@@ -114,7 +114,7 @@ export function CommentCard({
     >
       {/* Header: autor + tempo + content-warning chip (C.6.2) */}
       <header className="flex items-center justify-between gap-2 border-b border-drift-border px-4 py-3">
-        <span className="font-display text-base font-bold uppercase tracking-tag text-drift-text">
+        <span className="font-display text-fluid-display font-bold uppercase tracking-tag text-drift-text">
           anon{truncate(node.author_pub)}
         </span>
         <div className="flex items-center gap-2">
@@ -202,7 +202,7 @@ export function CommentCard({
               </div>
             )}
             <p
-              className={`whitespace-pre-wrap break-words font-mono text-[13px] leading-relaxed text-drift-text ${
+              className={`whitespace-pre-wrap break-words font-mono text-fluid-lg leading-relaxed text-drift-text ${
                 cwBlur ? 'blur-sm' : ''
               }`}
               onClick={cwBlur ? () => setOverrideBlur(true) : undefined}

@@ -60,6 +60,19 @@
   --leading-title: 1.08;
   --leading-body: 1.65;
   --drift-body: #787874;
+  /*
+   * Fluid type scale — clamp(min, vw, max). 6 levels canônicos.
+   * Espelha tailwind.config.js theme.extend.fontSize.fluid-*.
+   * Source of truth = tailwind.config.js; aqui é cópia útil pra inline
+   * styles e debug em DevTools. LOCK_VIA_TEST garante paridade.
+   * Decisão de scale em Docs/sessions/text-responsivity-audit-2026-05-08.md §3-4.
+   */
+  --t-fluid-xs: clamp(9px, 2.4vw, 10px);
+  --t-fluid-sm: clamp(10px, 2.8vw, 11px);
+  --t-fluid-base: clamp(11px, 3.2vw, 12px);
+  --t-fluid-lg: clamp(12px, 3.6vw, 13px);
+  --t-fluid-display: clamp(13px, 4vw, 16px);
+  --t-fluid-hero: clamp(20px, 6vw, 30px);
 }
 
 @layer base {

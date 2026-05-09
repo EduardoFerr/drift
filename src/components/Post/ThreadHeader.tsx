@@ -101,7 +101,7 @@ export function ThreadHeader({
         {postTitle && (
           <div className="flex min-w-0 items-baseline gap-2">
             <h2
-              className="truncate font-display text-[14px] font-extrabold text-drift-text"
+              className="truncate font-display text-fluid-display font-extrabold text-drift-text"
               title={postTitle}
             >
               {postTitle}
@@ -119,7 +119,7 @@ export function ThreadHeader({
         )}
         {/* Breadcrumb */}
         <div
-          className="flex items-center gap-1 truncate font-mono text-[10px] uppercase tracking-meta text-drift-muted"
+          className="flex items-center gap-1 truncate font-mono text-fluid-xs uppercase tracking-meta text-drift-muted"
           aria-label="caminho da thread"
         >
           {breadcrumb.length === 0 ? (

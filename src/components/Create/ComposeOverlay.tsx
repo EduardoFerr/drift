@@ -248,7 +248,7 @@ export function ComposeOverlay({
         size="lg"
         onClick={handlePublish}
         disabled={blocked}
-        className="flex-1 py-[13px] font-display text-[14px] font-extrabold"
+        className="flex-1 py-[13px] font-display text-fluid-display font-extrabold"
       >
         {publishing
           ? capturingLocation
@@ -369,7 +369,7 @@ export function ComposeOverlay({
               }
               rows={5}
               data-subpost-input={safeIdx === 0 ? '' : undefined}
-              className="min-h-[85px] flex-1 resize-none rounded-sm border-[1.5px] border-drift-border bg-[#1e1e1c] p-3 font-mono text-[13px] leading-[1.6] text-drift-text placeholder:text-drift-muted focus:border-drift-accent focus:outline-none"
+              className="min-h-[85px] flex-1 resize-none rounded-sm border-[1.5px] border-drift-border bg-[#1e1e1c] p-3 font-mono text-fluid-lg leading-[1.6] text-drift-text placeholder:text-drift-muted focus:border-drift-accent focus:outline-none"
             />
             <div className="mt-1 flex items-center justify-between text-[10px]">
               <span

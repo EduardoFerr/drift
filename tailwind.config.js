@@ -53,6 +53,21 @@ export default {
         display: ['"Syne Variable"', 'Syne', 'system-ui', 'sans-serif'],
         mono: ['"DM Mono"', 'SF Mono', 'Fira Code', 'monospace'],
       },
+      // Fluid type scale — clamp(min, vw, max). 6 levels canônicos.
+      // Drift escala apenas em 320..448 px (max-w-md cap); acima disso o
+      // container congela em letterbox e a tipografia também (cap em max).
+      // Determinístico (manifesto §7) — mesmo viewport → mesmo render.
+      // Decisão de scale + trade-offs em Docs/sessions/text-responsivity-audit-2026-05-08.md §3-4.
+      // Espelhado em src/index.css :root (`--t-fluid-*`); LOCK_VIA_TEST
+      // garante paridade.
+      fontSize: {
+        'fluid-xs':      ['clamp(9px, 2.4vw, 10px)',  { lineHeight: '1.4' }],
+        'fluid-sm':      ['clamp(10px, 2.8vw, 11px)', { lineHeight: '1.45' }],
+        'fluid-base':    ['clamp(11px, 3.2vw, 12px)', { lineHeight: '1.55' }],
+        'fluid-lg':      ['clamp(12px, 3.6vw, 13px)', { lineHeight: '1.65' }],
+        'fluid-display': ['clamp(13px, 4vw, 16px)',   { lineHeight: '1.2' }],
+        'fluid-hero':    ['clamp(20px, 6vw, 30px)',   { lineHeight: '1.08' }],
+      },
       // Mockup v0.7 spacing tokens. Valores específicos do design que
       // não caem na escala 4px. CSS vars permitem override; fallback
       // estático mantém render. Use em CardText / SubpostLayout.

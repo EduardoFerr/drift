@@ -64,7 +64,7 @@ export function PostCard({
 
   return (
     <article className="rounded border border-drift-border bg-drift-surface p-4">
-      <div className="mb-2 flex items-center justify-between text-[10px] text-drift-muted">
+      <div className="mb-2 flex items-center justify-between text-fluid-xs text-drift-muted">
         <span>
           {isMine ? 'você' : 'anon'}…{post.authorPub.slice(-8)} · {timeAgo(post.createdAt)}
           {post.contentWarning && (
@@ -91,7 +91,7 @@ export function PostCard({
             blurred ? 'select-none blur-md' : ''
           }`}
         >
-          <p className="whitespace-pre-wrap break-words text-sm text-drift-text">
+          <p className="whitespace-pre-wrap break-words text-fluid-lg text-drift-text">
             {text}
           </p>
           {hasImage && (
