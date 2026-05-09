@@ -1,0 +1,95 @@
+name: lighthouse-ci
+
+# Round CWV-1 (Marshall) — gating de Core Web Vitals em PR + main.
+#
+# Target: Performance ≥ 0.95 (mobile, 4G throttled, 3 runs median).
+# Lighthouse 2026-05-09 baseline: 86/100 — gap de 9 pontos pra fechar
+# antes do gate hard.
+#
+# Por que separado de ci.yml?
+#   - lhci precisa de Chrome headless + dev server up — overhead de ~3min
+#     em todo PR (mesmo PRs Rust/docs).
+#   - PR-only opt-out via [skip lighthouse] no commit message não é
+#     suportado nativamente; usamos paths-filter pra rodar apenas em
+#     PRs que tocam em src/, vite.config.ts, ou index.html.
+#
+# Continue-on-error TRUE em PRs por enquanto (soft gate).
+# Quando entry chunk ≤ 250KB e helia genuinamente lazy, virar FALSE.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: lighthouse-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write  # pra eventual comment com link do report
+
+jobs:
+  lhci:
+    name: lighthouse-ci (mobile, 3 runs)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    # Skip pra PRs que não tocam frontend/build.
+    # main push sempre roda (regressão guard pós-merge).
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Detect frontend changes
+        id: changed
+        if: github.event_name == 'pull_request'
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            frontend:
+              - 'src/**'
+              - 'public/**'
+              - 'index.html'
+              - 'vite.config.ts'
+              - 'tailwind.config.js'
+              - 'postcss.config.js'
+              - 'package.json'
+              - 'package-lock.json'
+              - '.lighthouserc.cjs'
+              - '.github/workflows/lighthouse.yml'
+
+      - name: Setup Node 22
+        if: github.event_name == 'push' || steps.changed.outputs.frontend == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        if: github.event_name == 'push' || steps.changed.outputs.frontend == 'true'
+        run: npm install --no-audit --no-fund --prefer-offline
+
+      - name: Build
+        if: github.event_name == 'push' || steps.changed.outputs.frontend == 'true'
+        run: npm run build
+
+      - name: Run Lighthouse CI
+        # Soft em PR (warn-only via continue-on-error).
+        # Hard em main — regressão merged é responsabilidade do team.
+        # Quando assertions virarem 'error' no .lighthouserc.cjs, este
+        # continue-on-error vira false em PR também.
+        if: github.event_name == 'push' || steps.changed.outputs.frontend == 'true'
+        continue-on-error: ${{ github.event_name == 'pull_request' }}
+        run: npx lhci autorun
+        env:
+          LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
+
+      - name: Upload Lighthouse reports
+        if: always() && (github.event_name == 'push' || steps.changed.outputs.frontend == 'true')
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse-reports
+          path: .lighthouseci
+          retention-days: 14

@@ -1,7 +1,16 @@
-import { defineConfig } from 'vite'
+import { defineConfig, type PluginOption } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import basicSsl from '@vitejs/plugin-basic-ssl'
+// Bundle analysis opt-in via DRIFT_ANALYZE=1 (npm run build:analyze).
+// Round CWV-1: visualizer gera dist/stats.html com sunburst dos chunks
+// pra investigar regressão de tamanho.
+//
+// Lazy import: rollup-plugin-visualizer só é resolvido quando o flag
+// está ativo, evitando ~3MB de devDep no resolver normal e tolerando
+// ambientes onde a dep ainda não foi instalada (fresh clone sem
+// `npm install` completo).
+const useAnalyzer = process.env.DRIFT_ANALYZE === '1'
 
 // HTTP mode opt-in via env var pra rodar com Cloudflare tunnel ou
 // similar. localhost via HTTP é secure context per spec; tunnel
@@ -12,9 +21,38 @@ import basicSsl from '@vitejs/plugin-basic-ssl'
 //   npm run dev                     → Vite em HTTPS via basicSsl (default)
 const useHttp = process.env.DRIFT_DEV_HTTP === '1'
 
-export default defineConfig({
+// Conditional visualizer plugin — async resolution evita require síncrono
+// de uma optional devDep. Type usa PluginOption (Vite) pra aceitar tanto
+// plugin vazio quanto array.
+async function maybeVisualizer(): Promise<PluginOption[]> {
+  if (!useAnalyzer) return []
+  try {
+    const { visualizer } = await import('rollup-plugin-visualizer')
+    // `template: 'sunburst'` = melhor pra entender hot path; gzipSize
+    // pra estimar transferência real.
+    return [
+      visualizer({
+        filename: 'dist/stats.html',
+        template: 'sunburst',
+        gzipSize: true,
+        brotliSize: true,
+        open: false,
+      }) as PluginOption,
+    ]
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      '[vite] DRIFT_ANALYZE=1 mas rollup-plugin-visualizer não está instalado. ' +
+        'Rode `npm install` ou `npm install -D rollup-plugin-visualizer`.',
+      e,
+    )
+    return []
+  }
+}
+export default defineConfig(async () => ({
   plugins: [
     react(),
+    ...(await maybeVisualizer()),
     // Cert auto-assinado para o dev server. Necessário porque
     // crossOriginIsolated (e portanto OPFS / SharedArrayBuffer) requer
     // secure context — localhost via HTTP funciona, mas IP de rede
@@ -243,4 +281,4 @@ export default defineConfig({
       '@': '/src',
     },
   },
-})
+}))

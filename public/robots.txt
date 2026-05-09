@@ -1,0 +1,17 @@
+# Drift PWA — política de crawl.
+#
+# Drift é cliente browser pra rede Nostr. Não há servidor de conteúdo
+# para indexar — todo "conteúdo" é renderizado client-side a partir
+# de eventos Nostr puxados de relays. Permitimos crawl da app shell
+# (index.html, manifest, ícones) pra discovery do PWA.
+
+User-agent: *
+Allow: /$
+Allow: /manifest.webmanifest
+Allow: /drift-icon.svg
+Allow: /apple-touch-icon.png
+Disallow: /assets/
+Disallow: /sw.js
+Disallow: /workbox-*
+
+# Sem sitemap — não há rotas indexáveis (SPA com state local).
