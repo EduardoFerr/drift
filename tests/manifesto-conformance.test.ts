@@ -694,6 +694,55 @@ describe('§28 privacidade pelo mínimo — comments sem location (Track C.5)', 
   })
 })
 
+describe('§15 anti-censura — webrtcTransport gated por network_mode', () => {
+  // Origem: Robin's finding em
+  // `Docs/sessions/15-e2e-testbed-scoping-2026-05-08.md` §7 item 1.
+  // Spec `Docs/webrtc-6.4-plan.md:106` exige que em modo `tor` ou
+  // `onion-only` o orchestrator NÃO registre `webrtcTransport` —
+  // STUN/ICE candidates locais vazariam IP do user mesmo com tráfego
+  // Nostr indo via Tor. `tests/webrtc-tor-mode-isolation.test.ts` cobre
+  // o comportamento; este teste estático garante que ninguém remova o
+  // gate em refactor futuro.
+  //
+  // Manifesto §15 (anti-censura por país), §27 (privacidade visível).
+  it('bootstrap.ts envolve registerTransport(webrtcTransport) com gate de network_mode', () => {
+    const src = readFileSync(join(SRC, 'lib', 'bootstrap.ts'), 'utf8')
+    const stripped = stripComments(src)
+
+    // 1. Confirma que a chamada existe (regressão futura: alguém remove
+    //    a registração inteira por engano).
+    const registerCallRe = /registerTransport\s*\(\s*webrtcTransport\b/
+    const callMatch = stripped.match(registerCallRe)
+    expect(
+      callMatch,
+      'bootstrap.ts deve registrar webrtcTransport no orchestrator',
+    ).toBeTruthy()
+
+    // 2. Confirma que existe um gate `network_mode === 'clearnet'`
+    //    (ou variante `!== 'tor' && !== 'onion-only'`) ANTES da chamada.
+    //    Janela de busca: 200 chars antes do match — generoso pra
+    //    comportar comentários de código + linha do `if`.
+    const callIdx = callMatch!.index!
+    const lookback = stripped.slice(Math.max(0, callIdx - 400), callIdx)
+
+    // Aceita qualquer das formas idiomáticas:
+    //   if (networkMode === 'clearnet')
+    //   if (networkMode !== 'tor' && networkMode !== 'onion-only')
+    //   if (network_mode === 'clearnet')  // futuro snake_case (pouco provável)
+    const gateRe =
+      /\bif\s*\([^)]*\b(?:network_?mode|networkMode|getPrefs\(\)\.network_mode)\b[^)]*(?:===\s*['"]clearnet['"]|!==\s*['"]tor['"][^)]*!==\s*['"]onion-only['"]|!==\s*['"]onion-only['"][^)]*!==\s*['"]tor['"])[^)]*\)/
+    expect(
+      gateRe.test(lookback),
+      'registerTransport(webrtcTransport) deve estar dentro de gate por network_mode === \'clearnet\' ' +
+        '(ou !== tor && !== onion-only). Spec: webrtc-6.4-plan.md §IP leak via WebRTC ICE. ' +
+        'Manifesto §15 (anti-censura) + §27 (privacidade visível). ' +
+        'STUN/ICE candidates vazariam IP local do user em modo tor/onion-only.\n\n' +
+        'Janela de lookback (400 chars antes da chamada):\n' +
+        lookback,
+    ).toBe(true)
+  })
+})
+
 describe('Native dialogs banidos em src/ (UX consistency, V14.2)', () => {
   // Native window.alert/confirm/prompt renderiza em estilo do browser
   // — feio sobre o tema dark Drift, e em Tauri nem sempre disponível.

@@ -103,7 +103,7 @@ Plano (sessão futura):
 
 ### IP leak via WebRTC ICE
 
-Mesmo em modo `tor`, WebRTC P2P pode vazar IP via STUN/TURN candidates locais. Mitigação: em modo `tor` ou `onion-only`, **WebRTC desabilitado** (orchestrator não registra `webrtcTransport`). Documentar pra usuário.
+Mesmo em modo `tor`, WebRTC P2P pode vazar IP via STUN/TURN candidates locais. Mitigação: em modo `tor` ou `onion-only`, **WebRTC desabilitado** (orchestrator não registra `webrtcTransport`). Implementação: gate em `bootstrap.ts` — `registerTransport(webrtcTransport)` só quando `network_mode === 'clearnet'`. Cobertura: `tests/webrtc-tor-mode-isolation.test.ts` (3 cenários) + invariante estática em `tests/manifesto-conformance.test.ts` §15. **Resíduo conhecido**: `seeder.ts:seedFromSpreaders` chama `connectTo` direto (não passa pelo orchestrator) — abrir SpreadMap em modo Tor ainda dispara `RTCPeerConnection`. Tracking item separado.
 
 ## 4. Roadmap pra arti real
 

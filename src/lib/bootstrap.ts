@@ -275,7 +275,24 @@ async function doBootstrap(): Promise<void> {
     // já foi instalado no SimplePool global do nostr-tools). NÃO registramos
     // `torTransport` separado — seria duplicação ruidosa pra orchestrator.
     registerTransport(wssTransport, { weight: 10 })
-    registerTransport(webrtcTransport, { weight: 5 })
+    // §15 anti-censura + §27 privacidade visível: WebRTC P2P pode vazar IP
+    // do user via STUN/ICE candidates locais mesmo quando o tráfego Nostr
+    // passa por Tor — `RTCPeerConnection.gatherIceCandidates` enumera
+    // interfaces de rede locais e as expõe ao peer remoto. Em modo
+    // `tor`/`onion-only`, NÃO registramos `webrtcTransport` pra honrar
+    // a promessa de anonimato do user. Spec: `Docs/webrtc-6.4-plan.md` §IP
+    // leak via WebRTC ICE.
+    //
+    // Trade-off user-facing: em modo Tor, WebRTC P2P fica indisponível.
+    // Publish/subscribe seguem funcionando via WSS-via-Tor; user não vê
+    // feature-degradation ativa, apenas perde a aceleração P2P opcional.
+    //
+    // Decisão init-only: se o user trocar `network_mode` em Settings, exige
+    // reload (já é convenção do Drift — `setActiveIdentity` faz o mesmo,
+    // manifesto §3 dispositivo descartável torna isso aceitável).
+    if (networkMode === 'clearnet') {
+      registerTransport(webrtcTransport, { weight: 5 })
+    }
 
     await startSync()
 
