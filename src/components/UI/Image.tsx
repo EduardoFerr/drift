@@ -19,7 +19,12 @@
 
 import { useEffect, useState } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import type { BlobMeta } from '../../lib/nip94'
+import {
+  lightboxBackdropVariants,
+  lightboxImageVariants,
+} from '../../lib/motion-variants'
 
 export interface ImageProps {
   /** Fallback URL quando `meta` é ausente ou fetch via blobs falha. */
@@ -236,36 +241,75 @@ export function Image({
 
     {/* Lightbox fullscreen — backdrop preto, imagem centralizada limpa,
         click-out / ESC / botão X fecham. Usa portal-like fixed inset-0
-        com z alto pra ficar acima de tudo (incluindo NavBar fixed). */}
-    {lightboxOpen && (
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={alt ? `imagem em primeiro plano: ${alt}` : 'imagem em primeiro plano'}
-        onClick={() => setLightboxOpen(false)}
-        className="fixed inset-0 z-[60] flex items-center justify-center bg-black/95 backdrop-blur-sm p-4 cursor-zoom-out"
-      >
-        <img
-          src={resolvedSrc}
-          alt={alt}
-          // stop propagation pra clique na própria imagem não fechar
-          onClick={(e) => e.stopPropagation()}
-          className="max-h-full max-w-full object-contain cursor-default select-none"
-          draggable={false}
-        />
-        <button
-          onClick={() => setLightboxOpen(false)}
-          aria-label="fechar"
-          title="fechar (ESC)"
-          className="absolute right-4 top-4 rounded-full border border-drift-accent bg-black/40 p-2 text-drift-accent hover:bg-drift-accent/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        </button>
-      </div>
-    )}
+        com z alto pra ficar acima de tudo (incluindo NavBar fixed).
+        Round 4 Fase B (B4): fade-in tokenizado (motion-fast backdrop +
+        motion-base image scale) substitui o "pop" abrupto que existia
+        antes (UX hostil — RFC §2.1 P1). Reduced motion respeitado
+        via factories. */}
+    <LightboxOverlay
+      open={lightboxOpen}
+      src={resolvedSrc}
+      alt={alt ?? ''}
+      onClose={() => setLightboxOpen(false)}
+    />
     </>
+  )
+}
+
+// ─── LightboxOverlay (Round 4 Fase B B4) ─────────────────────────────
+
+/**
+ * Lightbox fullscreen com fade tokenizado. Substitui o pop abrupto
+ * pre-Round 4. Backdrop em motion-fast, imagem em motion-base com
+ * scale sutil (0.92 → 1) — preserva sense of "imagem subindo pra
+ * frente" sem ser flashy.
+ */
+function LightboxOverlay({
+  open,
+  src,
+  alt,
+  onClose,
+}: {
+  open: boolean
+  src: string
+  alt: string
+  onClose: () => void
+}) {
+  const reduced = useReducedMotion() ?? false
+  const backdrop = lightboxBackdropVariants(reduced)
+  const image = lightboxImageVariants(reduced)
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          {...backdrop}
+          role="dialog"
+          aria-modal="true"
+          aria-label={alt ? `imagem em primeiro plano: ${alt}` : 'imagem em primeiro plano'}
+          onClick={onClose}
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/95 backdrop-blur-sm p-4 cursor-zoom-out"
+        >
+          <motion.img
+            {...image}
+            src={src}
+            alt={alt}
+            onClick={(e) => e.stopPropagation()}
+            className="max-h-full max-w-full object-contain cursor-default select-none"
+            draggable={false}
+          />
+          <button
+            onClick={onClose}
+            aria-label="fechar"
+            title="fechar (ESC)"
+            className="absolute right-4 top-4 rounded-full border border-drift-accent bg-black/40 p-2 text-drift-accent hover:bg-drift-accent/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </motion.div>
+      )}
+    </AnimatePresence>
   )
 }

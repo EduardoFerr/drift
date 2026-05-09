@@ -17,6 +17,7 @@
 
 import type { Post } from '../../types/drift'
 import { timeAgo } from '../../lib/format'
+import { DriftCard } from '../UI/DriftCard'
 
 export function PostCard({
   post,
@@ -63,7 +64,7 @@ export function PostCard({
   const buryActive = effectiveAction === 'bury'
 
   return (
-    <article className="rounded border border-drift-border bg-drift-surface p-4">
+    <DriftCard variant="default" size="md">
       <div className="mb-2 flex items-center justify-between text-fluid-xs text-drift-muted">
         <span>
           {isMine ? 'você' : 'anon'}…{post.authorPub.slice(-8)} · {timeAgo(post.createdAt)}
@@ -95,7 +96,7 @@ export function PostCard({
             {text}
           </p>
           {hasImage && (
-            <div className="mt-2 text-[10px] uppercase tracking-widest text-slate-600">
+            <div className="mt-2 text-[10px] uppercase tracking-widest text-drift-muted">
               [imagem · toque pra abrir]
             </div>
           )}
@@ -103,12 +104,12 @@ export function PostCard({
       </button>
 
       <div className="mt-3 flex items-center justify-between text-[10px]">
-        <div className="flex gap-3 text-slate-500">
+        <div className="flex gap-3 text-drift-muted">
           <span className="text-drift-spread">↑ {displaySpreads}</span>
           <span className="text-drift-bury">↓ {displayBuries}</span>
           <button
             onClick={onOpen}
-            className="text-slate-500 hover:text-drift-accent"
+            className="text-drift-muted hover:text-drift-accent"
           >
             abrir →
           </button>
@@ -156,6 +157,6 @@ export function PostCard({
           </button>
         </div>
       </div>
-    </article>
+    </DriftCard>
   )
 }

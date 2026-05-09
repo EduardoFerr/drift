@@ -44,8 +44,9 @@
 
 import type { ReactNode, MouseEvent as ReactMouseEvent } from 'react'
 import { useEffect } from 'react'
-import { motion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
 import { DriftButton } from './DriftButton'
+import { MOTION } from '../../lib/motion'
 
 export interface FullPageCardProps {
   /** Disparado pelo botão close, ESC, e (se habilitado) backdrop click. */
@@ -148,12 +149,17 @@ export function FullPageCard({
     if (e.target === e.currentTarget) onClose()
   }
 
+  // Round 4 Fase B: tokenizado via MOTION.base (240ms) + reduced-motion
+  // safe (substitui hardcoded `duration: 0.25, ease: easeOut`).
+  const reduced = useReducedMotion()
+  const transition = reduced ? { duration: 0 } : MOTION.base
+
   return (
     <motion.div
-      initial={fullPageCardMotionInitial()}
+      initial={reduced ? { opacity: 0.95 } : fullPageCardMotionInitial()}
       animate={fullPageCardMotionAnimate()}
-      exit={fullPageCardMotionExit()}
-      transition={{ duration: 0.25, ease: 'easeOut' }}
+      exit={reduced ? { opacity: 0 } : fullPageCardMotionExit()}
+      transition={transition}
       className={FULL_PAGE_CARD_CONTAINER_CLASS}
       role="dialog"
       aria-modal="true"

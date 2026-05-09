@@ -16,12 +16,13 @@
  */
 
 import { useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import type { CommentNode } from '../../lib/thread-cursor'
 import { applyContentFiltersComment } from '../../lib/feed'
 import { usePrefsStore } from '../../lib/prefs'
 import { timeAgo } from '../../lib/format'
 import { Image } from '../UI/Image'
+import { commentRevealVariants } from '../../lib/motion-variants'
 
 export interface CommentCardProps {
   node: CommentNode
@@ -95,6 +96,11 @@ export function CommentCard({
   // CC-T2 cleanup: data-post-id é só pra debug; só anexa em DEV.
   const debugProps = import.meta.env.DEV ? { 'data-post-id': postId } : {}
 
+  // Round 4 Fase B2: motion variants tokenizados (substitui durations
+  // hardcoded 0.18 / 0.22). Reduced motion respeitado via factory.
+  const reduced = useReducedMotion() ?? false
+  const reveal = commentRevealVariants(reduced)
+
   return (
     <article
       role="treeitem"
@@ -108,6 +114,11 @@ export function CommentCard({
       // "chegou desde abertura/refresh". Aplicado via classe condicional
       // pra evitar shift do conteúdo (border-l-2 sempre presente: cor
       // alterna entre transparente e drift-accent2).
+      // Round 4 Fase A: convergente com DriftCard primitive (Ted §3.1) —
+      // usa mesmo bg-drift-surface + focus-visible do primitive, mas
+      // mantém este article com layout custom flex-col h-full + border-l
+      // dinâmica (CommentCard tem layout próprio que DriftCard genérico
+      // não replica). DriftCard helpers exported pra futuro lift.
       className={`flex h-full w-full flex-col bg-drift-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2 border-l-2 ${
         isNew ? 'border-l-drift-accent2' : 'border-l-transparent'
       }`}
@@ -140,25 +151,11 @@ export function CommentCard({
       <div className="flex-1 overflow-y-auto px-5 py-4">
         <AnimatePresence mode="wait" initial={false}>
         {isHidden ? (
-          <motion.div
-            key="hidden-mod"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.18 }}
-            className="h-full"
-          >
+          <motion.div key="hidden-mod" {...reveal} className="h-full">
             <HiddenPlaceholder onReveal={() => setOverrideMod(true)} />
           </motion.div>
         ) : cwHide ? (
-          <motion.div
-            key="hidden-cw"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.18 }}
-            className="h-full"
-          >
+          <motion.div key="hidden-cw" {...reveal} className="h-full">
             <CwHiddenPlaceholder
               warning={cwHint.reason ?? cwHint.modReason ?? 'oculto'}
               onReveal={() => setOverrideCw(true)}
@@ -167,10 +164,7 @@ export function CommentCard({
         ) : (
           <motion.div
             key="content"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.22 }}
+            {...reveal}
             className="flex flex-col gap-3"
           >
             {/* C.6.3 — imagem anexada (Track B integration). Renderiza

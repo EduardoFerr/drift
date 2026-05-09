@@ -211,6 +211,11 @@ export function ComposeOverlay({
   const showImagePicker = draft.layout !== 'text'
   const remaining = DRIFT_LIMITS.TEXT_MAX_CHARS - draft.text.length
   const overLimit = remaining < 0
+  // Round 4 Fase B (F-27 friction fix): counter "62 chars" → "X / Y"
+  // (used / max), convenção universal Twitter/Mastodon. Cor warning
+  // quando remaining < 20 (já existia overLimit; complementa).
+  const used = draft.text.length
+  const nearLimit = remaining < 20 && !overLimit
 
   // Botão CANCELAR no header right (mockup pattern). Em vez do default
   // FECHAR; UX semântico — "cancela a composição" é mais claro que "fecha".
@@ -250,13 +255,18 @@ export function ComposeOverlay({
         disabled={blocked}
         className="flex-1 py-[13px] font-display text-fluid-display font-extrabold"
       >
+        {/* Round 4 Fase B (F-30 friction fix): CTA "drift ↑" → "publicar ↑".
+            DRIFT já é nome do app + ação no feed (↑ swipe). Usar "drift"
+            também no compose CTA criava o terceiro significado ("publicar"),
+            quebrando mental model do user. "publicar" + ↑ preserva
+            consistência visual com swipe direction sem overload do verbo. */}
         {publishing
           ? capturingLocation
             ? '📍 capturando location…'
             : 'publicando…'
           : anyUploading
           ? 'aguardando upload…'
-          : 'drift ↑'}
+          : 'publicar ↑'}
       </DriftButton>
     </div>
   )
@@ -374,10 +384,16 @@ export function ComposeOverlay({
             <div className="mt-1 flex items-center justify-between text-[10px]">
               <span
                 className={
-                  overLimit ? 'text-drift-bury' : 'text-drift-muted'
+                  overLimit
+                    ? 'text-drift-bury'
+                    : nearLimit
+                    ? 'text-amber-400'
+                    : 'text-drift-muted'
                 }
+                title={`${used} de ${DRIFT_LIMITS.TEXT_MAX_CHARS} caracteres usados`}
+                aria-label={`${used} de ${DRIFT_LIMITS.TEXT_MAX_CHARS} caracteres usados`}
               >
-                {remaining} chars
+                {used} / {DRIFT_LIMITS.TEXT_MAX_CHARS}
               </span>
               {draft.uploadError && (
                 <span className="ml-3 truncate font-mono text-drift-bury" title={draft.uploadError}>

@@ -236,9 +236,21 @@ function CardText({
   // pra texto subir do meio. Outros: bloco normal.
   const flex = variant === 'centered' ? 'flex flex-1 flex-col justify-center' : ''
 
-  // Body line-clamp 3 nos modos inset/overlay; text layout sem clamp.
-  const bodyClamp = variant === 'centered' ? '' : 'line-clamp-3'
-  const titleSize = variant === 'centered' ? 'text-3xl' : 'text-xl'
+  // Body line-clamp:
+  // - inset/overlay: clamp-3 (cards menores no feed)
+  // - centered: clamp-6 (text-only cards, mais espaço, mas evita overflow
+  //   em viewport pequeno com content longo — user feedback 2026-05-08
+  //   "alguns cards o texto está fazendo o card ficar maior que a area
+  //   reservada", caso típico SPOILER/NSFW posts longos).
+  const bodyClamp = variant === 'centered' ? 'line-clamp-6' : 'line-clamp-3'
+  // Title size:
+  // - centered: text-fluid-hero (clamp 20-30px) — escala com viewport,
+  //   evita 30px static estourar em mobile narrow combinado com content longo
+  // - outros: text-xl (mantém)
+  const titleSize = variant === 'centered' ? 'text-fluid-hero' : 'text-xl'
+  // Title clamp em centered pra title curto extremo não estourar (ex: post
+  // com primeira linha de 80 chars). 4 lines = ~70 chars em fluid-hero.
+  const titleClamp = variant === 'centered' ? 'line-clamp-4' : ''
 
   return (
     <div className={`relative ${wrapperBg} ${padding} ${flex}`}>
@@ -247,7 +259,7 @@ function CardText({
       </div>
       {title && (
         <h2
-          className={`mb-2 font-display font-bold leading-title tracking-title text-drift-text ${titleSize}`}
+          className={`mb-2 font-display font-bold leading-title tracking-title text-drift-text ${titleSize} ${titleClamp}`}
         >
           {title}
         </h2>
@@ -259,15 +271,23 @@ function CardText({
           {body}
         </p>
       )}
+      {/* Round 4 Fase B (F-11 friction fix): meta line com ícones em vez
+          de labels jargão. Antes: "DRIFT 22.1K · SUBS 3 · HÁ 6H" — três
+          abreviações em três idiomas conceituais (verbo PT/EN, plural EN,
+          advérbio PT). Agora: símbolos universais + número.
+          Tooltips preservam significado pra screen readers. */}
       <div className="flex gap-3 font-mono text-[9px] uppercase tracking-meta text-drift-muted">
-        <span>
-          DRIFT <span className="text-drift-accent2">{drift}</span>
+        <span title={`drifts: ${drift}`} aria-label={`${drift} drifts`}>
+          <span aria-hidden="true">↑</span>{' '}
+          <span className="text-drift-accent2">{drift}</span>
         </span>
-        <span>
-          SUBS <span className="text-drift-accent2">{subs}</span>
+        <span title={`${subs} subposts`} aria-label={`${subs} subposts`}>
+          <span aria-hidden="true">▣</span>{' '}
+          <span className="text-drift-accent2">{subs}</span>
         </span>
-        <span>
-          HÁ <span className="text-drift-accent2">{age}</span>
+        <span title={`há ${age}`} aria-label={`há ${age}`}>
+          <span aria-hidden="true">⏱</span>{' '}
+          <span className="text-drift-accent2">{age}</span>
         </span>
       </div>
     </div>
@@ -441,15 +461,20 @@ function TextLayout({
       <div className="relative flex flex-1 flex-col justify-center overflow-hidden">
         <CardText post={post} subpost={subpost} variant="centered" />
 
-        {/* Decorative letter — Syne 800 100px drift-border opacity 0.55,
-            absolute bottom-right negative offsets pra colar na borda. */}
+        {/* Decorative letter — Syne 800 100px drift-border absolute
+            bottom-right. Round 4 Fase B (F-04 / Barney friction audit):
+            opacity bumpada de 0.55 → 0.85 — em 0.55 sobre drift-border
+            #2a2a2e contra bg drift-surface #15151a o resultado era quase
+            invisível, deixando ~70% do card vazio (TX-3 Ted UX spike).
+            getDecorativeLetters nunca retorna vazio (fallback '•••' em
+            decorativeLetters.ts:46) — defesa em depth. */}
         <span
           aria-hidden="true"
           className="pointer-events-none absolute select-none font-display font-extrabold uppercase text-drift-border"
           style={{
             fontSize: '100px',
             letterSpacing: '-6px',
-            opacity: 0.55,
+            opacity: 0.85,
             lineHeight: 1,
             right: '-10px',
             bottom: '-18px',

@@ -21,7 +21,12 @@
  */
 
 import { useEffect, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
+import { MOTION } from '../../lib/motion'
+import {
+  DRIFT_CARD_SHADOW_BACK_CLASS,
+  DRIFT_CARD_SHADOW_MID_CLASS,
+} from '../UI/DriftCard'
 import type { Post, RenderHint, ReportReason } from '../../types/drift'
 import { dialog } from '../../lib/dialog'
 import { applyContentFilters } from '../../lib/feed'
@@ -452,14 +457,19 @@ export function PostViewer({
         )}
         {queue && queue.next && (
           <>
+            {/* Shadow stack (Tinder-style fila). Round 4 Fase A: usa
+                constants exported de DriftCard primitive (variant
+                shadow-stack). Inset-x-4/top-4/bottom-4 preserva margem
+                visual do PostViewer (DriftCard helpers usam inset-0
+                puro; aqui há margem do header/footer). */}
             <div
               aria-hidden="true"
-              className="pointer-events-none absolute inset-x-4 top-4 bottom-4 -z-20 rounded border border-drift-border bg-drift-surface"
+              className={`${DRIFT_CARD_SHADOW_BACK_CLASS} inset-x-4 top-4 bottom-4 inset-auto`.replace('inset-0', '')}
               style={{ transform: 'translateY(14px) scale(0.92)', opacity: 0.18 }}
             />
             <div
               aria-hidden="true"
-              className="pointer-events-none absolute inset-x-4 top-4 bottom-4 -z-10 rounded border border-drift-border bg-drift-surface"
+              className={`${DRIFT_CARD_SHADOW_MID_CLASS} inset-x-4 top-4 bottom-4 inset-auto`.replace('inset-0', '')}
               style={{ transform: 'translateY(7px) scale(0.96)', opacity: 0.4 }}
             />
           </>
@@ -469,7 +479,19 @@ export function PostViewer({
           onBury={pendingAction === null ? onBury : undefined}
           onPrev={total > 1 ? prev : undefined}
           onNext={total > 1 ? next : undefined}
-          onTap={!revealed ? () => setRevealed(true) : undefined}
+          // Round 4 Fase B (F-09 / TX-7 fix): tap em area neutra do
+          // card. Prioridade:
+          //   1. CW blurred → reveal (preserva comportamento atual)
+          //   2. multi-subpost → próximo (cycle: último → primeiro)
+          //   3. single subpost → no-op (mas user agora tem feedback
+          //      visual via swipe hint footer)
+          onTap={
+            !revealed
+              ? () => setRevealed(true)
+              : total > 1
+              ? () => setSubpostIdx((i) => (i + 1) % total)
+              : undefined
+          }
           disableHorizontal={total <= 1}
         >
           <div className="relative h-full w-full bg-drift-surface">
@@ -496,7 +518,7 @@ export function PostViewer({
                 >
                   toque pra revelar
                 </button>
-                <span className="text-[10px] text-slate-600">
+                <span className="text-[10px] text-drift-muted">
                   você pode mudar isso em settings
                 </span>
               </div>
@@ -812,12 +834,17 @@ interface WrapperProps {
  * direcional.
  */
 function ModalWrapper({ children, exitVariant }: WrapperProps) {
+  // Round 4 Fase B (B1): tokenizado via MOTION.emphasis (320ms drift-spring).
+  // Reduced motion respeitado — duration 0 colapsa entrada para fade
+  // simples. Convergente com Lily RFC §1.2 (PostViewer 0.32 → motion-emphasis).
+  const reduced = useReducedMotion()
+  const transition = reduced ? { duration: 0 } : MOTION.emphasis
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.96, y: 20 }}
+      initial={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.96, y: 20 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       exit={exitVariant}
-      transition={{ duration: 0.32, ease: [0.32, 0.72, 0, 1] }}
+      transition={transition}
       className="fixed inset-0 z-50 flex flex-col bg-drift-bg/95 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
@@ -834,12 +861,15 @@ function ModalWrapper({ children, exitVariant }: WrapperProps) {
  * quando custom='up'|'down'.
  */
 function EmbeddedWrapper({ children, exitVariant }: WrapperProps) {
+  // Round 4 Fase B (B1): mesmo tokenizado do ModalWrapper.
+  const reduced = useReducedMotion()
+  const transition = reduced ? { duration: 0 } : MOTION.emphasis
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.96, y: 20 }}
+      initial={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.96, y: 20 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       exit={exitVariant}
-      transition={{ duration: 0.32, ease: [0.32, 0.72, 0, 1] }}
+      transition={transition}
       className="relative flex h-full w-full flex-col overflow-hidden"
     >
       {children}

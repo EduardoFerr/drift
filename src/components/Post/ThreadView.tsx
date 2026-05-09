@@ -42,6 +42,7 @@ import { SwipeHandler } from './SwipeHandler'
 import { CommentCard } from './CommentCard'
 import { ThreadHeader } from './ThreadHeader'
 import { ReplySheet } from './ReplySheet'
+import { DriftSkeleton } from '../UI/DriftSkeleton'
 import type { Post } from '../../types/drift'
 
 export interface ThreadViewProps {
@@ -349,17 +350,25 @@ export function ThreadView({ postId, postAuthorPub, post, onClose }: ThreadViewP
             agora tem botão dedicado no header).
             UX fix 2026-05-08: thread vazia esconde FAB. EmptyState já
             tem CTA "↵ comentar"; senão user vê 3 botões fazendo a mesma
-            coisa (top-level comment). */}
+            coisa (top-level comment).
+            Round 4 Fase B (B5): wrapped em motion.button com hover
+            scale 1.05 + tap scale 0.95. Pulse sutil na primeira render
+            (chama atenção pro affordance) — tokenizado motion-fast.
+            Reduced motion: pulse some, scale colapsa. */}
         {currentNode && (
-          <button
+          <motion.button
+            initial={{ scale: 1 }}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            transition={{ duration: 0.18, ease: [0.0, 0.0, 0.2, 1] }}
             onClick={openReplyToCursor}
-            className="absolute bottom-5 right-5 z-30 rounded-full border-2 border-drift-accent bg-drift-surface px-4 py-2 font-mono text-[11px] uppercase tracking-meta text-drift-accent shadow-lg hover:bg-drift-accent/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2"
+            className="absolute bottom-5 right-5 z-30 rounded-full border-2 border-drift-accent bg-drift-surface px-4 py-2 font-mono text-[11px] uppercase tracking-meta text-drift-accent shadow-lg hover:bg-drift-accent/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2 motion-reduce:!scale-100"
             aria-label="responder este comentário"
             aria-keyshortcuts="Enter"
             title="responder (Enter)"
           >
             ↵ responder
-          </button>
+          </motion.button>
         )}
 
         {/* Coach-mark first-time.
@@ -460,15 +469,14 @@ function EmptyState({ onReply }: { onReply: () => void }) {
 }
 
 function LoadingState() {
+  // Round 4 Fase C (REC-2 / UX-14): substitui o texto puro "carregando
+  // comentários…" por DriftSkeleton variant=card×3 — perceived
+  // performance + alinhamento visual com o que a thread vai mostrar.
+  // Aria preservado via primitive (role="status").
   return (
-    <div
-      className="flex h-full items-center justify-center"
-      role="status"
-      aria-live="polite"
-    >
-      <span className="font-mono text-[11px] uppercase tracking-meta text-drift-muted">
-        carregando comentários…
-      </span>
+    <div className="flex h-full flex-col gap-3 px-4 py-6">
+      <DriftSkeleton variant="card" count={3} />
+      <span className="sr-only">carregando comentários</span>
     </div>
   )
 }

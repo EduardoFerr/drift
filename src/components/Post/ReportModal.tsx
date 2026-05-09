@@ -82,7 +82,7 @@ export function ReportModal({ post, pending, onSubmit, onClose }: ReportModalPro
 
       {!confirmStep && (
         <>
-          <div className="mb-4 rounded border border-drift-border bg-drift-bg/50 p-3 text-[10px] text-slate-400">
+          <div className="mb-4 rounded border border-drift-border bg-drift-bg/50 p-3 text-[10px] text-drift-muted">
             <div className="mb-1 text-drift-muted">post sendo denunciado:</div>
             <div className="line-clamp-3 text-drift-text">
               {post.subposts[0]?.text ?? '(imagem)'}
@@ -152,11 +152,11 @@ function ConfirmStep({
 }) {
   return (
     <div>
-      <div className="mb-3 text-[11px] text-slate-300">
+      <div className="mb-3 text-[11px] text-drift-text">
         confirmar denúncia: <span className="text-drift-accent">{reason}</span>
       </div>
 
-      <p className="mb-4 text-[10px] leading-relaxed text-slate-500">
+      <p className="mb-4 text-[10px] leading-relaxed text-drift-muted">
         O report vai ser publicado como evento Nostr assinado pela sua
         identidade. Não pode ser desfeito — eventos Drift são imutáveis
         (manifesto §6).
@@ -168,7 +168,7 @@ function ConfirmStep({
         <button
           onClick={onBack}
           disabled={pending}
-          className="rounded border border-drift-border px-3 py-1 text-[11px] text-slate-500 hover:border-slate-500 disabled:opacity-50"
+          className="rounded border border-drift-border px-3 py-1 text-[11px] text-drift-muted hover:border-drift-border disabled:opacity-50"
         >
           ← voltar
         </button>

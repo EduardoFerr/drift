@@ -560,7 +560,7 @@ export function ReplySheet({
             <footer className="flex items-center justify-between gap-3 border-t border-drift-border bg-drift-bg/40 px-4 py-3">
               <span
                 className={`font-mono text-[10px] ${
-                  overLimit ? 'text-drift-bury' : 'text-slate-400'
+                  overLimit ? 'text-drift-bury' : 'text-drift-muted'
                 }`}
                 aria-live={overLimit ? 'assertive' : 'off'}
                 aria-label={`${charCount} de ${COMMENT_MAX_CHARS} caracteres`}
