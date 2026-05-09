@@ -229,7 +229,12 @@ export function ThreadView({ postId, postAuthorPub, onClose }: ThreadViewProps) 
       role="tree"
       aria-label="thread de comentários"
       tabIndex={-1}
-      className="fixed inset-0 z-[60] flex flex-col bg-drift-bg/90 backdrop-blur-sm focus:outline-none motion-reduce:backdrop-blur-none"
+      // TX-2 (Ted UX spike §2) — ThreadView NÃO usa FullPageCard porque
+      // tem semantics próprios (role=tree, swipe handler, peek shadows,
+      // bg semi-transparent + backdrop-blur). Mas precisa do mesmo cap
+      // visual max-w-md mx-auto pra não vazar edge-to-edge em viewport
+      // > 448px (mockup mobile-first). sm:border-x espelha FullPageCard.
+      className="fixed inset-0 z-[60] mx-auto flex max-w-md flex-col border-drift-border bg-drift-bg/90 backdrop-blur-sm focus:outline-none motion-reduce:backdrop-blur-none sm:border-x"
       initial={{ opacity: 0 }}
       // polish: TV-P1 swipe-down feedback (Track C P1) — shake quando
       // exitShake=true antes de onClose dispara fade-out final.

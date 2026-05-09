@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import QRCode from 'qrcode'
-import { FullPageOverlay } from '../UI/FullPageOverlay'
+import { FullPageCard } from '../UI/FullPageCard'
 import { dialog } from '../../lib/dialog'
 import { setIdentityFromNsec } from '../../lib/identity'
 import {
@@ -40,7 +40,7 @@ export function IdentityPanel({ identity, onClose }: Props) {
   const [tab, setTab] = useState<'backup' | 'import' | 'passkey'>('backup')
 
   return (
-    <FullPageOverlay onClose={onClose} title="sua identidade" ariaLabel="sua identidade">
+    <FullPageCard onClose={onClose} title="sua identidade" ariaLabel="sua identidade">
       <div className="p-5">
       <div className="mb-5 flex gap-1 text-[10px] uppercase tracking-widest">
           <button
@@ -80,7 +80,7 @@ export function IdentityPanel({ identity, onClose }: Props) {
       {tab === 'import' && <ImportTab onClose={onClose} />}
       {tab === 'passkey' && <PasskeyTab npub={identity.npub} />}
       </div>
-    </FullPageOverlay>
+    </FullPageCard>
   )
 }
 

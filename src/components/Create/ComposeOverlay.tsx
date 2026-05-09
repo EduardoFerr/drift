@@ -21,7 +21,7 @@
  * Anti-CLS: textarea flex-1 com min-height fixo evita layout shift
  * quando user troca entre subposts. Drop area altura fixa 125px.
  *
- * Anti-overflow: body com overflow-y-auto via FullPageOverlay; textarea
+ * Anti-overflow: body com overflow-y-auto via FullPageCard; textarea
  * com sua própria scrollbar quando text excede min-height.
  */
 
@@ -39,7 +39,8 @@ import { UploadError } from '../../lib/upload'
 import type { BlobMeta } from '../../lib/nip94'
 import { DRIFT_LIMITS } from '../../config/constants'
 import { Image } from '../UI/Image'
-import { FullPageOverlay } from '../UI/FullPageOverlay'
+import { FullPageCard } from '../UI/FullPageCard'
+import { DriftButton } from '../UI/DriftButton'
 
 export interface ComposeOverlayProps {
   publishing: boolean
@@ -237,10 +238,17 @@ export function ComposeOverlay({
           - SUB
         </button>
       )}
-      <button
+      {/* DRIFT ↑ via DriftButton primitive (variant primary, size lg).
+          Mantém visual idêntico ao botão inline anterior; padding py-[13px]
+          + font-display extrabold é override via className extra (variant
+          primary cobre bg/text/hover, size lg cobre tracking; py específico
+          do mockup .post-go fica como extra). */}
+      <DriftButton
+        variant="primary"
+        size="lg"
         onClick={handlePublish}
         disabled={blocked}
-        className="flex-1 rounded bg-drift-accent px-3 py-[13px] font-display text-[14px] font-extrabold uppercase tracking-[2px] text-drift-bg transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-30 focus:outline-none focus:ring-2 focus:ring-drift-accent2 focus:ring-offset-2 focus:ring-offset-drift-bg"
+        className="flex-1 py-[13px] font-display text-[14px] font-extrabold"
       >
         {publishing
           ? capturingLocation
@@ -249,12 +257,12 @@ export function ComposeOverlay({
           : anyUploading
           ? 'aguardando upload…'
           : 'drift ↑'}
-      </button>
+      </DriftButton>
     </div>
   )
 
   return (
-    <FullPageOverlay
+    <FullPageCard
       onClose={onClose}
       title="novo drift"
       headerRight={headerRight}
@@ -386,7 +394,7 @@ export function ComposeOverlay({
           />
         </div>
       </div>
-    </FullPageOverlay>
+    </FullPageCard>
   )
 }
 

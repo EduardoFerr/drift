@@ -1,6 +1,6 @@
 ﻿/**
  * SettingsCards — V9.2d. Cada seção da ContentSettings vira sua
- * própria overlay focada (FullPageOverlay). User feedback: "cada nova
+ * própria overlay focada (FullPageCard). User feedback: "cada nova
  * opção nas configurações deveria abrir o seu card exclusivo".
  *
  * Antes: SettingsRoot routava tudo pra ContentSettings (overlay grande
@@ -37,7 +37,7 @@ import type {
   MapView,
   NetworkMode,
 } from '../../types/drift'
-import { FullPageOverlay } from '../UI/FullPageOverlay'
+import { FullPageCard } from '../UI/FullPageCard'
 
 // ─── Pickers/Toggle (locais ao módulo, mas reusáveis externamente
 // se exportar). Estilo idêntico ao ContentSettings legacy pra UX
@@ -138,7 +138,7 @@ interface CardProps {
 export function FiltersCard({ onClose }: CardProps) {
   const prefs = usePrefsStore()
   return (
-    <FullPageOverlay onClose={onClose} title="filtros" ariaLabel="filtros de conteúdo">
+    <FullPageCard onClose={onClose} title="filtros" ariaLabel="filtros de conteúdo">
       <div className="space-y-3 p-5">
         <p className="font-mono text-[11px] leading-relaxed text-drift-muted">
           Manifesto §27 — autor declara via tag <code>content-warning</code>;
@@ -164,7 +164,7 @@ export function FiltersCard({ onClose }: CardProps) {
           onChange={(v) => setPref('hide_ads', v)}
         />
       </div>
-    </FullPageOverlay>
+    </FullPageCard>
   )
 }
 
@@ -173,7 +173,7 @@ export function FiltersCard({ onClose }: CardProps) {
 export function LocationCard({ onClose }: CardProps) {
   const prefs = usePrefsStore()
   return (
-    <FullPageOverlay onClose={onClose} title="location nos meus posts" ariaLabel="granularidade de location">
+    <FullPageCard onClose={onClose} title="location nos meus posts" ariaLabel="granularidade de location">
       <div className="space-y-4 p-5">
         <p className="font-mono text-[11px] leading-relaxed text-drift-muted">
           Manifesto §28 — default <code>off</code>. Cidade pequena +
@@ -214,7 +214,7 @@ export function LocationCard({ onClose }: CardProps) {
           {GRANULARITY_OPTIONS.find((o) => o.value === prefs.location_granularity)?.hint}
         </div>
       </div>
-    </FullPageOverlay>
+    </FullPageCard>
   )
 }
 
@@ -223,7 +223,7 @@ export function LocationCard({ onClose }: CardProps) {
 export function MapViewCard({ onClose }: CardProps) {
   const prefs = usePrefsStore()
   return (
-    <FullPageOverlay onClose={onClose} title="mapa de spread" ariaLabel="enquadramento do mapa">
+    <FullPageCard onClose={onClose} title="mapa de spread" ariaLabel="enquadramento do mapa">
       <div className="space-y-4 p-5">
         <p className="font-mono text-[11px] leading-relaxed text-drift-muted">
           Como o mapa enquadra os pontos do post. <code>fechado</code>{' '}
@@ -256,7 +256,7 @@ export function MapViewCard({ onClose }: CardProps) {
           })}
         </div>
       </div>
-    </FullPageOverlay>
+    </FullPageCard>
   )
 }
 
@@ -311,7 +311,7 @@ export function NetworkModeCard({ onClose }: CardProps) {
   }
 
   return (
-    <FullPageOverlay onClose={onClose} title="modo de rede" ariaLabel="modo de rede">
+    <FullPageCard onClose={onClose} title="modo de rede" ariaLabel="modo de rede">
       <div className="space-y-4 p-5">
         <p className="font-mono text-[11px] leading-relaxed text-drift-muted">
           Manifesto §15 — em país que bloqueia relays Nostr, Tor
@@ -405,7 +405,7 @@ export function NetworkModeCard({ onClose }: CardProps) {
           </Alert>
         )}
       </div>
-    </FullPageOverlay>
+    </FullPageCard>
   )
 }
 
@@ -523,7 +523,7 @@ export function BlobsCard({ onClose }: CardProps) {
   }, [stats?.running])
 
   return (
-    <FullPageOverlay
+    <FullPageCard
       onClose={onClose}
       title="distribuição de blobs"
       ariaLabel="status helia ipfs"
@@ -610,7 +610,7 @@ export function BlobsCard({ onClose }: CardProps) {
           </div>
         )}
       </div>
-    </FullPageOverlay>
+    </FullPageCard>
   )
 }
 
@@ -662,7 +662,7 @@ export function DiagnosticCard({ onClose }: CardProps) {
   }
 
   return (
-    <FullPageOverlay
+    <FullPageCard
       onClose={onClose}
       title="diagnóstico"
       ariaLabel="diagnóstico — redefinir cache"
@@ -683,6 +683,6 @@ export function DiagnosticCard({ onClose }: CardProps) {
           {rebuilding ? 'reconstruindo…' : '↻ redefinir cache local'}
         </button>
       </div>
-    </FullPageOverlay>
+    </FullPageCard>
   )
 }
