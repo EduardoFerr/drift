@@ -1,4 +1,4 @@
-import { defineConfig, type PluginOption } from 'vite'
+import { defineConfig, type PluginOption, type UserConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import basicSsl from '@vitejs/plugin-basic-ssl'
@@ -49,7 +49,7 @@ async function maybeVisualizer(): Promise<PluginOption[]> {
     return []
   }
 }
-export default defineConfig(async () => ({
+export default defineConfig(async (): Promise<UserConfig> => ({
   plugins: [
     react(),
     ...(await maybeVisualizer()),
@@ -220,20 +220,67 @@ export default defineConfig(async () => ({
     exclude: ['@sqlite.org/sqlite-wasm'],
   },
   build: {
-    // Track B: dá nome explícito aos chunks de Helia/libp2p pra que
-    // o regex de runtimeCaching (em workbox acima) e o Glob de
-    // precache os identifiquem. Sem isso, Vite emite `index-<hash>.js`
-    // genérico e o lazy-chunks bucket do SW não bate.
+    // Round CWV-2 (2026-05-09): sourcemaps em prod 'hidden' — gera .map
+    // ao lado dos .js mas o bundle minified NÃO referencia
+    // (`//# sourceMappingURL=` omitido). Lighthouse para de queixar de
+    // "Missing source maps", e debug em prod ainda funciona uploadando
+    // .map manualmente. Manifesto §17 (sem chave mestra) não regride —
+    // bundle não embute segredos (nsec/master key nunca em runtime).
+    sourcemap: 'hidden',
+    // Round CWV-2 §3.1 (Ted RFC) — Helia preload fix. Vite default emite
+    // `<link rel="modulepreload">` pra todos os chunks alcançáveis no
+    // graph estático, incluindo dynamic imports descobertos
+    // (Image.tsx:116 → blobs → helia-deps). Browser baixa 313KB de
+    // Helia/libp2p ANTES do user precisar — bug confirmado em
+    // Lighthouse 2026-05-09 (LCP 3.8s, -2.1s estimado pra fix).
+    //
+    // Solução cirúrgica: filtra chunks lazy do preload graph, preserva
+    // preload pros chunks realmente críticos (entry → react-dom →
+    // nostr-tools).
+    modulePreload: {
+      polyfill: true,
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      resolveDependencies: (_filename: string, deps: string[]) => {
+        // Lazy chunks que NÃO devem ser preloaded:
+        //   - helia-deps    Track B (NIP-94 blobs/pin), Settings → Pin
+        //   - maplibre-gl   Mapa overlay (1.1 MB)
+        //   - tesselator    Deck.gl ArcLayer (467 KB)
+        //   - rebroadcast   re-broadcast oportunista (Fase 5)
+        const lazyChunks = /^(?:helia-deps|maplibre-gl|tesselator|rebroadcast)/
+        return deps.filter((d: string) => !lazyChunks.test(d))
+      },
+    },
     rollupOptions: {
       output: {
-        manualChunks(id) {
+        // Round CWV-2 §3.3 — vendor splitting pra cache stability.
+        // Re-deploy de feed.ts não invalida React/ReactDOM/nostr-tools
+        // no cache do user. Repeat-visit LCP melhora dramaticamente.
+        manualChunks(id: string) {
+          // React + ReactDOM + scheduler — vendor mais estável.
+          if (/[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/.test(id)) {
+            return 'vendor-react'
+          }
+          // nostr-tools + crypto primitives. Atenção: @noble/secp256k1
+          // e @noble/hashes saem do regex helia-deps porque nostr-tools
+          // depende deles tb — vendor-nostr é onde vivem agora.
+          if (
+            /[\\/]node_modules[\\/](nostr-tools|@noble[\\/]secp256k1|@noble[\\/]hashes|@scure)[\\/]/.test(id)
+          ) {
+            return 'vendor-nostr'
+          }
+          // Framer Motion — UI gestures + variants. Eager (PostCard
+          // mount usa) mas estável → cache hit em redeploys.
+          if (/[\\/]node_modules[\\/]framer-motion[\\/]/.test(id)) {
+            return 'vendor-motion'
+          }
           // helia, @helia/*, libp2p, @libp2p/*, @chainsafe/* (libp2p
           // family), multiformats, blockstore-*, datastore-* — agrupa
           // tudo num único chunk grande "helia-deps". Vite ainda
           // code-splita o que for usado por outras rotas; este é só o
-          // hint de naming.
+          // hint de naming. @noble/secp256k1 + @noble/hashes movidos
+          // pra vendor-nostr (Round CWV-2).
           if (
-            /[\\/]node_modules[\\/](helia|@helia|libp2p|@libp2p|@chainsafe|multiformats|blockstore-|datastore-|interface-blockstore|interface-datastore|interface-store|@multiformats|protons-runtime|uint8arrays|@noble[\\/]ed25519|@noble[\\/]secp256k1|@noble[\\/]hashes|it-[a-z]+|p-defer|p-queue|p-event|p-fifo|any-signal|race-event|merge-options|abortable-iterator|hashlru|progress-events|murmurhash3|just-safe-stringify)[\\/]/.test(id)
+            /[\\/]node_modules[\\/](helia|@helia|libp2p|@libp2p|@chainsafe|multiformats|blockstore-|datastore-|interface-blockstore|interface-datastore|interface-store|@multiformats|protons-runtime|uint8arrays|@noble[\\/]ed25519|it-[a-z]+|p-defer|p-queue|p-event|p-fifo|any-signal|race-event|merge-options|abortable-iterator|hashlru|progress-events|murmurhash3|just-safe-stringify)[\\/]/.test(id)
           ) {
             return 'helia-deps'
           }
