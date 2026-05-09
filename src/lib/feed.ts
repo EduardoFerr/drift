@@ -209,10 +209,20 @@ export function markFeedSeen(): void {
  * Troca a tab do feed. Dispara refresh imediato pra a nova query
  * carregar — UI vê transição. Manifesto §24: cada tab é só uma view
  * sobre os mesmos dados, score determinístico inalterado.
+ *
+ * Zera unseenByTab[newTab] no switch — user trocou pra ela, vai ver o
+ * conteúdo, dot indicator deve sumir imediatamente. Sem isso, badge
+ * persiste mesmo após user "ver" a tab (combinado com bumpUnseenCount
+ * que incrementa todas as tabs, criava sensação de "sempre tem novo").
+ * User feedback 2026-05-08.
  */
 export async function setFeedTab(tab: FeedTab): Promise<void> {
   if (useFeedStore.getState().tab === tab) return
-  useFeedStore.setState({ tab, loaded: false })
+  useFeedStore.setState((s) => ({
+    tab,
+    loaded: false,
+    unseenByTab: { ...s.unseenByTab, [tab]: 0 },
+  }))
   await refreshFeed()
 }
 
