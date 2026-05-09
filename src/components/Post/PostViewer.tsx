@@ -20,7 +20,9 @@
  * a transição React é instantânea — sem fetch, sem flash.
  */
 
-import { useEffect, useState } from 'react'
+import { lazy, useEffect, useState } from 'react'
+import { LazyBoundary } from '../UI/LazyBoundary'
+import { DriftSkeleton } from '../UI/DriftSkeleton'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { MOTION } from '../../lib/motion'
 import {
@@ -39,10 +41,17 @@ import { db } from '../../lib/db'
 import { timeAgo } from '../../lib/format'
 import { SwipeHandler } from './SwipeHandler'
 import { SubpostCarousel } from './SubpostCarousel'
-import { ReportModal } from './ReportModal'
 import { ThreadView } from './ThreadView'
 import { useCommentCountsStore } from '../../lib/comment-counts'
-import { SpreadMap } from '../Feed/SpreadMap'
+
+// Round CWV-2 — lazy: ReportModal (raríssimo, gesture explícito) e
+// SpreadMap (1.1 MB MapLibre + Deck.gl ArcLayer, só ao abrir map toggle).
+const ReportModal = lazy(() =>
+  import('./ReportModal').then((m) => ({ default: m.ReportModal })),
+)
+const SpreadMap = lazy(() =>
+  import('../Feed/SpreadMap').then((m) => ({ default: m.SpreadMap })),
+)
 import { SlideUpOverlay } from '../UI/SlideUpOverlay'
 import { ModalHeader } from '../UI/ModalHeader'
 import { GlassIconButton } from '../UI/GlassIconButton'
@@ -404,11 +413,13 @@ export function PostViewer({
             exit={{ height: 0, opacity: 0 }}
             className="overflow-hidden border-b border-drift-border"
           >
-            <SpreadMap
-              postId={post.id}
-              className="h-60 w-full"
-              {...(onOpenLocationSettings ? { onOpenLocationSettings } : {})}
-            />
+            <LazyBoundary fallback={<DriftSkeleton variant="image" aspect="16/9" />}>
+              <SpreadMap
+                postId={post.id}
+                className="h-60 w-full"
+                {...(onOpenLocationSettings ? { onOpenLocationSettings } : {})}
+              />
+            </LazyBoundary>
           </motion.div>
         )}
       </AnimatePresence>
@@ -613,12 +624,14 @@ export function PostViewer({
 
       <AnimatePresence>
         {showReport && (
-          <ReportModal
-            post={post}
-            pending={reporting}
-            onSubmit={handleReport}
-            onClose={() => setShowReport(false)}
-          />
+          <LazyBoundary fallback={<DriftSkeleton variant="card" />}>
+            <ReportModal
+              post={post}
+              pending={reporting}
+              onSubmit={handleReport}
+              onClose={() => setShowReport(false)}
+            />
+          </LazyBoundary>
         )}
       </AnimatePresence>
 

@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+﻿import { lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import { OPTIMISTIC_TIMEOUT_MS, CLIENT_VERSION } from './config/constants'
@@ -29,22 +29,7 @@ import {
 import { getPrefs, usePrefsStore } from './lib/prefs'
 import { useUserWeight } from './hooks/useUserWeight'
 import { useInstallPrompt } from './hooks/useInstallPrompt'
-import { IdentityPanel } from './components/Identity/IdentityPanel'
-import { IdentitySwitcher } from './components/Identity/IdentitySwitcher'
 import { PostViewer } from './components/Post/PostViewer'
-import { ComposeOverlay } from './components/Create/ComposeOverlay'
-import {
-  FiltersCard,
-  LocationCard,
-  MapViewCard,
-  NetworkModeCard,
-  BlobsCard,
-  DiagnosticCard,
-} from './components/Settings/SettingsCards'
-import { RelaySettings } from './components/Settings/RelaySettings'
-import { LocalListsSettings } from './components/Settings/LocalListsSettings'
-import { OnboardingOverlay } from './components/Onboarding/OnboardingOverlay'
-import { ProfileModal } from './components/Profile/ProfileModal'
 import { GpsErrorBanner } from './components/UI/GpsErrorBanner'
 import { MultiTabModal } from './components/UI/MultiTabModal'
 import { UpdatePrompt } from './components/UI/UpdatePrompt'
@@ -52,6 +37,61 @@ import { DialogHost } from './components/UI/DialogHost'
 import { dialog } from './lib/dialog'
 import { NavBar } from './components/UI/NavBar'
 import { FullPageCard } from './components/UI/FullPageCard'
+import { LazyBoundary } from './components/UI/LazyBoundary'
+import { DriftSkeleton } from './components/UI/DriftSkeleton'
+
+// Round CWV-2 §3.2 — Lazy boundaries pra todos os modal/overlay roots
+// que NÃO entram no first paint do feed. Reduz entry chunk em ~86 KB
+// (Ted RFC §2.1 estimate). Cada um vira chunk próprio com hash dedicado;
+// LazyBoundary (Suspense + ErrorBoundary) trata fetch failure.
+//
+// SettingsCards exporta 6 componentes — `lazy()` precisa default export
+// shape, então wrapping individual via `.then(m => ({ default: m.X }))`.
+const FiltersCard = lazy(() =>
+  import('./components/Settings/SettingsCards').then((m) => ({ default: m.FiltersCard })),
+)
+const LocationCard = lazy(() =>
+  import('./components/Settings/SettingsCards').then((m) => ({ default: m.LocationCard })),
+)
+const MapViewCard = lazy(() =>
+  import('./components/Settings/SettingsCards').then((m) => ({ default: m.MapViewCard })),
+)
+const NetworkModeCard = lazy(() =>
+  import('./components/Settings/SettingsCards').then((m) => ({ default: m.NetworkModeCard })),
+)
+const BlobsCard = lazy(() =>
+  import('./components/Settings/SettingsCards').then((m) => ({ default: m.BlobsCard })),
+)
+const DiagnosticCard = lazy(() =>
+  import('./components/Settings/SettingsCards').then((m) => ({ default: m.DiagnosticCard })),
+)
+const RelaySettings = lazy(() =>
+  import('./components/Settings/RelaySettings').then((m) => ({ default: m.RelaySettings })),
+)
+const LocalListsSettings = lazy(() =>
+  import('./components/Settings/LocalListsSettings').then((m) => ({
+    default: m.LocalListsSettings,
+  })),
+)
+const OnboardingOverlay = lazy(() =>
+  import('./components/Onboarding/OnboardingOverlay').then((m) => ({
+    default: m.OnboardingOverlay,
+  })),
+)
+const ProfileModal = lazy(() =>
+  import('./components/Profile/ProfileModal').then((m) => ({ default: m.ProfileModal })),
+)
+const IdentityPanel = lazy(() =>
+  import('./components/Identity/IdentityPanel').then((m) => ({ default: m.IdentityPanel })),
+)
+const IdentitySwitcher = lazy(() =>
+  import('./components/Identity/IdentitySwitcher').then((m) => ({
+    default: m.IdentitySwitcher,
+  })),
+)
+const ComposeOverlay = lazy(() =>
+  import('./components/Create/ComposeOverlay').then((m) => ({ default: m.ComposeOverlay })),
+)
 import {
   MapIcon,
   SlidersIcon,
@@ -73,7 +113,11 @@ import {
   ShieldIcon,
   PinOffIcon,
 } from './components/UI/Icons'
-import { SpreadMap } from './components/Feed/SpreadMap'
+// SpreadMap pull MapLibre GL (1.1 MB) + Deck.gl ArcLayer (467 KB) —
+// só carrega quando user abre overlay de mapa. Ver MapOverlay abaixo.
+const SpreadMap = lazy(() =>
+  import('./components/Feed/SpreadMap').then((m) => ({ default: m.SpreadMap })),
+)
 import type {
   DriftIdentity,
   LocationGranularity,
@@ -815,13 +859,15 @@ function App() {
           + DRIFT ↑. */}
       <AnimatePresence>
         {showCreate && (
-          <ComposeOverlay
-            publishing={publishing}
-            capturingLocation={gpsCapturing.has('__publish__')}
-            maxSubposts={userWeight.maxSubposts}
-            onClose={() => setShowCreate(false)}
-            onPublish={handlePublish}
-          />
+          <LazyBoundary fallback={<DriftSkeleton variant="card" />}>
+            <ComposeOverlay
+              publishing={publishing}
+              capturingLocation={gpsCapturing.has('__publish__')}
+              maxSubposts={userWeight.maxSubposts}
+              onClose={() => setShowCreate(false)}
+              onPublish={handlePublish}
+            />
+          </LazyBoundary>
         )}
       </AnimatePresence>
 
@@ -957,27 +1003,45 @@ function App() {
       {/* V9.2d — cards focados (substituem routing pra ContentSettings
           monolítica). Cada um abre como FullPageCard próprio. */}
       <AnimatePresence>
-        {showFilters && <FiltersCard onClose={() => setShowFilters(false)} />}
+        {showFilters && (
+          <LazyBoundary fallback={<DriftSkeleton variant="card" />}>
+            <FiltersCard onClose={() => setShowFilters(false)} />
+          </LazyBoundary>
+        )}
       </AnimatePresence>
       <AnimatePresence>
-        {showLocation && <LocationCard onClose={() => setShowLocation(false)} />}
+        {showLocation && (
+          <LazyBoundary fallback={<DriftSkeleton variant="card" />}>
+            <LocationCard onClose={() => setShowLocation(false)} />
+          </LazyBoundary>
+        )}
       </AnimatePresence>
       <AnimatePresence>
-        {showMapView && <MapViewCard onClose={() => setShowMapView(false)} />}
+        {showMapView && (
+          <LazyBoundary fallback={<DriftSkeleton variant="card" />}>
+            <MapViewCard onClose={() => setShowMapView(false)} />
+          </LazyBoundary>
+        )}
       </AnimatePresence>
       <AnimatePresence>
         {showNetworkMode && (
-          <NetworkModeCard onClose={() => setShowNetworkMode(false)} />
+          <LazyBoundary fallback={<DriftSkeleton variant="card" />}>
+            <NetworkModeCard onClose={() => setShowNetworkMode(false)} />
+          </LazyBoundary>
         )}
       </AnimatePresence>
       <AnimatePresence>
         {showBlobsCard && (
-          <BlobsCard onClose={() => setShowBlobsCard(false)} />
+          <LazyBoundary fallback={<DriftSkeleton variant="card" />}>
+            <BlobsCard onClose={() => setShowBlobsCard(false)} />
+          </LazyBoundary>
         )}
       </AnimatePresence>
       <AnimatePresence>
         {showDiagnosticCard && (
-          <DiagnosticCard onClose={() => setShowDiagnosticCard(false)} />
+          <LazyBoundary fallback={<DriftSkeleton variant="card" />}>
+            <DiagnosticCard onClose={() => setShowDiagnosticCard(false)} />
+          </LazyBoundary>
         )}
       </AnimatePresence>
 
@@ -1044,54 +1108,66 @@ function App() {
 
       <AnimatePresence>
         {showRelays && (
-          <RelaySettings onClose={() => setShowRelays(false)} />
+          <LazyBoundary fallback={<DriftSkeleton variant="card" />}>
+            <RelaySettings onClose={() => setShowRelays(false)} />
+          </LazyBoundary>
         )}
       </AnimatePresence>
 
       <AnimatePresence>
         {showSwitcher && (
-          <IdentitySwitcher
-            onClose={() => setShowSwitcher(false)}
-            onRequestExport={() => {
-              setShowSwitcher(false)
-              setShowIdentity(true)
-            }}
-          />
+          <LazyBoundary fallback={<DriftSkeleton variant="card" />}>
+            <IdentitySwitcher
+              onClose={() => setShowSwitcher(false)}
+              onRequestExport={() => {
+                setShowSwitcher(false)
+                setShowIdentity(true)
+              }}
+            />
+          </LazyBoundary>
         )}
       </AnimatePresence>
 
       <AnimatePresence>
         {showLists && (
-          <LocalListsSettings onClose={() => setShowLists(false)} />
+          <LazyBoundary fallback={<DriftSkeleton variant="card" />}>
+            <LocalListsSettings onClose={() => setShowLists(false)} />
+          </LazyBoundary>
         )}
       </AnimatePresence>
 
       <AnimatePresence>
         {showProfile && boot.identity && (
-          <ProfileModal
-            identity={boot.identity}
-            onClose={() => setShowProfile(false)}
-          />
+          <LazyBoundary fallback={<DriftSkeleton variant="card" />}>
+            <ProfileModal
+              identity={boot.identity}
+              onClose={() => setShowProfile(false)}
+            />
+          </LazyBoundary>
         )}
       </AnimatePresence>
 
       <AnimatePresence>
         {showOnboarding && (
-          <OnboardingOverlay
-            onClose={() => setShowOnboarding(false)}
-            onOpenIdentity={() => {
-              setShowOnboarding(false)
-              setShowIdentity(true)
-            }}
-          />
+          <LazyBoundary fallback={<DriftSkeleton variant="card" />}>
+            <OnboardingOverlay
+              onClose={() => setShowOnboarding(false)}
+              onOpenIdentity={() => {
+                setShowOnboarding(false)
+                setShowIdentity(true)
+              }}
+            />
+          </LazyBoundary>
         )}
       </AnimatePresence>
 
       {showIdentity && boot.identity && (
-        <IdentityPanel
-          identity={boot.identity}
-          onClose={() => setShowIdentity(false)}
-        />
+        <LazyBoundary fallback={<DriftSkeleton variant="card" />}>
+          <IdentityPanel
+            identity={boot.identity}
+            onClose={() => setShowIdentity(false)}
+          />
+        </LazyBoundary>
       )}
     </div>
   )
@@ -1505,14 +1581,16 @@ function MapOverlay({
       ariaLabel="mapa de propagação"
     >
       <div className="relative h-full w-full">
-        <SpreadMap
-          postId={postId}
-          mode={mapMode}
-          onModeChange={setMapMode}
-          className="h-full w-full"
-          onOpenLocationSettings={onOpenLocationSettings}
-          {...(currentPost ? { currentPostId: currentPost.id } : {})}
-        />
+        <LazyBoundary fallback={<DriftSkeleton variant="image" aspect="16/9" />}>
+          <SpreadMap
+            postId={postId}
+            mode={mapMode}
+            onModeChange={setMapMode}
+            className="h-full w-full"
+            onOpenLocationSettings={onOpenLocationSettings}
+            {...(currentPost ? { currentPostId: currentPost.id } : {})}
+          />
+        </LazyBoundary>
       </div>
     </FullPageCard>
   )
