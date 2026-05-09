@@ -1,11 +1,19 @@
 ﻿/**
- * ComposeOverlay — V9 full-page editor de post (mockup v0.7).
+ * ComposeOverlay — V9.1 full-page editor de post (auto-layout).
  *
  * Substitui o SubpostEditor modal (V7) pelo padrão do mockup: página
- * fullscreen com csub dots numerados (1, 2, 3, +) no topo, layout
- * chips horizontal, drop area condicional (visível só em RETRATO/
- * PAISAGEM), textarea flex-1, footer com botões `-SUB` (delete current)
- * e `DRIFT ↑` full-width.
+ * fullscreen com csub dots numerados (1, 2, 3, +) no topo, drop area
+ * sempre visível, textarea flex-1, footer com botões `-SUB` (delete
+ * current) e `DRIFT ↑` full-width.
+ *
+ * **V9.1 — auto-inferência de layout (2026-05-09):** removidos os 3
+ * botões RETRATO/PAISAGEM/TEXTO. Layout é inferido por
+ * `lib/layout-inference.ts:inferLayout()` no momento do publish a
+ * partir de (a) presença de imagem e (b) aspect ratio do `meta.dim`.
+ * Mesmo input → mesmo layout (manifesto §7 determinismo). User pode
+ * controlar layout indireto via aspect ratio da foto que escolhe; o
+ * wire format (`Subpost.layout` no content JSON) permanece inalterado
+ * pra compat com SubpostLayout.tsx exhaustive switch e posts antigos.
  *
  * Interação:
  * - Apenas 1 subpost visível por vez (currentIdx)
@@ -13,6 +21,9 @@
  * - Click no `+` = adiciona novo subpost (até maxSubposts)
  * - Click `-SUB` = remove subpost atual (só visível se >1 subpost)
  * - Click `DRIFT ↑` = publica todos os subposts não-vazios
+ *
+ * Validação: cada subpost permitido com (texto OU imagem); não exige
+ * ambos. Post inteiro requer ≥1 subpost não-vazio.
  *
  * Estado interno (drafts/CW/idx) — não compartilhado com SubpostEditor
  * legado. Quando publish completa, App.tsx fecha o overlay e o
@@ -28,12 +39,10 @@
 import { useState } from 'react'
 import {
   CONTENT_WARNING_VALUES,
-  LAYOUT_VALUES,
-  DEFAULT_LAYOUT,
   type Subpost,
   type ContentWarning,
-  type LayoutKind,
 } from '../../types/drift'
+import { inferLayout } from '../../lib/layout-inference'
 import { uploadBlob, BlobError } from '../../lib/blobs'
 import { UploadError } from '../../lib/upload'
 import type { BlobMeta } from '../../lib/nip94'
@@ -70,7 +79,6 @@ interface DraftSubpost {
   blobMeta: BlobMeta | null
   uploading: boolean
   uploadError: string | null
-  layout: LayoutKind
 }
 
 function newDraft(): DraftSubpost {
@@ -82,7 +90,6 @@ function newDraft(): DraftSubpost {
     blobMeta: null,
     uploading: false,
     uploadError: null,
-    layout: DEFAULT_LAYOUT,
   }
 }
 
@@ -97,13 +104,17 @@ function draftToSubpost(d: DraftSubpost, order: number): Subpost {
       ? 'text+image'
       : 'image'
     : 'text'
+  // V9.1: layout inferido automaticamente. Determinístico (§7) — depende
+  // só do que o user efetivamente colocou no subpost (texto + imagem +
+  // dim do blob). Wire format Subpost.layout permanece populated.
+  const layout = inferLayout(d.text, d.imageUrl, d.blobMeta)
   return {
     id: d.id,
     type,
     text,
     imageUrl: d.imageUrl,
     order,
-    layout: d.layout,
+    layout,
   }
 }
 
@@ -201,14 +212,6 @@ export function ComposeOverlay({
     setContentWarning(null)
   }
 
-  // Layout = label tradução pra UI (mockup: TEXTO/RETRATO/PAISAGEM).
-  const LAYOUT_LABELS: Record<LayoutKind, { label: string; icon: string }> = {
-    text: { label: 'texto', icon: '≡' },
-    portrait: { label: 'retrato', icon: '▯' },
-    landscape: { label: 'paisagem', icon: '▭' },
-  }
-
-  const showImagePicker = draft.layout !== 'text'
   const remaining = DRIFT_LIMITS.TEXT_MAX_CHARS - draft.text.length
   const overLimit = remaining < 0
   // Round 4 Fase B (F-27 friction fix): counter "62 chars" → "X / Y"
@@ -327,55 +330,32 @@ export function ComposeOverlay({
           </span>
         </div>
 
-        {/* Editor body — scrollable se viewport curto. */}
+        {/* Editor body — scrollable se viewport curto.
+            V9.1 (2026-05-09): removido layout picker (RETRATO/PAISAGEM/
+            TEXTO). Drop area sempre visível (opcional); textarea sempre
+            visível (opcional). Layout inferido automaticamente no publish
+            via lib/layout-inference.ts (manifesto §7 determinismo). */}
         <div className="flex min-h-0 flex-1 flex-col gap-[10px] overflow-y-auto px-[18px] py-[14px]">
-          {/* Layout picker (mockup .lp). */}
-          <div
-            className="flex shrink-0 gap-[7px]"
-            role="radiogroup"
-            aria-label="layout do subpost"
-          >
-            {LAYOUT_VALUES.map((kind) => {
-              const isActive = draft.layout === kind
-              const meta = LAYOUT_LABELS[kind]
-              return (
-                <button
-                  key={kind}
-                  onClick={() => updateCurrent({ layout: kind })}
-                  role="radio"
-                  aria-checked={isActive}
-                  className={`flex flex-1 items-center justify-center gap-[5px] rounded-sm border-[1.5px] py-[8px] font-mono text-[9px] uppercase tracking-meta transition-colors focus:outline-none focus:ring-1 focus:ring-drift-accent2 focus:ring-offset-2 focus:ring-offset-drift-bg ${
-                    isActive
-                      ? 'border-drift-accent text-drift-accent'
-                      : 'border-drift-border text-drift-muted hover:border-drift-text hover:text-drift-text'
-                  }`}
-                >
-                  <span aria-hidden="true">{meta.icon}</span>
-                  <span>{meta.label}</span>
-                </button>
-              )
-            })}
-          </div>
-
-          {/* Drop area (.img-drop) — visível só em retrato/paisagem. */}
-          {showImagePicker && (
-            <ImageDrop
-              draft={draft}
-              onFile={handleFile}
-              onClear={clearImage}
-            />
-          )}
+          {/* Drop area (.img-drop) — sempre visível. User pode pular
+              (post só-texto) ou anexar (auto-infere portrait/landscape
+              por aspect ratio). */}
+          <ImageDrop
+            draft={draft}
+            onFile={handleFile}
+            onClear={clearImage}
+          />
 
           {/* Textarea (.post-ta) flex:1. Min-height pra evitar CLS quando
-              imagem é adicionada/removida (drop area aparece/some). */}
+              imagem é adicionada/removida. Placeholder genérico —
+              caption opcional, post de texto puro também aceito. */}
           <div className="flex min-h-0 flex-1 flex-col">
             <textarea
               value={draft.text}
               onChange={(e) => updateCurrent({ text: e.target.value })}
               placeholder={
-                draft.layout === 'text'
-                  ? 'escreva o que vai derivar…'
-                  : 'legenda (opcional)…'
+                draft.imageUrl
+                  ? 'legenda (opcional)…'
+                  : 'escreva o que vai derivar… (ou anexe uma imagem)'
               }
               rows={5}
               data-subpost-input={safeIdx === 0 ? '' : undefined}
