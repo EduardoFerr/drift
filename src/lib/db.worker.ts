@@ -126,6 +126,18 @@ async function init(schema: string): Promise<{ hasOpfs: boolean; storage: Storag
   }
   log(`banco aberto (modo: ${storageMode}) · executando schema…`)
 
+  // PRAGMA busy_timeout = 5000 — quando uma operação encontra o DB locked
+  // (raro em single-worker, mas pode ocorrer em race windows com OPFS sync
+  // access handles), retry automático por até 5s antes de falhar com
+  // SQLITE_BUSY. Default sqlite-wasm é 0 (fail immediate).
+  // User feedback 2026-05-09: "SQLITE_BUSY: result code 5: database is
+  // locked" durante uso normal — sem busy_timeout, qualquer contenção
+  // momentânea (e.g., schema migration concorrente com first invalidateFeed)
+  // explode visivelmente. 5000ms é largo o suficiente pra absorver retries
+  // de lock contention típica em OPFS WASM (Drift faz <100 op/s típico).
+  // Aplicado APÓS open + ANTES de schema.exec pra cobrir migrações.
+  db.exec('PRAGMA busy_timeout = 5000')
+
   db.exec(schema)
   log('schema aplicado com sucesso')
 
