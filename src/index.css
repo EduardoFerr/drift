@@ -18,6 +18,42 @@
 @import '@fontsource/dm-mono/500.css';
 @import '@fontsource/dm-mono/300-italic.css';
 
+/*
+ * Round CWV-2 §3.4 — Font optimization. @fontsource ships
+ * `font-display: swap` por default em versões recentes, mas reforça
+ * explicitamente — Lighthouse audit (Robin §3.4.1) marca FOIT como
+ * regressão CLS/LCP. Override roda DEPOIS dos @import (cascata CSS),
+ * sobrescrevendo descriptors do @fontsource.
+ *
+ * `size-adjust` + `ascent-override` + `descent-override` +
+ * `line-gap-override` alinham métricas do fallback com a font custom,
+ * eliminando CLS de FOUT (-0.03 CLS estimado, Robin §3.4.3).
+ *
+ * Métricas Syne (display, OFL): em 1000 units/em
+ *   ascent  900, descent 250, line-gap 0  → ascent-override 90%, descent-override 25%
+ * Métricas DM Mono (body): em 1000 units/em
+ *   ascent  928, descent 235, line-gap 0  → ascent-override 92.8%, descent-override 23.5%
+ *
+ * Subset PT-BR DEFER (Robin §12) — latin completo necessário; ROI ~15 KB
+ * marginal vs. complexidade de pipeline custom.
+ */
+@font-face {
+  font-family: 'Syne Variable';
+  font-display: swap;
+  size-adjust: 100%;
+  ascent-override: 90%;
+  descent-override: 25%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: 'DM Mono';
+  font-display: swap;
+  size-adjust: 100%;
+  ascent-override: 92.8%;
+  descent-override: 23.5%;
+  line-gap-override: 0%;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
