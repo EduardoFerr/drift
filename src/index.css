@@ -38,7 +38,8 @@
   --drift-accent2: #5affd4;
   /* Type */
   --drift-text: #f0f0ea;
-  --drift-muted: #4a4a46;
+  /* muted bumped 2026-05-08: 3.7:1 -> 4.5:1+ WCAG AA. Vide tailwind.config.js. */
+  --drift-muted: #6b6b66;
   /* Role (protocolo) */
   --drift-spread: #34d399;
   --drift-bury: #f87171;

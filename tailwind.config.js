@@ -34,7 +34,12 @@ export default {
           accent2: '#5affd4',
           // Type tokens
           text: '#f0f0ea',
-          muted: '#4a4a46',
+          // muted bumped 2026-05-08: #4a4a46 -> #6b6b66 pra atingir
+          // WCAG AA contrast (4.5:1+) sobre drift-surface (#15151a).
+          // AY-4 do Robin QA #1 confirmava 3.7:1 fail. Bump deliberado
+          // pelos 5 personas HIMYM antes de Round 4 enforcement (slate-*
+          // → drift-muted purge) pra evitar rework duplo.
+          muted: '#6b6b66',
           // Body italic — mockup v0.7. CSS var permite override dinâmico,
           // fallback estático garante render se var sumir.
           body: 'var(--drift-body, #787874)',
