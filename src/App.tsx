@@ -1891,6 +1891,56 @@ function InstallModal({
 // ─── Bootstrap view ─────────────────────────────────────────────────
 
 function BootView({ state }: { state: BootState }) {
+  // User feedback 2026-05-09: bootstrap errors precisam de recovery
+  // actions inline. Cada Check ganha botão discreto na própria etapa
+  // que falhou — usuário comum encontra mitigação no contexto.
+  const reloadPage = () => window.location.reload()
+  const clearLocalAndReload = async () => {
+    try {
+      // Limpa OPFS storage (sqlite-wasm) + IndexedDB (master key) +
+      // localStorage. Identity é recriada no próximo boot — backup
+      // export antes é responsabilidade do user (warning no UI).
+      const ok = await dialog.confirm(
+        'isso vai apagar todos os dados locais (cache de posts, feed, configurações). identidade nsec será regenerada — exporta antes se quiser preservar. continuar?',
+        { title: 'limpar local + recarregar', dangerous: true, okLabel: 'limpar' },
+      )
+      if (!ok) return
+      try {
+        // OPFS root.remove() — não-tipado em todos os browsers; cast pra
+        // any pra contornar lib.dom.d.ts incompleta. Best-effort.
+        const root = await navigator.storage?.getDirectory?.()
+        if (root) {
+          // Itera entries e apaga tudo (mais portável que root.remove inexistente).
+          // @ts-expect-error: FileSystemDirectoryHandle async iteration é nova
+          for await (const [name] of root.entries()) {
+            try {
+              await root.removeEntry(name, { recursive: true })
+            } catch {
+              /* ignore individual entry failures */
+            }
+          }
+        }
+      } catch {
+        /* OPFS clean best-effort */
+      }
+      try {
+        const dbs = await indexedDB.databases?.()
+        for (const d of dbs ?? []) if (d.name) indexedDB.deleteDatabase(d.name)
+      } catch {
+        /* IDB clean best-effort */
+      }
+      try {
+        localStorage.clear()
+      } catch {
+        /* localStorage clean best-effort */
+      }
+      window.location.reload()
+    } catch (err) {
+      console.error('clearLocalAndReload falhou:', err)
+      window.location.reload()
+    }
+  }
+
   return (
     <main className="min-h-full p-6 font-mono text-sm sm:p-10">
       <div className="mx-auto max-w-2xl">
@@ -1898,7 +1948,7 @@ function BootView({ state }: { state: BootState }) {
           <h1 className="font-display text-[25px] font-extrabold leading-none tracking-[-0.5px] text-drift-text">
             dri<em className="not-italic text-drift-accent">ft</em>
           </h1>
-          <p className="mt-2 text-xs uppercase tracking-widest text-slate-400">
+          <p className="mt-2 text-xs uppercase tracking-widest text-drift-muted">
             Bootstrap · {state.step}
           </p>
         </header>
@@ -1911,7 +1961,16 @@ function BootView({ state }: { state: BootState }) {
               ? 'verificando…'
               : state.isolated
               ? 'COOP/COEP ativos · OPFS disponível'
-              : 'COOP/COEP inativos · SharedArrayBuffer indisponível'
+              : 'COOP/COEP inativos · recarregue a página ou tente em outro navegador'
+          }
+          action={
+            state.isolated === false
+              ? {
+                  label: '↻ recarregar',
+                  onClick: reloadPage,
+                  title: 'recarrega a página — COOP/COEP costumam vir em segundo load',
+                }
+              : undefined
           }
         />
         <Check
@@ -1935,6 +1994,15 @@ function BootView({ state }: { state: BootState }) {
               : state.storage === 'kvvfs'
               ? 'storage: localStorage (~5MB · Safari < 17 ou contexto sem OPFS)'
               : 'storage: memória — banco NÃO persiste após reload'
+          }
+          action={
+            state.storage === 'memory'
+              ? {
+                  label: '↻ recarregar',
+                  onClick: reloadPage,
+                  title: 'tenta abrir OPFS de novo — modo memória é fallback temporário',
+                }
+              : undefined
           }
         />
         <Check
@@ -1992,12 +2060,43 @@ function BootView({ state }: { state: BootState }) {
               ? 'verificando…'
               : 'aguardando'
           }
+          action={
+            state.relays && !state.relays.every((r) => r.ok)
+              ? {
+                  label: '↻ tentar de novo',
+                  onClick: reloadPage,
+                  title: 'recarrega — relays podem estar passageiramente offline',
+                }
+              : undefined
+          }
         />
 
         {state.step === 'error' && state.error && (
-          <div className="mt-6 rounded border border-red-900/60 bg-red-950/20 p-4 text-red-300">
-            <div className="mb-2 text-xs uppercase tracking-widest">erro</div>
-            <pre className="whitespace-pre-wrap break-words text-xs">{state.error}</pre>
+          <div className="mt-6 rounded border border-drift-bury/60 bg-drift-bury/10 p-4 text-drift-bury">
+            <div className="mb-2 text-xs uppercase tracking-widest">erro · bootstrap interrompido</div>
+            <pre className="mb-4 whitespace-pre-wrap break-words text-xs">{state.error}</pre>
+            <p className="mb-3 font-mono text-[11px] text-drift-muted">
+              tente uma das ações abaixo. se o erro persistir, exporte a
+              identidade nsec antes de limpar local.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={reloadPage}
+                className="rounded border border-drift-accent bg-drift-bg/40 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[2px] text-drift-accent transition-colors hover:bg-drift-accent/10 focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2"
+                title="recarrega a página — resolve race conditions transientes"
+              >
+                ↻ recarregar página
+              </button>
+              <button
+                type="button"
+                onClick={() => void clearLocalAndReload()}
+                className="rounded border border-drift-bury bg-drift-bg/40 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[2px] text-drift-bury transition-colors hover:bg-drift-bury/10 focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2"
+                title="apaga OPFS + IndexedDB + localStorage e recarrega — destrói dados locais"
+              >
+                ⚠ limpar local + recarregar
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -2187,10 +2286,23 @@ function Check({
   label,
   state,
   detail,
+  action,
 }: {
   label: string
   state: CheckState
   detail: string
+  /**
+   * User feedback 2026-05-09: "em casos de erro do bootstrap, devemos
+   * apresentar botões de ações para mitigar o erro e retomar". Cada
+   * Check renderiza botão discreto na própria etapa quando state=fail
+   * ou partial — user encontra mitigação no contexto, não precisa
+   * navegar até DiagnosticPanel.
+   */
+  action?: {
+    label: string
+    onClick: () => void
+    title?: string
+  }
 }) {
   const dot =
     state === 'pending' ? '◌' : state === 'ok' ? '✓' : state === 'partial' ? '◐' : state === 'fail' ? '✗' : '·'
@@ -2198,19 +2310,31 @@ function Check({
     state === 'pending'
       ? 'text-yellow-400'
       : state === 'ok'
-      ? 'text-emerald-400'
+      ? 'text-drift-spread'
       : state === 'partial'
       ? 'text-yellow-400'
       : state === 'fail'
-      ? 'text-red-400'
+      ? 'text-drift-bury'
       : 'text-drift-muted'
   return (
     <div className="mb-3 rounded border border-drift-border bg-drift-surface p-4">
       <div className="mb-2 flex items-center gap-3">
         <span className={`text-base ${color}`}>{dot}</span>
-        <span className="text-[11px] uppercase tracking-[0.2em] text-slate-400">{label}</span>
+        <span className="text-[11px] uppercase tracking-[0.2em] text-drift-muted">{label}</span>
       </div>
-      <pre className="ml-6 whitespace-pre-wrap break-all text-xs text-slate-400">{detail}</pre>
+      <pre className="ml-6 whitespace-pre-wrap break-all text-xs text-drift-muted">{detail}</pre>
+      {action && (state === 'fail' || state === 'partial') && (
+        <div className="ml-6 mt-3">
+          <button
+            type="button"
+            onClick={action.onClick}
+            title={action.title}
+            className="rounded border border-drift-accent/60 bg-drift-bg/40 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[2px] text-drift-accent transition-colors hover:border-drift-accent hover:bg-drift-accent/10 focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2"
+          >
+            {action.label}
+          </button>
+        </div>
+      )}
     </div>
   )
 }
