@@ -12,6 +12,14 @@ import {
 import { restartSync, useSyncStore } from './lib/sync'
 import { createPost, spreadPost, buryPost } from './lib/protocol'
 import { getMyAction, markFeedSeen, refreshFeed, useFeedStore } from './lib/feed'
+import {
+  advanceCursor,
+  exitAtEnd,
+  initialAnchor,
+  resolveCursorIdx,
+  setCursorByIndex,
+  type FeedCursor,
+} from './lib/feed-cursor'
 import { FeedTabs, type FeedTab } from './components/Feed/FeedTabs'
 import {
   startBoot,
@@ -303,38 +311,65 @@ function App() {
   //
   // V8: viewer modal e queue legada deletados completamente.
 
-  // V8 home stack — currentIdx + currentPost + nextHomePost.
-  // Default 0 (post mais recente). Ao chegar no fim da fila, mantém
-  // último post e swipe ↑/↓ vira no-op de avanço (mas spread/sink
-  // continuam funcionando). useMemo evita findIndex desnecessário.
+  // V8 home stack — cursor por ID + currentPost + nextHomePost.
+  //
+  // V11 (bug 2026-05-08 "swipe pula 2 posts"): rastreamos o post pelo
+  // ID em vez de índice. `posts` é re-ordenado em tempo real quando
+  // `invalidateFeed()` dispara — score recalc, evento novo, moderação.
+  // Trackear índice numérico → swipe + re-sort no mesmo tick fazia o
+  // user pular 2 posts (idx avançava pra slot que já era outro post).
+  // Trackear ID elimina a race: o post atual é estável até o user
+  // explicitamente avançar; quando avança, calculamos o ID do PRÓXIMO
+  // baseado num SNAPSHOT do array no momento do swipe.
+  //
+  // Estado por tab: `cursor.postId === null` = estado inicial (UI
+  // renderiza posts[0]); `cursor.atEnd === true` = passou do último,
+  // renderiza EndOfFeed. Lógica pura em src/lib/feed-cursor.ts pra
+  // facilitar testes em Node sem React/DOM.
   const [exitDir, setExitDir] = useState<'up' | 'down'>('up')
   // Subscreve `tab` pra que cada tab tenha sua sequência independente —
   // user feedback 2026-05-08: "Global/Seguindo/Trending cada um deveria
-  // ter sua própria sequência". `idxByTab` persiste posição por tab;
+  // ter sua própria sequência". `cursorByTab` persiste posição por tab;
   // trocar e voltar mantém onde parou. Manifesto §24 — feeds são views
   // distintas, navegação é local de cada view.
   const feedTab = useFeedStore((s) => s.tab)
-  const [idxByTab, setIdxByTab] = useState<Record<FeedTab, number>>({
+  const [cursorByTab, setCursorByTab] = useState<Record<FeedTab, FeedCursor>>({
+    global: { postId: null, atEnd: false },
+    following: { postId: null, atEnd: false },
+    trending: { postId: null, atEnd: false },
+  })
+  // Último idx válido por tab — usado pra snap quando o post atual
+  // some do feed (ex: moderação atinge threshold, score = -999 esconde).
+  // Sem isso, `findIndex(id) === -1` deixaria o user em limbo. Snap pro
+  // último idx conhecido (clampado contra posts.length atual) é o
+  // comportamento mínimo coerente: mantém posição relativa, nunca
+  // empurra pro topo nem pro fim.
+  const lastKnownIdxByTabRef = useRef<Record<FeedTab, number>>({
     global: 0,
     following: 0,
     trending: 0,
   })
-  const currentIdx = idxByTab[feedTab]
-  const setCurrentIdx = useCallback(
-    (updater: number | ((i: number) => number)) => {
-      setIdxByTab((prev) => {
-        const cur = prev[feedTab]
-        const next = typeof updater === 'function' ? updater(cur) : updater
-        return { ...prev, [feedTab]: next }
-      })
-    },
-    [feedTab],
+
+  const cursor = cursorByTab[feedTab]
+  const atEnd = cursor.atEnd && posts.length > 0
+  // Deriva idx atual do cursor (postId-aware, com snap pra lastKnown
+  // se o post sumiu). Lógica em feed-cursor.ts:resolveCursorIdx.
+  const currentIdx = useMemo(
+    () => resolveCursorIdx(cursor, posts, lastKnownIdxByTabRef.current[feedTab]),
+    [cursor, posts, feedTab],
   )
-  // Range válido pra navegação: [0..posts.length]. posts.length é o
-  // sentinel "fim do feed" — renderiza EndOfFeed em vez de PostViewer.
-  // User feedback 2026-05-08: card "trava" no último post sem feedback;
-  // permitir avançar pra fim explícito comunica "fim, recarregue".
-  const atEnd = posts.length > 0 && currentIdx >= posts.length
+
+  // Track lastKnown idx sempre que tivermos um idx válido (não atEnd,
+  // não array vazio). Stale-safe: ref não causa re-render, só mantém
+  // "memória" pra próximo snap.
+  useEffect(() => {
+    if (posts.length === 0 || atEnd) return
+    lastKnownIdxByTabRef.current = {
+      ...lastKnownIdxByTabRef.current,
+      [feedTab]: currentIdx,
+    }
+  }, [currentIdx, posts.length, atEnd, feedTab])
+
   const { currentPost, nextHomePost } = useMemo(() => {
     if (posts.length === 0 || atEnd) return { currentPost: null, nextHomePost: null }
     const safeIdx = Math.max(0, Math.min(currentIdx, posts.length - 1))
@@ -343,22 +378,39 @@ function App() {
       nextHomePost: safeIdx + 1 < posts.length ? posts[safeIdx + 1]! : null,
     }
   }, [currentIdx, posts, atEnd])
-  // Clamp do idx do tab ATUAL se posts mudou (moderação, refresh) e
-  // posição fica out-of-bounds. Não toca outros tabs.
+  // Inicialização lazy — quando posts carrega pela primeira vez E o
+  // user ainda não tem post selecionado naquela tab, ancora em posts[0].
+  // Ancorar em ID (em vez de deixar `null` permanente) é importante:
+  // assim que novos posts chegarem, o user permanece no post que estava
+  // vendo — o "topo" não se desloca embaixo dele.
   //
   // CRÍTICO: só dispara quando feedLoaded === true. Durante transição
   // de tab (setFeedTab → store loaded=false → refreshFeed async →
-  // store loaded=true), posts contém RESIDUAL da tab anterior. Se
-  // user volta pra Global no idx=5 mas posts ainda é [] do Seguindo
-  // vazio, sem este guard o clamp pisotearia idxByTab.global = 0.
-  // User feedback 2026-05-08: "ir pra tab vazia força outras tabs ao
-  // topo".
+  // store loaded=true), posts contém RESIDUAL da tab anterior. Sem
+  // esse guard, ancoraríamos a nova tab no post errado.
+  // User feedback 2026-05-08: "ir pra tab vazia força outras tabs ao topo".
   useEffect(() => {
     if (!feedLoaded) return
-    if (currentIdx > posts.length) {
-      setCurrentIdx(Math.max(0, posts.length))
-    }
-  }, [posts.length, currentIdx, setCurrentIdx, feedLoaded])
+    if (posts.length === 0) return
+    const next = initialAnchor(cursor, posts)
+    if (next === null) return
+    setCursorByTab((prev) => ({ ...prev, [feedTab]: next }))
+  }, [posts, feedLoaded, feedTab, cursor])
+
+  /** Helper: navega pro post de índice `targetIdx`. API compat pra
+   *  call sites que ainda raciocinam em termos de índice
+   *  (jumpToTop, onActiveTabTap). Snapshot da feed store no momento
+   *  do call — não depende de re-render. */
+  const setPostByIndex = useCallback(
+    (targetIdx: number) => {
+      const snapshot = useFeedStore.getState().posts
+      setCursorByTab((prev) => ({
+        ...prev,
+        [feedTab]: setCursorByIndex(prev[feedTab], snapshot, targetIdx),
+      }))
+    },
+    [feedTab],
+  )
 
   // V8: openViewer + advanceViewer (modal viewer queue) deletados —
   // home view embedded substituiu o paradigma. viewerPostId/viewerExitDir
@@ -367,14 +419,26 @@ function App() {
   // (nenhum em V8). Track futura limpa o resíduo.
 
   /**
-   * V8 home stack advance. Avança currentIdx pra próximo post.
-   * Última posição válida = `posts.length` (sentinel "fim do feed",
+   * V8 home stack advance. Avança pro próximo post.
+   *
+   * V11: snapshot do array atual no momento do swipe — `advanceCursor`
+   * (lib/feed-cursor.ts) decide o ID do próximo ANTES que
+   * `invalidateFeed()` (score recalc do spread que acabou de publicar)
+   * re-ordene `posts`. Isso elimina o bug "swipe pula 2 posts" (race
+   * UI state vs feed re-sort).
+   *
+   * Última posição válida = `cursor.atEnd` (sentinel "fim do feed",
    * renderiza EndOfFeed em vez de travar no último post). User
    * feedback 2026-05-08: travar gera ambiguidade ("acabou? travou?").
    */
   function advanceHome(dir: 'up' | 'down') {
     setExitDir(dir)
-    setCurrentIdx((i) => Math.min(i + 1, posts.length))
+    const snapshot = posts
+    const idxAtSwipe = currentIdx
+    setCursorByTab((prev) => ({
+      ...prev,
+      [feedTab]: advanceCursor(prev[feedTab], snapshot, idxAtSwipe),
+    }))
   }
 
   // Ações ──────────────────────────────────────────────────────────────
@@ -609,7 +673,7 @@ function App() {
         onOpenStatus={() => setShowStatusCard(true)}
         onOpenIdentity={() => setShowIdentity(true)}
         onOpenProfile={() => setShowProfile(true)}
-        onActiveTabTap={() => setCurrentIdx(0)}
+        onActiveTabTap={() => setPostByIndex(0)}
       />
 
       {/* Banners empilhados acima do stack. Layout flex-shrink-0 garante
@@ -678,8 +742,18 @@ function App() {
         ) : atEnd ? (
           <EndOfFeed
             tab={feedTab}
-            onBack={() => setCurrentIdx((i) => Math.max(0, i - 1))}
-            onJumpToTop={() => setCurrentIdx(0)}
+            onBack={() => {
+              // V11: voltar do EndOfFeed → último post visto. ID já
+              // está preservado no cursor (o "último" no momento que
+              // entrou em atEnd). Se aquele post sumiu, o memo
+              // currentIdx faz snap pro nearest. exitAtEnd só desliga
+              // a flag atEnd preservando postId.
+              setCursorByTab((prev) => ({
+                ...prev,
+                [feedTab]: exitAtEnd(prev[feedTab]),
+              }))
+            }}
+            onJumpToTop={() => setPostByIndex(0)}
           />
         ) : currentPost ? (
           <>
