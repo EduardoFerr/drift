@@ -340,11 +340,14 @@ describe('schema migration v9 (C.6.2)', () => {
     expect(src).toMatch(/ALTER TABLE comments ADD COLUMN content_warning TEXT/)
   })
 
-  it('db.worker.ts marker está em schema_v=9', () => {
+  it('db.worker.ts marker bumpado em schema_v=10 (Round Comments Nav Phase A)', () => {
+    // schema_v=9: content_warning em comments (Track C.6.2) — coluna ainda
+    // alterada idempotente no apply loop.
+    // schema_v=10: thread_view_mode em user_prefs (key/value, sem DDL).
     const src = readFileSync(
       resolve(__dirname, '../src/lib/db.worker.ts'),
       'utf-8',
     )
-    expect(src).toMatch(/'schema_v',\s*'9'/)
+    expect(src).toMatch(/'schema_v',\s*'10'/)
   })
 })

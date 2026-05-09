@@ -18,6 +18,10 @@
 import { useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import type { CommentNode } from '../../lib/thread-cursor'
+import {
+  LIST_INDENT_PER_LEVEL_PX,
+  LIST_INDENT_MAX_DEPTH,
+} from '../../lib/thread-list'
 import { applyContentFiltersComment } from '../../lib/feed'
 import { usePrefsStore } from '../../lib/prefs'
 import { timeAgo } from '../../lib/format'
@@ -51,7 +55,46 @@ export interface CommentCardProps {
    * (compat com qualquer caller que não esteja em ThreadView).
    */
   onDescend?: () => void
+  /**
+   * Round Comments Nav Redesign — Phase A (RFC `2026-05-rfc-comments-
+   * navigation-redesign`).
+   *
+   *  - `'card'` (default, legacy): layout fullscreen ocupa o viewport
+   *    do ThreadView (cards-mode swipe-driven). Border own, padding
+   *    generoso, font fluid-display.
+   *  - `'list'` (novo, default user-facing): compact threaded row sem
+   *    fullscreen. Indent visual via `paddingLeft = depth*12px` (cap
+   *    em depth 5 visual, manifesto §RFC §3 plateau). Border-left thread
+   *    line só pra `depth > 0`. Font fluid-base.
+   *
+   * Phase B (próximo sprint): collapse/expand persistido + virtualized
+   * list (`@tanstack/react-virtual`). Phase C: jump-to-parent pill.
+   */
+  variant?: 'card' | 'list'
+  /**
+   * Phase A (list variant) — `true` se o user clicou neste card e ele
+   * é o foco atual (ARIA `aria-selected`, border accent). `false` em
+   * list comum. Ignorado em variant='card' (cards-mode usa cursor).
+   */
+  isFocused?: boolean
+  /**
+   * Phase A (list variant) — `false` colapsa subtree (esconde respostas
+   * filhas no render do caller, footer mostra `[+ N respostas]` em vez
+   * de `[- N respostas]`). Default `true`. Ignorado em variant='card'.
+   */
+  isExpanded?: boolean
+  /**
+   * Phase A (list variant) — toggle collapse/expand do subtree. Caller
+   * mantém Set<commentId> de IDs colapsados. Ignorado em variant='card'.
+   */
+  onToggleExpand?: () => void
+  /**
+   * Phase A (list variant) — tap no body abre ReplySheet com ESTE
+   * comment como target. Ignorado em variant='card' (lá o tap é no FAB).
+   */
+  onTap?: () => void
 }
+
 
 export function CommentCard({
   node,
@@ -62,6 +105,11 @@ export function CommentCard({
   postId,
   isNew = false,
   onDescend,
+  variant = 'card',
+  isFocused = false,
+  isExpanded = true,
+  onToggleExpand,
+  onTap,
 }: CommentCardProps) {
   // fix: CC-B2 moderation override (Track C debt) — states separados pra
   // moderação (score<=-999) e CW. Compartilhar um mesmo override fazia o
@@ -100,6 +148,36 @@ export function CommentCard({
   // hardcoded 0.18 / 0.22). Reduced motion respeitado via factory.
   const reduced = useReducedMotion() ?? false
   const reveal = commentRevealVariants(reduced)
+
+  // Phase A (list variant) — render compacto, threaded, indent visual.
+  // Branch antes do return tradicional pra não inflar o card existing.
+  if (variant === 'list') {
+    return (
+      <ListVariant
+        node={node}
+        depth={depth}
+        posInSet={posInSet}
+        setSize={setSize}
+        childCount={childCount}
+        ariaLabel={ariaLabel}
+        debugProps={debugProps}
+        isNew={isNew}
+        isHidden={isHidden}
+        cwHide={cwHide}
+        cwBlur={cwBlur}
+        cwHint={cwHint}
+        overrideMod={overrideMod}
+        setOverrideMod={setOverrideMod}
+        overrideCw={overrideCw}
+        setOverrideCw={setOverrideCw}
+        setOverrideBlur={setOverrideBlur}
+        isFocused={isFocused}
+        isExpanded={isExpanded}
+        onToggleExpand={onToggleExpand}
+        onTap={onTap}
+      />
+    )
+  }
 
   return (
     <article
@@ -297,4 +375,230 @@ function HiddenPlaceholder({ onReveal }: { onReveal: () => void }) {
 function truncate(pub: string): string {
   if (pub.length <= 8) return pub
   return '…' + pub.slice(-6)
+}
+
+// ─── Phase A — list variant (Round Comments Nav Redesign) ───────────
+
+interface ListVariantProps {
+  node: CommentNode
+  depth: number
+  posInSet: number
+  setSize: number
+  childCount: number
+  ariaLabel: string
+  debugProps: Record<string, string | undefined>
+  isNew: boolean
+  isHidden: boolean
+  cwHide: boolean
+  cwBlur: boolean
+  cwHint: ReturnType<typeof applyContentFiltersComment>
+  overrideMod: boolean
+  setOverrideMod: (v: boolean) => void
+  overrideCw: boolean
+  setOverrideCw: (v: boolean) => void
+  setOverrideBlur: (v: boolean) => void
+  isFocused: boolean
+  isExpanded: boolean
+  onToggleExpand?: () => void
+  onTap?: () => void
+}
+
+/**
+ * Phase A (Round Comments Nav Redesign) — render compacto threaded.
+ *
+ * Layout (RFC §5 mockup):
+ *
+ *   [↳ thread line] @user · 2h · ▲N ▼N        [-]
+ *                   "comment text wraps here..."
+ *                   [↳ N respostas] [↵ responder]
+ *
+ * Indent: `paddingLeft = clamp(depth, 0, MAX) * PER_LEVEL_PX`. Border-left
+ * 1px só quando `depth > 0` (visual nesting hint, RFC §2 Twitter thread
+ * line + Reddit indent). Manifesto §22 score determinístico preservado
+ * (sem sort selector, ordem from buildThread).
+ */
+function ListVariant({
+  node,
+  depth,
+  posInSet,
+  setSize,
+  childCount,
+  ariaLabel,
+  debugProps,
+  isNew,
+  isHidden,
+  cwHide,
+  cwBlur,
+  cwHint,
+  setOverrideMod,
+  setOverrideCw,
+  setOverrideBlur,
+  isFocused,
+  isExpanded,
+  onToggleExpand,
+  onTap,
+}: ListVariantProps) {
+  const indentLevel = Math.min(depth, LIST_INDENT_MAX_DEPTH)
+  const paddingLeft = indentLevel * LIST_INDENT_PER_LEVEL_PX
+  const hasIndentLine = depth > 0
+
+  return (
+    <article
+      role="treeitem"
+      aria-level={depth}
+      aria-posinset={posInSet}
+      aria-setsize={setSize}
+      aria-label={ariaLabel}
+      aria-expanded={childCount > 0 ? isExpanded : undefined}
+      aria-selected={isFocused || undefined}
+      tabIndex={0}
+      {...debugProps}
+      style={{ paddingLeft }}
+      // Border-left thread line conectiva (Twitter §2.2). border-l-2
+      // alterna entre transparent / drift-accent2 (isNew, UX-5) /
+      // drift-border (depth>0). Focused vira drift-accent.
+      className={`relative flex w-full flex-col gap-1.5 border-l-2 px-3 py-3 transition-colors hover:bg-drift-surface/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2 ${
+        isFocused
+          ? 'border-l-drift-accent bg-drift-surface/60'
+          : isNew
+            ? 'border-l-drift-accent2'
+            : hasIndentLine
+              ? 'border-l-drift-border'
+              : 'border-l-transparent'
+      }`}
+    >
+      {/* Header: autor · tempo · CW chip · collapse toggle */}
+      <header className="flex items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="truncate font-display text-fluid-base font-bold uppercase tracking-tag text-drift-text">
+            anon{truncate(node.author_pub)}
+          </span>
+          <span className="shrink-0 font-mono text-[10px] uppercase tracking-meta text-drift-muted">
+            {timeAgo(node.created_at)}
+          </span>
+          {node.content_warning && (
+            <span
+              className="shrink-0 rounded border border-amber-400/60 bg-amber-500/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-meta text-amber-300"
+              title={`autor marcou: ${node.content_warning}`}
+              aria-label={`aviso de conteúdo: ${node.content_warning}`}
+            >
+              ⚠ {node.content_warning}
+            </span>
+          )}
+          {isNew && (
+            <span
+              className="shrink-0 rounded border border-drift-accent2/60 bg-drift-accent2/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-meta text-drift-accent2"
+              aria-label="comentário novo"
+            >
+              NOVO
+            </span>
+          )}
+        </div>
+        {childCount > 0 && onToggleExpand && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              onToggleExpand()
+            }}
+            className="shrink-0 rounded border border-drift-border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-meta text-drift-muted hover:border-drift-accent2 hover:text-drift-accent2 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2"
+            aria-label={
+              isExpanded
+                ? `colapsar ${childCount} ${childCount === 1 ? 'resposta' : 'respostas'}`
+                : `expandir ${childCount} ${childCount === 1 ? 'resposta' : 'respostas'}`
+            }
+            title={isExpanded ? 'colapsar' : 'expandir'}
+          >
+            {isExpanded ? '[−]' : '[+]'}
+          </button>
+        )}
+      </header>
+
+      {/* Body */}
+      {isHidden ? (
+        <HiddenPlaceholder onReveal={() => setOverrideMod(true)} />
+      ) : cwHide ? (
+        <CwHiddenPlaceholder
+          warning={cwHint.reason ?? cwHint.modReason ?? 'oculto'}
+          onReveal={() => setOverrideCw(true)}
+        />
+      ) : (
+        <div
+          className={onTap ? 'cursor-pointer' : undefined}
+          onClick={onTap}
+        >
+          {node.meta && (
+            <div
+              className={cwBlur ? 'relative cursor-pointer' : 'relative'}
+              onClick={
+                cwBlur
+                  ? (e) => {
+                      e.stopPropagation()
+                      setOverrideBlur(true)
+                    }
+                  : undefined
+              }
+            >
+              <Image
+                src={node.meta.url ?? ''}
+                meta={node.meta}
+                alt={node.meta.alt ?? ''}
+                className={`mb-2 max-h-[30vh] w-full rounded border border-drift-border object-contain transition ${
+                  cwBlur ? 'blur-xl' : ''
+                }`}
+                aspect="auto"
+                fit="contain"
+              />
+              {cwBlur && (
+                <span
+                  className="pointer-events-none absolute inset-0 flex items-center justify-center font-mono text-[10px] uppercase tracking-meta text-amber-200"
+                  aria-hidden="true"
+                >
+                  toque pra revelar
+                </span>
+              )}
+            </div>
+          )}
+          <p
+            className={`line-clamp-6 whitespace-pre-wrap break-words font-mono text-fluid-base leading-relaxed text-drift-text ${
+              cwBlur ? 'blur-sm' : ''
+            }`}
+            onClick={
+              cwBlur
+                ? (e) => {
+                    e.stopPropagation()
+                    setOverrideBlur(true)
+                  }
+                : undefined
+            }
+          >
+            {node.content}
+          </p>
+        </div>
+      )}
+
+      {/* Footer meta */}
+      <footer className="flex items-center gap-3 font-mono text-[10px] uppercase tracking-meta text-drift-muted">
+        {childCount > 0 && (
+          <span className="text-drift-accent2">
+            ↳ {childCount} {childCount === 1 ? 'resposta' : 'respostas'}
+          </span>
+        )}
+        {onTap && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              onTap()
+            }}
+            className="rounded text-drift-accent hover:text-drift-accent2 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2"
+            aria-label="responder este comentário"
+            title="responder"
+          >
+            ↵ responder
+          </button>
+        )}
+      </footer>
+    </article>
+  )
 }

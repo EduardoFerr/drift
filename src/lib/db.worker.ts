@@ -420,13 +420,21 @@ function applyMigrations(schema: string) {
     // idempotente roda no apply loop acima; aqui só bumpa o marker.
     // Sem rebuild de domínio — coluna nullable, dados antigos seguem.
 
+    // schema_v=10 (Round Comments Nav Redesign Phase A — RFC
+    // `2026-05-rfc-comments-navigation-redesign`): introduz pref
+    // `thread_view_mode` ('list' | 'cards') em user_prefs (key/value).
+    // Sem DDL — user_prefs é key/value; o row é criado on-demand pelo
+    // primeiro `setPref('thread_view_mode', …)`. Default 'list' aplicado
+    // por `prefs.ts:applyRow` (chave ausente → DEFAULT_USER_PREFS).
+    // Marker semântico só pra facilitar telemetria de migração futura.
+
     db.exec({
-      sql: `INSERT INTO user_prefs (key, value) VALUES ('schema_v', '9')
+      sql: `INSERT INTO user_prefs (key, value) VALUES ('schema_v', '10')
             ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
     })
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    log(`migração schema_v=9 FALHOU (continuando): ${msg}`)
+    log(`migração schema_v=10 FALHOU (continuando): ${msg}`)
   }
 
   // Auto-recuperação: se alguma migração falhou, rebuild do schema de

@@ -3,29 +3,62 @@
  *
  * Spec: `Docs/design-comments.md` §1, §3, §4, §6, §7, §8, §9.
  *
- * Modelo:
+ * Round Comments Nav Redesign — Phase A
+ * (RFC `Docs/rfcs/2026-05-rfc-comments-navigation-redesign.md`)
+ * --------------------------------------------------------------
+ *  - Default novo: **list-mode** (scrollable threaded list). Alinha
+ *    com Reddit/HN/Bluesky/Mastodon — UX familiar pra newcomer
+ *    (RFC §2.9 prior art, §10 Q3 cohort C).
+ *  - Card-stack swipe-driven preservado como **opt-in** via toggle
+ *    no ThreadHeader (`☰`/`⊞`). Manifesto §28 (privacy default —
+ *    user agency sobre experiência).
+ *  - A11y: keyboard nav J/K (prev/next comment) preservado em ambos
+ *    modos. List-mode adiciona scroll nativo + tap-to-reply.
+ *  - Manifesto §22 score determinístico INALTERADO — sem sort
+ *    selector; ordem from buildThread (created_at ASC, id ASC).
+ *  - Manifesto §27 CW per-comment preservado em ambos modos.
+ *  - Manifesto §28 privacy — sem read receipts, sem view counts.
+ *
+ *  Phase B (próximo sprint): virtualized list (`@tanstack/react-virtual`)
+ *  + collapse persistido em user_prefs.comments_expanded_threads.
+ *  Phase C: jump-to-parent pill, breadcrumb expand on focus.
+ *  Phase D: a11y deep dive (live regions, screen reader nav).
+ *
+ * Modelo (cards-mode legacy):
  *   - swipe ← / H : prevSibling
  *   - swipe → / L : nextSibling
  *   - swipe ↑ / K : descend (filho)
  *   - swipe ↓ / J : ascend (parent) — no root, fecha ThreadView
  *   - Esc / botão ✕: fecha
- *   - Enter: abre ReplySheet (placeholder até Track Ted)
+ *   - Enter: abre ReplySheet
+ *
+ * Modelo (list-mode novo):
+ *   - scroll vertical nativo
+ *   - tap em comment → ReplySheet com snapshot do target (UX-3 fix)
+ *   - [-]/[+] toggle collapse subtree (state efêmero por sessão)
+ *   - J/K keyboard mantém prev/next no flat order
+ *   - Esc fecha
+ *   - swipe DESLIGADO em list-mode (vertical scroll é nativo)
  *
  * State:
- *   - `cursor` (useState) — efêmero, escopo do viewport
+ *   - `cursor` (useState) — usado em cards-mode
+ *   - `focusedId` (useState) — usado em list-mode (Phase A: shared
+ *      com `cursor.path.at(-1)` na transição entre modos)
+ *   - `expandedSet` (useState) — list-mode collapse/expand efêmero
  *   - `tree` via `useThread(postId)` — Zustand store
  *   - `replyOpen` — local
  *   - `coachVisible` — local + usePrefsStore.thread_coach_seen
  *
- * Render lazy: só CommentCard central + peek de 1-2 vizinhos. DOM ~3
- * cards independente do tamanho da tree (design §5.1).
+ * Render lazy: cards-mode mantém CommentCard central + peek (DOM ~3).
+ * List-mode (Phase A) renderiza forest flatten — non-virtualized.
+ * Virtualization é Phase B (>200 comments => jank em low-end).
  *
  * A11y: `role="tree"`, ARIA level/posinset/setsize por card,
  * keyboard H/J/K/L + setas + Esc, focus trap, restore focus on close,
  * `prefers-reduced-motion` desabilita translate/scale (mantém fade).
  */
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { useThread } from '../../hooks/useThread'
 import { loadThread } from '../../lib/comments'
@@ -35,8 +68,11 @@ import {
   descend,
   nextSibling,
   prevSibling,
+  type CommentNode,
   type ThreadCursor,
+  type ThreadIndex,
 } from '../../lib/thread-cursor'
+import { flattenForList } from '../../lib/thread-list'
 import { siblingPosition } from '../../lib/thread-header'
 import { SwipeHandler } from './SwipeHandler'
 import { CommentCard } from './CommentCard'
@@ -59,9 +95,28 @@ export interface ThreadViewProps {
 }
 
 export function ThreadView({ postId, postAuthorPub, post, onClose }: ThreadViewProps) {
-  const { index, loading } = useThread(postId)
+  const { forest, index, loading } = useThread(postId)
   const coachSeen = usePrefsStore((s) => s.thread_coach_seen)
+  // Phase A — view mode pref (default 'list', RFC §10 Q3 cohort C).
+  const viewMode = usePrefsStore((s) => s.thread_view_mode)
   const reducedMotion = useReducedMotion()
+
+  // Phase A — list-mode state efêmero (Phase B: persistir em user_prefs).
+  // expandedSet armazena IDs COLAPSADOS (não os expandidos) — default
+  // expanded é a opção mais user-friendly. ID na set = subtree colapsado.
+  const [collapsedSet, setCollapsedSet] = useState<Set<string>>(() => new Set())
+  // focusedId em list-mode: tap selectiona pra ARIA + ReplySheet target.
+  const [focusedId, setFocusedId] = useState<string | null>(null)
+
+  function toggleCollapsed(id: string): void {
+    setCollapsedSet((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
 
   // Cursor: começa no primeiro root quando tree disponível
   const [cursor, setCursor] = useState<ThreadCursor | null>(null)
@@ -103,6 +158,21 @@ export function ThreadView({ postId, postAuthorPub, post, onClose }: ThreadViewP
   // fix: TH-B1 dead UI (Track C debt) — openedAt agora é state pra refresh
   // resetar a baseline quando user clica "+N novos" no header.
   const [openedAt, setOpenedAt] = useState(() => Math.floor(Date.now() / 1000))
+
+  // Phase A — toggle list⇄cards. Preserva foco entre modos:
+  //   list → cards: focusedId vira cursor.path[único nó]. Cap simples
+  //                 (Phase A) — reconstrução exata do parent-chain é
+  //                 melhoria Phase B; aqui o user pode navegar normal.
+  //   cards → list: cursor.path.at(-1) vira focusedId.
+  function toggleViewMode(): void {
+    const nextMode = viewMode === 'list' ? 'cards' : 'list'
+    if (nextMode === 'cards' && focusedId && index.byId.has(focusedId)) {
+      setCursor({ path: [focusedId] })
+    } else if (nextMode === 'list' && cursor) {
+      setFocusedId(cursor.path.at(-1) ?? null)
+    }
+    void setPref('thread_view_mode', nextMode)
+  }
 
   // fix: TH-B1 dead UI (Track C debt) — handler real do badge "+N novos".
   // Re-carrega snapshot do thread + reseta baseline de "novos".
@@ -266,6 +336,9 @@ export function ThreadView({ postId, postAuthorPub, post, onClose }: ThreadViewP
           index.roots.length > 0 ? openReplyTopLevel : undefined
         }
         post={post}
+        // Phase A — toggle list⇄cards (RFC §5 mockup).
+        viewMode={viewMode}
+        onToggleViewMode={toggleViewMode}
       />
 
       <div className="relative flex-1 overflow-hidden">
@@ -275,7 +348,29 @@ export function ThreadView({ postId, postAuthorPub, post, onClose }: ThreadViewP
         )}
         {loading && index.roots.length === 0 && <LoadingState />}
 
-        {currentNode && (
+        {/* Phase A — list-mode (default novo, RFC §10 Q3 cohort C). */}
+        {viewMode === 'list' && index.roots.length > 0 && (
+          <ListModeBody
+            forest={forest}
+            index={index}
+            postId={postId}
+            collapsedSet={collapsedSet}
+            onToggleCollapsed={toggleCollapsed}
+            focusedId={focusedId}
+            onFocus={(id) => setFocusedId(id)}
+            onTapReply={(id) => {
+              setFocusedId(id)
+              setReplyMode('cursor')
+              // Sincroniza cursor pra ReplySheet pegar o ID certo via IIFE.
+              setCursor({ path: [id] })
+              setReplyOpen(true)
+            }}
+            openedAt={openedAt}
+          />
+        )}
+
+        {/* Cards-mode (legacy opt-in) — render swipe-stack original. */}
+        {viewMode === 'cards' && currentNode && (
           <SwipeHandler
             onPrev={hasPrevSibling ? handlePrev : undefined}
             onNext={hasNextSibling ? handleNext : undefined}
@@ -355,7 +450,9 @@ export function ThreadView({ postId, postAuthorPub, post, onClose }: ThreadViewP
             scale 1.05 + tap scale 0.95. Pulse sutil na primeira render
             (chama atenção pro affordance) — tokenizado motion-fast.
             Reduced motion: pulse some, scale colapsa. */}
-        {currentNode && (
+        {/* FAB ↵ — só em cards-mode. List-mode tem reply inline em cada
+            comment (tap-to-reply UX-3 snapshot). */}
+        {viewMode === 'cards' && currentNode && (
           <motion.button
             initial={{ scale: 1 }}
             whileHover={{ scale: 1.05 }}
@@ -378,8 +475,11 @@ export function ThreadView({ postId, postAuthorPub, post, onClose }: ThreadViewP
             resto do card não permite". Agora overlay decorativo (passa
             eventos) + botão dedicado pra dismiss. Touch em qualquer
             lugar dispara dismissCoach via window listener. */}
+        {/* Coach mark — só em cards-mode (ensina swipe ↑↓←→).
+            List-mode é familiar (Reddit-style scrollable threaded) e
+            não precisa coach. RFC §9.6 risco mitigado. */}
         <AnimatePresence>
-          {coachVisible && (
+          {viewMode === 'cards' && coachVisible && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -444,6 +544,78 @@ export function ThreadView({ postId, postAuthorPub, post, onClose }: ThreadViewP
 }
 
 // ─── Sub-renders ────────────────────────────────────────────────────
+
+interface ListModeBodyProps {
+  forest: CommentNode[]
+  index: ThreadIndex
+  postId: string
+  collapsedSet: Set<string>
+  onToggleCollapsed: (id: string) => void
+  focusedId: string | null
+  onFocus: (id: string) => void
+  onTapReply: (id: string) => void
+  openedAt: number
+}
+
+/**
+ * Phase A — ThreadView body em list-mode (RFC §4.1, §5 mockup).
+ *
+ * Render flatten do forest (DFS preorder, collapsedSet skipa subtree).
+ * Cada CommentCard variant='list' com indent + thread line + tap-reply.
+ * Phase A: non-virtualized — render full list, simples. Phase B troca
+ * por @tanstack/react-virtual quando metric de jank em low-end aparecer.
+ */
+function ListModeBody({
+  forest,
+  index: _index,
+  postId,
+  collapsedSet,
+  onToggleCollapsed,
+  focusedId,
+  onFocus,
+  onTapReply,
+  openedAt,
+}: ListModeBodyProps) {
+  const flat = useMemo(
+    () => flattenForList(forest, collapsedSet),
+    [forest, collapsedSet],
+  )
+
+  return (
+    <div
+      role="list"
+      aria-label="lista de comentários"
+      className="h-full w-full overflow-y-auto px-2 pb-12 pt-2"
+    >
+      {flat.map((entry) => (
+        <div
+          key={entry.node.id}
+          role="listitem"
+          onFocus={() => onFocus(entry.node.id)}
+        >
+          <CommentCard
+            variant="list"
+            node={entry.node}
+            depth={entry.depth}
+            posInSet={entry.posInSet}
+            setSize={entry.setSize}
+            childCount={entry.childCount}
+            postId={postId}
+            isNew={entry.node.created_at >= openedAt}
+            isFocused={focusedId === entry.node.id}
+            isExpanded={!collapsedSet.has(entry.node.id)}
+            onToggleExpand={
+              entry.childCount > 0
+                ? () => onToggleCollapsed(entry.node.id)
+                : undefined
+            }
+            onTap={() => onTapReply(entry.node.id)}
+          />
+        </div>
+      ))}
+    </div>
+  )
+}
 
 function EmptyState({ onReply }: { onReply: () => void }) {
   return (

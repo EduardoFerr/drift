@@ -329,7 +329,30 @@ export interface UserPrefs {
    * pelo idle watcher de `helia.ts` (5min default).
    */
   use_ipfs: boolean
+  /**
+   * Round Comments Nav Redesign — Phase A (RFC `2026-05-rfc-comments-navigation-redesign`).
+   *
+   * Modo de renderização do `<ThreadView>`:
+   *  - `'list'` (default novo): scrollable threaded list com indent
+   *    progressivo, alinhado a Reddit/HN/Bluesky/Mastodon. Recomendação
+   *    Robin §10 Q3 — fix do problema S0 (UX-1 audit + F-19 friction)
+   *    onde card-stack swipe-driven é hostil pra newcomer e thread > 5
+   *    comments.
+   *  - `'cards'` (legacy/opt-in): card-stack swipe-driven preservado pra
+   *    users que internalizaram o gesture, manifesto §28 (privacy
+   *    default — user agency sobre experiência).
+   *
+   * Toggle no `<ThreadHeader>`. Persistente per-device (manifesto §28 —
+   * pref nunca sai do device).
+   *
+   * Phase B (próximo sprint): cohort-based migration banner pra users
+   * existentes (ver RFC §6.5 Opção C). Hoje: default `'list'` pra todos.
+   */
+  thread_view_mode: ThreadViewMode
 }
+
+/** Modo de renderização do `<ThreadView>` — list (default) ou cards (opt-in). */
+export type ThreadViewMode = 'list' | 'cards'
 
 /** Modo de visualização do mapa de spread. */
 export type MapView = 'fit-bounds' | 'open'
@@ -355,4 +378,5 @@ export const DEFAULT_USER_PREFS: UserPrefs = {
   network_mode: 'clearnet',
   thread_coach_seen: false,
   use_ipfs: false,
+  thread_view_mode: 'list',
 }

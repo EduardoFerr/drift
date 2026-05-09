@@ -87,6 +87,13 @@ function applyRow(target: UserPrefs, key: string, value: string): void {
     case 'use_ipfs':
       target.use_ipfs = value === '1'
       return
+    case 'thread_view_mode':
+      // Round Comments Nav Redesign Phase A — list é default novo,
+      // cards preservado opt-in. Valor inválido cai pro default.
+      if (value === 'list' || value === 'cards') {
+        target.thread_view_mode = value
+      }
+      return
     default:
       // chave desconhecida — pode ser de fase futura, ignora silenciosamente
       return
