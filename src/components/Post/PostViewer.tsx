@@ -40,6 +40,7 @@ import { useCommentCountsStore } from '../../lib/comment-counts'
 import { SpreadMap } from '../Feed/SpreadMap'
 import { SlideUpOverlay } from '../UI/SlideUpOverlay'
 import { ModalHeader } from '../UI/ModalHeader'
+import { GlassIconButton } from '../UI/GlassIconButton'
 
 /** 'up' = espalhou; 'down' = enterrou. Sai sem direção (X/ESC) = undefined. */
 export type QueueExitDir = 'up' | 'down'
@@ -419,17 +420,17 @@ export function PostViewer({
             SlideUpOverlay com lista de ações. */}
         {embedded && (
           <>
-            <button
+            <GlassIconButton
               onClick={(e) => {
                 e.stopPropagation()
                 setShowActionsMenu(true)
               }}
-              className="absolute right-6 top-6 z-30 flex h-7 w-7 items-center justify-center rounded-full border border-drift-border bg-drift-surface/80 text-drift-muted backdrop-blur-sm transition-colors hover:border-drift-accent hover:text-drift-accent focus:outline-none focus:ring-1 focus:ring-drift-accent2"
+              className="absolute right-6 top-6 z-30"
               aria-label="abrir menu de ações"
               title="ações do post"
             >
-              <span className="text-[14px] leading-none">⋮</span>
-            </button>
+              <span aria-hidden="true">⋮</span>
+            </GlassIconButton>
             {/* Track C.4.2 — trigger pra ThreadView (comments) */}
             <button
               onClick={(e) => {
