@@ -32,13 +32,17 @@ export type DriftKind = (typeof DRIFT_KIND)[keyof typeof DRIFT_KIND]
 /** Conjunto para checagem rápida de kind Drift (early return em events.ts) */
 export const DRIFT_KIND_SET: ReadonlySet<number> = new Set(Object.values(DRIFT_KIND))
 
+// 256 chars = power-of-2, alinha com memory page allocators.
+// 8 subposts × 256 = 2048 chars = 2KB exact slot. Convenção CS clássica
+// de byte-economy. Aplicado uniformemente em posts E comments (user
+// feedback 2026-05-08): mesmo cap pra ambos previne divergência visual
+// + força brevidade. Antes: 280 posts / 1000 comments — divergente,
+// comments podiam estourar card.
+// 250 → 256 user-deliberado: "verifique melhor uso de memória entre
+// 200 e 300 caracteres, não queremos desperdiçar bytes" — power-of-2
+// ganha trade-off vs 250 round ou 280 Twitter-familiar.
 export const DRIFT_LIMITS = {
-  // 250 chars uniformiza posts E comments (user feedback 2026-05-08:
-  // "limite é 250 caracteres" para ambos). Limite curto previne
-  // overflow visual em cards (substitui line-clamp band-aid) e força
-  // brevidade — alinha com Twitter-like density. Antes: 280 posts /
-  // 1000 comments — divergente, comments podiam estourar card.
-  TEXT_MAX_CHARS: 250,
+  TEXT_MAX_CHARS: 256,
   MAX_SUBPOSTS_ABS: 8,
   MAX_POSTS_CACHE: 10_000,
   CACHE_CLEANUP_MS: 6 * 60 * 60 * 1000, // 6h
