@@ -259,7 +259,11 @@ export function ThreadView({ postId, postAuthorPub, post, onClose }: ThreadViewP
         openedAt={openedAt}
         onClose={onClose}
         onRefreshNew={handleRefreshNew}
-        onNewTopLevelComment={openReplyTopLevel}
+        // UX fix 2026-05-08: thread vazia → EmptyState já provê CTA único
+        // ("↵ comentar"). Esconder "+ no post" header pra não duplicar.
+        onNewTopLevelComment={
+          index.roots.length > 0 ? openReplyTopLevel : undefined
+        }
         post={post}
       />
 
@@ -342,18 +346,29 @@ export function ThreadView({ postId, postAuthorPub, post, onClose }: ThreadViewP
         )}
 
         {/* FAB Reply — sempre responde ao cursor atual (UX-9: top-level
-            agora tem botão dedicado no header). */}
-        <button
-          onClick={openReplyToCursor}
-          className="absolute bottom-5 right-5 z-30 rounded-full border-2 border-drift-accent bg-drift-surface px-4 py-2 font-mono text-[11px] uppercase tracking-meta text-drift-accent shadow-lg hover:bg-drift-accent/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2"
-          aria-label="responder este comentário"
-          aria-keyshortcuts="Enter"
-          title="responder (Enter)"
-        >
-          ↵ responder
-        </button>
+            agora tem botão dedicado no header).
+            UX fix 2026-05-08: thread vazia esconde FAB. EmptyState já
+            tem CTA "↵ comentar"; senão user vê 3 botões fazendo a mesma
+            coisa (top-level comment). */}
+        {currentNode && (
+          <button
+            onClick={openReplyToCursor}
+            className="absolute bottom-5 right-5 z-30 rounded-full border-2 border-drift-accent bg-drift-surface px-4 py-2 font-mono text-[11px] uppercase tracking-meta text-drift-accent shadow-lg hover:bg-drift-accent/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2"
+            aria-label="responder este comentário"
+            aria-keyshortcuts="Enter"
+            title="responder (Enter)"
+          >
+            ↵ responder
+          </button>
+        )}
 
-        {/* Coach-mark first-time */}
+        {/* Coach-mark first-time.
+            UX fix 2026-05-08: era `absolute inset-0 z-40` SEM
+            `pointer-events-none` → bloqueava swipe + tap-to-reveal por
+            3s (timer). User feedback: "só consigo swipe pelo header,
+            resto do card não permite". Agora overlay decorativo (passa
+            eventos) + botão dedicado pra dismiss. Touch em qualquer
+            lugar dispara dismissCoach via window listener. */}
         <AnimatePresence>
           {coachVisible && (
             <motion.div
@@ -361,13 +376,18 @@ export function ThreadView({ postId, postAuthorPub, post, onClose }: ThreadViewP
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.24 }}
-              onClick={dismissCoach}
-              className="absolute inset-0 z-40 flex items-center justify-center bg-drift-bg/80 backdrop-blur-sm motion-reduce:backdrop-blur-none"
-              role="dialog"
-              aria-modal="false"
-              aria-label="dica de navegação por swipe — toque ou pressione Esc pra fechar"
+              className="pointer-events-none absolute inset-0 z-40 flex items-center justify-center bg-drift-bg/60 backdrop-blur-sm motion-reduce:backdrop-blur-none"
+              role="status"
+              aria-live="polite"
+              aria-label="dica de navegação por swipe"
             >
-              <CoachContent />
+              <button
+                onClick={dismissCoach}
+                aria-label="fechar dica"
+                className="pointer-events-auto rounded border border-drift-accent/40 bg-drift-surface/90 px-5 py-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2"
+              >
+                <CoachContent />
+              </button>
             </motion.div>
           )}
         </AnimatePresence>
