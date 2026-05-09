@@ -94,6 +94,24 @@ export default {
         title: 'var(--leading-title, 1.08)',
         body: 'var(--leading-body, 1.65)',
       },
+      // Motion duration tokens — RFC `2026-05-rfc-motion-perf-polish.md` §1.1
+      // + Ted §4.1 §2.3. 5 níveis cobrem >95% dos call sites de Framer
+      // Motion + transition CSS no app. Source-of-truth duplicado em
+      // `src/lib/motion.ts` (Framer consome JS); paridade pode ser
+      // verificada em test futuro (Marshall §4.3).
+      transitionDuration: {
+        'motion-micro':    '120ms',
+        'motion-fast':     '180ms',
+        'motion-base':     '240ms',
+        'motion-emphasis': '320ms',
+        'motion-card':     '360ms',
+      },
+      transitionTimingFunction: {
+        // 3 easings cobrem 95% dos casos. Ver RFC §1.1.
+        'drift-out':    'cubic-bezier(0.0, 0.0, 0.2, 1)',     // ease-out canônico
+        'drift-inout':  'cubic-bezier(0.4, 0.0, 0.2, 1)',     // overlay enter/exit
+        'drift-spring': 'cubic-bezier(0.32, 0.72, 0, 1)',     // card stack, emphasis
+      },
     },
   },
   plugins: [],
