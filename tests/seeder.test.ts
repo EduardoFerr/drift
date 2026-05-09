@@ -1,11 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-const { execMock, runMock, getMock, connectToMock, getPeersMock } = vi.hoisted(() => ({
+const { execMock, runMock, getMock, connectToMock, getPeersMock, getPrefsMock } = vi.hoisted(() => ({
   execMock: vi.fn(),
   runMock: vi.fn(),
   getMock: vi.fn(),
   connectToMock: vi.fn(),
   getPeersMock: vi.fn(),
+  getPrefsMock: vi.fn(),
 }))
 
 vi.mock('../src/lib/db', () => ({
@@ -29,6 +30,11 @@ vi.mock('../src/lib/transport/webrtc', () => ({
   },
 }))
 
+// Mock prefs — gate por network_mode (§15 anti-IP-leak em modo Tor).
+vi.mock('../src/lib/prefs', () => ({
+  getPrefs: getPrefsMock,
+}))
+
 import { seedFromSpreaders, _resetSeederState } from '../src/lib/seeder'
 
 const POST_ID = 'p'.repeat(64)
@@ -47,6 +53,8 @@ beforeEach(() => {
   getMock.mockReset()
   connectToMock.mockReset().mockResolvedValue(undefined)
   getPeersMock.mockReset().mockReturnValue([])
+  // Default: clearnet — caso ativo. Tests específicos de gate sobrescrevem.
+  getPrefsMock.mockReset().mockReturnValue({ network_mode: 'clearnet' })
   _resetSeederState()
 })
 
@@ -187,5 +195,39 @@ describe('seedFromSpreaders', () => {
     const n = await seedFromSpreaders(POST_ID)
     expect(n).toBe(3)
     expect(connectToMock).toHaveBeenCalledTimes(3)
+  })
+
+  // §15 anti-censura — gate por network_mode (mesmo padrão do bootstrap.ts).
+  // Sem esse gate, abrir SpreadMap em modo Tor disparava connectTo direto,
+  // bypassando o orchestrator → IP leak via STUN/ICE candidates.
+  describe('§15 — gate por network_mode (anti-IP-leak em Tor/onion-only)', () => {
+    it('em modo tor: NÃO consulta DB nem chama connectTo (early return)', async () => {
+      getPrefsMock.mockReturnValue({ network_mode: 'tor' })
+      execMock.mockResolvedValue([
+        { spreader_pub: pub('a') },
+        { spreader_pub: pub('b') },
+      ])
+      const n = await seedFromSpreaders(POST_ID)
+      expect(n).toBe(0)
+      expect(execMock).not.toHaveBeenCalled()
+      expect(connectToMock).not.toHaveBeenCalled()
+    })
+
+    it('em modo onion-only: NÃO consulta DB nem chama connectTo', async () => {
+      getPrefsMock.mockReturnValue({ network_mode: 'onion-only' })
+      execMock.mockResolvedValue([{ spreader_pub: pub('a') }])
+      const n = await seedFromSpreaders(POST_ID)
+      expect(n).toBe(0)
+      expect(execMock).not.toHaveBeenCalled()
+      expect(connectToMock).not.toHaveBeenCalled()
+    })
+
+    it('em modo clearnet: comportamento normal (default dos outros tests)', async () => {
+      getPrefsMock.mockReturnValue({ network_mode: 'clearnet' })
+      execMock.mockResolvedValue([{ spreader_pub: pub('a') }])
+      const n = await seedFromSpreaders(POST_ID)
+      expect(n).toBe(1)
+      expect(connectToMock).toHaveBeenCalledTimes(1)
+    })
   })
 })

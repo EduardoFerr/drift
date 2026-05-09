@@ -29,6 +29,7 @@
 
 import { db } from './db'
 import { isBlacklisted } from './peerRegistry'
+import { getPrefs } from './prefs'
 import { connectTo, getPeers, WEBRTC_LIMITS } from './transport/webrtc'
 
 /**
@@ -61,6 +62,18 @@ interface SpreaderRow {
  * @returns número de connectTo disparados (não garante sucesso)
  */
 export async function seedFromSpreaders(postId: string): Promise<number> {
+  // §15 anti-censura — em modo Tor/onion-only, WebRTC desabilitado pra
+  // evitar IP leak via STUN/ICE candidates. Mesmo padrão do gate em
+  // bootstrap.ts:registerTransport(webrtcTransport). Sem este gate,
+  // abrir SpreadMap em modo Tor disparava connectTo() → RTCPeerConnection
+  // direto, bypassando o orchestrator. Documentado em
+  // Docs/sessions/15-e2e-testbed-scoping-2026-05-08.md §7 item 1
+  // (Robin finding) e webrtc-6.4-plan.md:106.
+  const networkMode = getPrefs().network_mode
+  if (networkMode !== 'clearnet') {
+    return 0
+  }
+
   if (SEEDED_POSTS.has(postId)) return 0
   markSeeded(postId)
 
