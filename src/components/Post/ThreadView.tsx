@@ -42,15 +42,22 @@ import { SwipeHandler } from './SwipeHandler'
 import { CommentCard } from './CommentCard'
 import { ThreadHeader } from './ThreadHeader'
 import { ReplySheet } from './ReplySheet'
+import type { Post } from '../../types/drift'
 
 export interface ThreadViewProps {
   postId: string
   /** Author do post root (P tag NIP-22). Repassa pra ReplySheet. */
   postAuthorPub: string
+  /**
+   * TX-5 (Ted UX spike 2026-05-08) — post root completo. Quando passado,
+   * ThreadHeader exibe o título legível em vez do hex críptico do path.
+   * Opcional pra retrocompat com callers que ainda não migraram.
+   */
+  post?: Post
   onClose: () => void
 }
 
-export function ThreadView({ postId, postAuthorPub, onClose }: ThreadViewProps) {
+export function ThreadView({ postId, postAuthorPub, post, onClose }: ThreadViewProps) {
   const { index, loading } = useThread(postId)
   const coachSeen = usePrefsStore((s) => s.thread_coach_seen)
   const reducedMotion = useReducedMotion()
@@ -253,6 +260,7 @@ export function ThreadView({ postId, postAuthorPub, onClose }: ThreadViewProps) 
         onClose={onClose}
         onRefreshNew={handleRefreshNew}
         onNewTopLevelComment={openReplyTopLevel}
+        post={post}
       />
 
       <div className="relative flex-1 overflow-hidden">

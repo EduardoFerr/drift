@@ -155,7 +155,7 @@ function PinnedList({
           <span className="text-slate-600">{timeAgo(p.pinnedAt)}</span>
           {p.cid && (
             <span
-              className="rounded bg-emerald-950/30 px-1 text-emerald-400"
+              className="rounded bg-drift-spread/15 px-1 text-drift-spread"
               title={`IPFS CID: ${p.cid}`}
             >
               IPFS

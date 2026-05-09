@@ -11,12 +11,14 @@
  * (puros, testados).
  */
 
+import type { Post } from '../../types/drift'
 import type { ThreadCursor, ThreadIndex } from '../../lib/thread-cursor'
 import {
   buildBreadcrumb,
   countNewSince,
   siblingPosition,
 } from '../../lib/thread-header'
+import { splitTitleBody, synthesizeTag } from './SubpostLayout'
 
 export interface ThreadHeaderProps {
   cursor: ThreadCursor | null
@@ -34,6 +36,32 @@ export interface ThreadHeaderProps {
    * aparece em thread vazia. Sempre visível quando passado.
    */
   onNewTopLevelComment?: () => void
+  /**
+   * TX-5 (Ted UX spike 2026-05-08) — post root da thread. Usado pra
+   * exibir título legível ("III. Da identidade") em vez do hex críptico
+   * "_D7DE3A". Quando ausente (callers legados), header cai pro modo
+   * antigo "comentários · …xxxxxx". Determinístico (§7) — title vem do
+   * `splitTitleBody(post.subposts[0]?.text)` ou `synthesizeTag(post)`.
+   */
+  post?: Post
+}
+
+/**
+ * TX-5 helper — decide o título legível pra mostrar no header.
+ *
+ * Estratégia (puro, determinístico §7):
+ *   1. splitTitleBody do primeiro subpost — se houver title, usa ele
+ *   2. fallback: synthesizeTag (category, location, ou contentWarning)
+ *
+ * Truncado em maxLen chars (default 40); abrevia com elipse (single char
+ * U+2026). Caller decide se mostra "/" e o ID chip.
+ */
+export function deriveHeaderTitle(post: Post, maxLen = 40): string {
+  const firstText = post.subposts[0]?.text ?? null
+  const { title } = splitTitleBody(firstText)
+  const candidate = title || synthesizeTag(post)
+  if (candidate.length <= maxLen) return candidate
+  return `${candidate.slice(0, maxLen - 1).trimEnd()}…`
 }
 
 export function ThreadHeader({
@@ -43,6 +71,7 @@ export function ThreadHeader({
   onClose,
   onRefreshNew,
   onNewTopLevelComment,
+  post,
 }: ThreadHeaderProps) {
   const breadcrumb = cursor ? buildBreadcrumb(cursor, index) : []
   const { position, total } = cursor
@@ -55,12 +84,39 @@ export function ThreadHeader({
     cursor?.path[cursor.path.length - 1] ?? null,
   )
 
+  // TX-5 — título legível do post root (em vez do hex críptico
+  // "_xxxxxx"). Chip ID com últimos 6 chars segue disponível pra debug
+  // (font-mono small). Ambos só renderizam quando `post` foi passado;
+  // sem `post`, header mostra apenas a breadcrumb (modo legado).
+  const postTitle = post ? deriveHeaderTitle(post) : null
+  const postIdShort = post ? post.id.slice(-6).toUpperCase() : null
+
   return (
     <header
       className="flex shrink-0 items-center justify-between gap-3 border-b border-drift-border bg-drift-surface/95 px-4 py-3 backdrop-blur-sm"
       role="banner"
     >
       <div className="flex min-w-0 flex-1 flex-col gap-1">
+        {/* TX-5 — título do post root, legível, com chip ID opcional. */}
+        {postTitle && (
+          <div className="flex min-w-0 items-baseline gap-2">
+            <h2
+              className="truncate font-display text-[14px] font-extrabold text-drift-text"
+              title={postTitle}
+            >
+              {postTitle}
+            </h2>
+            {postIdShort && (
+              <span
+                className="shrink-0 font-mono text-[9px] uppercase tracking-meta text-drift-muted"
+                title={`post id …${post!.id.slice(-12)}`}
+                aria-hidden="true"
+              >
+                …{postIdShort}
+              </span>
+            )}
+          </div>
+        )}
         {/* Breadcrumb */}
         <div
           className="flex items-center gap-1 truncate font-mono text-[10px] uppercase tracking-meta text-drift-muted"

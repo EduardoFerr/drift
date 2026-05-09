@@ -18,6 +18,7 @@
  */
 
 import { useEffect, useState } from 'react'
+import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
 import type { BlobMeta } from '../../lib/nip94'
 
 export interface ImageProps {
@@ -140,13 +141,26 @@ export function Image({
 
   // Wrapper element: button quando lightbox=true (clicável + a11y),
   // div quando false (comportamento atual).
+  // User feedback 2026-05-08: lightbox em SINGLE click conflitava com
+  // swipe gestures + tap-to-reveal CW. Double-click é o trigger agora.
+  // Keyboard: Enter/Space também abrem (a11y) — esses não têm conflito
+  // com swipe pq são teclas dedicadas.
   const Wrapper = lightbox && state === 'loaded' ? 'button' : 'div'
   const wrapperProps =
     lightbox && state === 'loaded'
       ? {
           type: 'button' as const,
-          onClick: () => setLightboxOpen(true),
-          'aria-label': alt ? `abrir imagem: ${alt}` : 'abrir imagem em primeiro plano',
+          onDoubleClick: () => setLightboxOpen(true),
+          onKeyDown: (e: ReactKeyboardEvent) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              setLightboxOpen(true)
+            }
+          },
+          'aria-label': alt
+            ? `abrir imagem: ${alt} (toque duplo)`
+            : 'abrir imagem em primeiro plano (toque duplo)',
+          title: 'toque duplo pra abrir',
           // Cursor zoom-in pra signalizar interação.
           className: `relative block w-full overflow-hidden bg-drift-surface/40 cursor-zoom-in focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2 ${className}`,
         }

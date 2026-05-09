@@ -328,7 +328,7 @@ export function IdentitySwitcher({ onRequestExport, onClose }: IdentitySwitcherP
               value={newLabel}
               onChange={(e) => setNewLabel(e.target.value)}
               placeholder="label (opcional, ex: ativismo)"
-              className="mb-3 w-full rounded border border-drift-border bg-drift-bg px-2 py-1 text-[11px] text-slate-200 placeholder:text-slate-700 focus:border-drift-accent focus:outline-none"
+              className="mb-3 w-full rounded border border-drift-border bg-drift-bg px-2 py-1 text-[11px] text-slate-200 placeholder:text-drift-muted/60 focus:border-drift-accent focus:outline-none"
             />
             <div className="flex gap-2">
               <button
@@ -359,14 +359,14 @@ export function IdentitySwitcher({ onRequestExport, onClose }: IdentitySwitcherP
               value={newLabel}
               onChange={(e) => setNewLabel(e.target.value)}
               placeholder="label (opcional)"
-              className="mb-2 w-full rounded border border-drift-border bg-drift-bg px-2 py-1 text-[11px] text-slate-200 placeholder:text-slate-700 focus:border-drift-accent focus:outline-none"
+              className="mb-2 w-full rounded border border-drift-border bg-drift-bg px-2 py-1 text-[11px] text-slate-200 placeholder:text-drift-muted/60 focus:border-drift-accent focus:outline-none"
             />
             <textarea
               value={importNsec}
               onChange={(e) => setImportNsec(e.target.value)}
               placeholder="nsec1..."
               rows={2}
-              className="mb-3 w-full resize-none rounded border border-drift-border bg-drift-bg px-2 py-1 font-mono text-[11px] text-slate-200 placeholder:text-slate-700 focus:border-drift-accent focus:outline-none"
+              className="mb-3 w-full resize-none rounded border border-drift-border bg-drift-bg px-2 py-1 font-mono text-[11px] text-slate-200 placeholder:text-drift-muted/60 focus:border-drift-accent focus:outline-none"
             />
             <div className="flex gap-2">
               <button
@@ -402,7 +402,7 @@ export function IdentitySwitcher({ onRequestExport, onClose }: IdentitySwitcherP
               value={newLabel}
               onChange={(e) => setNewLabel(e.target.value)}
               placeholder="label (opcional)"
-              className="mb-3 w-full rounded border border-drift-border bg-drift-bg px-2 py-1 text-[11px] text-slate-200 placeholder:text-slate-700 focus:border-drift-accent focus:outline-none"
+              className="mb-3 w-full rounded border border-drift-border bg-drift-bg px-2 py-1 text-[11px] text-slate-200 placeholder:text-drift-muted/60 focus:border-drift-accent focus:outline-none"
             />
             <div className="flex gap-2">
               <button
@@ -476,21 +476,21 @@ export function IdentitySwitcher({ onRequestExport, onClose }: IdentitySwitcherP
               value={newLabel}
               onChange={(e) => setNewLabel(e.target.value)}
               placeholder="label (opcional)"
-              className="mb-2 w-full rounded border border-drift-border bg-drift-bg px-2 py-1 text-[11px] text-slate-200 placeholder:text-slate-700 focus:border-drift-accent focus:outline-none"
+              className="mb-2 w-full rounded border border-drift-border bg-drift-bg px-2 py-1 text-[11px] text-slate-200 placeholder:text-drift-muted/60 focus:border-drift-accent focus:outline-none"
             />
             <textarea
               value={bip39Phrase}
               onChange={(e) => setBip39Phrase(e.target.value)}
               placeholder="palavra1 palavra2 ... palavra12"
               rows={3}
-              className="mb-2 w-full resize-none rounded border border-drift-border bg-drift-bg px-2 py-1 font-mono text-[11px] text-slate-200 placeholder:text-slate-700 focus:border-drift-accent focus:outline-none"
+              className="mb-2 w-full resize-none rounded border border-drift-border bg-drift-bg px-2 py-1 font-mono text-[11px] text-slate-200 placeholder:text-drift-muted/60 focus:border-drift-accent focus:outline-none"
             />
             <input
               type="password"
               value={bip39Passphrase}
               onChange={(e) => setBip39Passphrase(e.target.value)}
               placeholder="passphrase (opcional, padrão vazio)"
-              className="mb-3 w-full rounded border border-drift-border bg-drift-bg px-2 py-1 text-[11px] text-slate-200 placeholder:text-slate-700 focus:border-drift-accent focus:outline-none"
+              className="mb-3 w-full rounded border border-drift-border bg-drift-bg px-2 py-1 text-[11px] text-slate-200 placeholder:text-drift-muted/60 focus:border-drift-accent focus:outline-none"
             />
             <div className="flex gap-2">
               <button

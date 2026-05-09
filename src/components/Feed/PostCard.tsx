@@ -64,7 +64,7 @@ export function PostCard({
 
   return (
     <article className="rounded border border-drift-border bg-drift-surface p-4">
-      <div className="mb-2 flex items-center justify-between text-[10px] text-slate-600">
+      <div className="mb-2 flex items-center justify-between text-[10px] text-drift-muted">
         <span>
           {isMine ? 'você' : 'anon'}…{post.authorPub.slice(-8)} · {timeAgo(post.createdAt)}
           {post.contentWarning && (
@@ -77,7 +77,7 @@ export function PostCard({
           )}
         </span>
         <span title={`drifts ${displaySpreads} · sinks ${displayBuries}`}>
-          DERIVA <span className="text-slate-400">{post.score.toFixed(3)}</span>
+          DERIVA <span className="text-drift-accent2">{post.score.toFixed(3)}</span>
         </span>
       </div>
 
@@ -91,7 +91,7 @@ export function PostCard({
             blurred ? 'select-none blur-md' : ''
           }`}
         >
-          <p className="whitespace-pre-wrap break-words text-sm text-slate-200">
+          <p className="whitespace-pre-wrap break-words text-sm text-drift-text">
             {text}
           </p>
           {hasImage && (
@@ -119,8 +119,8 @@ export function PostCard({
             disabled={pending !== null}
             className={`rounded border px-2 py-1 transition-colors disabled:opacity-40 ${
               spreadActive
-                ? 'border-drift-spread bg-emerald-900/40 text-emerald-300'
-                : 'border-drift-spread/40 text-drift-spread hover:bg-emerald-950/30'
+                ? 'border-drift-spread bg-drift-spread/15 text-drift-spread'
+                : 'border-drift-spread/40 text-drift-spread hover:bg-drift-spread/10'
             }`}
             title={
               capturingLocation && pending === 'spread'
@@ -142,8 +142,8 @@ export function PostCard({
             disabled={pending !== null}
             className={`rounded border px-2 py-1 transition-colors disabled:opacity-40 ${
               buryActive
-                ? 'border-drift-bury bg-red-900/40 text-red-300'
-                : 'border-drift-bury/40 text-drift-bury hover:bg-red-950/30'
+                ? 'border-drift-bury bg-drift-bury/15 text-drift-bury'
+                : 'border-drift-bury/40 text-drift-bury hover:bg-drift-bury/10'
             }`}
             title={
               myAction === 'bury'

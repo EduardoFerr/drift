@@ -157,7 +157,7 @@ function DialogModal() {
             }}
             placeholder={current.options.placeholder}
             maxLength={current.options.maxLength}
-            className="mt-4 w-full rounded border border-drift-border bg-drift-bg px-3 py-2 font-mono text-[12px] text-drift-text placeholder:text-slate-500 focus:border-drift-accent2 focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2"
+            className="mt-4 w-full rounded border border-drift-border bg-drift-bg px-3 py-2 font-mono text-[12px] text-drift-text placeholder:text-drift-muted/60 focus:border-drift-accent2 focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2"
           />
         )}
 

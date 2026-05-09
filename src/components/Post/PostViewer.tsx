@@ -549,8 +549,8 @@ export function PostViewer({
             disabled={pendingAction !== null}
             className={`rounded border px-2 py-1 disabled:opacity-40 ${
               spreadActive
-                ? 'border-drift-spread bg-emerald-900/40 text-emerald-300'
-                : 'border-drift-spread/40 text-drift-spread hover:bg-emerald-950/30'
+                ? 'border-drift-spread bg-drift-spread/15 text-drift-spread'
+                : 'border-drift-spread/40 text-drift-spread hover:bg-drift-spread/10'
             }`}
             title={
               capturingLocation && pendingAction === 'spread'
@@ -572,8 +572,8 @@ export function PostViewer({
             disabled={pendingAction !== null}
             className={`rounded border px-2 py-1 disabled:opacity-40 ${
               buryActive
-                ? 'border-drift-bury bg-red-900/40 text-red-300'
-                : 'border-drift-bury/40 text-drift-bury hover:bg-red-950/30'
+                ? 'border-drift-bury bg-drift-bury/15 text-drift-bury'
+                : 'border-drift-bury/40 text-drift-bury hover:bg-drift-bury/10'
             }`}
             title={
               myAction === 'bury'
@@ -607,6 +607,7 @@ export function PostViewer({
           <ThreadView
             postId={post.id}
             postAuthorPub={post.authorPub}
+            post={post}
             onClose={() => setShowThread(false)}
           />
         )}

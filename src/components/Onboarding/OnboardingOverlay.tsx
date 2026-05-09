@@ -117,19 +117,19 @@ export function OnboardingOverlay({ onClose, onOpenIdentity }: OnboardingOverlay
         <>
           <ul className="space-y-2">
             <li>
-              <span className="text-emerald-400">✓</span> Posts são <span className="text-slate-300">imutáveis</span>.
+              <span className="text-drift-spread">✓</span> Posts são <span className="text-slate-300">imutáveis</span>.
               Nem o fundador apaga.
             </li>
             <li>
-              <span className="text-emerald-400">✓</span> Cliente oficial NÃO escaneia conteúdo automaticamente.
+              <span className="text-drift-spread">✓</span> Cliente oficial NÃO escaneia conteúdo automaticamente.
             </li>
             <li>
-              <span className="text-emerald-400">✓</span> Auto-classificação (NSFW, spoiler) é{' '}
+              <span className="text-drift-spread">✓</span> Auto-classificação (NSFW, spoiler) é{' '}
               <span className="text-slate-300">do autor</span>; filtros são{' '}
               <span className="text-slate-300">do leitor</span>.
             </li>
             <li>
-              <span className="text-emerald-400">✓</span> Conteúdo problemático é moderado pela comunidade via reports
+              <span className="text-drift-spread">✓</span> Conteúdo problemático é moderado pela comunidade via reports
               + threshold dinâmico.
             </li>
           </ul>

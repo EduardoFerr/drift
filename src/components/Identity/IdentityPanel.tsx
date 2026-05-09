@@ -357,7 +357,7 @@ function ImportTab({ onClose }: { onClose: () => void }) {
           spellCheck={false}
           autoCapitalize="off"
           autoCorrect="off"
-          className="w-full break-all rounded border border-drift-border bg-black/30 p-2 font-mono text-[11px] text-slate-300 placeholder:text-slate-700 focus:border-drift-accent focus:outline-none"
+          className="w-full break-all rounded border border-drift-border bg-black/30 p-2 font-mono text-[11px] text-slate-300 placeholder:text-drift-muted/60 focus:border-drift-accent focus:outline-none"
         />
       </div>
 

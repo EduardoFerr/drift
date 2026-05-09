@@ -135,7 +135,7 @@ export function RelaySettings({ onClose }: RelaySettingsProps) {
                 <span className="flex-1 truncate text-slate-300" title={r.lastErr ?? ''}>
                   {r.url}
                 </span>
-                <span className="rounded bg-slate-800/50 px-1 text-[9px] text-slate-500">
+                <span className="rounded bg-drift-border/40 px-1 text-[9px] text-drift-muted">
                   {r.source}
                 </span>
                 <button
@@ -166,7 +166,7 @@ export function RelaySettings({ onClose }: RelaySettingsProps) {
               value={newUrl}
               onChange={(e) => setNewUrl(e.target.value)}
               placeholder="wss://relay.exemplo.com"
-              className="flex-1 rounded border border-drift-border bg-drift-bg px-2 py-1 text-[11px] text-slate-200 placeholder:text-slate-700 focus:border-drift-accent focus:outline-none"
+              className="flex-1 rounded border border-drift-border bg-drift-bg px-2 py-1 text-[11px] text-slate-200 placeholder:text-drift-muted/60 focus:border-drift-accent focus:outline-none"
             />
             <button
               onClick={handleAdd}
@@ -195,7 +195,7 @@ export function RelaySettings({ onClose }: RelaySettingsProps) {
               value={importNpub}
               onChange={(e) => setImportNpub(e.target.value)}
               placeholder="npub1... — buscar lista de relays desse user"
-              className="flex-1 rounded border border-drift-border bg-drift-bg px-2 py-1 text-[11px] text-slate-200 placeholder:text-slate-700 focus:border-drift-accent focus:outline-none"
+              className="flex-1 rounded border border-drift-border bg-drift-bg px-2 py-1 text-[11px] text-slate-200 placeholder:text-drift-muted/60 focus:border-drift-accent focus:outline-none"
             />
             <button
               onClick={handleImport}
