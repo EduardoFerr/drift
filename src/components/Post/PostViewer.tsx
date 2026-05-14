@@ -62,6 +62,8 @@ import { GlassIconButton } from '../UI/GlassIconButton'
 import { SlideUpOverlay } from '../UI/SlideUpOverlay'
 import { ModalHeader } from '../UI/ModalHeader'
 import { DriftChip } from '../UI/DriftChip'
+import { computeInitialFromExit } from '../../lib/post-viewer-motion'
+import { buildFanItems, type FanItem } from '../../lib/actions-fan'
 
 /** 'up' = espalhou; 'down' = enterrou. Sai sem direção (X/ESC) = undefined. */
 export type QueueExitDir = 'up' | 'down'
@@ -996,71 +998,21 @@ function ActionsFan({
   onSharePost: () => void
   onShareImage: () => void
 }) {
-  type FanItem = {
-    key: string
-    icon: string
-    label: string
-    hint: string
-    onClick: () => void
-    disabled?: boolean
-  }
-  const items: FanItem[] = [
-    {
-      key: 'share-post',
-      icon: '📤',
-      label: 'compartilhar post',
-      hint: 'gera link njump.me que abre em qualquer cliente Nostr',
-      onClick: onSharePost,
+  const items: FanItem[] = buildFanItems({
+    isMine,
+    pinned,
+    isFollowing,
+    mapOpen,
+    currentHasImage,
+    handlers: {
+      onPinToggle,
+      onMapToggle,
+      onFollowToggle,
+      onMute,
+      onSharePost,
+      onShareImage,
     },
-  ]
-  if (currentHasImage) {
-    items.push({
-      key: 'share-image',
-      icon: '🖼',
-      label: 'compartilhar imagem',
-      hint: 'abre o share sheet do sistema com a imagem como arquivo',
-      onClick: onShareImage,
-    })
-  }
-  items.push(
-    {
-      key: 'map',
-      icon: '🗺',
-      label: mapOpen ? 'fechar mapa' : 'mapa de spread',
-      hint: 'visualização geográfica de quem drift-ou este post',
-      onClick: onMapToggle,
-    },
-    {
-      key: 'pin',
-      icon: pinned ? '📌' : '📍',
-      label: pinned ? 'desfixar' : 'fixar',
-      hint: pinned
-        ? 'remove proteção contra eviction local'
-        : 'protege de eviction local + marca pra re-broadcast (§16)',
-      onClick: onPinToggle,
-      disabled: pinned === null,
-    },
-  )
-  if (!isMine) {
-    items.push(
-      {
-        key: 'follow',
-        icon: isFollowing ? '✓' : '➕',
-        label: isFollowing ? 'deixar de seguir' : 'seguir',
-        hint: isFollowing
-          ? 'publica kind 3 atualizado removendo este autor'
-          : 'alimenta a aba "seguindo" do feed (NIP-02)',
-        onClick: onFollowToggle,
-      },
-      {
-        key: 'mute',
-        icon: '🔇',
-        label: 'silenciar',
-        hint: 'esconde posts dele do meu feed (filtro local §24)',
-        onClick: onMute,
-      },
-    )
-  }
+  })
 
   // V9.19 (user pedido 2026-05-14): hold em qualquer ícone do fan
   // por 500ms → mostra tooltip à esquerda explicando a ação. Release
@@ -1212,20 +1164,15 @@ function EmbeddedWrapper({ children, exitVariant }: WrapperProps) {
   // quart) dá sensação papel-no-deck. User feedback 2026-05-09.
   const transition = reduced ? { duration: 0 } : MOTION.swap
   // V9.23 (user report 2026-05-14: "após bury perdeu a suavidade na
-  // troca de cards"). Antes: initial fixo y=20 (sempre de baixo). Após
-  // spread (exit y=-110%) o novo subia de y=20 — direções alinhadas,
-  // fluido. Após bury (exit y=+110%) o novo AINDA subia de y=20 —
-  // direção conflitante, sensação de quebra. Agora initial reflete o
-  // exitVariant: exit pra cima → entry vem de baixo; exit pra baixo →
-  // entry vem de cima. EXIT_VARIANTS.none (sem dir) mantém entry y=20
-  // como antes.
-  const enterFromAbove = exitVariant.y === '110%'
-  const initial = reduced
-    ? { opacity: 0 }
-    : { opacity: 0, scale: 0.96, y: enterFromAbove ? -20 : 20 }
+  // troca de cards"). Lógica direcional extraída pra
+  // `lib/post-viewer-motion.ts:computeInitialFromExit` — função pura
+  // com testes (manifesto §7 + §16). Exit pra cima (spread) → entry
+  // de baixo; exit pra baixo (bury) → entry de cima; none mantém
+  // y=+20.
+  const initial = computeInitialFromExit(exitVariant, reduced ?? false)
   return (
     <motion.div
-      initial={initial}
+      initial={initial as unknown as Record<string, number>}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       exit={exitVariant}
       transition={transition}
