@@ -153,10 +153,22 @@ export function SwipeHandler({
     animate(x, 0, spring)
     animate(y, 0, spring)
 
-    if (verticalDominant && !disableVertical) {
-      const passed =
-        ay > SWIPE_THRESHOLD_PX_V || Math.abs(velocity.y) > SWIPE_VELOCITY_PXS
-      if (!passed) return
+    // V9.12 (user report 2026-05-09: "swipe pra voltar com 2 subposts
+    // não passa"): antes, se verticalDominant=true mas o offset ficava
+    // abaixo do threshold vertical (160px), saíamos cedo sem testar
+    // horizontal — gesto que era 100px vertical / 90px horizontal
+    // morria, mesmo o horizontal já tendo passado dos 80px. Especialmente
+    // ruim depois do bump V→160px (V9.7 do threshold) porque o swipe de
+    // dedo sempre tem algum drift. Agora avaliamos cada eixo independente
+    // e o dominante decide o desempate quando ambos passam.
+    const verticalPassed =
+      !disableVertical &&
+      (ay > SWIPE_THRESHOLD_PX_V || Math.abs(velocity.y) > SWIPE_VELOCITY_PXS)
+    const horizontalPassed =
+      !disableHorizontal &&
+      (ax > SWIPE_THRESHOLD_PX_H || Math.abs(velocity.x) > SWIPE_VELOCITY_PXS)
+
+    function fireVertical() {
       if (offset.y < 0 && fireUp) {
         if (onSpread) showHint('spread')
         fireUp()
@@ -164,13 +176,8 @@ export function SwipeHandler({
         if (onBury) showHint('bury')
         fireDown()
       }
-      return
     }
-
-    if (!disableHorizontal) {
-      const passed =
-        ax > SWIPE_THRESHOLD_PX_H || Math.abs(velocity.x) > SWIPE_VELOCITY_PXS
-      if (!passed) return
+    function fireHorizontal() {
       if (offset.x < 0 && onNext) {
         showHint('next')
         onNext()
@@ -178,6 +185,16 @@ export function SwipeHandler({
         showHint('prev')
         onPrev()
       }
+    }
+
+    if (verticalPassed && horizontalPassed) {
+      // Ambos passaram — dominante decide
+      if (verticalDominant) fireVertical()
+      else fireHorizontal()
+    } else if (verticalPassed) {
+      fireVertical()
+    } else if (horizontalPassed) {
+      fireHorizontal()
     }
   }
 
