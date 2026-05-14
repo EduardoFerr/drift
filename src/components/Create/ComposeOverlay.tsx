@@ -367,7 +367,7 @@ export function ComposeOverlay({
                   overLimit
                     ? 'text-drift-bury'
                     : nearLimit
-                    ? 'text-amber-400'
+                    ? 'text-drift-warning'
                     : 'text-drift-muted'
                 }
                 title={`${used} de ${DRIFT_LIMITS.TEXT_MAX_CHARS} caracteres usados`}
@@ -398,7 +398,7 @@ export function ComposeOverlay({
             <div
               role="note"
               aria-label="sugestão de aviso de conteúdo"
-              className="rounded border border-amber-400/40 bg-amber-500/5 px-3 py-2 font-mono text-[10px] leading-snug text-amber-300"
+              className="rounded border border-drift-warning/40 bg-drift-warning/5 px-3 py-2 font-mono text-[10px] leading-snug text-drift-warning"
             >
               <span className="mr-1" aria-hidden="true">⚠</span>
               Seu post tem imagem mas nenhum aviso de conteúdo. Considere
@@ -509,7 +509,7 @@ function ContentWarningRow({
               onClick={() => onChange(active ? null : cw)}
               className={`rounded-sm border-[1.5px] px-[10px] py-[5px] font-mono text-[9px] uppercase tracking-meta transition-colors focus:outline-none focus:ring-1 focus:ring-drift-accent2 ${
                 active
-                  ? 'border-amber-400 bg-amber-500/15 text-amber-300'
+                  ? 'border-drift-warning bg-drift-warning/15 text-drift-warning'
                   : 'border-drift-border text-drift-muted hover:border-drift-text hover:text-drift-text'
               }`}
             >

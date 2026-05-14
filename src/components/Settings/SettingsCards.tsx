@@ -352,7 +352,7 @@ export function NetworkModeCard({ onClose }: CardProps) {
             )
           })}
         </div>
-        <p className="font-mono text-[10px] leading-relaxed text-amber-500/70">
+        <p className="font-mono text-[10px] leading-relaxed text-drift-warning/70">
           Status atual: scaffold/stub em PWA. Tor real funciona em build
           Tauri com <code>--features arti</code>. Trocar de modo exige
           reload (limitação do <code>SimplePool</code> global).
@@ -421,9 +421,9 @@ function Alert({
 }) {
   const colors =
     tone === 'error'
-      ? 'border-red-700/60 bg-red-950/30 text-red-300'
-      : 'border-amber-700/60 bg-amber-950/30 text-amber-300'
-  const titleColor = tone === 'error' ? 'text-red-200' : 'text-amber-200'
+      ? 'border-drift-danger/60 bg-drift-danger/10 text-drift-danger'
+      : 'border-drift-warning/60 bg-drift-warning/10 text-drift-warning'
+  const titleColor = tone === 'error' ? 'text-drift-danger' : 'text-drift-warning'
   return (
     <div role="alert" className={`rounded border px-3 py-2 font-mono text-[10px] leading-relaxed ${colors}`}>
       <strong className={`block ${titleColor}`}>{title}</strong>
@@ -568,7 +568,7 @@ export function BlobsCard({ onClose }: CardProps) {
         )}
 
         {useIpfs && error && (
-          <div className="rounded border border-red-700/60 bg-red-950/20 p-3 font-mono text-[11px] leading-relaxed text-red-300">
+          <div className="rounded border border-drift-danger/60 bg-drift-danger/10 p-3 font-mono text-[11px] leading-relaxed text-drift-danger">
             falha: {error}
           </div>
         )}
@@ -731,7 +731,7 @@ export function DiagnosticCard({ onClose }: CardProps) {
           <button
             onClick={handleRebuild}
             disabled={rebuilding}
-            className="w-full rounded border border-yellow-700/60 bg-yellow-950/20 px-3 py-3 font-mono text-[11px] uppercase tracking-meta text-yellow-300 transition-colors hover:bg-yellow-950/40 disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus:ring-1 focus:ring-drift-accent2 focus:ring-offset-2 focus:ring-offset-drift-bg"
+            className="w-full rounded border border-drift-warning/60 bg-drift-warning/10 px-3 py-3 font-mono text-[11px] uppercase tracking-meta text-drift-warning transition-colors hover:bg-drift-warning/20 disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus:ring-1 focus:ring-drift-accent2 focus:ring-offset-2 focus:ring-offset-drift-bg"
           >
             {rebuilding ? 'reconstruindo…' : '↻ redefinir cache local'}
           </button>

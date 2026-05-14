@@ -116,7 +116,7 @@ function TabBtn({
       className={`flex-1 px-2 py-1 text-[10px] uppercase tracking-widest transition-colors ${
         active
           ? 'border-b-2 border-drift-accent text-drift-accent'
-          : 'border-b-2 border-transparent text-slate-500 hover:text-slate-300'
+          : 'border-b-2 border-transparent text-drift-muted hover:text-drift-text'
       }`}
     >
       {children}
@@ -133,7 +133,7 @@ function PinnedList({
 }) {
   if (list.length === 0) {
     return (
-      <p className="py-6 text-center text-[11px] text-slate-600">
+      <p className="py-6 text-center text-[11px] text-drift-muted">
         nenhum post fixado.
         <br />
         no PostViewer, clique em 📍 pra fixar — protege de eviction local
@@ -148,11 +148,11 @@ function PinnedList({
           key={p.postId}
           className="flex items-center gap-2 rounded border border-drift-border/60 bg-drift-bg/30 px-2 py-1 text-[10px]"
         >
-          <span className="text-yellow-300">📌</span>
-          <span className="flex-1 truncate font-mono text-slate-400">
+          <span className="text-drift-warning">📌</span>
+          <span className="flex-1 truncate font-mono text-drift-muted">
             {p.postId.slice(0, 16)}…
           </span>
-          <span className="text-slate-600">{timeAgo(p.pinnedAt)}</span>
+          <span className="text-drift-muted">{timeAgo(p.pinnedAt)}</span>
           {p.cid && (
             <span
               className="rounded bg-drift-spread/15 px-1 text-drift-spread"
@@ -163,7 +163,7 @@ function PinnedList({
           )}
           <button
             onClick={() => void onUnpin(p.postId)}
-            className="rounded border border-red-900/60 px-1 py-0.5 text-red-400/80 hover:bg-red-950/30"
+            className="rounded border border-drift-danger/60 px-1 py-0.5 text-drift-danger/80 hover:bg-drift-danger/10"
           >
             unpin
           </button>
@@ -184,7 +184,7 @@ function ModList({
 }) {
   if (list.length === 0) {
     return (
-      <p className="py-6 text-center text-[11px] text-slate-600">
+      <p className="py-6 text-center text-[11px] text-drift-muted">
         nenhum {kind === 'blocked' ? 'bloqueado' : 'silenciado'}. Filtros
         locais (manifesto §24) — não mudam o score, só sua visualização.
       </p>
@@ -204,13 +204,13 @@ function ModList({
             key={e.npub}
             className="flex items-center gap-2 rounded border border-drift-border/60 bg-drift-bg/30 px-2 py-1 text-[10px]"
           >
-            <span className="flex-1 truncate font-mono text-slate-400" title={e.reason ?? ''}>
+            <span className="flex-1 truncate font-mono text-drift-muted" title={e.reason ?? ''}>
               {bech32.slice(0, 18)}…
             </span>
-            <span className="text-slate-600">{timeAgo(e.at)}</span>
+            <span className="text-drift-muted">{timeAgo(e.at)}</span>
             <button
               onClick={() => void onAction(e.npub)}
-              className="rounded border border-drift-border px-1 py-0.5 text-slate-400 hover:border-drift-accent hover:text-drift-accent"
+              className="rounded border border-drift-border px-1 py-0.5 text-drift-muted hover:border-drift-accent hover:text-drift-accent"
             >
               {kind === 'blocked' ? 'desbloquear' : 'dessilenciar'}
             </button>

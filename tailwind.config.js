@@ -46,6 +46,17 @@ export default {
           // Role tokens (semântica de protocolo — não renomear)
           spread: '#34d399', // ação positiva (kind 9079, label UI = DRIFT)
           bury: '#f87171', // ação negativa (kind 9080, label UI = SINK)
+          // Intent tokens (semântica de UI, NÃO de protocolo)
+          //   warning: avisos NÃO-destrutivos — CW chips, alerts informativos,
+          //            "segure pra moderar", GPS warnings, scaffold/stub notes.
+          //   danger:  ações destrutivas confirmáveis — Bloquear, Remover,
+          //            Report CTA, error states. Distinto de `drift-bury` que
+          //            é reservado pra ação semântica do protocolo (kind 9080).
+          // WCAG AA confirmado sobre drift-surface (#15151a):
+          //   warning #fbbf24 = 10.45:1 · danger #ef4444 = 4.63:1
+          // Tokens semânticos (carregam intenção); não introduzir paletas.
+          warning: '#fbbf24',
+          danger: '#ef4444',
         },
       },
       fontFamily: {

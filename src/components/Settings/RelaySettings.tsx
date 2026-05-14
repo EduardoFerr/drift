@@ -120,7 +120,7 @@ export function RelaySettings({ onClose }: RelaySettingsProps) {
               ? '✓'
               : '·'
             const tone = r.lastErr
-              ? 'text-red-400'
+              ? 'text-drift-danger'
               : r.lastOkAt
               ? 'text-drift-spread'
               : 'text-drift-muted'
@@ -146,7 +146,7 @@ export function RelaySettings({ onClose }: RelaySettingsProps) {
                 </button>
                 <button
                   onClick={() => void removeRelay(r.url)}
-                  className="rounded border border-red-900/60 px-1 py-0.5 text-red-400/80 hover:bg-red-950/30"
+                  className="rounded border border-drift-danger/60 px-1 py-0.5 text-drift-danger/80 hover:bg-drift-danger/10"
                 >
                   remover
                 </button>
@@ -177,7 +177,7 @@ export function RelaySettings({ onClose }: RelaySettingsProps) {
             </button>
           </div>
           {error && (
-            <div className="mt-2 text-[10px] text-red-400">{error}</div>
+            <div className="mt-2 text-[10px] text-drift-danger">{error}</div>
           )}
         </section>
 
