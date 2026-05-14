@@ -18,7 +18,10 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
-import type { KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent } from 'react'
+import type {
+  KeyboardEvent as ReactKeyboardEvent,
+  MouseEvent as ReactMouseEvent,
+} from 'react'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import type { BlobMeta } from '../../lib/nip94'
 import {
@@ -83,17 +86,21 @@ export function Image({
 }: ImageProps) {
   const [state, setState] = useState<'loading' | 'loaded' | 'error'>('loading')
   const [lightboxOpen, setLightboxOpen] = useState(false)
-  // Manual double-tap detection — `ondblclick` em mobile é não-confiável
-  // (varia por engine/keyboard show, fica preso no 300ms tap delay e
-  // alguns browsers não disparam quando os 2 taps usam pointers
-  // distintos). User feedback 2026-05-09: "no mobile o duplo click
-  // parece nao funcionar". Solução: trackeio o timestamp do último
-  // pointerup; se o próximo cair dentro de 350ms na mesma região,
-  // abro lightbox. Funciona em desktop + touch sem depender de dblclick.
+  // Manual double-tap detection via onClick — `ondblclick` em mobile
+  // é não-confiável (300ms tap delay, varia por engine), e `pointerup`
+  // pode ser engolido pelo Framer Motion swipe parent durante gesture
+  // capture. `onClick` em touch dispara DEPOIS que o navegador
+  // classifica o gesto como tap (não swipe), o que é exatamente o que
+  // queremos. User feedback 2026-05-09 (2x): "no mobile o duplo click
+  // parece nao funcionar".
+  //
+  // Algoritmo: ref guarda timestamp/posição do último click. Se o
+  // próximo cair dentro de 400ms e 40px do anterior, abre o lightbox.
+  // Slop generoso pra dedos imprecisos em mobile.
   const lastTapRef = useRef<{ t: number; x: number; y: number } | null>(null)
-  const DOUBLE_TAP_MS = 350
-  const DOUBLE_TAP_SLOP_PX = 32
-  function handlePointerUp(e: ReactPointerEvent<HTMLElement>) {
+  const DOUBLE_TAP_MS = 400
+  const DOUBLE_TAP_SLOP_PX = 40
+  function handleClick(e: ReactMouseEvent<HTMLElement>) {
     const now = performance.now()
     const last = lastTapRef.current
     if (
@@ -103,6 +110,8 @@ export function Image({
       Math.abs(e.clientY - last.y) <= DOUBLE_TAP_SLOP_PX
     ) {
       lastTapRef.current = null
+      e.preventDefault()
+      e.stopPropagation()
       setLightboxOpen(true)
       return
     }
@@ -180,12 +189,7 @@ export function Image({
     lightbox && state === 'loaded'
       ? {
           type: 'button' as const,
-          onPointerUp: handlePointerUp,
-          // onDoubleClick mantido como fallback pra desktop em casos
-          // onde pointerup não dispara (drag-then-release fora do
-          // elemento) — não conflita pq nosso handler manual já abre
-          // antes em cenário normal.
-          onDoubleClick: () => setLightboxOpen(true),
+          onClick: handleClick,
           onKeyDown: (e: ReactKeyboardEvent) => {
             if (e.key === 'Enter' || e.key === ' ') {
               e.preventDefault()
