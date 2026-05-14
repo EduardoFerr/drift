@@ -145,7 +145,17 @@ export function OnboardingOverlay({ onClose, onOpenIdentity }: OnboardingOverlay
   const isLast = step === steps.length - 1
 
   async function finish() {
-    await setPref('onboarding_done', true)
+    // try/catch defensivo (user report 2026-05-09 "Pular/Começar não
+    // avança"): se setPref falhar (lock SQLite, OPFS contention,
+    // migration in-flight), o await rejeita e onClose NUNCA roda →
+    // user clica de novo no mesmo botão e nada acontece. Catch garante
+    // que o overlay fecha mesmo nesse cenário; pior caso o user vê
+    // onboarding em próxima boot.
+    try {
+      await setPref('onboarding_done', true)
+    } catch (err) {
+      console.warn('[OnboardingOverlay] setPref onboarding_done falhou:', err)
+    }
     onClose()
   }
 
@@ -164,7 +174,12 @@ export function OnboardingOverlay({ onClose, onOpenIdentity }: OnboardingOverlay
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.15 }}
-      className="fixed inset-0 z-40 flex items-center justify-center bg-drift-bg/95 p-4 backdrop-blur-sm"
+      // z-[60] pra dominar TODAS as outras overlays (UpdatePrompt
+      // z-50, SlideUp z-40, NavBar z-30). User report 2026-05-09:
+      // "Pular/Começar não avança" — o UpdatePrompt fixed bottom z-50
+      // cobria a região dos botões do onboarding, absorvendo todos
+      // os clicks. First-run + SW prompt simultâneo = bloqueio.
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-drift-bg/95 p-4 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
     >
