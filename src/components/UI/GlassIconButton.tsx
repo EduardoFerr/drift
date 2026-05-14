@@ -30,9 +30,10 @@
  * efeito glass pressupõe overlay sobre algo.
  *
  * Sizes:
- *   - `sm` → h-6 w-6, ícone text-[12px]
- *   - `md` → h-7 w-7, ícone text-[14px] (default — match PostViewer)
- *   - `lg` → h-8 w-8, ícone text-[16px]
+ *   - `sm` → h-6 w-6, ícone text-[12px] (visual-only, sem tap)
+ *   - `md` → h-7 w-7, ícone text-[14px] (legacy — pre-WCAG 2.5.5)
+ *   - `lg` → h-8 w-8, ícone text-[16px] (legacy)
+ *   - `xl` → h-11 w-11, ícone text-[18px] (WCAG 2.5.5 AA — tap target 44px)
  *
  * Variants:
  *   - `default`     → hover chartreuse (drift-accent)
@@ -53,7 +54,7 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
 
 export type GlassIconButtonVariant = 'default' | 'destructive'
-export type GlassIconButtonSize = 'sm' | 'md' | 'lg'
+export type GlassIconButtonSize = 'sm' | 'md' | 'lg' | 'xl'
 
 export interface GlassIconButtonProps
   extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'type' | 'aria-label'> {
@@ -109,6 +110,10 @@ export function glassIconButtonSizeClass(size: GlassIconButtonSize): string {
       return 'h-7 w-7 text-[14px]'
     case 'lg':
       return 'h-8 w-8 text-[16px]'
+    case 'xl':
+      // WCAG 2.5.5 AA — touch target 44×44 mínimo. Adotado em
+      // PostViewer (Round CWV-4 a11y pass 2026-05-09).
+      return 'h-11 w-11 text-[18px]'
   }
 }
 

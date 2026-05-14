@@ -72,8 +72,15 @@ describe('glassIconButtonSizeClass', () => {
     expect(cls).toContain('text-[16px]')
   })
 
+  it('xl = h-11 w-11 com ícone text-[18px] (WCAG 2.5.5 AA — 44×44 tap target)', () => {
+    const cls = glassIconButtonSizeClass('xl')
+    expect(cls).toContain('h-11')
+    expect(cls).toContain('w-11')
+    expect(cls).toContain('text-[18px]')
+  })
+
   it('todas as sizes distintas produzem strings diferentes', () => {
-    const sizes: GlassIconButtonSize[] = ['sm', 'md', 'lg']
+    const sizes: GlassIconButtonSize[] = ['sm', 'md', 'lg', 'xl']
     const classes = sizes.map(glassIconButtonSizeClass)
     const uniqueCount = new Set(classes).size
     expect(uniqueCount).toBe(sizes.length)
@@ -81,11 +88,12 @@ describe('glassIconButtonSizeClass', () => {
 
   it('size H = W (aspect 1:1, círculo regular)', () => {
     // h-N e w-N com mesmo N — aspect ratio garantido pra rounded-full.
-    const sizes: GlassIconButtonSize[] = ['sm', 'md', 'lg']
+    const sizes: GlassIconButtonSize[] = ['sm', 'md', 'lg', 'xl']
     const expected: Record<GlassIconButtonSize, [string, string]> = {
       sm: ['h-6', 'w-6'],
       md: ['h-7', 'w-7'],
       lg: ['h-8', 'w-8'],
+      xl: ['h-11', 'w-11'],
     }
     for (const s of sizes) {
       const cls = glassIconButtonSizeClass(s)

@@ -324,7 +324,7 @@ export function PostViewer({
           <button
             onClick={handleTogglePin}
             disabled={pinned === null}
-            className={`rounded border px-2 py-1 ${
+            className={`inline-flex h-11 min-w-[44px] items-center justify-center rounded border px-2 ${
               pinned
                 ? 'border-yellow-500 text-yellow-300'
                 : 'border-drift-border hover:border-yellow-500 hover:text-yellow-300'
@@ -340,7 +340,7 @@ export function PostViewer({
           </button>
           <button
             onClick={() => setShowMap((v) => !v)}
-            className={`rounded border px-2 py-1 ${
+            className={`inline-flex h-11 min-w-[44px] items-center justify-center rounded border px-2 ${
               showMap
                 ? 'border-drift-accent text-drift-accent'
                 : 'border-drift-border hover:border-drift-accent hover:text-drift-accent'
@@ -354,7 +354,7 @@ export function PostViewer({
             <>
               <button
                 onClick={handleFollowToggle}
-                className={`rounded border px-2 py-1 ${
+                className={`inline-flex h-11 min-w-[44px] items-center justify-center rounded border px-2 ${
                   isFollowing
                     ? 'border-drift-accent text-drift-accent'
                     : 'border-drift-border hover:border-drift-accent hover:text-drift-accent'
@@ -370,7 +370,7 @@ export function PostViewer({
               </button>
               <button
                 onClick={handleMute}
-                className="rounded border border-drift-border px-2 py-1 hover:border-yellow-500 hover:text-yellow-300"
+                className="inline-flex h-11 min-w-[44px] items-center justify-center rounded border border-drift-border px-2 hover:border-yellow-500 hover:text-yellow-300"
                 title="silenciar autor — só esconde posts dele do meu feed (manifesto §24)"
                 aria-label="Silenciar"
               >
@@ -378,7 +378,7 @@ export function PostViewer({
               </button>
               <button
                 onClick={handleBlock}
-                className="rounded border border-drift-border px-2 py-1 hover:border-orange-500 hover:text-orange-300"
+                className="inline-flex h-11 min-w-[44px] items-center justify-center rounded border border-drift-border px-2 hover:border-orange-500 hover:text-orange-300"
                 title="bloquear autor — esconde posts e interações dele (manifesto §24)"
                 aria-label="Bloquear"
               >
@@ -386,7 +386,7 @@ export function PostViewer({
               </button>
               <button
                 onClick={() => setShowReport(true)}
-                className="rounded border border-drift-border px-2 py-1 hover:border-red-500 hover:text-red-400"
+                className="inline-flex h-11 min-w-[44px] items-center justify-center rounded border border-drift-border px-2 hover:border-red-500 hover:text-red-400"
                 title="denunciar — manifesto §26"
                 aria-label="Denunciar"
               >
@@ -396,7 +396,7 @@ export function PostViewer({
           )}
           <button
             onClick={onClose}
-            className="rounded border border-drift-border px-2 py-1 hover:border-drift-accent hover:text-drift-accent"
+            className="inline-flex h-11 min-w-[44px] items-center justify-center rounded border border-drift-border px-2 hover:border-drift-accent hover:text-drift-accent"
             aria-label="Fechar"
           >
             ✕
@@ -441,25 +441,30 @@ export function PostViewer({
                 e.stopPropagation()
                 setShowActionsMenu(true)
               }}
-              className="absolute right-6 top-6 z-30"
+              size="xl"
+              className="absolute right-4 top-4 z-30"
               aria-label="abrir menu de ações"
               title="ações do post"
             >
               <span aria-hidden="true">⋮</span>
             </GlassIconButton>
-            {/* Track C.4.2 — trigger pra ThreadView (comments) */}
+            {/* Track C.4.2 — trigger pra ThreadView (comments). Round
+                CWV-4 a11y 2026-05-09: bumped h-7→h-11 (WCAG 2.5.5 AA
+                tap target 44px). min-w mantém pílula expansível pro
+                badge de count. */}
             <button
               onClick={(e) => {
                 e.stopPropagation()
                 setShowThread(true)
               }}
-              className="absolute right-16 top-6 z-30 flex h-7 items-center gap-1 rounded-full border border-drift-border bg-drift-surface/80 px-2 text-drift-muted backdrop-blur-sm transition-colors hover:border-drift-accent2 hover:text-drift-accent2 focus:outline-none focus:ring-1 focus:ring-drift-accent2"
+              className="absolute right-[68px] top-4 z-30 flex h-11 min-w-[44px] items-center justify-center gap-1 rounded-full border border-drift-border bg-drift-surface/80 px-3 text-drift-muted backdrop-blur-sm transition-colors hover:border-drift-accent2 hover:text-drift-accent2 focus:outline-none focus:ring-1 focus:ring-drift-accent2"
+              style={{ touchAction: 'manipulation' }}
               aria-label={`abrir comentários${commentCount > 0 ? ` (${commentCount})` : ''}`}
               title="comentários (thread)"
             >
-              <span className="text-[12px] leading-none">💬</span>
+              <span className="text-[16px] leading-none">💬</span>
               {commentCount > 0 && (
-                <span className="text-[10px] leading-none font-mono tabular-nums">
+                <span className="text-[11px] leading-none font-mono tabular-nums">
                   {commentCount}
                 </span>
               )}
@@ -572,7 +577,7 @@ export function PostViewer({
           {/* Track C.4.2 — comments trigger (modal mode) */}
           <button
             onClick={() => setShowThread(true)}
-            className="rounded border border-drift-border px-2 py-1 text-drift-muted hover:border-drift-accent2 hover:text-drift-accent2"
+            className="inline-flex h-11 min-w-[44px] items-center justify-center rounded border border-drift-border px-2 text-drift-muted hover:border-drift-accent2 hover:text-drift-accent2"
             title="abrir comentários"
             aria-label={`Comentários${commentCount > 0 ? ` (${commentCount})` : ''}`}
           >
@@ -581,7 +586,7 @@ export function PostViewer({
           <button
             onClick={onSpread}
             disabled={pendingAction !== null}
-            className={`rounded border px-2 py-1 disabled:opacity-40 ${
+            className={`inline-flex h-11 min-w-[44px] items-center justify-center rounded border px-2 disabled:opacity-40 ${
               spreadActive
                 ? 'border-drift-spread bg-drift-spread/15 text-drift-spread'
                 : 'border-drift-spread/40 text-drift-spread hover:bg-drift-spread/10'
@@ -604,7 +609,7 @@ export function PostViewer({
           <button
             onClick={onBury}
             disabled={pendingAction !== null}
-            className={`rounded border px-2 py-1 disabled:opacity-40 ${
+            className={`inline-flex h-11 min-w-[44px] items-center justify-center rounded border px-2 disabled:opacity-40 ${
               buryActive
                 ? 'border-drift-bury bg-drift-bury/15 text-drift-bury'
                 : 'border-drift-bury/40 text-drift-bury hover:bg-drift-bury/10'
