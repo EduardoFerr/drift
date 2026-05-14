@@ -502,30 +502,19 @@ export function PostViewer({
           onBury={pendingAction === null ? onBury : undefined}
           onPrev={total > 1 ? prev : undefined}
           onNext={total > 1 ? next : undefined}
-          // Round 4 Fase B (F-09 / TX-7 fix): tap em area neutra do
-          // card. Prioridade:
-          //   1. CW blurred → reveal (preserva comportamento atual)
-          //   2. multi-subpost → próximo (cycle: último → primeiro)
-          //   3. single subpost → no-op (mas user agora tem feedback
-          //      visual via swipe hint footer)
-          //
-          // 2026-05-09 fix: ignore taps que aterrissam em children
-          // interativos (botão lightbox da imagem, ícones de ação no
-          // menu). Sem isso o tap dispara onClick do botão E o onTap
-          // do Framer paralelamente → subpost avança no mesmo tick em
-          // que o lightbox tenta abrir, desmontando o Image antes do
-          // overlay aparecer. User report 2026-05-09.
+          // V9.13 (user feedback 2026-05-09: "swipe é o que avança, não
+          // o click"): onTap não avança mais subpost. Antes ele empilhava
+          // duas responsabilidades no mesmo gesto (advance + reveal CW)
+          // e disputava com o onClick do Image button (lightbox), criando
+          // bugs cruzados em cada tuning de swipe. Agora:
+          //   - swipe horizontal → onPrev/onNext (Framer drag)
+          //   - tap em segment da Instagram bar → onSelect(idx)
+          //   - tap na imagem → double-tap counter abre lightbox
+          //   - tap em área neutra com CW blurred → reveal
+          // Sem tap-to-advance.
           onTap={
             !revealed
               ? () => setRevealed(true)
-              : total > 1
-              ? (e: MouseEvent | TouchEvent | PointerEvent) => {
-                  const target = e.target as Element | null
-                  if (target && target.closest && target.closest('button,a,[data-no-advance]')) {
-                    return
-                  }
-                  setSubpostIdx((i) => (i + 1) % total)
-                }
               : undefined
           }
           disableHorizontal={total <= 1}
