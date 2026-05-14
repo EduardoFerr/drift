@@ -32,17 +32,29 @@ module.exports = {
     collect: {
       // `npm run preview` serve dist/ em http://localhost:4173 por default.
       // lhci sobe, espera, navega, mata.
+      // `@vitejs/plugin-basic-ssl` se aplica a `vite preview` também,
+      // servindo HTTPS com cert auto-assinado. Chrome bloqueia com
+      // interstitial → redireciona pra chrome-error://chromewebdata/
+      // (CHROME_INTERSTITIAL_ERROR no LHCI runner, push commit cd738f2+).
+      // Fix: passar a URL https + flag chrome ignorando cert.
       startServerCommand: 'npm run preview -- --port 4173',
-      url: ['http://localhost:4173/'],
+      url: ['https://localhost:4173/'],
+      // Esperar 5s pelo server (cert TLS demora ~2-3s no CI).
+      startServerReadyPattern: 'Local:',
+      startServerReadyTimeout: 30000,
       // 3 runs → mediana. 1 run tem variance ~10pts; 3 estabiliza pra
       // ~3pt p95. 5 runs seria melhor mas dobra wall time CI.
       numberOfRuns: 3,
+      // Chrome flags pra LHCI runner: ignorar cert auto-assinado do
+      // basicSsl, e desabilitar HSTS pinning entre runs.
+      chromeFlags: '--ignore-certificate-errors --allow-insecure-localhost --disable-features=HttpsUpgrades',
       settings: {
         // Mobile form-factor + 3G-fast throttling: matching default
         // PageSpeed Insights "Mobile" tab (que é o que stakeholders
         // veem). Desktop run pode entrar como `lhci-desktop` futuro.
         preset: 'desktop', // será sobrescrito por throttling/formFactor abaixo
         formFactor: 'mobile',
+        chromeFlags: ['--ignore-certificate-errors', '--allow-insecure-localhost', '--disable-features=HttpsUpgrades'],
         screenEmulation: {
           mobile: true,
           width: 360,
