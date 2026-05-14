@@ -83,7 +83,11 @@ module.exports = {
     assert: {
       // Soft mode inicial — warn, não erro. Quando bundle otimizado
       // (entry chunk ≤ 250KB, helia lazy real), virar 'error'.
-      preset: 'lighthouse:no-pwa',
+      // Sem preset: o `lighthouse:no-pwa` preset assert exige que TODOS
+      // os audits (a11y, best-practices, seo) tenham rodado, mas
+      // `onlyCategories: ['performance']` pula esses → `auditRan`
+      // failure em cascata. Asserts explícitos só pro que nos
+      // interessa.
       assertions: {
         'categories:performance': ['warn', { minScore: 0.95 }],
         'largest-contentful-paint': ['warn', { maxNumericValue: 2500 }],
