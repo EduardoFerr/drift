@@ -257,9 +257,35 @@ function App() {
     } else if (action === 'settings') {
       setShowSettingsRoot(true)
     }
-    if (action) {
+    // V9.20 — deep link `?p=<nevent>` gerado pelo share post. Decodifica
+    // o nevent, busca o evento do post via relay (filter ids=[id]),
+    // entrega pra onNostrEvent que persiste no SQLite + invalidateFeed.
+    // User vê o post aparecer no feed em segundos. (TODO: auto-abrir
+    // PostViewer pro post linkado — exige refactor da fila do feed.)
+    const pParam = params.get('p')
+    if (pParam) {
+      void (async () => {
+        try {
+          const { nip19 } = await import('nostr-tools')
+          const decoded = nip19.decode(pParam)
+          if (decoded.type === 'nevent') {
+            const eventId = decoded.data.id
+            const { pool } = await import('./lib/nostr')
+            const { activeReadRelays } = await import('./lib/relays')
+            const { onNostrEvent } = await import('./lib/events')
+            const relays = activeReadRelays()
+            const ev = await pool.get(relays, { ids: [eventId] })
+            if (ev) await onNostrEvent(ev)
+          }
+        } catch (err) {
+          console.warn('[deep-link] falha ao resolver ?p=', err)
+        }
+      })()
+    }
+    if (action || pParam) {
       const url = new URL(window.location.href)
       url.searchParams.delete('action')
+      url.searchParams.delete('p')
       window.history.replaceState({}, '', url.toString())
     }
   }, [boot.step])

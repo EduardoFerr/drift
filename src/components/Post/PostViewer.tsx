@@ -311,7 +311,12 @@ export function PostViewer({
         author: post.authorPub,
         kind: 9078,
       })
-      const url = `https://njump.me/${nevent}`
+      // V9.20 (user pedido 2026-05-14): URL volta pro domínio do app
+      // com `?p=<nevent>` — quem clicar abre o Drift direto, fora do
+      // Drift cai na home (App.tsx consome o param no mount, busca o
+      // evento via relay e materializa). Mantém formato nevent pra
+      // outros clientes Nostr também conseguirem decodificar.
+      const url = `${window.location.origin}/?p=${nevent}`
       const firstText = post.subposts[0]?.text?.slice(0, 100) ?? ''
       if (navigator.share) {
         await navigator.share({ url, title: 'drift', text: firstText })
@@ -320,7 +325,6 @@ export function PostViewer({
         await dialog.alert(`Link copiado: ${url}`, { title: 'compartilhar' })
       }
     } catch (err) {
-      // AbortError = user cancelou; ignora silenciosamente
       if (err instanceof Error && err.name === 'AbortError') return
       console.warn('[share-post] falhou:', err)
     }
