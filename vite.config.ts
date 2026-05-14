@@ -246,7 +246,7 @@ export default defineConfig(async (): Promise<UserConfig> => ({
         //   - maplibre-gl   Mapa overlay (1.1 MB)
         //   - tesselator    Deck.gl ArcLayer (467 KB)
         //   - rebroadcast   re-broadcast oportunista (Fase 5)
-        const lazyChunks = /^(?:helia-deps|maplibre-gl|tesselator|rebroadcast)/
+        const lazyChunks = /^(?:helia-deps|maplibre-gl|tesselator|rebroadcast|vendor-identity)/
         return deps.filter((d: string) => !lazyChunks.test(d))
       },
     },
@@ -260,11 +260,22 @@ export default defineConfig(async (): Promise<UserConfig> => ({
           if (/[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/.test(id)) {
             return 'vendor-react'
           }
+          // V9.21 — vendor-identity: qrcode + @scure/bip39 + @scure/bip32
+          // só carregam quando IdentityPanel/IdentitySwitcher (lazy) montam.
+          // Antes ficavam dentro de vendor-nostr (eager) porque match em
+          // `@scure`. Ratchet de ~30-40 KB do bundle inicial.
+          if (
+            /[\\/]node_modules[\\/](qrcode|@scure[\\/]bip39|@scure[\\/]bip32)[\\/]/.test(id)
+          ) {
+            return 'vendor-identity'
+          }
           // nostr-tools + crypto primitives. Atenção: @noble/secp256k1
           // e @noble/hashes saem do regex helia-deps porque nostr-tools
           // depende deles tb — vendor-nostr é onde vivem agora.
+          // @scure/base fica aqui (nostr-tools depende pra bech32 npub
+          // encoding); apenas bip39/bip32 saíram (V9.21).
           if (
-            /[\\/]node_modules[\\/](nostr-tools|@noble[\\/]secp256k1|@noble[\\/]hashes|@scure)[\\/]/.test(id)
+            /[\\/]node_modules[\\/](nostr-tools|@noble[\\/]secp256k1|@noble[\\/]hashes|@scure[\\/]base)[\\/]/.test(id)
           ) {
             return 'vendor-nostr'
           }
