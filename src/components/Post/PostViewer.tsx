@@ -870,7 +870,10 @@ function ModalWrapper({ children, exitVariant }: WrapperProps) {
   // Reduced motion respeitado — duration 0 colapsa entrada para fade
   // simples. Convergente com Lily RFC §1.2 (PostViewer 0.32 → motion-emphasis).
   const reduced = useReducedMotion()
-  const transition = reduced ? { duration: 0 } : MOTION.emphasis
+  // V9.6: emphasis 320ms percebido como "saindo muito rápido" pelo
+  // user em swipe vertical (spread/bury). swap (500ms ease-out-quart)
+  // dá sensação papel-no-deck. User feedback 2026-05-09.
+  const transition = reduced ? { duration: 0 } : MOTION.swap
   return (
     <motion.div
       initial={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.96, y: 20 }}
@@ -895,7 +898,10 @@ function ModalWrapper({ children, exitVariant }: WrapperProps) {
 function EmbeddedWrapper({ children, exitVariant }: WrapperProps) {
   // Round 4 Fase B (B1): mesmo tokenizado do ModalWrapper.
   const reduced = useReducedMotion()
-  const transition = reduced ? { duration: 0 } : MOTION.emphasis
+  // V9.6: emphasis 320ms percebido como "saindo muito rápido" pelo
+  // user em swipe vertical (spread/bury). swap (500ms ease-out-quart)
+  // dá sensação papel-no-deck. User feedback 2026-05-09.
+  const transition = reduced ? { duration: 0 } : MOTION.swap
   return (
     <motion.div
       initial={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.96, y: 20 }}
