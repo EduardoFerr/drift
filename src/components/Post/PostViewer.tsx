@@ -20,7 +20,7 @@
  * a transição React é instantânea — sem fetch, sem flash.
  */
 
-import { lazy, useEffect, useState } from 'react'
+import { lazy, useEffect, useRef, useState } from 'react'
 import { LazyBoundary } from '../UI/LazyBoundary'
 import { DriftSkeleton } from '../UI/DriftSkeleton'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
@@ -53,6 +53,8 @@ const SpreadMap = lazy(() =>
   import('../Feed/SpreadMap').then((m) => ({ default: m.SpreadMap })),
 )
 import { GlassIconButton } from '../UI/GlassIconButton'
+import { SlideUpOverlay } from '../UI/SlideUpOverlay'
+import { ModalHeader } from '../UI/ModalHeader'
 
 /** 'up' = espalhou; 'down' = enterrou. Sai sem direção (X/ESC) = undefined. */
 export type QueueExitDir = 'up' | 'down'
@@ -140,6 +142,45 @@ export function PostViewer({
   const [subpostIdx, setSubpostIdx] = useState(0)
   const [showMap, setShowMap] = useState(false)
   const [showReport, setShowReport] = useState(false)
+  // V9.16 (user pedido 2026-05-14): long-press 5s → moderação.
+  // Estado local: pressing controla render do progress bar; pressTimer
+  // dispara a abertura do modal. moderationOpen é o modal em si.
+  const [pressing, setPressing] = useState(false)
+  const [moderationOpen, setModerationOpen] = useState(false)
+  const pressTimerRef = useRef<number | null>(null)
+  const pressStartRef = useRef<{ x: number; y: number } | null>(null)
+  const LONG_PRESS_MS = 5000
+  const LONG_PRESS_SLOP_PX = 20
+  function cancelLongPress() {
+    if (pressTimerRef.current !== null) {
+      window.clearTimeout(pressTimerRef.current)
+      pressTimerRef.current = null
+    }
+    pressStartRef.current = null
+    setPressing(false)
+  }
+  function handleCardPointerDown(e: React.PointerEvent) {
+    if (isMine) return // long-press só faz sentido em posts de outros
+    // Ignora taps em controles (botões do fan, ⋮, ícones top-right).
+    const target = e.target as Element | null
+    if (target && target.closest && target.closest('button,a')) return
+    pressStartRef.current = { x: e.clientX, y: e.clientY }
+    setPressing(true)
+    pressTimerRef.current = window.setTimeout(() => {
+      pressTimerRef.current = null
+      setPressing(false)
+      pressStartRef.current = null
+      navigator.vibrate?.(50)
+      setModerationOpen(true)
+    }, LONG_PRESS_MS)
+  }
+  function handleCardPointerMove(e: React.PointerEvent) {
+    if (!pressStartRef.current) return
+    const dx = e.clientX - pressStartRef.current.x
+    const dy = e.clientY - pressStartRef.current.y
+    if (Math.hypot(dx, dy) > LONG_PRESS_SLOP_PX) cancelLongPress()
+  }
+  useEffect(() => () => cancelLongPress(), [])
   const [reporting, setReporting] = useState(false)
   const [pinned, setPinned] = useState<boolean | null>(null) // null = loading
   // V11: menu de ações no embedded mode (substitui os 8 botões do
@@ -433,7 +474,28 @@ export function PostViewer({
           2 shadow cards atrás (próximos da fila) com scale 0.96/0.92,
           translateY 7px/14px, opacity 0.4/0.18. Efeito Tinder de "tem
           mais posts atrás". Aria-hidden — visual puro. */}
-      <div className="relative flex-1">
+      <div
+        className="relative flex-1"
+        onPointerDown={handleCardPointerDown}
+        onPointerMove={handleCardPointerMove}
+        onPointerUp={cancelLongPress}
+        onPointerCancel={cancelLongPress}
+        onPointerLeave={cancelLongPress}
+      >
+        {/* V9.16 — long-press progress bar (top edge, 4px, drift-bury).
+            Aparece só durante o hold; preenche linearmente em 5s. Se
+            user libera ou move >20px, AnimatePresence dissolve. */}
+        <AnimatePresence>
+          {pressing && (
+            <motion.div
+              className="pointer-events-none absolute inset-x-0 top-0 z-[15] h-1 origin-left bg-drift-bury"
+              initial={{ scaleX: 0, opacity: 0.9 }}
+              animate={{ scaleX: 1 }}
+              exit={{ opacity: 0, scaleX: 1, transition: { duration: 0.18 } }}
+              transition={{ duration: LONG_PRESS_MS / 1000, ease: 'linear' }}
+            />
+          )}
+        </AnimatePresence>
         {/* V11 — botão ⋮ menu de ações (embedded mode only).
             Absolute top-right do card area, z-30 pra ficar acima do
             SwipeHandler. onClick stopPropagation pra evitar conflito
@@ -690,15 +752,103 @@ export function PostViewer({
         )}
       </AnimatePresence>
 
-      {/* V9.15: ActionsMenu (SlideUpOverlay) removido. Ações rápidas
-          viraram fan inline expandido pelo ⋮; ações sensíveis (block/
-          report) ganham long-press 5s pra evitar dispara acidental.
-          ActionsMenu component permanece exportado pra retrocompat de
-          tests/external callers. */}
+      {/* V9.16 — moderation modal (long-press 5s gate). Block e Report
+          são ações sensíveis (filtragem local destrutiva + denúncia
+          comunitária). Cada item chama o handler existente, que já tem
+          dialog.confirm próprio com explicação. */}
+      <AnimatePresence>
+        {moderationOpen && !isMine && (
+          <ModerationModal
+            onClose={() => setModerationOpen(false)}
+            onBlock={() => {
+              setModerationOpen(false)
+              void handleBlock()
+            }}
+            onReport={() => {
+              setModerationOpen(false)
+              setShowReport(true)
+            }}
+          />
+        )}
+      </AnimatePresence>
     </Wrapper>
   )
 }
 
+
+// ─── ModerationModal ─────────────────────────────────────────────────
+
+/**
+ * V9.16 — modal de moderação. Acionado por long-press 5s no card. Lista
+ * só 2 itens (Bloquear, Denunciar). Cada um chama o handler que abre o
+ * dialog.confirm/ReportModal com explicação + Cancelar/Confirmar — o
+ * gate de 5s + o dialog são camadas independentes de fricção contra
+ * dispara acidental ou impulsivo.
+ */
+function ModerationModal({
+  onClose,
+  onBlock,
+  onReport,
+}: {
+  onClose: () => void
+  onBlock: () => void
+  onReport: () => void
+}) {
+  type Item = {
+    key: string
+    icon: string
+    label: string
+    hint: string
+    onClick: () => void
+  }
+  const items: Item[] = [
+    {
+      key: 'block',
+      icon: '⊘',
+      label: 'bloquear',
+      hint: 'esconde posts e interações deste autor do meu feed (manifesto §24)',
+      onClick: onBlock,
+    },
+    {
+      key: 'report',
+      icon: '⚠',
+      label: 'denunciar',
+      hint: 'reporta pra moderação comunitária (manifesto §26)',
+      onClick: onReport,
+    },
+  ]
+  return (
+    <SlideUpOverlay onClose={onClose} ariaLabel="moderação">
+      <ModalHeader title="moderação" onClose={onClose} />
+      <ul className="-mx-1 divide-y divide-drift-border">
+        {items.map((item) => (
+          <li key={item.key}>
+            <button
+              onClick={item.onClick}
+              className="group flex w-full items-center gap-3 px-1 py-3 text-left text-drift-bury transition-colors hover:text-[#ff6b6b] focus:outline-none focus:ring-1 focus:ring-drift-accent2 focus:ring-offset-2 focus:ring-offset-drift-surface"
+              style={{ touchAction: 'manipulation' }}
+            >
+              <span aria-hidden="true" className="text-[16px] leading-none">
+                {item.icon}
+              </span>
+              <span className="flex flex-1 flex-col gap-[2px]">
+                <span className="font-mono text-[11px] uppercase tracking-[2px]">
+                  {item.label}
+                </span>
+                <span className="font-mono text-[10px] normal-case tracking-normal text-drift-muted">
+                  {item.hint}
+                </span>
+              </span>
+              <span aria-hidden="true" className="font-mono text-[12px] text-drift-muted transition-colors group-hover:text-current">
+                →
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </SlideUpOverlay>
+  )
+}
 
 // ─── ActionsFan ──────────────────────────────────────────────────────
 
