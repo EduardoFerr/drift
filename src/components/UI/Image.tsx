@@ -187,6 +187,12 @@ export function Image({
           ? `abrir imagem em primeiro plano: ${alt} (toque duplo)`
           : 'abrir imagem em primeiro plano (toque duplo)',
         title: 'toque duplo pra abrir',
+        // V9.17 — long-press 5s (em PostViewer) NÃO deve disparar
+        // moderação quando o press é sobre a imagem. data-no-longpress
+        // é o opt-out explícito que PostViewer.handleCardPointerDown
+        // checa via target.closest('[data-no-longpress]'). Belt-and-
+        // suspenders sobre closest('button') que já deveria filtrar.
+        'data-no-longpress': 'true',
         // touch-action: 'none' delega TUDO pro JS — necessário pra
         // que o Framer drag do SwipeHandler pai veja os movimentos
         // de pan iniciados sobre a imagem. Com 'manipulation' o

@@ -161,9 +161,17 @@ export function PostViewer({
   }
   function handleCardPointerDown(e: React.PointerEvent) {
     if (isMine) return // long-press só faz sentido em posts de outros
-    // Ignora taps em controles (botões do fan, ⋮, ícones top-right).
+    // Ignora taps em controles + áreas opt-out (imagem-botão usa
+    // data-no-longpress pra preservar duplo-clique → lightbox sem
+    // disputa com hold-to-moderate). User report 2026-05-14: "segurar
+    // em posts com imagem conflita com ação de abrir imagem".
     const target = e.target as Element | null
-    if (target && target.closest && target.closest('button,a')) return
+    if (
+      target &&
+      target.closest &&
+      (target.closest('button,a') || target.closest('[data-no-longpress]'))
+    )
+      return
     pressStartRef.current = { x: e.clientX, y: e.clientY }
     setPressing(true)
     pressTimerRef.current = window.setTimeout(() => {
