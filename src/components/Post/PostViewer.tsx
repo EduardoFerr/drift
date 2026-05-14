@@ -501,11 +501,24 @@ export function PostViewer({
           //   2. multi-subpost → próximo (cycle: último → primeiro)
           //   3. single subpost → no-op (mas user agora tem feedback
           //      visual via swipe hint footer)
+          //
+          // 2026-05-09 fix: ignore taps que aterrissam em children
+          // interativos (botão lightbox da imagem, ícones de ação no
+          // menu). Sem isso o tap dispara onClick do botão E o onTap
+          // do Framer paralelamente → subpost avança no mesmo tick em
+          // que o lightbox tenta abrir, desmontando o Image antes do
+          // overlay aparecer. User report 2026-05-09.
           onTap={
             !revealed
               ? () => setRevealed(true)
               : total > 1
-              ? () => setSubpostIdx((i) => (i + 1) % total)
+              ? (e: MouseEvent | TouchEvent | PointerEvent) => {
+                  const target = e.target as Element | null
+                  if (target && target.closest && target.closest('button,a,[data-no-advance]')) {
+                    return
+                  }
+                  setSubpostIdx((i) => (i + 1) % total)
+                }
               : undefined
           }
           disableHorizontal={total <= 1}

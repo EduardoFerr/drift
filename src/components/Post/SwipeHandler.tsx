@@ -31,7 +31,17 @@ export interface SwipeHandlerProps {
   onBury?: () => void
   onPrev?: () => void
   onNext?: () => void
-  onTap?: () => void
+  /**
+   * Disparado em tap (sem movimento). Recebe o evento original do
+   * Framer pra permitir target inspection — necessário pra ignorar
+   * taps que aterrissam em children interativos (botão lightbox da
+   * imagem, ícones de ação) e dispararem ao mesmo tempo da onClick do
+   * filho. Sem isso o Framer onTap + child onClick disparam em
+   * paralelo → tap na imagem avança subpost E abre lightbox no mesmo
+   * tick (e o unmount do subpost zera o state do lightbox). User
+   * report 2026-05-09.
+   */
+  onTap?: (event: MouseEvent | TouchEvent | PointerEvent) => void
   /**
    * Track C.4.2 — gesto vertical genérico, opt-in. Usado pelo ThreadView
    * onde ↑ = descend (filho) e ↓ = ascend (parent). Non-breaking: se
