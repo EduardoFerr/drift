@@ -297,6 +297,62 @@ export function PostViewer({
     }
   }
 
+  // V9.18 (user pedido 2026-05-14): substituir as opções nativas do
+  // browser que foram suprimidas (copiar/baixar/compartilhar imagem)
+  // por handlers próprios. Compartilhar post via njump.me — gateway
+  // público que resolve nevent1 em qualquer cliente Nostr. Imagem via
+  // Web Share API com files (mobile moderno), fallback URL share, e
+  // último fallback clipboard.
+  async function handleSharePost() {
+    try {
+      const { nip19 } = await import('nostr-tools')
+      const nevent = nip19.neventEncode({
+        id: post.id,
+        author: post.authorPub,
+        kind: 9078,
+      })
+      const url = `https://njump.me/${nevent}`
+      const firstText = post.subposts[0]?.text?.slice(0, 100) ?? ''
+      if (navigator.share) {
+        await navigator.share({ url, title: 'drift', text: firstText })
+      } else if (navigator.clipboard) {
+        await navigator.clipboard.writeText(url)
+        await dialog.alert(`Link copiado: ${url}`, { title: 'compartilhar' })
+      }
+    } catch (err) {
+      // AbortError = user cancelou; ignora silenciosamente
+      if (err instanceof Error && err.name === 'AbortError') return
+      console.warn('[share-post] falhou:', err)
+    }
+  }
+
+  async function handleShareImage() {
+    const current = post.subposts[subpostIdx]
+    if (!current?.imageUrl) return
+    try {
+      const res = await fetch(current.imageUrl)
+      const blob = await res.blob()
+      const ext = (blob.type.split('/')[1] ?? 'jpg').replace('+xml', '')
+      const file = new File(
+        [blob],
+        `drift-${post.id.slice(0, 8)}.${ext}`,
+        { type: blob.type },
+      )
+      const canShareFiles = !!navigator.canShare?.({ files: [file] })
+      if (canShareFiles && navigator.share) {
+        await navigator.share({ files: [file] })
+      } else if (navigator.share) {
+        await navigator.share({ url: current.imageUrl })
+      } else if (navigator.clipboard) {
+        await navigator.clipboard.writeText(current.imageUrl)
+        await dialog.alert(`Link da imagem copiado`, { title: 'compartilhar imagem' })
+      }
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') return
+      console.warn('[share-image] falhou:', err)
+    }
+  }
+
   async function handleFollowToggle() {
     try {
       if (isFollowing) await unfollow(post.authorPub)
@@ -534,6 +590,7 @@ export function PostViewer({
               pinned={pinned}
               isFollowing={isFollowing}
               mapOpen={showMap}
+              currentHasImage={!!post.subposts[subpostIdx]?.imageUrl}
               onPinToggle={() => {
                 void handleTogglePin()
                 setShowActionsMenu(false)
@@ -548,6 +605,14 @@ export function PostViewer({
               }}
               onMute={() => {
                 void handleMute()
+                setShowActionsMenu(false)
+              }}
+              onSharePost={() => {
+                void handleSharePost()
+                setShowActionsMenu(false)
+              }}
+              onShareImage={() => {
+                void handleShareImage()
                 setShowActionsMenu(false)
               }}
             />
@@ -876,20 +941,27 @@ function ActionsFan({
   pinned,
   isFollowing,
   mapOpen,
+  currentHasImage,
   onPinToggle,
   onMapToggle,
   onFollowToggle,
   onMute,
+  onSharePost,
+  onShareImage,
 }: {
   visible: boolean
   isMine: boolean
   pinned: boolean | null
   isFollowing: boolean
   mapOpen: boolean
+  /** Subpost atual tem imagem? Controla render do share-image. */
+  currentHasImage: boolean
   onPinToggle: () => void
   onMapToggle: () => void
   onFollowToggle: () => void
   onMute: () => void
+  onSharePost: () => void
+  onShareImage: () => void
 }) {
   type FanItem = {
     key: string
@@ -899,6 +971,22 @@ function ActionsFan({
     disabled?: boolean
   }
   const items: FanItem[] = [
+    {
+      key: 'share-post',
+      icon: '📤',
+      label: 'compartilhar post',
+      onClick: onSharePost,
+    },
+  ]
+  if (currentHasImage) {
+    items.push({
+      key: 'share-image',
+      icon: '🖼',
+      label: 'compartilhar imagem',
+      onClick: onShareImage,
+    })
+  }
+  items.push(
     {
       key: 'map',
       icon: '🗺',
@@ -912,7 +1000,7 @@ function ActionsFan({
       onClick: onPinToggle,
       disabled: pinned === null,
     },
-  ]
+  )
   if (!isMine) {
     items.push(
       {
