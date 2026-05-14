@@ -20,6 +20,7 @@ import {
   motion,
   useMotionValue,
   useTransform,
+  animate,
   type PanInfo,
 } from 'framer-motion'
 
@@ -129,9 +130,20 @@ export function SwipeHandler({
     const ay = Math.abs(offset.y)
     const verticalDominant = ay > ax
 
-    // Reset position
-    x.set(0)
-    y.set(0)
+    // V9.8 (user pedido 2026-05-09): retorno suave/magnético quando o
+    // user desiste do gesto. Antes: x.set(0); y.set(0) snap instantâneo
+    // → sensação de "fim brusco". Agora: spring com stiffness 500,
+    // damping 38 — pull firme mas com easing visível (~250-300ms a
+    // partir de 80px de drag).
+    //
+    // Aplicado SEMPRE: mesmo quando threshold é cruzado e ação dispara,
+    // o spring back roda em paralelo ao exit animation do Wrapper —
+    // ambos somam (parent flies away + child centraliza). Pra horizontal
+    // (subpost nav, mesmo PostViewer fica montado) o reset é essencial
+    // ou o offset persiste pro próximo subpost.
+    const spring = { type: 'spring' as const, stiffness: 500, damping: 38 }
+    animate(x, 0, spring)
+    animate(y, 0, spring)
 
     if (verticalDominant && !disableVertical) {
       const passed =
