@@ -9,7 +9,7 @@ import {
   warmUpGpsLocation,
   type GeolocationFailureReason,
 } from './lib/geolocation'
-import { restartSync, useSyncStore } from './lib/sync'
+import { rebuildIdentityHistory, restartSync, useSyncStore } from './lib/sync'
 import { createPost, spreadPost, buryPost } from './lib/protocol'
 import { getMyAction, markFeedSeen, refreshFeed, useFeedStore } from './lib/feed'
 import {
@@ -2188,6 +2188,8 @@ function DiagnosticPanel({ boot }: { boot: BootState }) {
   const sync = useSyncStore()
   const [resyncing, setResyncing] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
+  const npub = boot.identity?.npub ?? null
+  const historyRebuilding = npub ? sync.rebuildsInProgress.includes(npub) : false
 
   async function handleResync() {
     if (resyncing) return
@@ -2206,6 +2208,18 @@ function DiagnosticPanel({ boot }: { boot: BootState }) {
       await refreshFeed()
     } finally {
       setRefreshing(false)
+    }
+  }
+
+  // V9.10b (user pergunta 2026-05-09 sobre cliente 0.2-0.4): startSync
+  // só pede últimos 7 dias; este botão chama rebuildIdentityHistory que
+  // busca SEM cap temporal (authors=[npub]). Histórico do user own.
+  async function handleFetchHistory() {
+    if (!npub || historyRebuilding) return
+    try {
+      await rebuildIdentityHistory(npub)
+    } catch (err) {
+      console.error('[diag] rebuildIdentityHistory failed:', err)
     }
   }
 
@@ -2269,6 +2283,18 @@ function DiagnosticPanel({ boot }: { boot: BootState }) {
           {resyncing ? '…' : '↻ re-subscribe'}
         </button>
       </div>
+
+      {/* Backfill histórico — busca eventos do próprio nsec SEM o cap de
+          7d que startSync aplica. Útil quando user migra de cliente
+          antigo / device novo. V9.10b. */}
+      <button
+        onClick={handleFetchHistory}
+        disabled={historyRebuilding || !npub}
+        className="w-full rounded border border-drift-accent/60 bg-drift-accent/10 px-3 py-2 font-mono text-[10px] uppercase tracking-meta text-drift-accent transition-colors hover:bg-drift-accent/20 disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2"
+        title="busca TODOS os eventos do meu nsec nos relays (sem janela de 7d) — útil pra recuperar histórico de cliente antigo"
+      >
+        {historyRebuilding ? 'buscando histórico…' : '↻ buscar histórico do meu nsec'}
+      </button>
 
       {/* Ring buffer de últimos eventos recebidos — diagnóstico de
           sincronização entre devices. Se cliente A publica spread e
