@@ -24,7 +24,15 @@ import {
   type PanInfo,
 } from 'framer-motion'
 
-const SWIPE_THRESHOLD_PX = 80
+// Thresholds split por eixo (user pedido 2026-05-09: "aumente o limiar
+// para o card sair e nao voltar magneticamente, está muito curto o
+// raio do magnetismo" — sobre swipe vertical especificamente).
+// Vertical commits a ação destrutiva (spread/bury → post avança no
+// feed, ação irreversível visualmente), então merece raio magnético
+// maior pro user "sentir" o compromisso. Horizontal é só nav reversível
+// entre subposts — 80px continua confortável.
+const SWIPE_THRESHOLD_PX_V = 160
+const SWIPE_THRESHOLD_PX_H = 80
 const SWIPE_VELOCITY_PXS = 200
 
 export interface SwipeHandlerProps {
@@ -147,7 +155,7 @@ export function SwipeHandler({
 
     if (verticalDominant && !disableVertical) {
       const passed =
-        ay > SWIPE_THRESHOLD_PX || Math.abs(velocity.y) > SWIPE_VELOCITY_PXS
+        ay > SWIPE_THRESHOLD_PX_V || Math.abs(velocity.y) > SWIPE_VELOCITY_PXS
       if (!passed) return
       if (offset.y < 0 && fireUp) {
         if (onSpread) showHint('spread')
@@ -161,7 +169,7 @@ export function SwipeHandler({
 
     if (!disableHorizontal) {
       const passed =
-        ax > SWIPE_THRESHOLD_PX || Math.abs(velocity.x) > SWIPE_VELOCITY_PXS
+        ax > SWIPE_THRESHOLD_PX_H || Math.abs(velocity.x) > SWIPE_VELOCITY_PXS
       if (!passed) return
       if (offset.x < 0 && onNext) {
         showHint('next')
