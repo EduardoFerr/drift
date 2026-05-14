@@ -77,6 +77,16 @@ export function SwipeHandler({
   const x = useMotionValue(0)
   const y = useMotionValue(0)
 
+  // V9.5 — rotação leve em função do drag horizontal. User pedido
+  // 2026-05-09: "ao arrastar deve rotacionar levemente nas pontas,
+  // como se imitasse o papel passando". Mapping linear x → rotate,
+  // suprimido quando horizontal está desabilitado (single subpost).
+  // Curva: [-160, 160] → [-5°, 5°]. Threshold de swipe (80px) cai em
+  // ~2.5°, ainda discreto. Pivot default (center) é suficiente — pivô
+  // bottom-center foi testado mas exagera o efeito a ponto de
+  // distorcer a leitura do título superior do subpost.
+  const rotate = useTransform(x, [-160, 0, 160], [5, 0, -5])
+
   // Feedback visual: borda vai mudando de cor conforme o gesto progride.
   // ↑ = verde (spread), ↓ = vermelho (bury), ← → = lilás (navegação).
   const borderColor = useTransform(
@@ -216,7 +226,15 @@ export function SwipeHandler({
   return (
     <motion.div
       className="relative h-full w-full touch-none select-none rounded border-2"
-      style={{ x, y, borderColor }}
+      style={{
+        x,
+        y,
+        borderColor,
+        // Rotação só vale quando horizontal nav é possível. Sem isso,
+        // single-subpost post ainda rota com pequenos deslocamentos
+        // verticais → sensação esquisita.
+        ...(disableHorizontal ? {} : { rotate }),
+      }}
       drag
       dragConstraints={{ top: 0, bottom: 0, left: 0, right: 0 }}
       dragElastic={0.6}
