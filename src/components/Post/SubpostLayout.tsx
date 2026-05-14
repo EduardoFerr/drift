@@ -346,12 +346,15 @@ function PortraitLayout({
         />
       </div>
 
-      {/* Card de cima: gradient é o bg do card de texto — dots e texto
-          são filhos dele (correção user feedback: estavam siblings, mas
-          semanticamente são parte do mesmo "card de texto").
-          pointer-events-none no wrapper deixa cliques passarem pra
-          imagem nas áreas vazias do gradient; filhos com
-          pointer-events-auto recuperam interatividade onde precisa. */}
+      {/* Card de cima: gradient + texto puramente visuais. User insight
+          2026-05-09: "a camada de texto fica em cima da camada de
+          imagem e ambas preenchem todo espaço — basta usarmos a
+          primeira camada como interface". CardText não tem elementos
+          interativos (tag/título/body/meta-stats com ícones, zero
+          onClick/href). Logo, overlay inteira pointer-events-none →
+          imagem absorve TODOS os taps na área (single-tap → lightbox
+          via Image.tsx). Tap-target máximo, descobrível, sem
+          conflitos. */}
       <div
         className="pointer-events-none absolute inset-0 z-[2]"
         style={{
@@ -360,11 +363,11 @@ function PortraitLayout({
         }}
       >
         {subpostsTotal > 1 && (
-          <div className="pointer-events-auto absolute inset-x-0 z-[3] bottom-[88px] py-2">
+          <div className="absolute inset-x-0 z-[3] bottom-[88px] py-2">
             <CardDots idx={subpostIdx} total={subpostsTotal} />
           </div>
         )}
-        <div className="pointer-events-auto absolute inset-x-0 bottom-0">
+        <div className="absolute inset-x-0 bottom-0">
           <CardText post={post} subpost={subpost} variant="overlay" />
         </div>
       </div>
@@ -416,12 +419,9 @@ function LandscapeLayout({
           lightbox
         />
       </div>
-      {/* Card de cima: gradient é o bg do card de texto — dots e texto
-          são filhos. pointer-events-none no wrapper deixa cliques
-          passarem pra imagem nas áreas vazias; filhos com pointer-
-          events-auto recuperam interatividade onde precisa.
-          Bottom calc do dots: 16(meta gap) + 14(padding-top text) +
-          20(title) + 38(body+meta) ≈ 88px. */}
+      {/* Card de cima: overlay puramente visual (sem clickables) →
+          pointer-events-none na cadeia inteira. Vide explicação em
+          PortraitLayout acima. */}
       <div
         className="pointer-events-none absolute inset-0 z-[2]"
         style={{
@@ -430,11 +430,11 @@ function LandscapeLayout({
         }}
       >
         {subpostsTotal > 1 && (
-          <div className="pointer-events-auto absolute inset-x-0 z-[3] bottom-[88px] py-2">
+          <div className="absolute inset-x-0 z-[3] bottom-[88px] py-2">
             <CardDots idx={subpostIdx} total={subpostsTotal} />
           </div>
         )}
-        <div className="pointer-events-auto absolute inset-x-0 bottom-0">
+        <div className="absolute inset-x-0 bottom-0">
           <CardText post={post} subpost={subpost} variant="overlay" />
         </div>
       </div>
