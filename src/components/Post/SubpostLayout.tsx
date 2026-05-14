@@ -290,7 +290,12 @@ function CardText({
             e.stopPropagation()
             setShowFullText(true)
           }}
-          className="mb-2 inline-flex items-center self-start font-mono text-[10px] uppercase tracking-meta text-drift-accent2 hover:text-drift-accent focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2 rounded"
+          // pointer-events-auto: em Portrait/Landscape o CardText vive
+          // dentro de um overlay com pointer-events-none (libera tap da
+          // imagem). Sem este override o botão herda none → não clica.
+          // User report 2026-05-09. touch-action:none delega gestos
+          // pro SwipeHandler pai (não bloqueia swipe nav).
+          className="pointer-events-auto mb-2 inline-flex items-center self-start font-mono text-[10px] uppercase tracking-meta text-drift-accent2 hover:text-drift-accent focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2 rounded"
           style={{ touchAction: 'none' }}
           aria-label="ver texto completo"
         >
