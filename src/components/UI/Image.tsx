@@ -202,7 +202,18 @@ export function Image({
         // esquerda está bugado entre os subposts". React onClick
         // continua disparando em taps (lightbox); Framer drag agora
         // captura swipes (subpost nav + spread/bury).
-        style: { aspectRatio: aspect, touchAction: 'none' },
+        // V9.18 (user report 2026-05-14: "ao segurar exibe menu nativo
+        // do browser — copiar, baixar, compartilhar"): -webkit-touch-
+        // callout suprime o callout iOS; user-select none + onContextMenu
+        // preventDefault suprime menu de contexto Android/desktop.
+        style: {
+          aspectRatio: aspect,
+          touchAction: 'none',
+          WebkitTouchCallout: 'none',
+          WebkitUserSelect: 'none',
+          userSelect: 'none',
+        } as React.CSSProperties,
+        onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
         className: `relative block w-full overflow-hidden bg-drift-surface/40 cursor-zoom-in focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2 ${className}`,
       }
     : {
@@ -228,6 +239,7 @@ export function Image({
         src={resolvedSrc}
         alt={alt}
         draggable={draggable}
+        onContextMenu={(e) => e.preventDefault()}
         style={
           natural
             ? {
@@ -243,6 +255,9 @@ export function Image({
                     : position === 'bottom'
                     ? 'center bottom'
                     : 'center center',
+                WebkitTouchCallout: 'none',
+                WebkitUserSelect: 'none',
+                userSelect: 'none',
               }
             : {
                 objectPosition:
@@ -251,6 +266,9 @@ export function Image({
                     : position === 'bottom'
                     ? 'center bottom'
                     : 'center center',
+                WebkitTouchCallout: 'none',
+                WebkitUserSelect: 'none',
+                userSelect: 'none',
               }
         }
         className={
