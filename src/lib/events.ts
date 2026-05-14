@@ -32,7 +32,9 @@ import { bumpUnseenCount, invalidateFeed } from './feed'
 import { getReportWeight, maybeModerate } from './moderation'
 import { calculateUserWeight, calculateWeight } from './weight'
 import { bumpCommentCount } from './comment-counts'
-import type { ReportReason } from '../types/drift'
+import { addCommentToStore } from './comments'
+import { parseImetaTags } from './nip94'
+import type { CommentRecord, ContentWarning, ReportReason } from '../types/drift'
 
 /**
  * Kind 1111 — NIP-22 comments. Não vive em DRIFT_KIND porque não é
@@ -487,6 +489,32 @@ async function persistCommentRow(event: SignedEvent): Promise<void> {
   // Track C.6.1: count prefetch. Idempotente cross-relay via dedup
   // interno por commentId. UI consome via `useCommentCountsStore`.
   bumpCommentCount(parsed.rootEventId, event.id)
+  // V9.11 (user report 2026-05-09: "quando eu comento, tenho que
+  // fechar e abrir pra ver"): addCommentToStore estava documentado
+  // mas NUNCA chamado. Comments persistiam no SQLite via INSERT mas
+  // o useThreadStore ficava stale até loadThread re-query (que só
+  // dispara em mount do ThreadView). Wire-up direto aqui — única
+  // porta de domínio também é a única que mexe na store reativa.
+  // Idempotente: addCommentToStore dedup por id; ignora se thread
+  // não está carregada.
+  try {
+    const metas = parseImetaTags(event)
+    const cwTag = getTag(event, 'content-warning')
+    const record: CommentRecord = {
+      id: event.id,
+      postId: parsed.rootEventId,
+      replyTo: parsed.parentEventId,
+      authorPub: event.pubkey,
+      content: event.content,
+      createdAt: event.created_at,
+      score: 0,
+      contentWarning: (cwTag as ContentWarning | null | undefined) ?? null,
+      ...(metas.length > 0 && metas[0] ? { meta: metas[0] } : {}),
+    }
+    addCommentToStore(parsed.rootEventId, record)
+  } catch (err) {
+    console.warn('[events] addCommentToStore failed (non-fatal):', err)
+  }
   // Track C.5: comments alimentam score do post recebedor via
   // `applyCommentReceived` em `recalculateScore`. Igual spreads/buries,
   // usa debounce de SCORE_RECALC_DEBOUNCE_MS pra rajadas (post viral
