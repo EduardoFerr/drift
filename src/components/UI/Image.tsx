@@ -170,10 +170,16 @@ export function Image({
           ? `abrir imagem em primeiro plano: ${alt}`
           : 'abrir imagem em primeiro plano',
         title: 'toque pra abrir',
-        // touch-action: manipulation mata o 300ms tap delay e o
-        // double-tap-to-zoom default do browser. Cursor zoom-in
-        // sinaliza interação no desktop.
-        style: { aspectRatio: aspect, touchAction: 'manipulation' },
+        // touch-action: 'none' delega TUDO pro JS — necessário pra
+        // que o Framer drag do SwipeHandler pai veja os movimentos
+        // de pan iniciados sobre a imagem. Com 'manipulation' o
+        // browser intercepta pan nativo, virando no-op (sem scroll
+        // horizontal na página) e Framer drag morre na área da
+        // imagem. User report 2026-05-09: "navegar pra direita ou
+        // esquerda está bugado entre os subposts". React onClick
+        // continua disparando em taps (lightbox); Framer drag agora
+        // captura swipes (subpost nav + spread/bury).
+        style: { aspectRatio: aspect, touchAction: 'none' },
         className: `relative block w-full overflow-hidden bg-drift-surface/40 cursor-zoom-in focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2 ${className}`,
       }
     : {

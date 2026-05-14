@@ -45,7 +45,6 @@ import type { Subpost, Post, LayoutKind } from '../../types/drift'
 import { DEFAULT_LAYOUT } from '../../types/drift'
 import { Image } from '../UI/Image'
 import { getDecorativeLetters } from '../../lib/decorativeLetters'
-import { DotsIndicator } from '../UI/DotsIndicator'
 
 export interface SubpostLayoutProps {
   subpost: Subpost
@@ -183,17 +182,6 @@ export function timeAgoCompact(unixSeconds: number, now = Math.floor(Date.now() 
 }
 
 // ─── Card pieces (compartilhadas pelos 3 layouts) ────────────────────
-
-function CardDots({ idx, total }: { idx: number; total: number }) {
-  // Mockup .c-dots com border-top/bottom controlado pelo layout pai
-  // (portrait/text) ou border-none + position absolute (landscape).
-  // Layout pai aplica wrapper; aqui só renderiza os dots.
-  return (
-    <div className="flex items-center justify-center gap-[5px] py-[7px]">
-      <DotsIndicator total={total} active={idx} />
-    </div>
-  )
-}
 
 function CardText({
   post,
@@ -362,11 +350,8 @@ function PortraitLayout({
             'linear-gradient(to top, rgba(10,10,9,0.96) 0%, rgba(10,10,9,0.55) 45%, transparent 70%)',
         }}
       >
-        {subpostsTotal > 1 && (
-          <div className="absolute inset-x-0 z-[3] bottom-[88px] py-2">
-            <CardDots idx={subpostIdx} total={subpostsTotal} />
-          </div>
-        )}
+        {/* V9.2: CardDots saiu daqui pro SubpostCarousel (barra
+            Instagram no topo do card). Vide doc do carousel. */}
         <div className="absolute inset-x-0 bottom-0">
           <CardText post={post} subpost={subpost} variant="overlay" />
         </div>
@@ -429,11 +414,7 @@ function LandscapeLayout({
             'linear-gradient(to top, rgba(10,10,9,0.96) 0%, rgba(10,10,9,0.55) 45%, transparent 70%)',
         }}
       >
-        {subpostsTotal > 1 && (
-          <div className="absolute inset-x-0 z-[3] bottom-[88px] py-2">
-            <CardDots idx={subpostIdx} total={subpostsTotal} />
-          </div>
-        )}
+        {/* V9.2: CardDots saiu daqui pro SubpostCarousel (top bar). */}
         <div className="absolute inset-x-0 bottom-0">
           <CardText post={post} subpost={subpost} variant="overlay" />
         </div>
@@ -442,22 +423,12 @@ function LandscapeLayout({
   )
 }
 
-function TextLayout({
-  subpost,
-  post,
-  subpostIdx,
-  subpostsTotal,
-}: SubpostLayoutProps) {
+function TextLayout({ subpost, post }: SubpostLayoutProps) {
   const letters = getDecorativeLetters(subpost.text)
 
   return (
     <div className="flex h-full w-full flex-col bg-drift-surface">
-      {/* Dots top (border-bottom). */}
-      {subpostsTotal > 1 && (
-        <div className="shrink-0 border-b border-drift-border">
-          <CardDots idx={subpostIdx} total={subpostsTotal} />
-        </div>
-      )}
+      {/* V9.2: CardDots saiu daqui pro SubpostCarousel (top bar). */}
 
       {/* Text flex:1 centered. */}
       <div className="relative flex flex-1 flex-col justify-center overflow-hidden">

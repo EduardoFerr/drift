@@ -533,6 +533,7 @@ export function PostViewer({
                 subposts={post.subposts}
                 index={subpostIdx}
                 post={post}
+                onSelect={setSubpostIdx}
               />
             </div>
 
