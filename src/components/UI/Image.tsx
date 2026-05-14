@@ -17,7 +17,7 @@
  * fica leve (sem importar Helia até hover/scroll-into-view).
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import type { BlobMeta } from '../../lib/nip94'
@@ -83,12 +83,17 @@ export function Image({
 }: ImageProps) {
   const [state, setState] = useState<'loading' | 'loaded' | 'error'>('loading')
   const [lightboxOpen, setLightboxOpen] = useState(false)
-  // User insight 2026-05-09: "a camada de texto fica em cima da imagem
-  // e ambas preenchem todo espaço — basta usar a primeira camada como
-  // interface". CardText overlay agora é 100% pointer-events-none
-  // (sem clickables internos), liberando o tap-target inteiro pra
-  // imagem. Single-tap em qualquer parte → lightbox. Tap-target
-  // máximo possível, sem necessidade de botão dedicado nem duplo-tap.
+  // User pedido 2026-05-09 (v9.3): voltar pra double-click. Razões:
+  // - Single-click conflitava com swipe quando user tinha intenção de
+  //   navegar mas o toque era curto demais.
+  // - Padrão Instagram/Twitter: tap navega/like, doubleclick zoom.
+  // Implementação: counter via onClick (2 cliques < 400ms / < 40px de
+  // distância). Mobile-friendly — onClick em touch fires depois do
+  // browser classificar como tap (Framer drag detect já filtra swipes).
+  // touch-action:none no wrapper garante que tap fires no JS.
+  const lastTapRef = useRef<{ t: number; x: number; y: number } | null>(null)
+  const DOUBLE_TAP_MS = 400
+  const DOUBLE_TAP_SLOP_PX = 40
   // Track B.2 — quando meta está presente e tem cid|hash, tenta resolver
   // via blobs.fetchBlobUrl (Helia + verify). Senão, usa src direto.
   const [resolvedSrc, setResolvedSrc] = useState<string>(src)
@@ -156,9 +161,21 @@ export function Image({
     ? {
         type: 'button' as const,
         onClick: (e: React.MouseEvent) => {
-          e.preventDefault()
-          e.stopPropagation()
-          setLightboxOpen(true)
+          const now = performance.now()
+          const last = lastTapRef.current
+          if (
+            last &&
+            now - last.t <= DOUBLE_TAP_MS &&
+            Math.abs(e.clientX - last.x) <= DOUBLE_TAP_SLOP_PX &&
+            Math.abs(e.clientY - last.y) <= DOUBLE_TAP_SLOP_PX
+          ) {
+            lastTapRef.current = null
+            e.preventDefault()
+            e.stopPropagation()
+            setLightboxOpen(true)
+            return
+          }
+          lastTapRef.current = { t: now, x: e.clientX, y: e.clientY }
         },
         onKeyDown: (e: ReactKeyboardEvent) => {
           if (e.key === 'Enter' || e.key === ' ') {
@@ -167,9 +184,9 @@ export function Image({
           }
         },
         'aria-label': alt
-          ? `abrir imagem em primeiro plano: ${alt}`
-          : 'abrir imagem em primeiro plano',
-        title: 'toque pra abrir',
+          ? `abrir imagem em primeiro plano: ${alt} (toque duplo)`
+          : 'abrir imagem em primeiro plano (toque duplo)',
+        title: 'toque duplo pra abrir',
         // touch-action: 'none' delega TUDO pro JS — necessário pra
         // que o Framer drag do SwipeHandler pai veja os movimentos
         // de pan iniciados sobre a imagem. Com 'manipulation' o
