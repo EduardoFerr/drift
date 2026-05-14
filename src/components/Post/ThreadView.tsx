@@ -73,6 +73,7 @@ import {
   type ThreadIndex,
 } from '../../lib/thread-cursor'
 import { flattenForList } from '../../lib/thread-list'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import { siblingPosition } from '../../lib/thread-header'
 import { SwipeHandler } from './SwipeHandler'
 import { CommentCard } from './CommentCard'
@@ -581,38 +582,74 @@ function ListModeBody({
     [forest, collapsedSet],
   )
 
+  // V9.22 (Phase B) — virtualização via @tanstack/react-virtual. Threads
+  // grandes (até COMMENTS_LOAD_CAP=200 entries) renderizavam todos os
+  // CommentCards = ~10k px de DOM + 200 React fibers. Agora só renderiza
+  // window visible + overscan 5. estimateSize 56px (média list-variant);
+  // measureElement habilitado pra heights dinâmicos quando body é longo.
+  const parentRef = useRef<HTMLDivElement | null>(null)
+  const virtualizer = useVirtualizer({
+    count: flat.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 56,
+    overscan: 5,
+    getItemKey: (i) => flat[i]?.node.id ?? i,
+  })
+
   return (
     <div
+      ref={parentRef}
       role="list"
       aria-label="lista de comentários"
       className="h-full w-full overflow-y-auto px-2 pb-12 pt-2"
     >
-      {flat.map((entry) => (
-        <div
-          key={entry.node.id}
-          role="listitem"
-          onFocus={() => onFocus(entry.node.id)}
-        >
-          <CommentCard
-            variant="list"
-            node={entry.node}
-            depth={entry.depth}
-            posInSet={entry.posInSet}
-            setSize={entry.setSize}
-            childCount={entry.childCount}
-            postId={postId}
-            isNew={entry.node.created_at >= openedAt}
-            isFocused={focusedId === entry.node.id}
-            isExpanded={!collapsedSet.has(entry.node.id)}
-            onToggleExpand={
-              entry.childCount > 0
-                ? () => onToggleCollapsed(entry.node.id)
-                : undefined
-            }
-            onTap={() => onTapReply(entry.node.id)}
-          />
-        </div>
-      ))}
+      <div
+        style={{
+          height: `${virtualizer.getTotalSize()}px`,
+          width: '100%',
+          position: 'relative',
+        }}
+      >
+        {virtualizer.getVirtualItems().map((virtualRow) => {
+          const entry = flat[virtualRow.index]
+          if (!entry) return null
+          return (
+            <div
+              key={entry.node.id}
+              data-index={virtualRow.index}
+              ref={virtualizer.measureElement}
+              role="listitem"
+              onFocus={() => onFocus(entry.node.id)}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                transform: `translateY(${virtualRow.start}px)`,
+              }}
+            >
+              <CommentCard
+                variant="list"
+                node={entry.node}
+                depth={entry.depth}
+                posInSet={entry.posInSet}
+                setSize={entry.setSize}
+                childCount={entry.childCount}
+                postId={postId}
+                isNew={entry.node.created_at >= openedAt}
+                isFocused={focusedId === entry.node.id}
+                isExpanded={!collapsedSet.has(entry.node.id)}
+                onToggleExpand={
+                  entry.childCount > 0
+                    ? () => onToggleCollapsed(entry.node.id)
+                    : undefined
+                }
+                onTap={() => onTapReply(entry.node.id)}
+              />
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
