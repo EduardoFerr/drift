@@ -135,29 +135,6 @@ export function SwipeHandler({
     const ay = Math.abs(offset.y)
     const verticalDominant = ay > ax
 
-    // V9.8 (user pedido 2026-05-09): retorno suave/magnético quando o
-    // user desiste do gesto. Antes: x.set(0); y.set(0) snap instantâneo
-    // → sensação de "fim brusco". Agora: spring com stiffness 500,
-    // damping 38 — pull firme mas com easing visível (~250-300ms a
-    // partir de 80px de drag).
-    //
-    // Aplicado SEMPRE: mesmo quando threshold é cruzado e ação dispara,
-    // o spring back roda em paralelo ao exit animation do Wrapper —
-    // ambos somam (parent flies away + child centraliza). Pra horizontal
-    // (subpost nav, mesmo PostViewer fica montado) o reset é essencial
-    // ou o offset persiste pro próximo subpost.
-    const spring = { type: 'spring' as const, stiffness: 500, damping: 38 }
-    animate(x, 0, spring)
-    animate(y, 0, spring)
-
-    // V9.12 (user report 2026-05-09: "swipe pra voltar com 2 subposts
-    // não passa"): antes, se verticalDominant=true mas o offset ficava
-    // abaixo do threshold vertical (160px), saíamos cedo sem testar
-    // horizontal — gesto que era 100px vertical / 90px horizontal
-    // morria, mesmo o horizontal já tendo passado dos 80px. Especialmente
-    // ruim depois do bump V→160px (V9.7 do threshold) porque o swipe de
-    // dedo sempre tem algum drift. Agora avaliamos cada eixo independente
-    // e o dominante decide o desempate quando ambos passam.
     const verticalPassed =
       !disableVertical &&
       (ay > SWIPE_THRESHOLD_PX_V || Math.abs(velocity.y) > SWIPE_VELOCITY_PXS)
@@ -184,14 +161,48 @@ export function SwipeHandler({
       }
     }
 
+    // V9.25 (user report 2026-05-14: "às vezes arrasto pra cima e o
+    // efeito é de que ele foi pra baixo, ou o inverso"):
+    //
+    // Root cause: spring-back animava x/y → 0 SEMPRE, inclusive quando
+    // ação foi disparada. No caso vertical (spread/bury), o PostViewer
+    // é desmontado e o Wrapper exit translateY 0→±110% roda em paralelo
+    // ao spring que puxava na direção OPOSTA (de -150 → 0 = pra baixo
+    // quando user swipou pra cima). Net visual: card "balança" pro lado
+    // oposto antes de sair, criando a ilusão de direção errada.
+    //
+    // Fix:
+    //   - Vertical fire (PostViewer vai desmontar): NÃO mexe nos motion
+    //     values. Wrapper exit toma conta do visual completo. Motion
+    //     values são gc'd no unmount.
+    //   - Horizontal fire (PostViewer fica montado, SubpostCarousel
+    //     anima o swap): reset x/y → 0 instantâneo. Sem isso o offset
+    //     persiste pro próximo subpost.
+    //   - Sem ação (desistiu): spring back magnético — gesto preserva
+    //     a sensação que o user pediu na V9.8.
+    const spring = { type: 'spring' as const, stiffness: 500, damping: 38 }
+
     if (verticalPassed && horizontalPassed) {
       // Ambos passaram — dominante decide
-      if (verticalDominant) fireVertical()
-      else fireHorizontal()
+      if (verticalDominant) {
+        fireVertical()
+        // PostViewer desmonta; Wrapper exit toma conta.
+      } else {
+        fireHorizontal()
+        x.set(0)
+        y.set(0)
+      }
     } else if (verticalPassed) {
       fireVertical()
+      // PostViewer desmonta; sem spring-back.
     } else if (horizontalPassed) {
       fireHorizontal()
+      x.set(0)
+      y.set(0)
+    } else {
+      // Desistiu: spring back magnético.
+      animate(x, 0, spring)
+      animate(y, 0, spring)
     }
   }
 
