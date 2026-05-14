@@ -161,46 +161,56 @@ export function SwipeHandler({
       }
     }
 
-    // V9.25 (user report 2026-05-14: "às vezes arrasto pra cima e o
-    // efeito é de que ele foi pra baixo, ou o inverso"):
+    // V9.27 (user report 2026-05-14: "o problema de arrastar pra um
+    // lado e animação ir pro outro continua"):
     //
-    // Root cause: spring-back animava x/y → 0 SEMPRE, inclusive quando
-    // ação foi disparada. No caso vertical (spread/bury), o PostViewer
-    // é desmontado e o Wrapper exit translateY 0→±110% roda em paralelo
-    // ao spring que puxava na direção OPOSTA (de -150 → 0 = pra baixo
-    // quando user swipou pra cima). Net visual: card "balança" pro lado
-    // oposto antes de sair, criando a ilusão de direção errada.
+    // ROOT CAUSE DEEPER LEVEL — Framer Motion's drag tem seu PRÓPRIO
+    // elastic snap-back interno que anima x/y → 0 em toda release,
+    // independente de `dragMomentum: false` (que só desabilita inercia
+    // de velocidade). x.set(0) NÃO cancela essa animação interna;
+    // precisamos chamar x.stop() / y.stop() explicitamente.
+    //
+    // Sem stop(), no commit vertical: Framer animava y de -150 → 0
+    // (pra BAIXO) ao mesmo tempo que o Wrapper exit animava y de 0 →
+    // -110% (pra CIMA). Resultado visual nos primeiros 100-150ms: card
+    // bouncia pra baixo (snap interno mais rápido que o exit) antes de
+    // voar pra cima — exatamente a ilusão de "foi pro lado errado".
     //
     // Fix:
-    //   - Vertical fire (PostViewer vai desmontar): NÃO mexe nos motion
-    //     values. Wrapper exit toma conta do visual completo. Motion
-    //     values são gc'd no unmount.
-    //   - Horizontal fire (PostViewer fica montado, SubpostCarousel
-    //     anima o swap): reset x/y → 0 instantâneo. Sem isso o offset
-    //     persiste pro próximo subpost.
-    //   - Sem ação (desistiu): spring back magnético — gesto preserva
-    //     a sensação que o user pediu na V9.8.
+    //   - Commit (vertical ou horizontal): x.stop() + y.stop() pra
+    //     cancelar Framer drag snap. Vertical deixa motion values onde
+    //     estão (Wrapper exit toma conta). Horizontal seta 0 (próximo
+    //     subpost renderiza centralizado).
+    //   - Sem commit: animate() com spring magnético — Framer
+    //     internamente substitui sua animação pela nossa.
     const spring = { type: 'spring' as const, stiffness: 500, damping: 38 }
 
     if (verticalPassed && horizontalPassed) {
       // Ambos passaram — dominante decide
       if (verticalDominant) {
+        x.stop()
+        y.stop()
         fireVertical()
-        // PostViewer desmonta; Wrapper exit toma conta.
       } else {
-        fireHorizontal()
+        x.stop()
+        y.stop()
         x.set(0)
         y.set(0)
+        fireHorizontal()
       }
     } else if (verticalPassed) {
+      x.stop()
+      y.stop()
       fireVertical()
-      // PostViewer desmonta; sem spring-back.
     } else if (horizontalPassed) {
-      fireHorizontal()
+      x.stop()
+      y.stop()
       x.set(0)
       y.set(0)
+      fireHorizontal()
     } else {
-      // Desistiu: spring back magnético.
+      // Desistiu: spring back magnético. animate() substitui qualquer
+      // animação Framer-interna em curso pelos nossos valores.
       animate(x, 0, spring)
       animate(y, 0, spring)
     }
