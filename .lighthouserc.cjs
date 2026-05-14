@@ -16,6 +16,17 @@
  *
  * Como rodar em CI: ver `.github/workflows/lighthouse.yml`.
  *
+ * HTTPS na preview?
+ * - `vite.config.ts` adiciona `basicSsl()` no array de plugins, o que
+ *   afeta `vite preview` também — preview vira HTTPS com cert
+ *   auto-assinado. Lighthouse v11+ falha hard com
+ *   `INSECURE_DOCUMENT_REQUEST` mesmo com `--ignore-certificate-errors`
+ *   (a auditoria interna do LH checa cert antes do gather).
+ * - Solução: setar `DRIFT_DEV_HTTP=1` no startServerCommand. O toggle
+ *   em vite.config.ts remove basicSsl() quando essa env var está
+ *   presente, fazendo preview servir HTTP plain — exatamente o que
+ *   LHCI precisa.
+ *
  * Thresholds (mobile, throttled — match runtime real de celular médio):
  *   - Performance score ≥ 0.95 (target manifesto §13 UX/perf)
  *   - LCP ≤ 2500ms (Google Core Web Vitals "good")
@@ -30,31 +41,22 @@
 module.exports = {
   ci: {
     collect: {
-      // `npm run preview` serve dist/ em http://localhost:4173 por default.
-      // lhci sobe, espera, navega, mata.
-      // `@vitejs/plugin-basic-ssl` se aplica a `vite preview` também,
-      // servindo HTTPS com cert auto-assinado. Chrome bloqueia com
-      // interstitial → redireciona pra chrome-error://chromewebdata/
-      // (CHROME_INTERSTITIAL_ERROR no LHCI runner, push commit cd738f2+).
-      // Fix: passar a URL https + flag chrome ignorando cert.
-      startServerCommand: 'npm run preview -- --port 4173',
-      url: ['https://localhost:4173/'],
-      // Esperar 5s pelo server (cert TLS demora ~2-3s no CI).
+      // DRIFT_DEV_HTTP=1 → vite.config.ts pula basicSsl() → preview HTTP.
+      // cross-env garante portabilidade Windows/Linux (CI roda Ubuntu,
+      // dev pode rodar Windows).
+      startServerCommand: 'cross-env DRIFT_DEV_HTTP=1 npm run preview -- --port 4173',
+      url: ['http://localhost:4173/'],
       startServerReadyPattern: 'Local:',
       startServerReadyTimeout: 30000,
       // 3 runs → mediana. 1 run tem variance ~10pts; 3 estabiliza pra
       // ~3pt p95. 5 runs seria melhor mas dobra wall time CI.
       numberOfRuns: 3,
-      // Chrome flags pra LHCI runner: ignorar cert auto-assinado do
-      // basicSsl, e desabilitar HSTS pinning entre runs.
-      chromeFlags: '--ignore-certificate-errors --allow-insecure-localhost --disable-features=HttpsUpgrades',
       settings: {
         // Mobile form-factor + 3G-fast throttling: matching default
         // PageSpeed Insights "Mobile" tab (que é o que stakeholders
         // veem). Desktop run pode entrar como `lhci-desktop` futuro.
         preset: 'desktop', // será sobrescrito por throttling/formFactor abaixo
         formFactor: 'mobile',
-        chromeFlags: ['--ignore-certificate-errors', '--allow-insecure-localhost', '--disable-features=HttpsUpgrades'],
         screenEmulation: {
           mobile: true,
           width: 360,
