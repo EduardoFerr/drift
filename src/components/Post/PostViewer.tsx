@@ -52,8 +52,6 @@ const ReportModal = lazy(() =>
 const SpreadMap = lazy(() =>
   import('../Feed/SpreadMap').then((m) => ({ default: m.SpreadMap })),
 )
-import { SlideUpOverlay } from '../UI/SlideUpOverlay'
-import { ModalHeader } from '../UI/ModalHeader'
 import { GlassIconButton } from '../UI/GlassIconButton'
 
 /** 'up' = espalhou; 'down' = enterrou. Sai sem direção (X/ESC) = undefined. */
@@ -446,15 +444,43 @@ export function PostViewer({
             <GlassIconButton
               onClick={(e) => {
                 e.stopPropagation()
-                setShowActionsMenu(true)
+                setShowActionsMenu((v) => !v)
               }}
               size="xl"
               className="absolute right-4 top-4 z-30"
-              aria-label="abrir menu de ações"
-              title="ações do post"
+              aria-label={showActionsMenu ? 'fechar ações' : 'abrir ações'}
+              title="ações rápidas"
             >
-              <span aria-hidden="true">⋮</span>
+              <span aria-hidden="true">{showActionsMenu ? '×' : '⋮'}</span>
             </GlassIconButton>
+            {/* V9.15 (user pedido 2026-05-14): tap em ⋮ expande em fan
+                de 4 quick actions (mapa/fixar/seguir/silenciar). Ações
+                sensíveis (block/report) saem do menu pra long-press 5s.
+                Cada ícone slide-in vertical 48px abaixo do anterior,
+                stagger 40ms. */}
+            <ActionsFan
+              visible={showActionsMenu}
+              isMine={isMine}
+              pinned={pinned}
+              isFollowing={isFollowing}
+              mapOpen={showMap}
+              onPinToggle={() => {
+                void handleTogglePin()
+                setShowActionsMenu(false)
+              }}
+              onMapToggle={() => {
+                setShowMap((v) => !v)
+                setShowActionsMenu(false)
+              }}
+              onFollowToggle={() => {
+                void handleFollowToggle()
+                setShowActionsMenu(false)
+              }}
+              onMute={() => {
+                void handleMute()
+                setShowActionsMenu(false)
+              }}
+            />
             {/* Track C.4.2 — trigger pra ThreadView (comments). Round
                 CWV-4 a11y 2026-05-09: bumped h-7→h-11 (WCAG 2.5.5 AA
                 tap target 44px). min-w mantém pílula expansível pro
@@ -664,188 +690,118 @@ export function PostViewer({
         )}
       </AnimatePresence>
 
-      {/* V11 — Actions menu (embedded mode only). SlideUpOverlay com
-          lista de ações. Cada item executa handler + fecha o menu. */}
-      <AnimatePresence>
-        {showActionsMenu && (
-          <ActionsMenu
-            isMine={isMine}
-            pinned={pinned}
-            isFollowing={isFollowing}
-            mapOpen={showMap}
-            onClose={() => setShowActionsMenu(false)}
-            onPinToggle={() => {
-              void handleTogglePin()
-              setShowActionsMenu(false)
-            }}
-            onMapToggle={() => {
-              setShowMap((v) => !v)
-              setShowActionsMenu(false)
-            }}
-            onFollowToggle={() => {
-              void handleFollowToggle()
-              setShowActionsMenu(false)
-            }}
-            onMute={() => {
-              void handleMute()
-              setShowActionsMenu(false)
-            }}
-            onBlock={() => {
-              void handleBlock()
-              setShowActionsMenu(false)
-            }}
-            onReport={() => {
-              setShowActionsMenu(false)
-              setShowReport(true)
-            }}
-          />
-        )}
-      </AnimatePresence>
+      {/* V9.15: ActionsMenu (SlideUpOverlay) removido. Ações rápidas
+          viraram fan inline expandido pelo ⋮; ações sensíveis (block/
+          report) ganham long-press 5s pra evitar dispara acidental.
+          ActionsMenu component permanece exportado pra retrocompat de
+          tests/external callers. */}
     </Wrapper>
   )
 }
 
-// ─── ActionsMenu (V11) ───────────────────────────────────────────────
+
+// ─── ActionsFan ──────────────────────────────────────────────────────
 
 /**
- * V11 — menu de ações do post no embedded mode. Substitui os 8 botões
- * do header bulky pré-V8 (PostViewer modal mode).
+ * V9.15 — fan vertical de quick actions expandido pelo ⋮. 4 ações:
+ * mapa, fixar, seguir, silenciar (last two só quando !isMine). Cada
+ * GlassIconButton xl posicionado absolute right-4, com top calculado
+ * (60 + i*48) descendo a partir do ⋮. Stagger 40ms na entrada via
+ * Framer Motion.
  *
- * Acionado pelo botão ⋮ no canto top-right do card. Lista completa:
- *   📌 fixar/desfixar (pin/unpin)
- *   🗺 mapa de spread (toggle inline)
- *   ➕/✓ seguir/deixar de seguir (só se !isMine)
- *   🔇 silenciar (só se !isMine)
- *   ⊘ bloquear (só se !isMine)
- *   ⚠ denunciar (só se !isMine)
- *
- * Ações destrutivas (block) já têm confirm via window.confirm dentro
- * dos handlers — não precisa duplicar UI.
+ * Block/Report saíram daqui — long-press 5s ativa modal de moderação
+ * (Phase 2). Decisão: ações destrutivas precisam fricção intencional.
  */
-function ActionsMenu({
+function ActionsFan({
+  visible,
   isMine,
   pinned,
   isFollowing,
   mapOpen,
-  onClose,
   onPinToggle,
   onMapToggle,
   onFollowToggle,
   onMute,
-  onBlock,
-  onReport,
 }: {
+  visible: boolean
   isMine: boolean
   pinned: boolean | null
   isFollowing: boolean
   mapOpen: boolean
-  onClose: () => void
   onPinToggle: () => void
   onMapToggle: () => void
   onFollowToggle: () => void
   onMute: () => void
-  onBlock: () => void
-  onReport: () => void
 }) {
-  type Action = {
+  type FanItem = {
+    key: string
     icon: string
     label: string
     onClick: () => void
     disabled?: boolean
-    danger?: boolean
-    hint?: string
   }
-
-  const items: Action[] = [
+  const items: FanItem[] = [
     {
+      key: 'map',
+      icon: '🗺',
+      label: mapOpen ? 'fechar mapa' : 'mapa de spread',
+      onClick: onMapToggle,
+    },
+    {
+      key: 'pin',
       icon: pinned ? '📌' : '📍',
       label: pinned ? 'desfixar' : 'fixar',
       onClick: onPinToggle,
       disabled: pinned === null,
-      hint: pinned
-        ? 'fixado — protegido de eviction (manifesto §16)'
-        : 'fixar — protege de eviction local + marca pra re-broadcast',
-    },
-    {
-      icon: '🗺',
-      label: mapOpen ? 'fechar mapa' : 'mapa de spread',
-      onClick: onMapToggle,
-      hint: 'visualização da propagação deste post',
     },
   ]
-
   if (!isMine) {
     items.push(
       {
+        key: 'follow',
         icon: isFollowing ? '✓' : '➕',
         label: isFollowing ? 'deixar de seguir' : 'seguir',
         onClick: onFollowToggle,
-        hint: isFollowing
-          ? 'publica kind 3 atualizado'
-          : 'alimenta a aba "seguindo" do feed (NIP-02)',
       },
       {
+        key: 'mute',
         icon: '🔇',
         label: 'silenciar',
         onClick: onMute,
-        hint: 'esconde posts dele do meu feed (manifesto §24)',
-      },
-      {
-        icon: '⊘',
-        label: 'bloquear',
-        onClick: onBlock,
-        danger: true,
-        hint: 'esconde posts e interações dele (manifesto §24)',
-      },
-      {
-        icon: '⚠',
-        label: 'denunciar',
-        onClick: onReport,
-        danger: true,
-        hint: 'reporta pra moderação comunitária — manifesto §26',
       },
     )
   }
 
+  // Top base: ⋮ ocupa top-4 (16px) + h-11 (44px) = bottom em 60px.
+  // Cada filho desce 48px (44 botão + 4 gap).
   return (
-    <SlideUpOverlay onClose={onClose} ariaLabel="ações do post">
-      <ModalHeader title="ações" onClose={onClose} />
-      <ul className="-mx-1 divide-y divide-drift-border">
-        {items.map((item) => (
-          <li key={item.label}>
-            <button
-              onClick={item.onClick}
+    <AnimatePresence>
+      {visible &&
+        items.map((item, i) => (
+          <motion.div
+            key={item.key}
+            initial={{ opacity: 0, y: -8, scale: 0.85 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -8, scale: 0.85 }}
+            transition={{ duration: 0.18, delay: i * 0.04, ease: [0.22, 1, 0.36, 1] }}
+            className="absolute right-4 z-30"
+            style={{ top: `${60 + i * 48}px` }}
+          >
+            <GlassIconButton
+              size="xl"
+              onClick={(e) => {
+                e.stopPropagation()
+                if (!item.disabled) item.onClick()
+              }}
               disabled={item.disabled}
-              className={`group flex w-full items-center gap-3 px-1 py-3 text-left transition-colors disabled:opacity-40 focus:outline-none focus:ring-1 focus:ring-drift-accent2 focus:ring-offset-2 focus:ring-offset-drift-surface ${
-                item.danger
-                  ? 'text-drift-bury hover:text-[#ff6b6b]'
-                  : 'text-drift-text hover:text-drift-accent'
-              }`}
+              aria-label={item.label}
+              title={item.label}
             >
-              <span aria-hidden="true" className="text-[16px] leading-none">
-                {item.icon}
-              </span>
-              <span className="flex flex-1 flex-col gap-[2px]">
-                <span className="font-mono text-[11px] uppercase tracking-[2px]">
-                  {item.label}
-                </span>
-                {item.hint && (
-                  <span className="font-mono text-[10px] normal-case tracking-normal text-drift-muted">
-                    {item.hint}
-                  </span>
-                )}
-              </span>
-              <span
-                aria-hidden="true"
-                className="font-mono text-[12px] text-drift-muted transition-colors group-hover:text-current"
-              >
-                →
-              </span>
-            </button>
-          </li>
+              <span aria-hidden="true">{item.icon}</span>
+            </GlassIconButton>
+          </motion.div>
         ))}
-      </ul>
-    </SlideUpOverlay>
+    </AnimatePresence>
   )
 }
 
