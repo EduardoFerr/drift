@@ -556,17 +556,33 @@ export function PostViewer({
         onPointerLeave={cancelLongPress}
       >
         {/* V9.16 — long-press progress bar (top edge, 4px, drift-bury).
-            Aparece só durante o hold; preenche linearmente em 5s. Se
-            user libera ou move >20px, AnimatePresence dissolve. */}
+            Preenche linearmente em 5s. V9.24 — label "moderação" central
+            aparece em 600ms (após o user já passou da janela de "tap
+            normal") pra dar contexto do que está acontecendo. Sem label,
+            o user via uma barra vermelha aparecendo sem motivo aparente
+            (bad discoverability). */}
         <AnimatePresence>
           {pressing && (
-            <motion.div
-              className="pointer-events-none absolute inset-x-0 top-0 z-[15] h-1 origin-left bg-drift-bury"
-              initial={{ scaleX: 0, opacity: 0.9 }}
-              animate={{ scaleX: 1 }}
-              exit={{ opacity: 0, scaleX: 1, transition: { duration: 0.18 } }}
-              transition={{ duration: LONG_PRESS_MS / 1000, ease: 'linear' }}
-            />
+            <>
+              <motion.div
+                className="pointer-events-none absolute inset-x-0 top-0 z-[15] h-1 origin-left bg-drift-bury"
+                initial={{ scaleX: 0, opacity: 0.9 }}
+                animate={{ scaleX: 1 }}
+                exit={{ opacity: 0, scaleX: 1, transition: { duration: 0.18 } }}
+                transition={{ duration: LONG_PRESS_MS / 1000, ease: 'linear' }}
+              />
+              <motion.div
+                className="pointer-events-none absolute inset-x-0 top-2 z-[15] flex items-center justify-center"
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.18, delay: 0.6 }}
+              >
+                <span className="rounded-full border border-drift-bury/60 bg-drift-bg/85 px-3 py-1 font-mono text-[10px] uppercase tracking-meta text-drift-bury backdrop-blur-sm">
+                  segure pra moderar
+                </span>
+              </motion.div>
+            </>
           )}
         </AnimatePresence>
         {/* V11 — botão ⋮ menu de ações (embedded mode only).
