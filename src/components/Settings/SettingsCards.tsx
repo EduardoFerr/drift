@@ -29,6 +29,7 @@ import { setPref, usePrefsStore } from '../../lib/prefs'
 import { dialog } from '../../lib/dialog'
 import { db } from '../../lib/db'
 import { useBootStore } from '../../lib/bootstrap'
+import { rebuildIdentityHistory, useSyncStore } from '../../lib/sync'
 import { useRelaysStore } from '../../lib/relays'
 import { isTauri } from '../../lib/runtime'
 import { SEED_RELAY_CONFIGS } from '../../config/relays'
@@ -637,6 +638,37 @@ function Row({
 
 export function DiagnosticCard({ onClose }: CardProps) {
   const [rebuilding, setRebuilding] = useState(false)
+  const npub = useBootStore((s) => s.identity?.npub) ?? null
+  const rebuildsInProgress = useSyncStore((s) => s.rebuildsInProgress)
+  const historyRebuilding = npub ? rebuildsInProgress.includes(npub) : false
+
+  // V9.10 (user report 2026-05-09 "cliente novo não está recebendo
+  // mensagens do antigo 0.2-0.4"): startSync usa janela de 7d
+  // (INITIAL_WINDOW_SECONDS) — eventos antigos do mesmo nsec ficam fora
+  // do filter. Trigger explícito de rebuildIdentityHistory puxa TUDO
+  // do npub atual (filter authors=[npub], sem since), atravessando
+  // qualquer cap temporal. Útil pra migração entre devices/versões.
+  async function handleFetchHistory() {
+    if (!npub) {
+      await dialog.alert('identidade não disponível — boot incompleto', {
+        title: 'erro',
+      })
+      return
+    }
+    if (historyRebuilding) return
+    try {
+      await rebuildIdentityHistory(npub)
+      await dialog.alert(
+        'busca concluída. Eventos antigos do seu nsec foram materializados localmente. Pode ser necessário scrollar/recarregar pra ver no feed.',
+        { title: 'histórico reconstruído' },
+      )
+    } catch (err) {
+      await dialog.alert(
+        `Falha: ${err instanceof Error ? err.message : String(err)}`,
+        { title: 'erro' },
+      )
+    }
+  }
 
   async function handleRebuild() {
     const ok = await dialog.confirm(
@@ -668,20 +700,42 @@ export function DiagnosticCard({ onClose }: CardProps) {
       ariaLabel="diagnóstico — redefinir cache"
       escDismissible={!rebuilding}
     >
-      <div className="space-y-4 p-5">
-        <p className="font-mono text-[11px] leading-relaxed text-drift-muted">
-          Se a app travar com erro de schema (ex:{' '}
-          <code>no such column</code>), reconstrói o banco local.
-          Identidade e preferências preservadas; posts re-sincronizam dos
-          relays.
-        </p>
-        <button
-          onClick={handleRebuild}
-          disabled={rebuilding}
-          className="w-full rounded border border-yellow-700/60 bg-yellow-950/20 px-3 py-3 font-mono text-[11px] uppercase tracking-meta text-yellow-300 transition-colors hover:bg-yellow-950/40 disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus:ring-1 focus:ring-drift-accent2 focus:ring-offset-2 focus:ring-offset-drift-bg"
-        >
-          {rebuilding ? 'reconstruindo…' : '↻ redefinir cache local'}
-        </button>
+      <div className="space-y-5 p-5">
+        {/* Backfill histórico — V9.10 user report cliente 0.2-0.4 com
+            posts não aparecendo no cliente novo. startSync usa janela
+            de 7d; este botão chama rebuildIdentityHistory que busca
+            sem cap temporal (authors=[npub]) e materializa via
+            onNostrEvent. */}
+        <div className="space-y-2">
+          <p className="font-mono text-[11px] leading-relaxed text-drift-muted">
+            Cliente novo só sincroniza dos últimos 7 dias por default. Se
+            você usou Drift em outro device/versão e tá faltando posts
+            antigos do seu nsec, force a reconstrução.
+          </p>
+          <button
+            onClick={handleFetchHistory}
+            disabled={historyRebuilding || !npub}
+            className="w-full rounded border border-drift-accent/60 bg-drift-accent/10 px-3 py-3 font-mono text-[11px] uppercase tracking-meta text-drift-accent transition-colors hover:bg-drift-accent/20 disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus:ring-1 focus:ring-drift-accent2 focus:ring-offset-2 focus:ring-offset-drift-bg"
+          >
+            {historyRebuilding ? 'reconstruindo histórico…' : '↻ buscar histórico do meu nsec'}
+          </button>
+        </div>
+
+        <div className="border-t border-drift-border/60 pt-4 space-y-2">
+          <p className="font-mono text-[11px] leading-relaxed text-drift-muted">
+            Se a app travar com erro de schema (ex:{' '}
+            <code>no such column</code>), reconstrói o banco local.
+            Identidade e preferências preservadas; posts re-sincronizam dos
+            relays.
+          </p>
+          <button
+            onClick={handleRebuild}
+            disabled={rebuilding}
+            className="w-full rounded border border-yellow-700/60 bg-yellow-950/20 px-3 py-3 font-mono text-[11px] uppercase tracking-meta text-yellow-300 transition-colors hover:bg-yellow-950/40 disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus:ring-1 focus:ring-drift-accent2 focus:ring-offset-2 focus:ring-offset-drift-bg"
+          >
+            {rebuilding ? 'reconstruindo…' : '↻ redefinir cache local'}
+          </button>
+        </div>
       </div>
     </FullPageCard>
   )
