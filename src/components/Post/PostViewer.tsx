@@ -1182,15 +1182,26 @@ function ModalWrapper({ children, exitVariant }: WrapperProps) {
  * quando custom='up'|'down'.
  */
 function EmbeddedWrapper({ children, exitVariant }: WrapperProps) {
-  // Round 4 Fase B (B1): mesmo tokenizado do ModalWrapper.
   const reduced = useReducedMotion()
   // V9.6: emphasis 320ms percebido como "saindo muito rápido" pelo
-  // user em swipe vertical (spread/bury). swap (500ms ease-out-quart)
-  // dá sensação papel-no-deck. User feedback 2026-05-09.
+  // user em swipe vertical (spread/bury). swap (500/750ms ease-out-
+  // quart) dá sensação papel-no-deck. User feedback 2026-05-09.
   const transition = reduced ? { duration: 0 } : MOTION.swap
+  // V9.23 (user report 2026-05-14: "após bury perdeu a suavidade na
+  // troca de cards"). Antes: initial fixo y=20 (sempre de baixo). Após
+  // spread (exit y=-110%) o novo subia de y=20 — direções alinhadas,
+  // fluido. Após bury (exit y=+110%) o novo AINDA subia de y=20 —
+  // direção conflitante, sensação de quebra. Agora initial reflete o
+  // exitVariant: exit pra cima → entry vem de baixo; exit pra baixo →
+  // entry vem de cima. EXIT_VARIANTS.none (sem dir) mantém entry y=20
+  // como antes.
+  const enterFromAbove = exitVariant.y === '110%'
+  const initial = reduced
+    ? { opacity: 0 }
+    : { opacity: 0, scale: 0.96, y: enterFromAbove ? -20 : 20 }
   return (
     <motion.div
-      initial={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.96, y: 20 }}
+      initial={initial}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       exit={exitVariant}
       transition={transition}
