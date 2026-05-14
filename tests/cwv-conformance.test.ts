@@ -169,19 +169,20 @@ describe('CWV conformance — bundle size budget + dist artifacts', () => {
       },
     )
 
+    // V9.28 (2026-05-14): promovido de warn-only pra hard assert.
+    // Entry chunk ficou em 200 KB depois de lazy ThreadView (23f8e6c)
+    // — folga de 50 KB pro target. Ratchet ativo: regressão dispara
+    // CI fail em vez de só warn no console.
     it.skipIf(!inspection.hasDist || !inspection.entryChunk)(
-      `entry chunk ≤ ${ENTRY_CHUNK_BUDGET_SOFT / 1024} KB (soft target — manifesto perf)`,
+      `entry chunk ≤ ${ENTRY_CHUNK_BUDGET_SOFT / 1024} KB (soft target — manifesto perf, hard since V9.28)`,
       () => {
         const chunk = inspection.entryChunk!
         const sizeKB = (chunk.size / 1024).toFixed(1)
-        if (chunk.size > ENTRY_CHUNK_BUDGET_SOFT) {
-          // eslint-disable-next-line no-console
-          console.warn(
-            `[cwv-conformance][S1-soft] entry chunk ${chunk.name} = ${sizeKB} KB ` +
-              `> ${ENTRY_CHUNK_BUDGET_SOFT / 1024} KB (target). Ainda dentro do hard ceiling.`,
-          )
-        }
-        expect(chunk.size).toBeGreaterThan(0)
+        expect(
+          chunk.size,
+          `entry chunk ${chunk.name} = ${sizeKB} KB > ${ENTRY_CHUNK_BUDGET_SOFT / 1024} KB target. ` +
+            `Reduza chunk principal (mais lazy?) ou debata bump no orçamento.`,
+        ).toBeLessThanOrEqual(ENTRY_CHUNK_BUDGET_SOFT)
       },
     )
   })
