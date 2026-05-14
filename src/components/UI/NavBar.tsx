@@ -90,7 +90,24 @@ export function NavBar({
           // laterais ficavam apertados (labels MAPA/CONFIG + ícones).
           className="flex h-12 w-12 shrink-0 aspect-square items-center justify-center rounded-full bg-drift-accent text-drift-bg shadow-[0_0_22px_rgba(232,255,90,0.22)] focus:outline-none focus:ring-2 focus:ring-drift-accent2 focus:ring-offset-2 focus:ring-offset-drift-bg"
         >
-          <span className="font-display text-xl font-extrabold leading-none">+</span>
+          {/* V9.14 — SVG plus em vez de glyph Syne extrabold. O glyph
+              tinha asta vertical mais curta que horizontal, dando
+              sensação de "+" achatado mesmo dentro do disco perfeito.
+              SVG com stroke-width 2.5 + linecap round entrega cruz
+              simétrica, herda cor via currentColor (text-drift-bg). */}
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            aria-hidden="true"
+          >
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
         </motion.button>
 
         <div className="flex flex-1 items-center justify-around gap-2">
