@@ -40,10 +40,13 @@
  * Sempre uppercase + tracking 2.5px (mockup .c-tag).
  */
 
+import { useLayoutEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { Subpost, Post, LayoutKind } from '../../types/drift'
 import { DEFAULT_LAYOUT } from '../../types/drift'
 import { Image } from '../UI/Image'
+import { SlideUpOverlay } from '../UI/SlideUpOverlay'
+import { ModalHeader } from '../UI/ModalHeader'
 import { getDecorativeLetters } from '../../lib/decorativeLetters'
 
 export interface SubpostLayoutProps {
@@ -199,6 +202,23 @@ function CardText({
 }) {
   const tag = synthesizeTag(post)
   const { title, body } = splitTitleBody(subpost.text)
+  // V9.4 — detecta overflow do body com clamp pra mostrar "ver mais".
+  // useLayoutEffect roda síncrono após mutações DOM, antes da paint —
+  // sem flicker. Re-checa quando body/variant muda (text update,
+  // re-render de subpost). User pedido 2026-05-09: "alguns textos
+  // grande estão com '...' no final, deveria ter '...ver mais' como
+  // ação que abre card com texto completo".
+  const bodyRef = useRef<HTMLParagraphElement>(null)
+  const [bodyOverflows, setBodyOverflows] = useState(false)
+  const [showFullText, setShowFullText] = useState(false)
+  useLayoutEffect(() => {
+    const el = bodyRef.current
+    if (!el) {
+      setBodyOverflows(false)
+      return
+    }
+    setBodyOverflows(el.scrollHeight > el.clientHeight + 1)
+  }, [body, variant])
   const drift = formatStat(post.spreads)
   const subs = post.subposts.length
   const age = timeAgoCompact(post.createdAt)
@@ -256,10 +276,44 @@ function CardText({
       )}
       {body && (
         <p
-          className={`mb-2.5 font-mono text-xs italic leading-body text-drift-body ${bodyClamp}`}
+          ref={bodyRef}
+          className={`mb-1 font-mono text-xs italic leading-body text-drift-body ${bodyClamp}`}
         >
           {body}
         </p>
+      )}
+      {body && bodyOverflows && variant !== 'centered' && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            setShowFullText(true)
+          }}
+          className="mb-2 inline-flex items-center self-start font-mono text-[10px] uppercase tracking-meta text-drift-accent2 hover:text-drift-accent focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2 rounded"
+          style={{ touchAction: 'none' }}
+          aria-label="ver texto completo"
+        >
+          ver mais
+        </button>
+      )}
+      {showFullText && (
+        <SlideUpOverlay onClose={() => setShowFullText(false)} ariaLabel="texto completo" maxWidth="md">
+          <ModalHeader title="texto completo" onClose={() => setShowFullText(false)} />
+          <div className="mt-3 space-y-3">
+            <div className="font-mono text-[9px] uppercase tracking-tag text-drift-muted">
+              {tag}
+            </div>
+            {title && (
+              <h2 className="font-display text-fluid-display font-bold leading-title tracking-title text-drift-text">
+                {title}
+              </h2>
+            )}
+            <p className="whitespace-pre-wrap font-mono text-xs italic leading-body text-drift-body">
+              {body}
+            </p>
+          </div>
+        </SlideUpOverlay>
       )}
       {/* Round 4 Fase B (F-11 friction fix): meta line com ícones em vez
           de labels jargão. Antes: "DRIFT 22.1K · SUBS 3 · HÁ 6H" — três
