@@ -45,8 +45,6 @@ import type { ReactNode } from 'react'
 import type { Subpost, Post, LayoutKind } from '../../types/drift'
 import { DEFAULT_LAYOUT } from '../../types/drift'
 import { Image } from '../UI/Image'
-import { SlideUpOverlay } from '../UI/SlideUpOverlay'
-import { ModalHeader } from '../UI/ModalHeader'
 import { getDecorativeLetters } from '../../lib/decorativeLetters'
 
 export interface SubpostLayoutProps {
@@ -190,15 +188,26 @@ function CardText({
   post,
   subpost,
   variant,
+  expanded = false,
+  onToggleExpanded,
 }: {
   post: Post
   subpost: Subpost
   /**
    * 'inset' = bg surface + padding 14/17/18 (portrait/text default).
    * 'overlay' = bg transparent (landscape, sobre gradient).
-   * 'centered' = padding 28/22/28, body sem clamp (text layout).
+   * 'centered' = padding 28/22/28, body sem clamp (text layout / expanded).
    */
   variant: 'inset' | 'overlay' | 'centered'
+  /**
+   * V9.7 (user pedido 2026-05-09): quando true, body renderiza sem
+   * clamp e o botão vira "ver menos". Layouts Portrait/Landscape
+   * escondem a imagem nesse modo e setam variant='centered'. Default
+   * false (estado original do card).
+   */
+  expanded?: boolean
+  /** Toggle handler — only fired pelos botões "ver mais"/"ver menos". */
+  onToggleExpanded?: () => void
 }) {
   const tag = synthesizeTag(post)
   const { title, body } = splitTitleBody(subpost.text)
@@ -210,15 +219,21 @@ function CardText({
   // ação que abre card com texto completo".
   const bodyRef = useRef<HTMLParagraphElement>(null)
   const [bodyOverflows, setBodyOverflows] = useState(false)
-  const [showFullText, setShowFullText] = useState(false)
   useLayoutEffect(() => {
     const el = bodyRef.current
     if (!el) {
       setBodyOverflows(false)
       return
     }
+    // Quando expanded, body não tem clamp → não medimos overflow
+    // (sempre cabe). Forçar false libera renderização do "ver menos"
+    // mesmo se o texto antes overflowava.
+    if (expanded) {
+      setBodyOverflows(true)
+      return
+    }
     setBodyOverflows(el.scrollHeight > el.clientHeight + 1)
-  }, [body, variant])
+  }, [body, variant, expanded])
   const drift = formatStat(post.spreads)
   const subs = post.subposts.length
   const age = timeAgoCompact(post.createdAt)
@@ -282,13 +297,13 @@ function CardText({
           {body}
         </p>
       )}
-      {body && bodyOverflows && variant !== 'centered' && (
+      {body && bodyOverflows && onToggleExpanded && (
         <button
           type="button"
           onClick={(e) => {
             e.preventDefault()
             e.stopPropagation()
-            setShowFullText(true)
+            onToggleExpanded()
           }}
           // pointer-events-auto: em Portrait/Landscape o CardText vive
           // dentro de um overlay com pointer-events-none (libera tap da
@@ -297,28 +312,10 @@ function CardText({
           // pro SwipeHandler pai (não bloqueia swipe nav).
           className="pointer-events-auto mb-2 inline-flex items-center self-start font-mono text-[10px] uppercase tracking-meta text-drift-accent2 hover:text-drift-accent focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2 rounded"
           style={{ touchAction: 'none' }}
-          aria-label="ver texto completo"
+          aria-label={expanded ? 'recolher texto' : 'expandir texto'}
         >
-          ver mais
+          {expanded ? 'ver menos' : 'ver mais'}
         </button>
-      )}
-      {showFullText && (
-        <SlideUpOverlay onClose={() => setShowFullText(false)} ariaLabel="texto completo" maxWidth="md">
-          <ModalHeader title="texto completo" onClose={() => setShowFullText(false)} />
-          <div className="mt-3 space-y-3">
-            <div className="font-mono text-[9px] uppercase tracking-tag text-drift-muted">
-              {tag}
-            </div>
-            {title && (
-              <h2 className="font-display text-fluid-display font-bold leading-title tracking-title text-drift-text">
-                {title}
-              </h2>
-            )}
-            <p className="whitespace-pre-wrap font-mono text-xs italic leading-body text-drift-body">
-              {body}
-            </p>
-          </div>
-        </SlideUpOverlay>
       )}
       {/* Round 4 Fase B (F-11 friction fix): meta line com ícones em vez
           de labels jargão. Antes: "DRIFT 22.1K · SUBS 3 · HÁ 6H" — três
@@ -351,6 +348,7 @@ function PortraitLayout({
   subpostIdx,
   subpostsTotal,
 }: SubpostLayoutProps) {
+  const [expanded, setExpanded] = useState(false)
   const hasImage =
     (subpost.type === 'image' || subpost.type === 'text+image') && subpost.imageUrl
 
@@ -370,13 +368,26 @@ function PortraitLayout({
     )
   }
 
+  // V9.7 (user pedido 2026-05-09): "ao clicar em ver mais a camada
+  // onde tem o texto centraliza o texto e deixamos de exibir a camada
+  // de imagem; ver menos volta ao estado original". Modal SlideUpOverlay
+  // removido em favor deste expand inline.
+  if (expanded) {
+    return (
+      <div className="relative flex h-full w-full flex-col overflow-hidden bg-drift-surface">
+        <CardText
+          post={post}
+          subpost={subpost}
+          variant="centered"
+          expanded
+          onToggleExpanded={() => setExpanded(false)}
+        />
+      </div>
+    )
+  }
+
   // V14.3 — refactor estrutural (user feedback 2026-05-07): "pense em
   // dois cards, imagem em baixo e texto em cima com fundo transparente".
-  // Antes: flex column com image flex-1 + text shrink-0 — texto e
-  // imagem como siblings no mesmo nível. Agora: layered overlay igual
-  // ao LandscapeLayout. Image absolute fill (preserva inteira via
-  // fit=contain + position=top, sem crop), text absolute bottom com
-  // bg transparente via variant=overlay + gradient pra legibilidade.
   return (
     <div className="relative h-full w-full overflow-hidden">
       {/* Card de baixo: imagem. fit=contain preserva imagem inteira
@@ -397,11 +408,9 @@ function PortraitLayout({
           2026-05-09: "a camada de texto fica em cima da camada de
           imagem e ambas preenchem todo espaço — basta usarmos a
           primeira camada como interface". CardText não tem elementos
-          interativos (tag/título/body/meta-stats com ícones, zero
-          onClick/href). Logo, overlay inteira pointer-events-none →
-          imagem absorve TODOS os taps na área (single-tap → lightbox
-          via Image.tsx). Tap-target máximo, descobrível, sem
-          conflitos. */}
+          interativos (tag/título/body/meta-stats com ícones). Overlay
+          inteira pointer-events-none → imagem absorve TODOS os taps.
+          Botão "ver mais" tem pointer-events-auto pra escapar. */}
       <div
         className="pointer-events-none absolute inset-0 z-[2]"
         style={{
@@ -409,10 +418,13 @@ function PortraitLayout({
             'linear-gradient(to top, rgba(10,10,9,0.96) 0%, rgba(10,10,9,0.55) 45%, transparent 70%)',
         }}
       >
-        {/* V9.2: CardDots saiu daqui pro SubpostCarousel (barra
-            Instagram no topo do card). Vide doc do carousel. */}
         <div className="absolute inset-x-0 bottom-0">
-          <CardText post={post} subpost={subpost} variant="overlay" />
+          <CardText
+            post={post}
+            subpost={subpost}
+            variant="overlay"
+            onToggleExpanded={() => setExpanded(true)}
+          />
         </div>
       </div>
     </div>
@@ -425,6 +437,7 @@ function LandscapeLayout({
   subpostIdx,
   subpostsTotal,
 }: SubpostLayoutProps) {
+  const [expanded, setExpanded] = useState(false)
   const hasImage =
     (subpost.type === 'image' || subpost.type === 'text+image') && subpost.imageUrl
 
@@ -439,6 +452,21 @@ function LandscapeLayout({
         subpostIdx={subpostIdx}
         subpostsTotal={subpostsTotal}
       />
+    )
+  }
+
+  // V9.7 expanded mode: idem PortraitLayout.
+  if (expanded) {
+    return (
+      <div className="relative flex h-full w-full flex-col overflow-hidden bg-drift-surface">
+        <CardText
+          post={post}
+          subpost={subpost}
+          variant="centered"
+          expanded
+          onToggleExpanded={() => setExpanded(false)}
+        />
+      </div>
     )
   }
 
@@ -475,7 +503,12 @@ function LandscapeLayout({
       >
         {/* V9.2: CardDots saiu daqui pro SubpostCarousel (top bar). */}
         <div className="absolute inset-x-0 bottom-0">
-          <CardText post={post} subpost={subpost} variant="overlay" />
+          <CardText
+            post={post}
+            subpost={subpost}
+            variant="overlay"
+            onToggleExpanded={() => setExpanded(true)}
+          />
         </div>
       </div>
     </div>
