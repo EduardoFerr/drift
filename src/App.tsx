@@ -199,6 +199,12 @@ function App() {
   const [showStatusCard, setShowStatusCard] = useState(false)
   // V9.2e: sobre = versão do cliente + manifesto link.
   const [showAboutCard, setShowAboutCard] = useState(false)
+  // V9.20 — post linkado via `?p=<nevent>`. Renderiza PostViewer em
+  // modal mode (não-embedded) acima da home view. onClose volta pro
+  // feed normal. State import desnecessário porque resolvemos no
+  // mount effect, mas o `Post` carrega state local (myAction, etc.)
+  // via PostViewer interno.
+  const [deepLinkedPost, setDeepLinkedPost] = useState<Post | null>(null)
 
   // Banner de erro GPS (Lily 29-04): user habilita location_granularity
   // mas browser bloqueia silenciosamente. Trackeamos timestamp da última
@@ -257,26 +263,37 @@ function App() {
     } else if (action === 'settings') {
       setShowSettingsRoot(true)
     }
-    // V9.20 — deep link `?p=<nevent>` gerado pelo share post. Decodifica
-    // o nevent, busca o evento do post via relay (filter ids=[id]),
-    // entrega pra onNostrEvent que persiste no SQLite + invalidateFeed.
-    // User vê o post aparecer no feed em segundos. (TODO: auto-abrir
-    // PostViewer pro post linkado — exige refactor da fila do feed.)
+    // V9.20 — deep link `?p=<nevent>` gerado pelo share post. Fluxo:
+    //   1. Decodifica nevent → eventId.
+    //   2. Tenta SELECT local primeiro (getPostById) — instantâneo se
+    //      já está no SQLite (re-share, mesma sessão).
+    //   3. Senão, busca o evento via pool.get(relays, {ids:[id]}),
+    //      passa por onNostrEvent que persiste no SQLite.
+    //   4. Re-tenta getPostById → seta deepLinkedPost → abre
+    //      PostViewer em modal mode acima da home.
     const pParam = params.get('p')
     if (pParam) {
       void (async () => {
         try {
           const { nip19 } = await import('nostr-tools')
           const decoded = nip19.decode(pParam)
-          if (decoded.type === 'nevent') {
-            const eventId = decoded.data.id
+          if (decoded.type !== 'nevent') return
+          const eventId = decoded.data.id
+          const { getPostById } = await import('./lib/feed')
+          let post = await getPostById(eventId)
+          if (!post) {
             const { pool } = await import('./lib/nostr')
             const { activeReadRelays } = await import('./lib/relays')
             const { onNostrEvent } = await import('./lib/events')
             const relays = activeReadRelays()
             const ev = await pool.get(relays, { ids: [eventId] })
-            if (ev) await onNostrEvent(ev)
+            if (ev) {
+              await onNostrEvent(ev)
+              post = await getPostById(eventId)
+            }
           }
+          if (post) setDeepLinkedPost(post)
+          else console.warn('[deep-link] evento não encontrado:', eventId)
         } catch (err) {
           console.warn('[deep-link] falha ao resolver ?p=', err)
         }
@@ -929,6 +946,35 @@ function App() {
 
       {/* V8: modal viewer overlay deletado — home view embedded
           substituiu o paradigma "tap to open". */}
+
+      {/* V9.20 — deep-link viewer (modal mode). Renderiza quando
+          ?p=<nevent> resolveu pra um Post no SQLite. Fica acima da
+          home view. onClose volta pro feed. spread/bury fecham o modal
+          e disparam os handlers normais; o feed embedded segue intocado. */}
+      <AnimatePresence>
+        {deepLinkedPost && (
+          <PostViewer
+            key={`deep-${deepLinkedPost.id}`}
+            post={deepLinkedPost}
+            isMine={deepLinkedPost.authorPub === boot.identity?.npub}
+            pendingAction={pending[deepLinkedPost.id] ?? null}
+            myAction={myActions[deepLinkedPost.id] ?? null}
+            capturingLocation={gpsCapturing.has(deepLinkedPost.id)}
+            onOpenLocationSettings={() => {
+              setShowLocation(true)
+            }}
+            onSpread={() => {
+              handleSpread(deepLinkedPost)
+              setDeepLinkedPost(null)
+            }}
+            onBury={() => {
+              handleBury(deepLinkedPost)
+              setDeepLinkedPost(null)
+            }}
+            onClose={() => setDeepLinkedPost(null)}
+          />
+        )}
+      </AnimatePresence>
 
       {/* V8 — Mapa overlay (acionado pelo MAPA da NavBar). Mostra a
           propagação do post atualmente visível + contador de eventos

@@ -109,6 +109,23 @@ export async function getTrendingFeed(limit = 50, now = Date.now()): Promise<Pos
 }
 
 /**
+ * V9.20 — busca um Post pelo id no SQLite local. Usado pelo handler
+ * de deep-link (`?p=<nevent>`) em App.tsx pra abrir PostViewer modal
+ * com o post linkado depois do onNostrEvent ter materializado o row.
+ * Retorna null se id não existir (ainda) localmente.
+ */
+export async function getPostById(id: string): Promise<Post | null> {
+  const row = await db.get<PostRow>(
+    `SELECT id, author_pub, content, created_at, category, location, client, content_warning, score, spreads, buries, raw_event
+     FROM posts
+     WHERE id = ?
+     LIMIT 1`,
+    [id],
+  )
+  return row ? rowToPost(row) : null
+}
+
+/**
  * Dispatcher por tab — usado por `refreshFeed` pra escolher a query
  * correta baseado em `useFeedStore.tab`.
  */
