@@ -967,6 +967,7 @@ function ActionsFan({
     key: string
     icon: string
     label: string
+    hint: string
     onClick: () => void
     disabled?: boolean
   }
@@ -975,6 +976,7 @@ function ActionsFan({
       key: 'share-post',
       icon: '📤',
       label: 'compartilhar post',
+      hint: 'gera link njump.me que abre em qualquer cliente Nostr',
       onClick: onSharePost,
     },
   ]
@@ -983,6 +985,7 @@ function ActionsFan({
       key: 'share-image',
       icon: '🖼',
       label: 'compartilhar imagem',
+      hint: 'abre o share sheet do sistema com a imagem como arquivo',
       onClick: onShareImage,
     })
   }
@@ -991,12 +994,16 @@ function ActionsFan({
       key: 'map',
       icon: '🗺',
       label: mapOpen ? 'fechar mapa' : 'mapa de spread',
+      hint: 'visualização geográfica de quem drift-ou este post',
       onClick: onMapToggle,
     },
     {
       key: 'pin',
       icon: pinned ? '📌' : '📍',
       label: pinned ? 'desfixar' : 'fixar',
+      hint: pinned
+        ? 'remove proteção contra eviction local'
+        : 'protege de eviction local + marca pra re-broadcast (§16)',
       onClick: onPinToggle,
       disabled: pinned === null,
     },
@@ -1007,15 +1014,56 @@ function ActionsFan({
         key: 'follow',
         icon: isFollowing ? '✓' : '➕',
         label: isFollowing ? 'deixar de seguir' : 'seguir',
+        hint: isFollowing
+          ? 'publica kind 3 atualizado removendo este autor'
+          : 'alimenta a aba "seguindo" do feed (NIP-02)',
         onClick: onFollowToggle,
       },
       {
         key: 'mute',
         icon: '🔇',
         label: 'silenciar',
+        hint: 'esconde posts dele do meu feed (filtro local §24)',
         onClick: onMute,
       },
     )
+  }
+
+  // V9.19 (user pedido 2026-05-14): hold em qualquer ícone do fan
+  // por 500ms → mostra tooltip à esquerda explicando a ação. Release
+  // após tooltip aparecer NÃO dispara onClick (intencional: hold é
+  // gesto de descoberta, tap é gesto de ação). Cancel em move > 10px.
+  const [explainingKey, setExplainingKey] = useState<string | null>(null)
+  const holdTimerRef = useRef<number | null>(null)
+  const holdStartRef = useRef<{ x: number; y: number } | null>(null)
+  const holdFiredRef = useRef(false) // true quando tooltip já apareceu (cancela onClick na release)
+  const HOLD_MS = 500
+  const HOLD_SLOP = 10
+  function cancelHold() {
+    if (holdTimerRef.current !== null) {
+      window.clearTimeout(holdTimerRef.current)
+      holdTimerRef.current = null
+    }
+    holdStartRef.current = null
+    setExplainingKey(null)
+  }
+  function startHold(itemKey: string, e: React.PointerEvent) {
+    holdFiredRef.current = false
+    holdStartRef.current = { x: e.clientX, y: e.clientY }
+    holdTimerRef.current = window.setTimeout(() => {
+      holdTimerRef.current = null
+      holdFiredRef.current = true
+      setExplainingKey(itemKey)
+    }, HOLD_MS)
+  }
+  function holdMove(e: React.PointerEvent) {
+    if (!holdStartRef.current) return
+    const dx = e.clientX - holdStartRef.current.x
+    const dy = e.clientY - holdStartRef.current.y
+    if (Math.hypot(dx, dy) > HOLD_SLOP) cancelHold()
+  }
+  function holdEnd() {
+    cancelHold()
   }
 
   // Top base: ⋮ ocupa top-4 (16px) + h-11 (44px) = bottom em 60px.
@@ -1033,12 +1081,43 @@ function ActionsFan({
             className="absolute right-4 z-30"
             style={{ top: `${60 + i * 48}px` }}
           >
+            {/* Tooltip à esquerda do ícone — visível enquanto hold ativo
+                pra este item. Glass styled, max-w prevent overflow. */}
+            <AnimatePresence>
+              {explainingKey === item.key && (
+                <motion.div
+                  initial={{ opacity: 0, x: 8 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 8 }}
+                  transition={{ duration: 0.14, ease: [0.22, 1, 0.36, 1] }}
+                  className="pointer-events-none absolute right-[52px] top-1/2 -translate-y-1/2 w-[180px] rounded border border-drift-accent/60 bg-drift-surface/95 px-3 py-2 backdrop-blur-sm shadow-lg"
+                  role="tooltip"
+                >
+                  <div className="font-mono text-[10px] uppercase tracking-[2px] text-drift-accent">
+                    {item.label}
+                  </div>
+                  <div className="mt-1 font-mono text-[10px] leading-snug text-drift-muted">
+                    {item.hint}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
             <GlassIconButton
               size="xl"
               onClick={(e) => {
                 e.stopPropagation()
+                // Se hold já disparou tooltip, esta release não fira ação.
+                if (holdFiredRef.current) {
+                  holdFiredRef.current = false
+                  return
+                }
                 if (!item.disabled) item.onClick()
               }}
+              onPointerDown={(e) => startHold(item.key, e)}
+              onPointerMove={holdMove}
+              onPointerUp={holdEnd}
+              onPointerCancel={holdEnd}
+              onPointerLeave={holdEnd}
               disabled={item.disabled}
               aria-label={item.label}
               title={item.label}
