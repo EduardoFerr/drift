@@ -17,11 +17,7 @@
  * fica leve (sem importar Helia até hover/scroll-into-view).
  */
 
-import { useEffect, useRef, useState } from 'react'
-import type {
-  KeyboardEvent as ReactKeyboardEvent,
-  MouseEvent as ReactMouseEvent,
-} from 'react'
+import { useEffect, useState } from 'react'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import type { BlobMeta } from '../../lib/nip94'
 import {
@@ -86,37 +82,13 @@ export function Image({
 }: ImageProps) {
   const [state, setState] = useState<'loading' | 'loaded' | 'error'>('loading')
   const [lightboxOpen, setLightboxOpen] = useState(false)
-  // Manual double-tap detection via onClick — `ondblclick` em mobile
-  // é não-confiável (300ms tap delay, varia por engine), e `pointerup`
-  // pode ser engolido pelo Framer Motion swipe parent durante gesture
-  // capture. `onClick` em touch dispara DEPOIS que o navegador
-  // classifica o gesto como tap (não swipe), o que é exatamente o que
-  // queremos. User feedback 2026-05-09 (2x): "no mobile o duplo click
-  // parece nao funcionar".
-  //
-  // Algoritmo: ref guarda timestamp/posição do último click. Se o
-  // próximo cair dentro de 400ms e 40px do anterior, abre o lightbox.
-  // Slop generoso pra dedos imprecisos em mobile.
-  const lastTapRef = useRef<{ t: number; x: number; y: number } | null>(null)
-  const DOUBLE_TAP_MS = 400
-  const DOUBLE_TAP_SLOP_PX = 40
-  function handleClick(e: ReactMouseEvent<HTMLElement>) {
-    const now = performance.now()
-    const last = lastTapRef.current
-    if (
-      last &&
-      now - last.t <= DOUBLE_TAP_MS &&
-      Math.abs(e.clientX - last.x) <= DOUBLE_TAP_SLOP_PX &&
-      Math.abs(e.clientY - last.y) <= DOUBLE_TAP_SLOP_PX
-    ) {
-      lastTapRef.current = null
-      e.preventDefault()
-      e.stopPropagation()
-      setLightboxOpen(true)
-      return
-    }
-    lastTapRef.current = { t: now, x: e.clientX, y: e.clientY }
-  }
+  // User feedback 2026-05-09 (3x): "duplo click parece nao funcionar
+  // pra abrir a foto" → "provavelmente tem a ver com a overlay?". Sim.
+  // O CardText overlay em Portrait/Landscape tem pointer-events-auto
+  // no bottom — gradient escuro absorve taps de duplo click. Solução:
+  // botão dedicado de zoom (ícone ⛶ top-right) em single tap.
+  // Descobrível, sem conflito com swipe vertical do feed nem com tap
+  // no CardText.
   // Track B.2 — quando meta está presente e tem cid|hash, tenta resolver
   // via blobs.fetchBlobUrl (Helia + verify). Senão, usa src direto.
   const [resolvedSrc, setResolvedSrc] = useState<string>(src)
@@ -178,41 +150,39 @@ export function Image({
     return () => window.removeEventListener('keydown', onKey)
   }, [lightboxOpen])
 
-  // Wrapper element: button quando lightbox=true (clicável + a11y),
-  // div quando false (comportamento atual).
-  // User feedback 2026-05-08: lightbox em SINGLE click conflitava com
-  // swipe gestures + tap-to-reveal CW. Double-click é o trigger agora.
-  // Keyboard: Enter/Space também abrem (a11y) — esses não têm conflito
-  // com swipe pq são teclas dedicadas.
-  const Wrapper = lightbox && state === 'loaded' ? 'button' : 'div'
-  const wrapperProps =
-    lightbox && state === 'loaded'
-      ? {
-          type: 'button' as const,
-          onClick: handleClick,
-          onKeyDown: (e: ReactKeyboardEvent) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault()
-              setLightboxOpen(true)
-            }
-          },
-          'aria-label': alt
-            ? `abrir imagem: ${alt} (toque duplo)`
-            : 'abrir imagem em primeiro plano (toque duplo)',
-          title: 'toque duplo pra abrir',
-          // Cursor zoom-in pra signalizar interação.
-          className: `relative block w-full overflow-hidden bg-drift-surface/40 cursor-zoom-in focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2 ${className}`,
-        }
-      : {
-          className: `relative overflow-hidden bg-drift-surface/40 ${className}`,
-        }
+  const showZoomButton = lightbox && state === 'loaded'
 
   return (
     <>
-    <Wrapper
-      {...wrapperProps}
+    <div
+      className={`relative overflow-hidden bg-drift-surface/40 ${className}`}
       style={{ aspectRatio: aspect }}
     >
+      {showZoomButton && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            setLightboxOpen(true)
+          }}
+          aria-label={alt ? `abrir imagem em primeiro plano: ${alt}` : 'abrir imagem em primeiro plano'}
+          title="abrir imagem"
+          // z-[4] fica acima do CardText overlay (z-[2/3]) pra não ser
+          // engolido. touch-action: manipulation desabilita 300ms tap
+          // delay e double-tap-to-zoom do browser. Backdrop-blur
+          // mantém legibilidade sobre imagens de qualquer cor.
+          className="absolute right-2 top-2 z-[4] flex h-9 w-9 items-center justify-center rounded-full border border-drift-border/60 bg-black/45 text-drift-text/90 backdrop-blur-sm transition-colors hover:bg-black/60 hover:text-drift-accent2 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2"
+          style={{ touchAction: 'manipulation' }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <polyline points="15 3 21 3 21 9" />
+            <polyline points="9 21 3 21 3 15" />
+            <line x1="21" y1="3" x2="14" y2="10" />
+            <line x1="3" y1="21" x2="10" y2="14" />
+          </svg>
+        </button>
+      )}
       {state === 'loading' && (
         <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-drift-surface to-drift-bg" />
       )}
@@ -271,7 +241,7 @@ export function Image({
           onError?.()
         }}
       />
-    </Wrapper>
+    </div>
 
     {/* Lightbox fullscreen — backdrop preto, imagem centralizada limpa,
         click-out / ESC / botão X fecham. Usa portal-like fixed inset-0
