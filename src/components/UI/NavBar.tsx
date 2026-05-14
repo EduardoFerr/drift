@@ -83,7 +83,12 @@ export function NavBar({
           whileHover={{ scale: 1.04 }}
           onClick={onCompose}
           aria-label={composeAriaLabel}
-          className="flex h-12 w-12 items-center justify-center rounded-full bg-drift-accent text-drift-bg shadow-[0_0_22px_rgba(232,255,90,0.22)] focus:outline-none focus:ring-2 focus:ring-drift-accent2 focus:ring-offset-2 focus:ring-offset-drift-bg"
+          // shrink-0 + aspect-square: prevenir squash horizontal quando
+          // os flex-1 das laterais pressionam o botão. User report
+          // 2026-05-09: "o + nao está correto, parece achatado".
+          // Default flex-shrink:1 deixava o w-12 ceder quando containers
+          // laterais ficavam apertados (labels MAPA/CONFIG + ícones).
+          className="flex h-12 w-12 shrink-0 aspect-square items-center justify-center rounded-full bg-drift-accent text-drift-bg shadow-[0_0_22px_rgba(232,255,90,0.22)] focus:outline-none focus:ring-2 focus:ring-drift-accent2 focus:ring-offset-2 focus:ring-offset-drift-bg"
         >
           <span className="font-display text-xl font-extrabold leading-none">+</span>
         </motion.button>
