@@ -26,6 +26,7 @@ import { applyContentFiltersComment } from '../../lib/feed'
 import { usePrefsStore } from '../../lib/prefs'
 import { timeAgo } from '../../lib/format'
 import { Image } from '../UI/Image'
+import { DriftChip } from '../UI/DriftChip'
 import { commentRevealVariants } from '../../lib/motion-variants'
 
 export interface CommentCardProps {
@@ -208,13 +209,14 @@ export function CommentCard({
         </span>
         <div className="flex items-center gap-2">
           {node.content_warning && (
-            <span
-              className="rounded border border-amber-400/60 bg-amber-500/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-meta text-amber-300"
-              title={`autor marcou: ${node.content_warning}`}
-              aria-label={`aviso de conteúdo: ${node.content_warning}`}
+            <DriftChip
+              variant="warning"
+              size="xs"
+              icon="⚠"
+              ariaLabel={`aviso de conteúdo: ${node.content_warning}`}
             >
-              ⚠ {node.content_warning}
-            </span>
+              {node.content_warning}
+            </DriftChip>
           )}
           <span className="font-mono text-[10px] uppercase tracking-meta text-drift-muted">
             {timeAgo(node.created_at)}
@@ -337,9 +339,9 @@ function CwHiddenPlaceholder({
 }) {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
-      <span className="font-mono text-[11px] uppercase tracking-meta text-amber-300">
-        ⚠ {warning}
-      </span>
+      <DriftChip variant="warning" size="sm" active icon="⚠" ariaLabel={`aviso de conteúdo: ${warning}`}>
+        {warning}
+      </DriftChip>
       <span className="font-mono text-[10px] text-drift-muted">
         autor marcou — manifesto §27
       </span>

@@ -55,6 +55,7 @@ const SpreadMap = lazy(() =>
 import { GlassIconButton } from '../UI/GlassIconButton'
 import { SlideUpOverlay } from '../UI/SlideUpOverlay'
 import { ModalHeader } from '../UI/ModalHeader'
+import { DriftChip } from '../UI/DriftChip'
 
 /** 'up' = espalhou; 'down' = enterrou. Sai sem direção (X/ESC) = undefined. */
 export type QueueExitDir = 'up' | 'down'
@@ -422,12 +423,16 @@ export function PostViewer({
           {' · '}
           {timeAgo(post.createdAt)}
           {post.contentWarning && (
-            <span
-              className="ml-2 rounded bg-yellow-900/30 px-1.5 py-0.5 text-yellow-300"
-              title="aviso de conteúdo declarado pelo autor (manifesto §27)"
+            <DriftChip
+              variant="warning"
+              size="xs"
+              active
+              icon="⚠"
+              className="ml-2"
+              ariaLabel={`aviso de conteúdo: ${post.contentWarning}`}
             >
-              ⚠ {post.contentWarning}
-            </span>
+              {post.contentWarning}
+            </DriftChip>
           )}
         </span>
         <div className="flex items-center gap-3 font-mono">
