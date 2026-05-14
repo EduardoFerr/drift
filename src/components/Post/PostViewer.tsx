@@ -264,11 +264,18 @@ export function PostViewer({
     }
   }
 
+  // V9.9 (user report 2026-05-09: "com 2 subposts passar pro lado não
+  // está passando"). Era clamp não-circular: em idx=0 swipe→prev ficava
+  // em 0 (sem feedback); em idx=last swipe→next ficava em last. Com 2
+  // subposts o user sempre está numa ponta, metade dos swipes parecia
+  // morta. Agora circular via modulo — consistente com onTap
+  // (tap-to-advance já usava `(i + 1) % total`). Total <= 0 não acontece
+  // (SwipeHandler tem disableHorizontal nesse caso, esta func não dispara).
   function next() {
-    setSubpostIdx((i) => Math.min(i + 1, total - 1))
+    setSubpostIdx((i) => (i + 1) % total)
   }
   function prev() {
-    setSubpostIdx((i) => Math.max(i - 1, 0))
+    setSubpostIdx((i) => (i - 1 + total) % total)
   }
 
   // ESC fecha. (SwipeHandler já cuida das setas, mas registramos ESC
