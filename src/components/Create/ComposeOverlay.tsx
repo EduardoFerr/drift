@@ -388,6 +388,24 @@ export function ComposeOverlay({
             value={contentWarning}
             onChange={setContentWarning}
           />
+
+          {/* TM-3 (Marshall Opção A) — warning informativo quando o post
+              contém imagens e nenhum content-warning foi declarado.
+              Manifesto §27 auto-classificação voluntária: cliente sugere,
+              não bloqueia. Não persiste, não telemetra, não hash imagem
+              (§17/§28). Aparece só durante compose. */}
+          {!contentWarning && drafts.some((d) => !!d.imageUrl) && (
+            <div
+              role="note"
+              aria-label="sugestão de aviso de conteúdo"
+              className="rounded border border-amber-400/40 bg-amber-500/5 px-3 py-2 font-mono text-[10px] leading-snug text-amber-300"
+            >
+              <span className="mr-1" aria-hidden="true">⚠</span>
+              Seu post tem imagem mas nenhum aviso de conteúdo. Considere
+              adicionar (NSFW, violência, spoiler, ad) acima — ajuda quem
+              filtra. Manifesto §27 — auto-classificação voluntária.
+            </div>
+          )}
         </div>
       </div>
     </FullPageCard>
