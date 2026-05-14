@@ -41,7 +41,13 @@ import { db } from '../../lib/db'
 import { timeAgo } from '../../lib/format'
 import { SwipeHandler } from './SwipeHandler'
 import { SubpostCarousel } from './SubpostCarousel'
-import { ThreadView } from './ThreadView'
+// V9.26 — ThreadView lazy. Comments view só monta quando user
+// abre o painel; carrega ~30 KB de código (CommentCard + react-virtual
+// + thread-cursor) só nessa hora. Tira massa do entry chunk pra
+// voltar abaixo do 300 KB hard ceiling (cwv-conformance test).
+const ThreadView = lazy(() =>
+  import('./ThreadView').then((m) => ({ default: m.ThreadView })),
+)
 import { useCommentCountsStore } from '../../lib/comment-counts'
 
 // Round CWV-2 — lazy: ReportModal (raríssimo, gesture explícito) e
@@ -841,12 +847,14 @@ export function PostViewer({
           fechar libera subscribe (refcount em comments.ts). */}
       <AnimatePresence>
         {showThread && (
-          <ThreadView
-            postId={post.id}
-            postAuthorPub={post.authorPub}
-            post={post}
-            onClose={() => setShowThread(false)}
-          />
+          <LazyBoundary fallback={<DriftSkeleton variant="card" />}>
+            <ThreadView
+              postId={post.id}
+              postAuthorPub={post.authorPub}
+              post={post}
+              onClose={() => setShowThread(false)}
+            />
+          </LazyBoundary>
         )}
       </AnimatePresence>
 
