@@ -264,37 +264,29 @@ async function doBootstrap(): Promise<void> {
       }
     }
 
-    // Fase 6.2-E: registra transportes ativos no orchestrator antes do
-    // startSync. WSS é o transporte primário; WebRTC ativa peer-to-peer
-    // quando há peers conectados (default mock signaling = só entre abas
-    // mesma origin; Nostr signaling via flag `VITE_USE_NOSTR_SIGNALING=1`
-    // pra peers em redes diferentes). Manifesto §12 (múltiplos transportes).
+    // ─── Boot perceptualmente "ready" ─────────────────────────────
     //
-    // Quando `network_mode` é tor/onion-only e arti conectou acima, o
-    // `wssTransport` abaixo automaticamente roteia via Tor (TorWebSocket
-    // já foi instalado no SimplePool global do nostr-tools). NÃO registramos
-    // `torTransport` separado — seria duplicação ruidosa pra orchestrator.
-    registerTransport(wssTransport, { weight: 10 })
-    // §15 anti-censura + §27 privacidade visível: WebRTC P2P pode vazar IP
-    // do user via STUN/ICE candidates locais mesmo quando o tráfego Nostr
-    // passa por Tor — `RTCPeerConnection.gatherIceCandidates` enumera
-    // interfaces de rede locais e as expõe ao peer remoto. Em modo
-    // `tor`/`onion-only`, NÃO registramos `webrtcTransport` pra honrar
-    // a promessa de anonimato do user. Spec: `Docs/webrtc-6.4-plan.md` §IP
-    // leak via WebRTC ICE.
+    // Lighthouse 2026-05-15 audit:
+    //   `vendor-nostr-*.js` scripting = 5.08s no boot
+    //   mainthread-work = 7.6s, bootup-time = 5.7s
     //
-    // Trade-off user-facing: em modo Tor, WebRTC P2P fica indisponível.
-    // Publish/subscribe seguem funcionando via WSS-via-Tor; user não vê
-    // feature-degradation ativa, apenas perde a aceleração P2P opcional.
+    // Causa: `startSync()` (logo abaixo, agora deferido) abre
+    // WebSocket(s) via SimplePool + recebe até 500×N relays = ~2000
+    // eventos stored, e cada um passa por `verifyEvent` (Schnorr
+    // secp256k1, ~1ms cada → ~2s scripting puro só no verify storm
+    // inicial). Antes esse storm rodava ANTES de `step:'ready'`,
+    // bloqueando first paint.
     //
-    // Decisão init-only: se o user trocar `network_mode` em Settings, exige
-    // reload (já é convenção do Drift — `setActiveIdentity` faz o mesmo,
-    // manifesto §3 dispositivo descartável torna isso aceitável).
-    if (networkMode === 'clearnet') {
-      registerTransport(webrtcTransport, { weight: 5 })
-    }
-
-    await startSync()
+    // Agora: marcamos `step:'ready'` imediatamente — UI renderiza feed
+    // **de SQLite local** (cache da sessão anterior; primeira boot
+    // mostra empty state brevemente). Sync, registerTransport e probe
+    // são agendados via `requestIdleCallback` pra rodar entre paints,
+    // não no caminho crítico. Manifesto §7 (determinismo) preservado:
+    // ordem de eventos só afeta velocidade de catch-up, não score
+    // final. Invariante #1 (onNostrEvent única porta) preservado: só
+    // mudou QUANDO `startSync` chama subscribe, não O QUE acontece em
+    // cada evento.
+    setBoot((p) => ({ ...p, step: 'ready' }))
 
     // Track C.6.1 — prefetch contagens de comments do banco local pra
     // UI mostrar "💬 N" sem materializar threads. Fire-and-forget: query
@@ -303,28 +295,73 @@ async function doBootstrap(): Promise<void> {
       console.warn('[bootstrap] loadCommentCounts falhou (degraded):', err)
     })
 
-    // Boot completo — UI renderiza imediatamente.
+    // ─── Post-paint: trabalho não-crítico ─────────────────────────
+    //
+    // Tudo abaixo abre WebSockets, dispara verify-storm de eventos
+    // stored ou faz network I/O. Mover pra idle desloca scripting time
+    // do critical path de boot pra depois do first paint — INP fica
+    // sensivelmente melhor sem mudar comportamento funcional.
+    //
+    // `timeout: 2000` garante execução em até 2s mesmo se o browser
+    // nunca achar idle (mobile com main thread saturada). Fallback
+    // setTimeout(0) cobre Safari <16.4 que não tem requestIdleCallback.
+    scheduleIdle(() => {
+      // Fase 6.2-E: registra transportes ativos no orchestrator antes do
+      // startSync. WSS é o transporte primário; WebRTC ativa peer-to-peer
+      // quando há peers conectados (default mock signaling = só entre abas
+      // mesma origin; Nostr signaling via flag `VITE_USE_NOSTR_SIGNALING=1`
+      // pra peers em redes diferentes). Manifesto §12 (múltiplos transportes).
+      //
+      // Quando `network_mode` é tor/onion-only e arti conectou acima, o
+      // `wssTransport` automaticamente roteia via Tor (TorWebSocket já foi
+      // instalado no SimplePool global do nostr-tools). NÃO registramos
+      // `torTransport` separado — seria duplicação ruidosa pra orchestrator.
+      registerTransport(wssTransport, { weight: 10 })
+      // §15 anti-censura + §27 privacidade visível: WebRTC P2P pode vazar IP
+      // do user via STUN/ICE candidates locais mesmo quando o tráfego Nostr
+      // passa por Tor. Em modo `tor`/`onion-only`, NÃO registramos
+      // `webrtcTransport` pra honrar a promessa de anonimato do user.
+      // Spec: `Docs/webrtc-6.4-plan.md` §IP leak via WebRTC ICE.
+      //
+      // Decisão init-only: se o user trocar `network_mode` em Settings, exige
+      // reload (convenção do Drift — `setActiveIdentity` faz o mesmo).
+      if (networkMode === 'clearnet') {
+        registerTransport(webrtcTransport, { weight: 5 })
+      }
+
+      // Antes: `await startSync()` antes de `step:'ready'` → bloqueava
+      // ~2s do main thread no Schnorr verify dos primeiros eventos
+      // entregues pelos relays. Agora: fire-and-forget após paint. O
+      // `pageshow(persisted=true)` em sync.ts:174 cuida do caso bfcache.
+      void startSync().catch((err) => {
+        console.error('[bootstrap] startSync (deferred) falhou:', err)
+      })
+    })
+
     // checkRelayConnectivity abre WebSockets DEDICADOS por relay
     // só pra medir latency (uso só informacional em DiagnosticPanel).
     // Com 4 relays seed, são +4 WS além das ~4 que `startSync` já
     // abriu via SimplePool — dobra connections no boot crítico.
-    // Fix: marca step=ready imediatamente; relays como `null` (UI
-    // mostra "checando…"); health probe roda em background sem bloquear.
-    setBoot((p) => ({ ...p, step: 'ready' }))
-    void checkRelayConnectivity()
-      .then((relays) => setBoot((p) => ({ ...p, relays })))
-      .catch((err) => {
-        console.warn('[bootstrap] relay health check falhou:', err)
-      })
+    // Health probe roda em idle pra não competir com o subscribe de
+    // sync que acabou de ser agendado.
+    scheduleIdle(() => {
+      void checkRelayConnectivity()
+        .then((relays) => setBoot((p) => ({ ...p, relays })))
+        .catch((err) => {
+          console.warn('[bootstrap] relay health check falhou:', err)
+        })
+    })
 
     // Schedule eviction. Idempotente — só roda se contagem ultrapassou
     // SOFT_LIMIT em cache.ts. Primeira corrida acontece após 6h (não
-    // imediatamente — boot já é pesado o suficiente).
+    // imediatamente — boot já é pesado o suficiente). `scheduleEviction`
+    // só seta um `setInterval`, não dispara trabalho síncrono — pode
+    // ficar fora do scheduleIdle. Mantemos eager pra que o timer comece
+    // a contar imediatamente, não depois da idle window.
     scheduleEviction(identity.npub)
 
-    // Probe anti-eclipse periódico — manifesto §20. Roda a cada 30min
-    // pegando sample de eventos conhecidos pra verificar que cada
-    // relay realmente os entrega.
+    // Probe anti-eclipse periódico — manifesto §20. Idem `scheduleEviction`:
+    // só seta `setInterval`, primeira execução real é em +30min.
     startProbe()
   } catch (err) {
     // Multi-aba: OPFS permite só 1 SyncAccessHandle por arquivo. Quando
@@ -339,6 +376,39 @@ async function doBootstrap(): Promise<void> {
     const message = err instanceof Error ? err.message : String(err)
     console.error('[bootstrap]', err)
     setBoot((p) => ({ ...p, step: 'error', error: message }))
+  }
+}
+
+/**
+ * Agenda trabalho não-crítico pra rodar entre paints. Usado pra mover
+ * tarefas de boot pra fora do critical path — melhora bootup-time e
+ * INP sem mudar comportamento funcional.
+ *
+ * `requestIdleCallback` com `timeout: 2000` é o ideal: o browser
+ * escolhe um momento de idle, mas garante execução em ≤2s mesmo se
+ * o main thread ficar saturado (mobile, abas em background promovidas).
+ *
+ * Fallback `setTimeout(fn, 0)`: Safari <16.4 não expõe
+ * `requestIdleCallback`. setTimeout(0) ainda cede o thread ao próximo
+ * tick — boot promise resolve, layout pinta, callback roda depois.
+ *
+ * Não introduzimos dep externa nem polyfill — manifesto §29
+ * (compatibilidade Nostr) só impõe runtime browser; aqui usamos só
+ * web platform APIs.
+ */
+function scheduleIdle(fn: () => void): void {
+  if (typeof window === 'undefined') {
+    // SSR/test: roda síncrono. Tests vitest podem assertar comportamento.
+    fn()
+    return
+  }
+  const ric = (window as Window & {
+    requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number
+  }).requestIdleCallback
+  if (typeof ric === 'function') {
+    ric(fn, { timeout: 2000 })
+  } else {
+    setTimeout(fn, 0)
   }
 }
 

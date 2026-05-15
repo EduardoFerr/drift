@@ -193,6 +193,14 @@ async function freshStartBoot(): Promise<void> {
   w.window = { crossOriginIsolated: true }
   const mod = await import('../src/lib/bootstrap')
   await mod.startBoot()
+  // Boot agora marca `step:'ready'` antes de `registerTransport` (perf
+  // optimization 2026-05-15) — registers e startSync rodam dentro de
+  // `requestIdleCallback`/`setTimeout(0)`. Flush a queue pra que as
+  // assertions de mock.calls vejam os registers. 2 ticks: 1 pro
+  // setTimeout do scheduleIdle disparar, 1 pra que o callback execute
+  // os registers síncronos dentro dele.
+  await new Promise((r) => setTimeout(r, 0))
+  await new Promise((r) => setTimeout(r, 0))
 }
 
 // ─── beforeEach ──────────────────────────────────────────────────────
