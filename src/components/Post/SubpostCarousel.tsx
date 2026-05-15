@@ -49,16 +49,24 @@ interface SlideCustom {
   direction: 1 | -1
   rotate: number
 }
+// V9.30 (user pedido 2026-05-15: "card que sai precisa completar o
+// movimento, card que entra precisa emergir suavemente"). Antes
+// distância x=32px era um "hint" de motion — old fade-out + new
+// fade-in no mesmo lugar, sem leitura clara de "card swap". Agora
+// distância 100% (largura do container) faz o card SAIR completamente
+// pela borda + NOVO ENTRA completamente do lado oposto, padrão
+// Instagram/iOS. Opacity 0→1 entrega o cross-fade extra durante o
+// slide pra esconder qualquer bug de hairline.
 const slideVariants = {
   enter: (c: SlideCustom) => ({
     opacity: 0,
-    x: c.direction * 32,
+    x: c.direction === 1 ? '100%' : '-100%',
     rotate: 0,
   }),
   center: { opacity: 1, x: 0, rotate: 0 },
   exit: (c: SlideCustom) => ({
     opacity: 0,
-    x: -c.direction * 32,
+    x: c.direction === 1 ? '-100%' : '100%',
     rotate: c.rotate,
   }),
 }
@@ -116,7 +124,12 @@ export function SubpostCarousel({
         </div>
       )}
 
-      <AnimatePresence mode="wait" custom={customValue}>
+      {/* V9.30 — sync mode (sem mode="wait") + absolute inset-0 nos
+          motion.divs: old saindo + new entrando rodam EM PARALELO sobre
+          o mesmo espaço, padrão Instagram. duration 0.32 + ease casa
+          com o swap do SwipeHandler. Container outer mantém
+          overflow-hidden pra cortar o slide além das bordas. */}
+      <AnimatePresence custom={customValue}>
         <motion.div
           key={current?.id ?? clampedIdx}
           custom={customValue}
@@ -124,8 +137,8 @@ export function SubpostCarousel({
           initial="enter"
           animate="center"
           exit="exit"
-          transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
-          className="h-full w-full"
+          transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+          className="absolute inset-0"
         >
           {current && (
             <SubpostLayout

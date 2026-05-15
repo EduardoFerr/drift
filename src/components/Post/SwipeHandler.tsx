@@ -185,6 +185,22 @@ export function SwipeHandler({
     //     internamente substitui sua animação pela nossa.
     const spring = { type: 'spring' as const, stiffness: 500, damping: 38 }
 
+    // V9.30 (user report 2026-05-15: "card não completa movimento de
+    // sair, e o card que entra deveria emergir suavemente"). Horizontal
+    // commit antes fazia x.set(0) instantâneo → o tree saltava de
+    // -150 (drag end) pra 0 num frame, ANTES do SubpostCarousel iniciar
+    // suas variants de slide. Sensação de "snap brusco antes do swap".
+    //
+    // Agora horizontal commit usa animate(x, 0, ease-out-quart 320ms)
+    // — duração casa com slideVariants do carousel. SwipeHandler volta
+    // ao centro suavemente enquanto o carousel desliza old→out + new→in
+    // em paralelo. Cada camada tem seu papel sem brigar.
+    //
+    // Vertical commit fica intocado (x.stop()/y.stop() sem animate):
+    // Wrapper exit translateY 0→±110% toma conta do visual. Mexer
+    // aqui re-introduziria a regressão V9.27 ("vai pro lado oposto").
+    const swapEase = { duration: 0.32, ease: [0.22, 1, 0.36, 1] as const }
+
     if (verticalPassed && horizontalPassed) {
       // Ambos passaram — dominante decide
       if (verticalDominant) {
@@ -194,7 +210,7 @@ export function SwipeHandler({
       } else {
         x.stop()
         y.stop()
-        x.set(0)
+        animate(x, 0, swapEase)
         y.set(0)
         fireHorizontal()
       }
@@ -205,7 +221,7 @@ export function SwipeHandler({
     } else if (horizontalPassed) {
       x.stop()
       y.stop()
-      x.set(0)
+      animate(x, 0, swapEase)
       y.set(0)
       fireHorizontal()
     } else {
