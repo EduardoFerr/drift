@@ -53,6 +53,8 @@ function rec(url: string, overrides: Partial<RelayRecord> = {}): RelayRecord {
     lastOkAt: null,
     lastErr: null,
     enabled: true,
+    demotedUntil: 0,
+    consecutiveFails: 0,
     ...overrides,
   }
 }

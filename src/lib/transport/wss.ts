@@ -34,6 +34,7 @@
 
 import { SimplePool } from 'nostr-tools/pool'
 import { activeReadRelays, activeRelays, activeWriteRelays, recordRelayError, recordRelayOk } from '../relays'
+import { probeRelayReachable } from '../relay-probe'
 import type { SignedEvent } from '../../types/nostr'
 import type {
   Filter,
@@ -107,13 +108,27 @@ async function health(timeoutMs = 5000): Promise<TransportHealth[]> {
   const relays = activeRelays()
   return Promise.all(
     relays.map(
-      (url) =>
-        new Promise<TransportHealth>((resolve) => {
+      async (url): Promise<TransportHealth> => {
+        // HTTPS pre-probe — evita o `console.error` nativo do browser
+        // quando `new WebSocket(...)` falha em conexão (DNS/TLS/refused).
+        // Promise rejections do fetch são silenciáveis; o WS log de
+        // networking layer não é. Marcamos demoted via recordRelayError
+        // antes mesmo de tentar o WS.
+        // Pre-probe usa metade do timeout do health pra deixar margem ao
+        // WS handshake real quando o host está vivo.
+        const preProbeTimeout = Math.max(1000, Math.floor(timeoutMs / 2))
+        const preProbe = await probeRelayReachable(url, preProbeTimeout)
+        if (!preProbe.reachable) {
+          void recordRelayError(url, 'pre-probe unreachable (DNS/TLS/conn)')
+          return { url, ok: false, latencyMs: null }
+        }
+        return new Promise<TransportHealth>((resolve) => {
           const start = performance.now()
           let ws: WebSocket
           try {
             ws = new WebSocket(url)
-          } catch {
+          } catch (err) {
+            void recordRelayError(url, `health construct: ${String(err)}`)
             resolve({ url, ok: false, latencyMs: null })
             return
           }
@@ -123,6 +138,7 @@ async function health(timeoutMs = 5000): Promise<TransportHealth[]> {
             } catch {
               /* noop */
             }
+            void recordRelayError(url, 'health timeout')
             resolve({ url, ok: false, latencyMs: null })
           }, timeoutMs)
           ws.onopen = () => {
@@ -133,13 +149,16 @@ async function health(timeoutMs = 5000): Promise<TransportHealth[]> {
             } catch {
               /* noop */
             }
+            void recordRelayOk(url)
             resolve({ url, ok: true, latencyMs })
           }
           ws.onerror = () => {
             clearTimeout(timer)
+            void recordRelayError(url, 'health onerror')
             resolve({ url, ok: false, latencyMs: null })
           }
-        }),
+        })
+      },
     ),
   )
 }

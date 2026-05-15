@@ -26,6 +26,13 @@ import {
 } from '../config/relays'
 import { getPrefs } from './prefs'
 import type { NetworkMode } from '../types/drift'
+import {
+  filterDemoted,
+  getHealth,
+  hydrateHealth,
+  noteFailure,
+  noteSuccess,
+} from './relay-health'
 
 // ─── Tipos ───────────────────────────────────────────────────────────
 
@@ -40,6 +47,10 @@ export interface RelayRecord {
   lastOkAt: number | null
   lastErr: string | null
   enabled: boolean
+  /** Demoted até este ms epoch. 0 = não demoted. (relay-health, Barney 2026-05-15) */
+  demotedUntil: number
+  /** Falhas consecutivas. Reset em sucesso. */
+  consecutiveFails: number
 }
 
 interface RelayRow {
@@ -50,7 +61,10 @@ interface RelayRow {
   added_at: number
   last_ok_at: number | null
   last_err: string | null
+  last_err_at: number | null
   enabled: number
+  consecutive_fails: number | null
+  demoted_until: number | null
 }
 
 function rowToRecord(r: RelayRow): RelayRecord {
@@ -70,8 +84,13 @@ function rowToRecord(r: RelayRow): RelayRecord {
     lastOkAt: r.last_ok_at,
     lastErr: r.last_err,
     enabled: r.enabled !== 0,
+    demotedUntil: r.demoted_until ?? 0,
+    consecutiveFails: r.consecutive_fails ?? 0,
   }
 }
+
+const SELECT_COLUMNS =
+  `url, read, write, source, added_at, last_ok_at, last_err, last_err_at, enabled, consecutive_fails, demoted_until`
 
 // ─── Store reativa ───────────────────────────────────────────────────
 
@@ -103,10 +122,20 @@ export async function loadRelays(): Promise<void> {
 
   await ensureSeedRelays()
   const rows = await db.exec<RelayRow>(
-    `SELECT url, read, write, source, added_at, last_ok_at, last_err, enabled
+    `SELECT ${SELECT_COLUMNS}
      FROM relays_user
      ORDER BY enabled DESC, added_at ASC`,
   )
+  // Hidrata o tracker de saúde a partir do banco. A partir daqui,
+  // `activeRelays`/etc. consultam o tracker (in-memory) — não vão ao
+  // banco no hot path.
+  hydrateHealth(rows.map((r) => ({
+    url: r.url,
+    consecutive_fails: r.consecutive_fails,
+    demoted_until: r.demoted_until,
+    last_ok_at: r.last_ok_at,
+    last_err_at: r.last_err_at,
+  })))
   useRelaysStore.setState({
     list: rows.map(rowToRecord),
     loaded: true,
@@ -135,7 +164,7 @@ async function ensureSeedRelays(): Promise<void> {
 
 async function refreshList(): Promise<void> {
   const rows = await db.exec<RelayRow>(
-    `SELECT url, read, write, source, added_at, last_ok_at, last_err, enabled
+    `SELECT ${SELECT_COLUMNS}
      FROM relays_user
      ORDER BY enabled DESC, added_at ASC`,
   )
@@ -220,17 +249,34 @@ export async function setRelayEnabled(url: string, enabled: boolean): Promise<vo
 }
 
 export async function recordRelayOk(url: string): Promise<void> {
+  const normalized = normalizeUrl(url)
+  const now = Date.now()
+  // Atualiza tracker in-memory primeiro — hot path lê daqui.
+  const state = noteSuccess(normalized, now)
   await db.run(
-    `UPDATE relays_user SET last_ok_at = ?, last_err = NULL WHERE url = ?`,
-    [Date.now(), normalizeUrl(url)],
+    `UPDATE relays_user
+       SET last_ok_at = ?,
+           last_err = NULL,
+           consecutive_fails = ?,
+           demoted_until = ?
+     WHERE url = ?`,
+    [now, state.consecutiveFails, state.demotedUntil, normalized],
   )
-  // Não refresh aqui — chamado em hot path; UI consume snapshot atual.
+  // Não refresh aqui — chamado em hot path; UI consome snapshot atual.
 }
 
 export async function recordRelayError(url: string, err: string): Promise<void> {
+  const normalized = normalizeUrl(url)
+  const now = Date.now()
+  const state = noteFailure(normalized, now)
   await db.run(
-    `UPDATE relays_user SET last_err = ? WHERE url = ?`,
-    [err.slice(0, 200), normalizeUrl(url)],
+    `UPDATE relays_user
+       SET last_err = ?,
+           last_err_at = ?,
+           consecutive_fails = ?,
+           demoted_until = ?
+     WHERE url = ?`,
+    [err.slice(0, 200), now, state.consecutiveFails, state.demotedUntil, normalized],
   )
 }
 
@@ -294,28 +340,40 @@ export function activeRelays(): string[] {
     const fallback = SEED_RELAYS.filter((u) => !knownUrls.has(u))
     urls = [...active, ...fallback]
   }
-  return applyNetworkMode(urls, getPrefs().network_mode)
+  // Filtra demoted (relay-health). `filterDemoted` garante ≥1 fallback
+  // mesmo em outage total — manifesto §20.
+  const live = filterDemoted(urls, getHealth, Date.now())
+  return applyNetworkMode(live, getPrefs().network_mode)
 }
 
 /**
  * URLs habilitadas pra escrita (publish). Subset de `activeRelays`.
  * NIP-65: read e write podem divergir.
+ *
+ * Filtra relays demoted (relay-health). Caller é responsável por
+ * tratar set vazio (em prática nunca: `filterDemoted` garante fallback
+ * via `activeRelays` se write list zera).
  */
 export function activeWriteRelays(): string[] {
   const list = useRelaysStore.getState().list
   const active = list.filter((r) => r.enabled && r.write).map((r) => r.url)
   if (active.length === 0) return activeRelays()
-  return applyNetworkMode(active, getPrefs().network_mode)
+  const live = filterDemoted(active, getHealth, Date.now())
+  return applyNetworkMode(live, getPrefs().network_mode)
 }
 
 /**
  * URLs habilitadas pra leitura (subscribe). Subset de `activeRelays`.
+ *
+ * Filtra relays demoted (relay-health). Em caso de todos demoted,
+ * `filterDemoted` mantém o de menor `demotedUntil` (anti-eclipse §20).
  */
 export function activeReadRelays(): string[] {
   const list = useRelaysStore.getState().list
   const active = list.filter((r) => r.enabled && r.read).map((r) => r.url)
   if (active.length === 0) return activeRelays()
-  return applyNetworkMode(active, getPrefs().network_mode)
+  const live = filterDemoted(active, getHealth, Date.now())
+  return applyNetworkMode(live, getPrefs().network_mode)
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────

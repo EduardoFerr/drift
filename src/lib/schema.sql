@@ -155,14 +155,17 @@ CREATE TABLE IF NOT EXISTS pinned (
 -- `source` rastreia origem ('user', 'nip65', 'seed', 'recommend')
 -- pra eventual reputação por fonte.
 CREATE TABLE IF NOT EXISTS relays_user (
-  url        TEXT PRIMARY KEY,
-  read       INTEGER DEFAULT 1,
-  write      INTEGER DEFAULT 1,
-  source     TEXT NOT NULL DEFAULT 'user',
-  added_at   INTEGER NOT NULL,
-  last_ok_at INTEGER,                    -- última conexão bem-sucedida
-  last_err   TEXT,                       -- última mensagem de erro (se houve)
-  enabled    INTEGER DEFAULT 1           -- user pode pausar sem remover
+  url               TEXT PRIMARY KEY,
+  read              INTEGER DEFAULT 1,
+  write             INTEGER DEFAULT 1,
+  source            TEXT NOT NULL DEFAULT 'user',
+  added_at          INTEGER NOT NULL,
+  last_ok_at        INTEGER,                    -- última conexão bem-sucedida
+  last_err          TEXT,                       -- última mensagem de erro (se houve)
+  last_err_at       INTEGER,                    -- ms epoch da última falha (relay-health)
+  consecutive_fails INTEGER NOT NULL DEFAULT 0, -- contador p/ demotion (relay-health)
+  demoted_until     INTEGER NOT NULL DEFAULT 0, -- ms epoch até quando o relay está demoted
+  enabled           INTEGER DEFAULT 1           -- user pode pausar sem remover
 );
 CREATE INDEX IF NOT EXISTS idx_relays_user_enabled ON relays_user(enabled);
 

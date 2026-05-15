@@ -5,11 +5,13 @@ const {
   subscribeManyMock,
   activeReadRelaysMock,
   recordRelayErrorMock,
+  recordRelayOkMock,
 } = vi.hoisted(() => ({
   execMock: vi.fn(),
   subscribeManyMock: vi.fn(),
   activeReadRelaysMock: vi.fn(),
   recordRelayErrorMock: vi.fn(),
+  recordRelayOkMock: vi.fn(),
 }))
 
 vi.mock('../src/lib/db', () => ({
@@ -23,6 +25,7 @@ vi.mock('../src/lib/transport/wss', () => ({
 vi.mock('../src/lib/relays', () => ({
   activeReadRelays: () => activeReadRelaysMock(),
   recordRelayError: (...args: unknown[]) => recordRelayErrorMock(...args),
+  recordRelayOk: (...args: unknown[]) => recordRelayOkMock(...args),
 }))
 
 import { runProbe, getProbeResults, startProbe, stopProbe } from '../src/lib/probe'
@@ -32,6 +35,7 @@ beforeEach(() => {
   subscribeManyMock.mockReset()
   activeReadRelaysMock.mockReset()
   recordRelayErrorMock.mockReset()
+  recordRelayOkMock.mockReset()
 })
 
 afterEach(() => {

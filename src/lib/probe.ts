@@ -20,7 +20,7 @@
 
 import { db } from './db'
 import { pool } from './transport/wss'
-import { activeReadRelays, recordRelayError } from './relays'
+import { activeReadRelays, recordRelayError, recordRelayOk } from './relays'
 import { DRIFT_KIND } from '../config/constants'
 
 const PROBE_INTERVAL_MS = 30 * 60 * 1000 // 30min
@@ -99,11 +99,16 @@ export async function runProbe(): Promise<Map<string, ProbeResult>> {
     relays.map(async (relay) => {
       const result = await probeRelay(relay, sampleIds, now)
       lastResults.set(relay, result)
-      if (result.flag === 'silent' || result.flag === 'incomplete') {
+      if (result.flag === 'silent' || result.flag === 'incomplete' || result.flag === 'error') {
         void recordRelayError(
           relay,
           `probe ${result.flag}: ${result.got}/${result.asked} eventos conhecidos`,
         )
+      } else if (result.flag === 'ok') {
+        // Probe ok = round-trip de REQ válido. Reabilita relay demoted
+        // ANTES do timeout (relay-health). Manifesto §20: defesa local
+        // adapta-se a recuperação em tempo real.
+        void recordRelayOk(relay)
       }
     }),
   )

@@ -114,16 +114,28 @@ export function RelaySettings({ onClose }: RelaySettingsProps) {
             <div className="text-[11px] text-drift-muted">nenhum relay configurado</div>
           )}
           {list.map((r) => {
-            const status = r.lastErr
+            const now = Date.now()
+            const isDemoted = r.demotedUntil > now
+            const status = isDemoted
+              ? '⏸'
+              : r.lastErr
               ? '✗'
               : r.lastOkAt
               ? '✓'
               : '·'
-            const tone = r.lastErr
+            const tone = isDemoted
+              ? 'text-drift-warning'
+              : r.lastErr
               ? 'text-drift-danger'
               : r.lastOkAt
               ? 'text-drift-spread'
               : 'text-drift-muted'
+            const demotedMin = isDemoted
+              ? Math.max(1, Math.round((r.demotedUntil - now) / 60000))
+              : 0
+            const titleAttr = isDemoted
+              ? `demoted ${demotedMin}min · fails ${r.consecutiveFails} · ${r.lastErr ?? '—'}`
+              : r.lastErr ?? ''
             return (
               <div
                 key={r.url}
@@ -132,9 +144,14 @@ export function RelaySettings({ onClose }: RelaySettingsProps) {
                 }`}
               >
                 <span className={`${tone} text-base leading-none`}>{status}</span>
-                <span className="flex-1 truncate text-drift-text" title={r.lastErr ?? ''}>
+                <span className="flex-1 truncate text-drift-text" title={titleAttr}>
                   {r.url}
                 </span>
+                {isDemoted && (
+                  <span className="rounded bg-drift-warning/20 px-1 text-[9px] text-drift-warning">
+                    demoted {demotedMin}m
+                  </span>
+                )}
                 <span className="rounded bg-drift-border/40 px-1 text-[9px] text-drift-muted">
                   {r.source}
                 </span>

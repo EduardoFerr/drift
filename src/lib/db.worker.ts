@@ -290,6 +290,26 @@ function applyMigrations(schema: string) {
       column: 'content_warning',
       sql: `ALTER TABLE comments ADD COLUMN content_warning TEXT`,
     },
+    {
+      // Relay health (Barney 2026-05-15) — tracking de relays flaky pra
+      // demotion adaptativa. Manifesto §20 (defesa local, sem signal global).
+      name: 'add_consecutive_fails_to_relays_user',
+      table: 'relays_user',
+      column: 'consecutive_fails',
+      sql: `ALTER TABLE relays_user ADD COLUMN consecutive_fails INTEGER NOT NULL DEFAULT 0`,
+    },
+    {
+      name: 'add_demoted_until_to_relays_user',
+      table: 'relays_user',
+      column: 'demoted_until',
+      sql: `ALTER TABLE relays_user ADD COLUMN demoted_until INTEGER NOT NULL DEFAULT 0`,
+    },
+    {
+      name: 'add_last_err_at_to_relays_user',
+      table: 'relays_user',
+      column: 'last_err_at',
+      sql: `ALTER TABLE relays_user ADD COLUMN last_err_at INTEGER`,
+    },
   ]
 
   let anyFailed = false
