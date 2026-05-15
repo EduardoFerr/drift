@@ -21,7 +21,8 @@
  *    manifesto §11 (eventos inválidos são ruído, não exceção).
  */
 
-import { encryptDM, decryptDM, signDriftEvent } from '../nostr'
+import { signDriftEvent } from '../nostr'
+import { encryptDM, decryptDM } from '../nostr-dm'
 import type {
   SignalingChannel,
   SignalingHandler,

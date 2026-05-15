@@ -34,7 +34,6 @@
  */
 
 import imageCompression from 'browser-image-compression'
-import { nip98 } from 'nostr-tools'
 import { finalizeEvent } from 'nostr-tools/pure'
 import type { EventTemplate } from 'nostr-tools'
 import { getOrCreateIdentity, nsecHexToBytes } from './identity'
@@ -57,6 +56,11 @@ async function buildNip98Header(url: string, method: string): Promise<string | n
     const identity = await getOrCreateIdentity()
     const nsecBytes = nsecHexToBytes(identity.nsec)
     const sign = (template: EventTemplate) => finalizeEvent(template, nsecBytes)
+    // V9.33 — lazy import pra adiar nostr-tools/nip98 até o user
+    // escolher imagem no compose, momento fora do critical path do
+    // first paint. Barrel import garante compat com a estrutura
+    // existente do vendor-nostr chunk (sem circular warning).
+    const { nip98 } = await import('nostr-tools')
     // includeAuthorizationScheme=true → retorna string já com "Nostr "
     return await nip98.getToken(url, method, sign, true)
   } catch (err) {
