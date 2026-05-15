@@ -79,6 +79,24 @@ function easeOutQuart(t: number): number {
   return 1 - Math.pow(1 - t, 4)
 }
 
+// V10.1 rubber-band — replica feel do Framer `dragElastic={0.6}` com
+// constraints zeradas. Curva clássica iOS: f(d) = d·dim·c / (dim + c·|d|).
+// Near zero é quase linear com slope ≈ 0.6; cresce mais devagar à medida
+// que |d| aumenta, criando a resistência tátil que o linear plano não
+// reproduzia. Sem isso o gesto vira "lap travado a 60% do deslocamento"
+// — feel rígido que o user reclamou após a migração pra pointer events.
+const RUBBER_DIMENSION_PX = 800
+const RUBBER_ELASTICITY = 0.6
+function rubberBand(d: number): number {
+  const sign = Math.sign(d)
+  const abs = Math.abs(d)
+  // f(0) = 0; f'(0) = elasticity; lim_{|d|→∞} f(d)/|d| → 0
+  return (
+    (sign * abs * RUBBER_DIMENSION_PX * RUBBER_ELASTICITY) /
+    (RUBBER_DIMENSION_PX + RUBBER_ELASTICITY * abs)
+  )
+}
+
 // Spring tuning V9.27 — stiffness 500 / damping 38 (subcritico, com
 // pouco overshoot). Implementação semi-implícita de Euler com dt
 // fixado em ms reais; estável até ~16ms/frame.
@@ -334,14 +352,20 @@ export function SwipeHandler({
     if (activePointerRef.current !== e.pointerId) return
     const dx = e.clientX - startXRef.current
     const dy = e.clientY - startYRef.current
-    // Elastic: copiamos o dragElastic 0.6 da V9.x. Em vez de aplicar
-    // elasticity simétrico (que comprime mesmo no eixo dominante), aqui
-    // ambos eixos passam direto — Framer dragElastic 0.6 com
-    // dragConstraints {top: 0, bottom: 0, left: 0, right: 0} significava
-    // que TODA distância era "fora dos constraints" e multiplicada por
-    // 0.6. Replicamos isso na exata mesma proporção:
-    xRef.current = dx * 0.6
-    yRef.current = dy * 0.6
+    // V10.1 fix (user pedido 2026-05-15: "swip ficou bagunçado novamente"):
+    // antes era linear `dx * 0.6` — comportamento RÍGIDO, sem progressão
+    // de resistência. Framer `dragElastic={0.6}` com constraints zeradas
+    // aplica RUBBER-BAND (curva iOS): perto da origem, slope ~constant
+    // (0.6 here); longe, slope cai progressivamente até quase 0. Essa
+    // assinatura tátil é o que diferencia "drag natural" de "drag linear
+    // truncado". Reimplementamos com a fórmula clássica de rubber-band:
+    //   f(d) = (d * dim * c) / (dim + c * |d|)
+    // dim = 800px (dimensão de referência), c = 0.6 (mesma elasticity
+    // antiga). Threshold horizontal de 80px = ~93px raw (era ~133px no
+    // linear 0.6); vertical 160px = ~232px raw (era ~267px). Levemente
+    // mais responsivo no commit, mais natural no não-commit.
+    xRef.current = rubberBand(dx)
+    yRef.current = rubberBand(dy)
     applyTransform()
     pushSample(performance.now(), xRef.current, yRef.current)
   }
