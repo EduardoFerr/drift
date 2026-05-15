@@ -38,9 +38,3 @@ export const MOTION = {
   swap:     { duration: 0.75, ease: [0.22, 1, 0.36, 1] as const },
 } as const
 
-export type MotionToken = keyof typeof MOTION
-
-/** Pure helper — devolve duration em ms (number) pra um token. */
-export function motionDurationMs(token: MotionToken): number {
-  return MOTION[token].duration * 1000
-}
