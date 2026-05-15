@@ -27,8 +27,6 @@ export const DRIFT_KIND = {
   REPORT: 9081, // report de moderação
 } as const
 
-export type DriftKind = (typeof DRIFT_KIND)[keyof typeof DRIFT_KIND]
-
 /** Conjunto para checagem rápida de kind Drift (early return em events.ts) */
 export const DRIFT_KIND_SET: ReadonlySet<number> = new Set(Object.values(DRIFT_KIND))
 

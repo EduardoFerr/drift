@@ -3,4 +3,4 @@
  * espalhar imports do nostr-tools por toda a base.
  */
 
-export type { Event as SignedEvent, EventTemplate } from 'nostr-tools'
+export type { Event as SignedEvent } from 'nostr-tools'

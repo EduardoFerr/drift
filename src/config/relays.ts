@@ -45,5 +45,3 @@ export const SEED_RELAY_CONFIGS: readonly RelayConfig[] = [
  * `SEED_RELAY_CONFIGS` pra evitar duplicação.
  */
 export const RELAYS: readonly string[] = SEED_RELAY_CONFIGS.map((r) => r.url)
-
-export type RelayUrl = (typeof RELAYS)[number]

@@ -170,21 +170,7 @@ export interface SpreadRecord {
   eventId: string
 }
 
-export interface BuryRecord {
-  postId: string
-  burierPub: string
-  createdAt: number
-  eventId: string
-}
-
 export type ReportReason = 'illegal' | 'spam' | 'harassment'
-
-export interface ReportRecord {
-  postId: string
-  reporterPub: string
-  weight: number
-  createdAt: number
-}
 
 // ─── Comments (Track C — kind 1111 NIP-22) ──────────────────────────
 
@@ -219,28 +205,9 @@ export interface CommentRecord {
   meta?: import('../lib/nip94').BlobMeta
 }
 
-// ─── Usuário (perfil agregado) ───────────────────────────────────────
-
-export interface DriftUser {
-  npub: string
-  alias: string | null
-  avatar: string | null
-  createdAt: number
-  engagement: number // 0..60
-  weight: number // 0..100 calculado
-  lastActive: number | null
-}
-
 // ─── Feed ────────────────────────────────────────────────────────────
 
 export type FeedTab = 'global' | 'following' | 'trending'
-
-export interface FeedOptions {
-  tab: FeedTab
-  category?: string
-  limit?: number
-  offset?: number
-}
 
 // ─── Mapa ────────────────────────────────────────────────────────────
 
