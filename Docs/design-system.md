@@ -83,15 +83,28 @@ Drift importa.
 Estes tokens **não são renomeados** apesar do rebrand UI. Ver §1
 (separação léxica).
 
-### 2.5 Tokens depreciados / legacy a auditar
+### 2.5 Semantic UI intent (Round 10, 2026-05-14)
 
-Hardcoded hex/RGB ainda presente em alguns components (a migrar
-durante V3 reskin):
-- `src/components/Post/SwipeHandler.tsx` linhas 64-70 — `rgba(52, 211, 153, ...)` literal (= `drift-spread`). Migrar.
-- `src/components/Post/PostViewer.tsx` linhas 439, 462 — `bg-emerald-900/40` (Tailwind raw). Migrar pra alpha de `drift-spread`.
+Distintos dos role tokens — não carregam semântica de protocolo. Sinalizam
+intent de UI (aviso, ação destrutiva). Reutilizam hex de role tokens
+quando faz sentido (ex.: `drift-danger` = mesma cor de `drift-bury` por
+ergonomia, mas o significado é "ação destrutiva genérica" não "bury").
 
-Lily flagou em HIMYM Round 1. V1 não migra (escopo: tokens central);
-V3.1/V3.5 fazem.
+| Token | Hex | Uso |
+|---|---|---|
+| `drift-warning` | `#fbbf24` | Avisos não-bloqueantes — CW chips, banners informativos, long-press progress, content-warning suggestion no compose. Amber 400 — contraste WCAG AA sobre `drift-surface` e `drift-bg`. |
+| `drift-danger` | `#f87171` | Ações destrutivas — botões Bloquear/Denunciar, dialogs `dangerous: true`, hover de delete CTAs. Mesma cor de `drift-bury` (mesma paleta, intent diferente). |
+
+Migração legacy `yellow-*`/`red-*`/`amber-*` → `drift-warning`/`drift-danger`
+completa em Round 10 (commits `1d0f5ed`, `1aee96b`, `b6545ec`). Hard ratchet
+`eslint . --max-warnings 0` impede regressões.
+
+### 2.6 Tokens depreciados / legacy a auditar (histórico)
+
+Hardcoded hex/RGB ainda presente em SwipeHandler — `rgba(52, 211, 153, ...)`
+inline em `style={...}` durante drag hint border. Não é Tailwind class
+então passa pelo lint rule. Migração futura — usar CSS var `--drift-spread`
+quando inline style precisar de alpha dinâmico.
 
 ---
 
