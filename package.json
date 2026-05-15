@@ -11,7 +11,7 @@
   "scripts": {
     "dev": "vite",
     "dev:tunnel": "cross-env DRIFT_DEV_HTTP=1 vite",
-    "build": "tsc -b && vite build && node scripts/strip-sourcemaps.mjs && node scripts/inject-sri.mjs",
+    "build": "tsc -b && vite build && node scripts/strip-sourcemaps.mjs && node scripts/inject-sri.mjs && node scripts/inline-css.mjs",
     "lint": "tsc -b --noEmit",
     "lint:check": "eslint . --max-warnings 0",
     "lint:fix": "eslint . --fix",
