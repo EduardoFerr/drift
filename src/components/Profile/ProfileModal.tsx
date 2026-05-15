@@ -133,10 +133,10 @@ function TierBadge({ tier }: { tier: WeightTier | null }) {
   if (tier === null) return null
   const config =
     tier === 'established'
-      ? { emoji: '🏆', label: 'estabelecido', color: 'text-amber-300 border-amber-300/40' }
+      ? { emoji: '🏆', label: 'estabelecido', color: 'text-drift-warning border-drift-warning/40' }
       : tier === 'active'
-      ? { emoji: '⭐', label: 'ativo', color: 'text-drift-text border-slate-300/40' }
-      : { emoji: '🌱', label: 'novo', color: 'text-green-300 border-green-300/40' }
+      ? { emoji: '⭐', label: 'ativo', color: 'text-drift-text border-drift-text/40' }
+      : { emoji: '🌱', label: 'novo', color: 'text-drift-spread border-drift-spread/40' }
   return (
     <span
       className={`inline-flex items-center gap-1 rounded border px-2 py-0.5 text-[10px] ${config.color}`}

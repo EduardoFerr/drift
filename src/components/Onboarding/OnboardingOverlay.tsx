@@ -84,7 +84,7 @@ export function OnboardingOverlay({ onClose, onOpenIdentity }: OnboardingOverlay
             <code className="text-drift-accent">nsec1…</code>) gerada localmente.
           </p>
           <p>
-            <span className="text-yellow-300">⚠</span> Faz backup. Se perder o nsec, perdeu a identidade. Se trocar de
+            <span className="text-drift-warning">⚠</span> Faz backup. Se perder o nsec, perdeu a identidade. Se trocar de
             celular, é só importar o nsec — todo o histórico volta dos relays.
           </p>
           <button
@@ -194,7 +194,7 @@ export function OnboardingOverlay({ onClose, onOpenIdentity }: OnboardingOverlay
                   ? 'bg-drift-accent/60'
                   : i === step
                   ? 'bg-drift-accent'
-                  : 'bg-slate-700/60'
+                  : 'bg-drift-border'
               }`}
             />
           ))}

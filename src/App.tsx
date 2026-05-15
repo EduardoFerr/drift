@@ -1370,7 +1370,7 @@ function StatusIndicators({
           causar layout shift quando aparece. Sinal forte de atenção. */}
       <button
         onClick={onOpenStatus}
-        className={`text-amber-300 transition-opacity hover:opacity-80 focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2 ${
+        className={`text-drift-warning transition-opacity hover:opacity-80 focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2 ${
           degradedCount > 0 ? 'visible' : 'invisible pointer-events-none'
         }`}
         title={`Modo degradado — ${degradedCount} feature${degradedCount > 1 ? 's' : ''} indisponível${degradedCount > 1 ? 'is' : ''}`}

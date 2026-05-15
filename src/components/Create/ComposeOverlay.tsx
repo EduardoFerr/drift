@@ -295,12 +295,15 @@ export function ComposeOverlay({
               <button
                 key={d.id}
                 onClick={() => setCurrentIdx(i)}
+                // Chips de subpost usam drift-bg pra inset visual contra drift-surface
+                // do painel parent (#15151a vs #0c0c0b). Diff sutil mas suficiente
+                // pra delimitar; antes era #1e1e1c custom — consolidado em token.
                 className={`relative flex h-[27px] w-[27px] shrink-0 items-center justify-center rounded-full border-[1.5px] font-mono text-[10px] transition-colors focus:outline-none focus:ring-1 focus:ring-drift-accent2 focus:ring-offset-1 focus:ring-offset-drift-bg ${
                   isActive
                     ? 'border-drift-accent bg-drift-accent font-bold text-drift-bg'
                     : isFilled
-                    ? 'border-drift-border bg-[#1e1e1c] text-drift-text'
-                    : 'border-drift-border bg-[#1e1e1c] text-drift-muted'
+                    ? 'border-drift-border bg-drift-bg text-drift-text'
+                    : 'border-drift-border bg-drift-bg text-drift-muted'
                 }`}
                 aria-label={`ir pro subpost ${i + 1}`}
                 aria-current={isActive ? 'true' : undefined}
@@ -359,7 +362,8 @@ export function ComposeOverlay({
               }
               rows={5}
               data-subpost-input={safeIdx === 0 ? '' : undefined}
-              className="min-h-[85px] flex-1 resize-none rounded-sm border-[1.5px] border-drift-border bg-[#1e1e1c] p-3 font-mono text-fluid-lg leading-[1.6] text-drift-text placeholder:text-drift-muted focus:border-drift-accent focus:outline-none"
+              // Textarea usa drift-bg pra inset visual vs drift-surface do painel.
+              className="min-h-[85px] flex-1 resize-none rounded-sm border-[1.5px] border-drift-border bg-drift-bg p-3 font-mono text-fluid-lg leading-[1.6] text-drift-text placeholder:text-drift-muted focus:border-drift-accent focus:outline-none"
             />
             <div className="mt-1 flex items-center justify-between text-[10px]">
               <span

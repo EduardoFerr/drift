@@ -175,7 +175,7 @@ function ConfirmStep({
         <button
           onClick={onSubmit}
           disabled={pending}
-          className="rounded border border-red-700 bg-red-950/30 px-3 py-1 text-[11px] uppercase tracking-widest text-red-300 hover:bg-red-950/50 disabled:opacity-50"
+          className="rounded border border-drift-danger/60 bg-drift-danger/15 px-3 py-1 text-[11px] uppercase tracking-widest text-drift-danger hover:bg-drift-danger/25 disabled:opacity-50"
         >
           {pending ? 'enviando…' : 'denunciar'}
         </button>
@@ -199,11 +199,11 @@ const AUTHORITIES: Authority[] = [
 
 function AuthoritiesBlock() {
   return (
-    <div className="mb-2 rounded border border-yellow-700/60 bg-yellow-950/20 p-3">
-      <div className="mb-2 text-[11px] font-semibold text-yellow-300">
+    <div className="mb-2 rounded border border-drift-warning/60 bg-drift-warning/10 p-3">
+      <div className="mb-2 text-[11px] font-semibold text-drift-warning">
         ⚠ conteúdo ilegal — denuncie também a autoridades
       </div>
-      <p className="mb-3 text-[10px] leading-relaxed text-yellow-200/80">
+      <p className="mb-3 text-[10px] leading-relaxed text-drift-warning/80">
         O Drift não substitui denúncia formal. Se viu conteúdo crime
         (especialmente CSAM), denuncie ao canal oficial do seu país —
         eles têm capacidade de investigação e ação que nenhuma rede
@@ -216,10 +216,10 @@ function AuthoritiesBlock() {
             href={a.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center justify-between rounded border border-yellow-700/40 bg-yellow-950/10 px-2 py-1 text-[10px] text-yellow-200 hover:border-yellow-700 hover:bg-yellow-950/30"
+            className="flex items-center justify-between rounded border border-drift-warning/40 bg-drift-warning/5 px-2 py-1 text-[10px] text-drift-warning hover:border-drift-warning/60 hover:bg-drift-warning/15"
           >
             <span className="truncate">{a.name}</span>
-            <span className="ml-2 shrink-0 text-yellow-500/70">{a.region} ↗</span>
+            <span className="ml-2 shrink-0 text-drift-warning/70">{a.region} ↗</span>
           </a>
         ))}
       </div>

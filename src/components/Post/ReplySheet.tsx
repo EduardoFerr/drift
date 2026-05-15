@@ -534,7 +534,7 @@ export function ReplySheet({
                         onClick={() => setContentWarning(active ? null : cw)}
                         className={`rounded-sm border-[1.5px] px-2.5 py-1 font-mono text-[9px] uppercase tracking-meta transition-colors focus:outline-none focus:ring-1 focus:ring-drift-accent2 disabled:opacity-40 ${
                           active
-                            ? 'border-amber-400 bg-amber-500/15 text-amber-300'
+                            ? 'border-drift-warning bg-drift-warning/15 text-drift-warning'
                             : 'border-drift-border text-drift-muted hover:border-drift-text hover:text-drift-text'
                         }`}
                       >

@@ -79,6 +79,9 @@
   /* Role (protocolo) */
   --drift-spread: #34d399;
   --drift-bury: #f87171;
+  /* Intent (UI) — ver tailwind.config.js pra rationale + WCAG. */
+  --drift-warning: #fbbf24;
+  --drift-danger: #f87171;
   /*
    * Mockup v0.7 tokens — valores que não caem na escala 4px do
    * Tailwind. Definidos como CSS vars pra permitir override dinâmico

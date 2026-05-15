@@ -203,7 +203,7 @@ export function IdentitySwitcher({ onRequestExport, onClose }: IdentitySwitcherP
         </p>
 
         {error && (
-          <div className="mb-3 rounded border border-red-900/60 bg-red-950/20 p-2 text-[11px] text-red-300">
+          <div className="mb-3 rounded border border-drift-danger/60 bg-drift-danger/10 p-2 text-[11px] text-drift-danger">
             {error}
           </div>
         )}
@@ -235,7 +235,7 @@ export function IdentitySwitcher({ onRequestExport, onClose }: IdentitySwitcherP
                         </span>
                         {id.imported && (
                           <span
-                            className="rounded bg-slate-800/50 px-1 text-[9px] text-drift-muted"
+                            className="rounded bg-drift-border/60 px-1 text-[9px] text-drift-muted"
                             title="importada via nsec1"
                           >
                             importada
@@ -266,7 +266,7 @@ export function IdentitySwitcher({ onRequestExport, onClose }: IdentitySwitcherP
                       {isActive && (
                         <button
                           onClick={onRequestExport}
-                          className="rounded border border-yellow-700/60 px-2 py-0.5 text-yellow-300 hover:bg-yellow-950/30"
+                          className="rounded border border-drift-warning/60 px-2 py-0.5 text-drift-warning hover:bg-drift-warning/15"
                         >
                           backup nsec
                         </button>
@@ -275,7 +275,7 @@ export function IdentitySwitcher({ onRequestExport, onClose }: IdentitySwitcherP
                         <button
                           onClick={() => void handleRemove(id)}
                           disabled={working}
-                          className="rounded border border-red-900/60 px-2 py-0.5 text-red-400/80 hover:bg-red-950/30 disabled:opacity-30"
+                          className="rounded border border-drift-danger/60 px-2 py-0.5 text-drift-danger/80 hover:bg-drift-danger/15 disabled:opacity-30"
                         >
                           remover
                         </button>
@@ -393,7 +393,7 @@ export function IdentitySwitcher({ onRequestExport, onClose }: IdentitySwitcherP
               (NIP-06). Mais fácil de anotar que <code>nsec1</code>;
               compatível com Damus/Snort/Coracle/Iris/Amethyst.
             </p>
-            <p className="mb-3 text-[10px] text-yellow-400">
+            <p className="mb-3 text-[10px] text-drift-warning">
               ⚠ Anote ou guarde as palavras em local seguro. Quem tem as
               12 palavras tem a identidade.
             </p>
@@ -424,15 +424,15 @@ export function IdentitySwitcher({ onRequestExport, onClose }: IdentitySwitcherP
 
         {bip39ShowResult && (
           <>
-            <p className="mb-2 text-[11px] text-yellow-300">
+            <p className="mb-2 text-[11px] text-drift-warning">
               ⚠ Anote estas 12 palavras AGORA. Não terão como serem
               recuperadas depois. Quem tem as palavras tem a identidade.
             </p>
-            <div className="mb-3 rounded border border-yellow-700/60 bg-yellow-950/20 p-3">
-              <div className="grid grid-cols-3 gap-1 font-mono text-[12px] text-yellow-200">
+            <div className="mb-3 rounded border border-drift-warning/60 bg-drift-warning/10 p-3">
+              <div className="grid grid-cols-3 gap-1 font-mono text-[12px] text-drift-warning">
                 {bip39ShowResult.mnemonic.split(' ').map((word, i) => (
                   <div key={i} className="flex gap-1">
-                    <span className="w-4 text-right text-yellow-600">{i + 1}.</span>
+                    <span className="w-4 text-right text-drift-warning/60">{i + 1}.</span>
                     <span>{word}</span>
                   </div>
                 ))}

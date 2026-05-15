@@ -52,11 +52,19 @@ export default {
           //   danger:  ações destrutivas confirmáveis — Bloquear, Remover,
           //            Report CTA, error states. Distinto de `drift-bury` que
           //            é reservado pra ação semântica do protocolo (kind 9080).
-          // WCAG AA confirmado sobre drift-surface (#15151a):
-          //   warning #fbbf24 = 10.45:1 · danger #ef4444 = 4.63:1
+          // WCAG AA confirmado sobre drift-surface (#15151a) e drift-bg (#0c0c0b):
+          //   warning #fbbf24 (amber-400) = 10.45:1 sobre surface · 11.15:1 sobre bg
+          //   danger  #f87171 (red-400)   =  5.27:1 sobre surface ·  5.61:1 sobre bg
+          // `danger` reusa a paleta `drift-bury` (#f87171) deliberadamente — ambos
+          // expressam "ação negativa" do ponto de vista do usuário. Mantemos dois
+          // tokens com mesmo hex porque carregam INTENÇÃO distinta:
+          //   `drift-bury`   = role de PROTOCOLO (kind 9080, ranking deterministico).
+          //   `drift-danger` = intent de UI (Bloquear, Remover, Report CTA, destrutivo).
+          // Trocar a paleta de bury não deve mexer em CTAs de UI e vice-versa;
+          // por isso os dois tokens existem, mesmo que hoje compartilhem hex.
           // Tokens semânticos (carregam intenção); não introduzir paletas.
           warning: '#fbbf24',
-          danger: '#ef4444',
+          danger: '#f87171',
         },
       },
       fontFamily: {

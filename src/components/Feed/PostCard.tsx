@@ -70,7 +70,7 @@ export function PostCard({
           {isMine ? 'você' : 'anon'}…{post.authorPub.slice(-8)} · {timeAgo(post.createdAt)}
           {post.contentWarning && (
             <span
-              className="ml-2 rounded bg-yellow-900/30 px-1.5 py-0.5 text-yellow-300"
+              className="ml-2 rounded bg-drift-warning/15 px-1.5 py-0.5 text-drift-warning"
               title="aviso declarado pelo autor (manifesto §27)"
             >
               ⚠ {post.contentWarning}

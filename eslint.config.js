@@ -72,6 +72,9 @@ export default [
       'tests/**',
       'scripts/**',
       'eslint-rules/**',
+      // Worktree snapshots (parallel agent sessions) — stale copies of
+      // src/ que poluem lint count e iteram independente do main worktree.
+      '.claude/**',
     ],
   },
   {

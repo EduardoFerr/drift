@@ -157,7 +157,7 @@ function BackupTab({ identity }: { identity: DriftIdentity }) {
 
       <div>
         <div className="mb-1 flex items-center justify-between">
-          <span className="text-[10px] uppercase tracking-widest text-red-400/80">
+          <span className="text-[10px] uppercase tracking-widest text-drift-danger/80">
             nsec privado
           </span>
           <button
@@ -170,7 +170,7 @@ function BackupTab({ identity }: { identity: DriftIdentity }) {
 
         {reveal ? (
           <div className="space-y-3">
-            <div className="break-all rounded border border-red-900/60 bg-red-950/20 p-2 text-[11px] text-red-300">
+            <div className="break-all rounded border border-drift-danger/60 bg-drift-danger/10 p-2 text-[11px] text-drift-danger">
               {identity.nsecBech32}
             </div>
 
@@ -230,7 +230,7 @@ function BackupTab({ identity }: { identity: DriftIdentity }) {
         </label>
       )}
 
-      <div className="rounded border border-yellow-900/60 bg-yellow-950/10 p-3 text-[10px] leading-relaxed text-yellow-300/70">
+      <div className="rounded border border-drift-warning/60 bg-drift-warning/10 p-3 text-[10px] leading-relaxed text-drift-warning/80">
         Esta é a sua identidade na rede Drift. Quem tiver acesso a ela
         controla a sua conta — pode publicar como você, drift e
         sink como você. Guarde offline (papel, gerenciador de
@@ -362,12 +362,12 @@ function ImportTab({ onClose }: { onClose: () => void }) {
       </div>
 
       {error && (
-        <div className="rounded border border-red-900/60 bg-red-950/20 p-2 text-[11px] text-red-300">
+        <div className="rounded border border-drift-danger/60 bg-drift-danger/10 p-2 text-[11px] text-drift-danger">
           {error}
         </div>
       )}
 
-      <div className="rounded border border-yellow-900/60 bg-yellow-950/10 p-3 text-[10px] leading-relaxed text-yellow-300/70">
+      <div className="rounded border border-drift-warning/60 bg-drift-warning/10 p-3 text-[10px] leading-relaxed text-drift-warning/80">
         Importar substitui a identidade atual. Posts publicados com a
         chave atual deixam de ser exibidos como "seus". Se você ainda
         não fez backup, volta na aba "backup" antes.
@@ -449,7 +449,7 @@ function PasskeyTab({ npub }: { npub: string }) {
 
   if (!supported) {
     return (
-      <div className="rounded border border-yellow-700/60 bg-yellow-950/20 p-3 text-[11px] text-yellow-300">
+      <div className="rounded border border-drift-warning/60 bg-drift-warning/15 p-3 text-[11px] text-drift-warning">
         ⚠ WebAuthn não suportado neste browser. Passkey requer browser
         moderno (Chrome 67+, Safari 14+, Firefox 60+) em contexto seguro
         (HTTPS ou localhost).
@@ -471,7 +471,7 @@ function PasskeyTab({ npub }: { npub: string }) {
       </p>
 
       {error && (
-        <div className="mb-3 rounded border border-red-900/60 bg-red-950/20 p-2 text-[11px] text-red-300">
+        <div className="mb-3 rounded border border-drift-danger/60 bg-drift-danger/10 p-2 text-[11px] text-drift-danger">
           {error}
         </div>
       )}
@@ -480,13 +480,13 @@ function PasskeyTab({ npub }: { npub: string }) {
         <div className="text-[11px] text-drift-muted">verificando…</div>
       ) : enabled ? (
         <div>
-          <div className="mb-3 rounded border border-emerald-700/60 bg-emerald-950/20 p-2 text-[11px] text-drift-spread">
+          <div className="mb-3 rounded border border-drift-spread/60 bg-drift-spread/10 p-2 text-[11px] text-drift-spread">
             ✓ Passkey ativo. Boot do app pede autenticação.
           </div>
           <button
             onClick={handleDisable}
             disabled={working}
-            className="w-full rounded border border-red-900/60 px-3 py-2 text-[11px] uppercase tracking-widest text-red-400 hover:bg-red-950/30 disabled:opacity-50"
+            className="w-full rounded border border-drift-danger/60 px-3 py-2 text-[11px] uppercase tracking-widest text-drift-danger hover:bg-drift-danger/15 disabled:opacity-50"
           >
             {working ? 'desabilitando…' : 'desabilitar passkey'}
           </button>

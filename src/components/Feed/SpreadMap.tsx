@@ -517,11 +517,11 @@ function MapShell({
         </div>
       )}
 
-      <div className="pointer-events-none absolute bottom-2 left-2 rounded bg-drift-bg/80 px-2 py-1 font-mono text-[10px] text-slate-400 backdrop-blur-sm">
+      <div className="pointer-events-none absolute bottom-2 left-2 rounded bg-drift-bg/80 px-2 py-1 font-mono text-[10px] text-drift-muted backdrop-blur-sm">
         {stats}
       </div>
       <div
-        className="pointer-events-auto absolute bottom-2 right-2 rounded bg-drift-bg/80 px-2 py-1 text-[9px] text-slate-500 backdrop-blur-sm [&_a]:underline [&_a]:hover:text-slate-300"
+        className="pointer-events-auto absolute bottom-2 right-2 rounded bg-drift-bg/80 px-2 py-1 text-[9px] text-drift-muted backdrop-blur-sm [&_a]:underline [&_a]:hover:text-drift-text"
         dangerouslySetInnerHTML={{ __html: MAP_ATTRIBUTION }}
       />
     </div>
@@ -565,9 +565,9 @@ function Placeholder({
   action?: { label: string; onClick: () => void }
 }) {
   return (
-    <div className={`flex flex-col items-center justify-center gap-2 rounded border border-dashed border-drift-border bg-drift-surface/40 p-6 text-center text-[11px] text-slate-500 ${className}`}>
+    <div className={`flex flex-col items-center justify-center gap-2 rounded border border-dashed border-drift-border bg-drift-surface/40 p-6 text-center text-[11px] text-drift-muted ${className}`}>
       <span className="text-base">🗺️</span>
-      <strong className="text-slate-400">{title}</strong>
+      <strong className="text-drift-text">{title}</strong>
       <p className="max-w-xs leading-relaxed">{body}</p>
       {action && (
         <button
