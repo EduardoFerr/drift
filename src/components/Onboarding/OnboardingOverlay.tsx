@@ -15,7 +15,8 @@
  */
 
 import { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+// `m` é o primitive leve do framer-motion (LazyMotion). Features via main.tsx.
+import { m, AnimatePresence } from 'framer-motion'
 import { setPref } from '../../lib/prefs'
 
 export interface OnboardingOverlayProps {
@@ -169,7 +170,7 @@ export function OnboardingOverlay({ onClose, onOpenIdentity }: OnboardingOverlay
   }
 
   return (
-    <motion.div
+    <m.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
@@ -202,7 +203,7 @@ export function OnboardingOverlay({ onClose, onOpenIdentity }: OnboardingOverlay
         </div>
 
         <AnimatePresence mode="wait">
-          <motion.div
+          <m.div
             key={step}
             initial={{ opacity: 0, x: 12 }}
             animate={{ opacity: 1, x: 0 }}
@@ -215,7 +216,7 @@ export function OnboardingOverlay({ onClose, onOpenIdentity }: OnboardingOverlay
             <div className="space-y-3 text-sm text-drift-text [&_code]:text-[11px] [&_p]:leading-relaxed">
               {currentStep?.body}
             </div>
-          </motion.div>
+          </m.div>
         </AnimatePresence>
 
         <div className="mt-6 flex items-center justify-between">
@@ -243,6 +244,6 @@ export function OnboardingOverlay({ onClose, onOpenIdentity }: OnboardingOverlay
           </div>
         </div>
       </div>
-    </motion.div>
+    </m.div>
   )
 }

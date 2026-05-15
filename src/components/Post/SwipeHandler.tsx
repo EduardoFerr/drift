@@ -17,7 +17,10 @@
 
 import { useEffect, useRef, useState } from 'react'
 import {
-  motion,
+  // `m` é o primitive leve do framer-motion (LazyMotion). drag é parte
+  // de `domMax` provido em main.tsx; useMotionValue/useTransform/animate
+  // são hooks puros (não-features-gated) e ficam.
+  m,
   useMotionValue,
   useTransform,
   animate,
@@ -295,7 +298,7 @@ export function SwipeHandler({
   ])
 
   return (
-    <motion.div
+    <m.div
       className="relative h-full w-full touch-none select-none rounded border-2"
       style={{
         x,
@@ -328,7 +331,7 @@ export function SwipeHandler({
           <div className={hintClasses(hint)}>{hintLabel(hint)}</div>
         </div>
       )}
-    </motion.div>
+    </m.div>
   )
 }
 

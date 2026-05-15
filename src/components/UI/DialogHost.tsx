@@ -16,7 +16,8 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+// `m` é o primitive leve do framer-motion (LazyMotion). Features via main.tsx.
+import { m, AnimatePresence } from 'framer-motion'
 import { resolveCurrent, useDialogStore } from '../../lib/dialog'
 
 export function DialogHost() {
@@ -104,7 +105,7 @@ function DialogModal() {
       : undefined) ?? 'cancelar'
 
   return (
-    <motion.div
+    <m.div
       key="dialog-backdrop"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -116,7 +117,7 @@ function DialogModal() {
         if (e.target === e.currentTarget) handleCancel()
       }}
     >
-      <motion.div
+      <m.div
         role="dialog"
         aria-modal="true"
         aria-labelledby={current.options.title ? 'dialog-title' : undefined}
@@ -183,7 +184,7 @@ function DialogModal() {
             {okLabel}
           </button>
         </div>
-      </motion.div>
-    </motion.div>
+      </m.div>
+    </m.div>
   )
 }

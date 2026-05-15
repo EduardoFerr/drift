@@ -16,7 +16,8 @@
  */
 
 import { useState } from 'react'
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
+// `m` é o primitive leve do framer-motion (LazyMotion). Features via main.tsx.
+import { AnimatePresence, m, useReducedMotion } from 'framer-motion'
 import type { CommentNode } from '../../lib/thread-cursor'
 import {
   LIST_INDENT_PER_LEVEL_PX,
@@ -231,18 +232,18 @@ export function CommentCard({
       <div className="flex-1 overflow-y-auto px-5 py-4">
         <AnimatePresence mode="wait" initial={false}>
         {isHidden ? (
-          <motion.div key="hidden-mod" {...reveal} className="h-full">
+          <m.div key="hidden-mod" {...reveal} className="h-full">
             <HiddenPlaceholder onReveal={() => setOverrideMod(true)} />
-          </motion.div>
+          </m.div>
         ) : cwHide ? (
-          <motion.div key="hidden-cw" {...reveal} className="h-full">
+          <m.div key="hidden-cw" {...reveal} className="h-full">
             <CwHiddenPlaceholder
               warning={cwHint.reason ?? cwHint.modReason ?? 'oculto'}
               onReveal={() => setOverrideCw(true)}
             />
-          </motion.div>
+          </m.div>
         ) : (
-          <motion.div
+          <m.div
             key="content"
             {...reveal}
             className="flex flex-col gap-3"
@@ -283,7 +284,7 @@ export function CommentCard({
             >
               {node.content}
             </p>
-          </motion.div>
+          </m.div>
         )}
         </AnimatePresence>
       </div>

@@ -19,7 +19,8 @@
  * - `subtitle`: string opcional abaixo do title
  */
 
-import { motion } from 'framer-motion'
+// `m` é o primitive leve do framer-motion (LazyMotion). Features via main.tsx.
+import { m } from 'framer-motion'
 
 export interface ModalHeaderProps {
   /** Texto principal do header (renderizado em <h2>). */
@@ -51,14 +52,14 @@ export function ModalHeader({ title, subtitle, onClose, tone = 'default', hideCl
         )}
       </div>
       {!hideClose && (
-        <motion.button
+        <m.button
           whileTap={{ scale: 0.92 }}
           onClick={onClose}
           className="shrink-0 rounded border border-drift-border px-2 py-1 text-[10px] text-drift-muted transition-colors hover:border-drift-accent hover:text-drift-accent focus:border-drift-accent focus:text-drift-accent focus:outline-none"
           aria-label="fechar"
         >
           ✕
-        </motion.button>
+        </m.button>
       )}
     </header>
   )

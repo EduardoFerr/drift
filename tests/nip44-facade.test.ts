@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { generateSecretKey, getPublicKey } from 'nostr-tools/pure'
 import { nip44 } from 'nostr-tools'
-import { encryptDM, decryptDM } from '../src/lib/nostr'
+// V9.33: encryptDM/decryptDM movidos pra nostr-dm.ts. Submodule
+// path em vez do barrel pra evitar pull do nip44 inteiro no test.
+import { encryptDM, decryptDM } from '../src/lib/nostr-dm'
 
 // fixtures: Alice / Bob / Charlie
 function pair() {

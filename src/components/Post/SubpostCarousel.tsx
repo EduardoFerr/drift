@@ -23,7 +23,8 @@
  */
 
 import { useEffect, useRef } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+// `m` é o primitive leve do framer-motion (LazyMotion). Features via main.tsx.
+import { m, AnimatePresence } from 'framer-motion'
 import type { Subpost, Post } from '../../types/drift'
 import { SubpostLayout } from './SubpostLayout'
 import { DotsIndicator } from '../UI/DotsIndicator'
@@ -130,7 +131,7 @@ export function SubpostCarousel({
           com o swap do SwipeHandler. Container outer mantém
           overflow-hidden pra cortar o slide além das bordas. */}
       <AnimatePresence custom={customValue}>
-        <motion.div
+        <m.div
           key={current?.id ?? clampedIdx}
           custom={customValue}
           variants={slideVariants}
@@ -148,7 +149,7 @@ export function SubpostCarousel({
               subpostsTotal={subposts.length}
             />
           )}
-        </motion.div>
+        </m.div>
       </AnimatePresence>
     </div>
   )

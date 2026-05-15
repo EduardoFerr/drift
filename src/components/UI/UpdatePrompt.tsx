@@ -24,7 +24,8 @@
  *     Sem ruído no console.
  */
 
-import { motion, AnimatePresence } from 'framer-motion'
+// `m` é o primitive leve do framer-motion (LazyMotion). Features via main.tsx.
+import { m, AnimatePresence } from 'framer-motion'
 import { useRegisterSW } from 'virtual:pwa-register/react'
 
 export function UpdatePrompt() {
@@ -63,7 +64,7 @@ export function UpdatePrompt() {
   return (
     <AnimatePresence>
       {needRefresh && (
-        <motion.div
+        <m.div
           role="status"
           aria-live="polite"
           initial={{ y: 80, opacity: 0 }}
@@ -101,7 +102,7 @@ export function UpdatePrompt() {
               Mais tarde
             </button>
           </div>
-        </motion.div>
+        </m.div>
       )}
     </AnimatePresence>
   )

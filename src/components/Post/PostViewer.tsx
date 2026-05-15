@@ -23,7 +23,8 @@
 import { lazy, useEffect, useRef, useState } from 'react'
 import { LazyBoundary } from '../UI/LazyBoundary'
 import { DriftSkeleton } from '../UI/DriftSkeleton'
-import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
+// `m` é o primitive leve do framer-motion (LazyMotion). Features via main.tsx.
+import { m, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { MOTION } from '../../lib/motion'
 import {
   DRIFT_CARD_SHADOW_BACK_CLASS,
@@ -534,7 +535,7 @@ export function PostViewer({
 
       <AnimatePresence>
         {showMap && (
-          <motion.div
+          <m.div
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 240, opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
@@ -547,7 +548,7 @@ export function PostViewer({
                 {...(onOpenLocationSettings ? { onOpenLocationSettings } : {})}
               />
             </LazyBoundary>
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
 
@@ -572,14 +573,14 @@ export function PostViewer({
         <AnimatePresence>
           {pressing && (
             <>
-              <motion.div
+              <m.div
                 className="pointer-events-none absolute inset-x-0 top-0 z-[15] h-1 origin-left bg-drift-bury"
                 initial={{ scaleX: 0, opacity: 0.9 }}
                 animate={{ scaleX: 1 }}
                 exit={{ opacity: 0, scaleX: 1, transition: { duration: 0.18 } }}
                 transition={{ duration: LONG_PRESS_MS / 1000, ease: 'linear' }}
               />
-              <motion.div
+              <m.div
                 className="pointer-events-none absolute inset-x-0 top-2 z-[15] flex items-center justify-center"
                 initial={{ opacity: 0, y: -4 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -589,7 +590,7 @@ export function PostViewer({
                 <span className="rounded-full border border-drift-bury/60 bg-drift-bg/85 px-3 py-1 font-mono text-[10px] uppercase tracking-meta text-drift-bury backdrop-blur-sm">
                   segure pra moderar
                 </span>
-              </motion.div>
+              </m.div>
             </>
           )}
         </AnimatePresence>
@@ -1057,7 +1058,7 @@ function ActionsFan({
     <AnimatePresence>
       {visible &&
         items.map((item, i) => (
-          <motion.div
+          <m.div
             key={item.key}
             initial={{ opacity: 0, y: -8, scale: 0.85 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -1070,7 +1071,7 @@ function ActionsFan({
                 pra este item. Glass styled, max-w prevent overflow. */}
             <AnimatePresence>
               {explainingKey === item.key && (
-                <motion.div
+                <m.div
                   initial={{ opacity: 0, x: 8 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 8 }}
@@ -1084,7 +1085,7 @@ function ActionsFan({
                   <div className="mt-1 font-mono text-[10px] leading-snug text-drift-muted">
                     {item.hint}
                   </div>
-                </motion.div>
+                </m.div>
               )}
             </AnimatePresence>
             <GlassIconButton
@@ -1109,7 +1110,7 @@ function ActionsFan({
             >
               <span aria-hidden="true">{item.icon}</span>
             </GlassIconButton>
-          </motion.div>
+          </m.div>
         ))}
     </AnimatePresence>
   )
@@ -1137,7 +1138,7 @@ function ModalWrapper({ children, exitVariant }: WrapperProps) {
   // dá sensação papel-no-deck. User feedback 2026-05-09.
   const transition = reduced ? { duration: 0 } : MOTION.swap
   return (
-    <motion.div
+    <m.div
       initial={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.96, y: 20 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       exit={exitVariant}
@@ -1148,7 +1149,7 @@ function ModalWrapper({ children, exitVariant }: WrapperProps) {
       aria-label="post"
     >
       {children}
-    </motion.div>
+    </m.div>
   )
 }
 
@@ -1172,7 +1173,7 @@ function EmbeddedWrapper({ children, exitVariant }: WrapperProps) {
   // y=+20.
   const initial = computeInitialFromExit(exitVariant, reduced ?? false)
   return (
-    <motion.div
+    <m.div
       initial={initial as unknown as Record<string, number>}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       exit={exitVariant}
@@ -1180,7 +1181,7 @@ function EmbeddedWrapper({ children, exitVariant }: WrapperProps) {
       className="relative flex h-full w-full flex-col overflow-hidden"
     >
       {children}
-    </motion.div>
+    </m.div>
   )
 }
 

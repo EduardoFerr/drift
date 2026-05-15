@@ -36,7 +36,8 @@ import type {
   OfferMsg,
   SignalingMessage,
 } from '../src/lib/transport/signaling'
-import { encryptDM } from '../src/lib/nostr'
+// V9.33: encryptDM movido pra nostr-dm.ts.
+import { encryptDM } from '../src/lib/nostr-dm'
 
 // ─── Fakes ───────────────────────────────────────────────────────────
 

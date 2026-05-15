@@ -59,7 +59,8 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
+// `m` é o primitive leve do framer-motion (LazyMotion). Features via main.tsx.
+import { m, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { useThread } from '../../hooks/useThread'
 import { loadThread } from '../../lib/comments'
 import { usePrefsStore, setPref } from '../../lib/prefs'
@@ -303,7 +304,7 @@ export function ThreadView({ postId, postAuthorPub, post, onClose }: ThreadViewP
   const hasChild = childCount > 0
 
   return (
-    <motion.div
+    <m.div
       ref={containerRef}
       role="tree"
       aria-label="thread de comentários"
@@ -413,7 +414,7 @@ export function ThreadView({ postId, postAuthorPub, post, onClose }: ThreadViewP
               )}
 
               <AnimatePresence mode="popLayout">
-                <motion.div
+                <m.div
                   key={currentNode.id}
                   initial={reducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.98 }}
                   animate={reducedMotion ? { opacity: 1 } : { opacity: 1, scale: 1 }}
@@ -436,7 +437,7 @@ export function ThreadView({ postId, postAuthorPub, post, onClose }: ThreadViewP
                     // dispara descend; mantém swipe ↑ como gesture primário.
                     onDescend={hasChild ? handleDescend : undefined}
                   />
-                </motion.div>
+                </m.div>
               </AnimatePresence>
             </div>
           </SwipeHandler>
@@ -454,7 +455,7 @@ export function ThreadView({ postId, postAuthorPub, post, onClose }: ThreadViewP
         {/* FAB ↵ — só em cards-mode. List-mode tem reply inline em cada
             comment (tap-to-reply UX-3 snapshot). */}
         {viewMode === 'cards' && currentNode && (
-          <motion.button
+          <m.button
             initial={{ scale: 1 }}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
@@ -466,7 +467,7 @@ export function ThreadView({ postId, postAuthorPub, post, onClose }: ThreadViewP
             title="responder (Enter)"
           >
             ↵ responder
-          </motion.button>
+          </m.button>
         )}
 
         {/* Coach-mark first-time.
@@ -481,7 +482,7 @@ export function ThreadView({ postId, postAuthorPub, post, onClose }: ThreadViewP
             não precisa coach. RFC §9.6 risco mitigado. */}
         <AnimatePresence>
           {viewMode === 'cards' && coachVisible && (
-            <motion.div
+            <m.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -498,7 +499,7 @@ export function ThreadView({ postId, postAuthorPub, post, onClose }: ThreadViewP
               >
                 <CoachContent />
               </button>
-            </motion.div>
+            </m.div>
           )}
         </AnimatePresence>
 
@@ -540,7 +541,7 @@ export function ThreadView({ postId, postAuthorPub, post, onClose }: ThreadViewP
           )
         })()}
       </div>
-    </motion.div>
+    </m.div>
   )
 }
 

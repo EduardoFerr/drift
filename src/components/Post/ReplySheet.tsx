@@ -33,7 +33,8 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
+// `m` é o primitive leve do framer-motion (LazyMotion). Features via main.tsx.
+import { AnimatePresence, m, useReducedMotion } from 'framer-motion'
 import * as nip19 from 'nostr-tools/nip19'
 import {
   commentOnPost,
@@ -411,7 +412,7 @@ export function ReplySheet({
   return (
     <AnimatePresence>
       {open && (
-        <motion.div
+        <m.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -421,7 +422,7 @@ export function ReplySheet({
             if (!pending) onClose()
           }}
         >
-          <motion.div
+          <m.div
             ref={sheetRef}
             initial={sheetInitial}
             animate={sheetAnimate}
@@ -587,8 +588,8 @@ export function ReplySheet({
                 </button>
               </div>
             </footer>
-          </motion.div>
-        </motion.div>
+          </m.div>
+        </m.div>
       )}
     </AnimatePresence>
   )

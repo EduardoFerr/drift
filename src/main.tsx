@@ -1,8 +1,17 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
+import { LazyMotion } from 'framer-motion'
 import App from './App.tsx'
 import { AppErrorBoundary } from './components/UI/AppErrorBoundary'
 import './index.css'
+
+// Lazy-load features de framer-motion num chunk separado. O entry só
+// puxa o `m` primitive (~5 KB) + LazyMotion shell; `domMax` (~35 KB com
+// animate/exit/initial/drag/layout) emite chunk próprio que carrega em
+// paralelo com o React mount. Lighthouse 2026-05-15: vendor-motion
+// virou entry-only ~12 KB raw + chunk separado pelo resto.
+const loadMotionFeatures = () =>
+  import('framer-motion').then((mod) => mod.domMax)
 
 // DEV: expor webrtcTransport pra smoke test e2e em 2 abas.
 // Acesso via console: `window.driftWebRTC.getPeers()` etc.
@@ -50,10 +59,22 @@ if (import.meta.env.DEV) {
   })
 }
 
+// LazyMotion: substitui o bundle "full" do framer-motion (que carrega
+// TODAS as features) por um core mínimo + features carregadas sob
+// demanda em chunk SEPARADO. Componentes usam `m.*` (~5 KB) em vez de
+// `motion.*` (~30 KB). Passando `features` como factory async, o bundler
+// emite as features num chunk próprio que carrega async no mount.
+//
+// `domMax` (resolved lazy) = `domAnimation` + drag + layout. Cobre todos
+// os usos do Drift (animate/exit/initial em ~17 componentes, drag no
+// SwipeHandler, `layoutId` no FeedTabs). `strict` faz `motion.*` direto
+// lançar erro em dev — força adoção do `m.*` (evita regressão).
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <AppErrorBoundary>
-      <App />
+      <LazyMotion features={loadMotionFeatures} strict>
+        <App />
+      </LazyMotion>
     </AppErrorBoundary>
   </React.StrictMode>,
 )

@@ -17,7 +17,8 @@
  */
 
 import type { ReactNode } from 'react'
-import { motion } from 'framer-motion'
+// `m` é o primitive leve do framer-motion (LazyMotion). Features via main.tsx.
+import { m } from 'framer-motion'
 
 export interface ChipProps {
   active: boolean
@@ -45,7 +46,7 @@ export function Chip({
   disabled = false,
 }: ChipProps) {
   return (
-    <motion.button
+    <m.button
       whileTap={disabled ? undefined : { scale: 0.95 }}
       onClick={disabled ? undefined : onClick}
       disabled={disabled}
@@ -58,6 +59,6 @@ export function Chip({
       }`}
     >
       {children}
-    </motion.button>
+    </m.button>
   )
 }

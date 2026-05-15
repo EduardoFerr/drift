@@ -19,7 +19,8 @@
 
 import { useEffect, useRef, useState } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
-import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
+// `m` é o primitive leve do framer-motion (LazyMotion). Features via main.tsx.
+import { m, AnimatePresence, useReducedMotion } from 'framer-motion'
 import type { BlobMeta } from '../../lib/nip94'
 import {
   lightboxBackdropVariants,
@@ -333,7 +334,7 @@ function LightboxOverlay({
   return (
     <AnimatePresence>
       {open && (
-        <motion.div
+        <m.div
           {...backdrop}
           role="dialog"
           aria-modal="true"
@@ -341,7 +342,7 @@ function LightboxOverlay({
           onClick={onClose}
           className="fixed inset-0 z-[60] flex items-center justify-center bg-black/95 backdrop-blur-sm p-4 cursor-zoom-out"
         >
-          <motion.img
+          <m.img
             {...image}
             src={src}
             alt={alt}
@@ -360,7 +361,7 @@ function LightboxOverlay({
               <line x1="6" y1="6" x2="18" y2="18" />
             </svg>
           </button>
-        </motion.div>
+        </m.div>
       )}
     </AnimatePresence>
   )

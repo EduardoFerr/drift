@@ -44,7 +44,8 @@
 
 import type { ReactNode, MouseEvent as ReactMouseEvent } from 'react'
 import { useEffect } from 'react'
-import { motion, useReducedMotion } from 'framer-motion'
+// `m` é o primitive leve do framer-motion (LazyMotion). Features via main.tsx.
+import { m, useReducedMotion } from 'framer-motion'
 import { DriftButton } from './DriftButton'
 import { MOTION } from '../../lib/motion'
 
@@ -155,7 +156,7 @@ export function FullPageCard({
   const transition = reduced ? { duration: 0 } : MOTION.base
 
   return (
-    <motion.div
+    <m.div
       initial={reduced ? { opacity: 0.95 } : fullPageCardMotionInitial()}
       animate={fullPageCardMotionAnimate()}
       exit={reduced ? { opacity: 0 } : fullPageCardMotionExit()}
@@ -178,6 +179,6 @@ export function FullPageCard({
       {footer && (
         <div className="shrink-0 border-t border-drift-border">{footer}</div>
       )}
-    </motion.div>
+    </m.div>
   )
 }

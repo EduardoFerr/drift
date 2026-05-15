@@ -14,7 +14,8 @@
  */
 
 import { useState, type ReactNode } from 'react'
-import { motion } from 'framer-motion'
+// `m` é o primitive leve do framer-motion (LazyMotion). Features via main.tsx.
+import { m } from 'framer-motion'
 import { markFeedSeen, refreshFeed, setFeedTab, useFeedStore } from '../../lib/feed'
 
 type FeedTab = 'global' | 'following' | 'trending'
@@ -169,7 +170,7 @@ function FeedTabBtn({
         )}
       </span>
       {active && (
-        <motion.span
+        <m.span
           layoutId="feed-tab-indicator"
           className="absolute inset-x-0 -bottom-px h-[2px] bg-drift-accent"
           transition={{

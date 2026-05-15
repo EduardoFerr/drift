@@ -32,7 +32,8 @@
  */
 
 import type { ReactNode } from 'react'
-import { motion } from 'framer-motion'
+// `m` é o primitive leve do framer-motion (LazyMotion). Features via main.tsx.
+import { m } from 'framer-motion'
 
 export interface SlideUpOverlayProps {
   /** Disparado quando user clica backdrop ou fecha via outro mecanismo. */
@@ -74,7 +75,7 @@ export function SlideUpOverlay({
   ariaLabel,
 }: SlideUpOverlayProps) {
   return (
-    <motion.div
+    <m.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
@@ -90,7 +91,7 @@ export function SlideUpOverlay({
           IdentityPanel com 3 tabs, SubpostEditor com 8 drafts) NÃO
           ultrapassa viewport. Scrollbar interno em vez de modal cortado.
           Pad inferior extra evita "última linha colada" na borda. */}
-      <motion.div
+      <m.div
         initial={{ y: 22, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         exit={{ y: 22, opacity: 0 }}
@@ -101,7 +102,7 @@ export function SlideUpOverlay({
         onClick={(e) => e.stopPropagation()}
       >
         {children}
-      </motion.div>
-    </motion.div>
+      </m.div>
+    </m.div>
   )
 }

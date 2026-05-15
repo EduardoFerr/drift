@@ -30,7 +30,8 @@
  */
 
 import type { ReactNode } from 'react'
-import { motion } from 'framer-motion'
+// `m` é o primitive leve do framer-motion (LazyMotion). Features via main.tsx.
+import { m } from 'framer-motion'
 
 export interface NavAction {
   /** Ícone (SVG component ou emoji em ReactNode). */
@@ -78,7 +79,7 @@ export function NavBar({
           ))}
         </div>
 
-        <motion.button
+        <m.button
           whileTap={{ scale: 0.95 }}
           whileHover={{ scale: 1.04 }}
           onClick={onCompose}
@@ -108,7 +109,7 @@ export function NavBar({
             <line x1="12" y1="5" x2="12" y2="19" />
             <line x1="5" y1="12" x2="19" y2="12" />
           </svg>
-        </motion.button>
+        </m.button>
 
         <div className="flex flex-1 items-center justify-around gap-2">
           {right.map((a, i) => (
@@ -122,7 +123,7 @@ export function NavBar({
 
 function NavBtn({ action }: { action: NavAction }) {
   return (
-    <motion.button
+    <m.button
       whileTap={{ scale: 0.95 }}
       onClick={action.onClick}
       aria-label={action.ariaLabel ?? action.label}
@@ -137,6 +138,6 @@ function NavBtn({ action }: { action: NavAction }) {
       <span className="font-mono text-[10px] uppercase tracking-widest">
         {action.label}
       </span>
-    </motion.button>
+    </m.button>
   )
 }
