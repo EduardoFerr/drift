@@ -131,7 +131,53 @@ function setStatus(updater: (s: SyncStatus) => SyncStatus): void {
 let subscription: Unsubscribe | null = null
 let flushTimer: ReturnType<typeof setInterval> | null = null
 
+// V9.34 — bfcache guard. WebSocket aberto impede o browser de colocar
+// a página no back/forward cache (Lighthouse bf-cache audit FAIL,
+// 2026-05-15). Pagehide: fechamos sub + WS pra que o browser possa
+// adicionar à bfcache. Pageshow (persisted=true): restauramos sync pra
+// que o user volte com feed atualizado em vez de stale.
+let bfcacheGuardInstalled = false
+function setupBfcacheGuard(): void {
+  if (typeof window === 'undefined' || bfcacheGuardInstalled) return
+  bfcacheGuardInstalled = true
+
+  window.addEventListener('pagehide', () => {
+    // Síncrono — pagehide tem janela curta; await aqui não dá tempo.
+    if (subscription) {
+      try {
+        subscription()
+      } catch {
+        /* noop */
+      }
+      subscription = null
+    }
+    if (flushTimer) {
+      clearInterval(flushTimer)
+      flushTimer = null
+    }
+    // Força close de todos os relays ativos pra liberar o WS.
+    try {
+      const relays = activeReadRelays()
+      if (relays.length > 0) pool.close(relays)
+    } catch {
+      /* noop */
+    }
+    setStatus((s) => ({ ...s, active: false }))
+  })
+
+  window.addEventListener('pageshow', (e) => {
+    // Persisted = restaurado de bfcache. Reabre sync porque o cursor
+    // local pode estar atrasado (página ficou fora do ar enquanto
+    // user navegava). Em navegações normais (persisted=false), main.tsx
+    // já chamou startBoot → startSync.
+    if (e.persisted) {
+      void startSync()
+    }
+  })
+}
+
 export async function startSync(): Promise<SyncStatus> {
+  setupBfcacheGuard()
   if (subscription) {
     return getSyncStatus()
   }
