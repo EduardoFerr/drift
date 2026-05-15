@@ -8,24 +8,49 @@
  *   → swipe right → onPrev   (subpost anterior)
  *   tap           → onTap    (revela conteúdo blurred, fecha overlay etc.)
  *
- * Threshold de 80px no eixo dominante + velocidade > 200px/s pra evitar
- * gesto acidental. Eixo "dominante" é o de maior delta absoluto.
+ * Threshold de 80/160px no eixo dominante + velocidade > 200px/s pra
+ * evitar gesto acidental. Eixo "dominante" é o de maior delta absoluto.
  *
  * Acessibilidade: também aceita teclado (setas + Enter) — sem gestos
  * é navegável.
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * V10 — sem Framer drag (perf round 11)
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * Versões anteriores (V9.27 / V9.30) usavam `<m.div drag …>` do
+ * framer-motion. Isso forçava o LazyMotion do app a carregar `domMax`
+ * (~143 KB gzip 48 KB) só pelo feature `drag`. Trocamos por pointer
+ * events nativos + spring/easing via RAF — comportamento idêntico,
+ * sem dependência de feature `drag`. Permite reduzir o LazyMotion pra
+ * `domAnimation` quando o FeedTabs também perder seu `layoutId`
+ * (coordenação com Marshall).
+ *
+ * Comportamentos preservados bit-a-bit:
+ *   - Threshold split por eixo (160 vert / 80 horiz) + velocidade 200 px/s
+ *   - Tilt leve no horizontal (-5°..+5°) — suprimido se nav h desabilitado
+ *   - Border-color reage ao gesto (verde spread / vermelho bury / lilás nav)
+ *   - Spring magnético quando NÃO comita (stiffness 500, damping 38)
+ *   - Horizontal commit: animate x→0 em ease-out-quart 320ms (casa com
+ *     slideVariants do SubpostCarousel — V9.30)
+ *   - Vertical commit: SEM animação interna; Wrapper exit translateY
+ *     ±110% no PostViewer toma conta (V9.27 — sem isso, surge a
+ *     ilusão de "bouncing pro lado errado")
+ *   - Reduced motion: spring/ease colapsam pra snap instantâneo
  */
 
-import { useEffect, useRef, useState } from 'react'
 import {
-  // `m` é o primitive leve do framer-motion (LazyMotion). drag é parte
-  // de `domMax` provido em main.tsx; useMotionValue/useTransform/animate
-  // são hooks puros (não-features-gated) e ficam.
-  m,
-  useMotionValue,
-  useTransform,
-  animate,
-  type PanInfo,
-} from 'framer-motion'
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
+} from 'react'
+// `useReducedMotion` é hook puro do core do framer-motion (não vem
+// gated por features), então mantemos. Removido: m, useMotionValue,
+// useTransform, animate, PanInfo — não há mais dependência do `drag`
+// feature de domMax.
+import { useReducedMotion } from 'framer-motion'
 
 // Thresholds split por eixo (user pedido 2026-05-09: "aumente o limiar
 // para o card sair e nao voltar magneticamente, está muito curto o
@@ -38,19 +63,43 @@ const SWIPE_THRESHOLD_PX_V = 160
 const SWIPE_THRESHOLD_PX_H = 80
 const SWIPE_VELOCITY_PXS = 200
 
+// Tap detection: gesto rápido com deslocamento curto vira tap.
+const TAP_MAX_DISTANCE_PX = 8
+const TAP_MAX_DURATION_MS = 350
+
+// Janela de velocidade: medimos delta entre os 2 últimos samples.
+// 80ms ≈ 5 frames @ 60fps — ruído de jitter no final do gesto fica
+// fora; deslocamento real de release fica dentro.
+const VELOCITY_SAMPLE_MS = 80
+
+// Curva ease-out-quart 320ms — casa exatamente com swapEase da V9.30
+// (mesmos coeficientes que `[0.22, 1, 0.36, 1]` em framer).
+const SWAP_EASE_DURATION_MS = 320
+function easeOutQuart(t: number): number {
+  return 1 - Math.pow(1 - t, 4)
+}
+
+// Spring tuning V9.27 — stiffness 500 / damping 38 (subcritico, com
+// pouco overshoot). Implementação semi-implícita de Euler com dt
+// fixado em ms reais; estável até ~16ms/frame.
+const SPRING_STIFFNESS = 500
+const SPRING_DAMPING = 38
+const SPRING_REST_VELOCITY = 0.5 // px/s — abaixo disso considera parado
+const SPRING_REST_DELTA = 0.5 // px — abaixo disso considera no zero
+
 export interface SwipeHandlerProps {
   onSpread?: () => void
   onBury?: () => void
   onPrev?: () => void
   onNext?: () => void
   /**
-   * Disparado em tap (sem movimento). Assinatura aceita o evento do
-   * Framer; consumidores podem inspecionar target se precisarem (ex.:
-   * ignorar taps em children interativos). PostViewer V9.13 não usa
-   * mais essa inspecção — tap-to-advance subpost foi removido em favor
-   * de swipe horizontal puro.
+   * Disparado em tap (sem movimento). Recebe o PointerEvent nativo.
+   * Consumidores podem inspecionar `target` se precisarem (ex.: ignorar
+   * taps em children interativos). PostViewer V9.13 não usa mais essa
+   * inspecção — tap-to-advance subpost foi removido em favor de swipe
+   * horizontal puro.
    */
-  onTap?: (event: MouseEvent | TouchEvent | PointerEvent) => void
+  onTap?: (event: PointerEvent) => void
   /**
    * Track C.4.2 — gesto vertical genérico, opt-in. Usado pelo ThreadView
    * onde ↑ = descend (filho) e ↓ = ascend (parent). Non-breaking: se
@@ -65,6 +114,8 @@ export interface SwipeHandlerProps {
   disableHorizontal?: boolean
   children: React.ReactNode
 }
+
+type HintKind = 'spread' | 'bury' | 'next' | 'prev'
 
 export function SwipeHandler({
   onSpread,
@@ -83,156 +134,311 @@ export function SwipeHandler({
   // (ThreadView).
   const fireUp = onSpread ?? onUp
   const fireDown = onBury ?? onDown
-  const x = useMotionValue(0)
-  const y = useMotionValue(0)
 
-  // V9.5 — rotação leve em função do drag horizontal. User pedido
-  // 2026-05-09: "ao arrastar deve rotacionar levemente nas pontas,
-  // como se imitasse o papel passando". Mapping linear x → rotate,
-  // suprimido quando horizontal está desabilitado (single subpost).
-  // Curva: [-160, 160] → [-5°, 5°]. Threshold de swipe (80px) cai em
-  // ~2.5°, ainda discreto. Pivot default (center) é suficiente — pivô
-  // bottom-center foi testado mas exagera o efeito a ponto de
-  // distorcer a leitura do título superior do subpost.
-  const rotate = useTransform(x, [-160, 0, 160], [5, 0, -5])
+  const reducedMotion = useReducedMotion() ?? false
 
-  // Feedback visual: borda vai mudando de cor conforme o gesto progride.
-  // ↑ = verde (spread), ↓ = vermelho (bury), ← → = lilás (navegação).
-  const borderColor = useTransform(
-    [x, y] as never,
-    ([latestX, latestY]: number[]) => {
-      const ax = Math.abs(latestX!)
-      const ay = Math.abs(latestY!)
-      if (ay > ax && ay > 20 && !disableVertical) {
-        return latestY! < 0
-          ? `rgba(52, 211, 153, ${Math.min(0.8, ay / 200)})` // verde spread
-          : `rgba(248, 113, 113, ${Math.min(0.8, ay / 200)})` // vermelho bury
-      }
-      if (ax > 20 && !disableHorizontal) {
-        return `rgba(167, 139, 250, ${Math.min(0.8, ax / 200)})` // lilás nav
-      }
-      return 'rgba(31, 41, 55, 1)' // borda default
-    },
-  )
+  const elRef = useRef<HTMLDivElement | null>(null)
 
-  const [hint, setHint] = useState<'spread' | 'bury' | 'next' | 'prev' | null>(
-    null,
-  )
-  const hintTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Estado de gesto em refs (não dispara re-render por sample) — só o
+  // DOM transform muda durante o drag. Imitamos useMotionValue da V9.x.
+  const xRef = useRef(0)
+  const yRef = useRef(0)
 
-  function showHint(kind: NonNullable<typeof hint>) {
+  // Pointer ativo + amostras pra cálculo de velocidade no release.
+  const activePointerRef = useRef<number | null>(null)
+  const startXRef = useRef(0)
+  const startYRef = useRef(0)
+  const startTimeRef = useRef(0)
+  // Histórico curto de samples: [{ t, x, y }]. Usamos só os últimos
+  // dentro de VELOCITY_SAMPLE_MS pra estimar velocidade no release.
+  const samplesRef = useRef<{ t: number; x: number; y: number }[]>([])
+
+  // RAF handle pra animações de release (spring back ou swap ease).
+  // Cancelado se um novo gesto começa — comportamento equivalente ao
+  // `x.stop()` da Framer (V9.27).
+  const rafRef = useRef<number | null>(null)
+
+  const [hint, setHint] = useState<HintKind | null>(null)
+  const hintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  function showHint(kind: HintKind) {
     setHint(kind)
-    if (hintTimer.current) clearTimeout(hintTimer.current)
-    hintTimer.current = setTimeout(() => setHint(null), 600)
+    if (hintTimerRef.current) clearTimeout(hintTimerRef.current)
+    hintTimerRef.current = setTimeout(() => setHint(null), 600)
   }
 
-  useEffect(() => {
-    return () => {
-      if (hintTimer.current) clearTimeout(hintTimer.current)
+  // Aplica transform + border-color direto no DOM. Chamado de RAF e dos
+  // handlers de pointer — evita re-render por sample (motion value style).
+  function applyTransform() {
+    const el = elRef.current
+    if (!el) return
+    const x = xRef.current
+    const y = yRef.current
+    // Tilt: linear x → rotate, [-160, 160] → [+5°, -5°]. Suprimido
+    // quando horizontal desabilitado (V9.5 — single-subpost não rota).
+    let rotate = 0
+    if (!disableHorizontal) {
+      const clamped = Math.max(-160, Math.min(160, x))
+      rotate = (-clamped / 160) * 5
     }
-  }, [])
+    el.style.transform = `translate3d(${x}px, ${y}px, 0) rotate(${rotate}deg)`
 
-  function handleDragEnd(_: unknown, info: PanInfo) {
-    const { offset, velocity } = info
-    const ax = Math.abs(offset.x)
-    const ay = Math.abs(offset.y)
+    // Border-color: feedback visual progressivo (verde spread, vermelho
+    // bury, lilás nav, default cinza). Mesma curva da V9.x.
+    const ax = Math.abs(x)
+    const ay = Math.abs(y)
+    let color = 'rgba(31, 41, 55, 1)'
+    if (ay > ax && ay > 20 && !disableVertical) {
+      color =
+        y < 0
+          ? `rgba(52, 211, 153, ${Math.min(0.8, ay / 200)})`
+          : `rgba(248, 113, 113, ${Math.min(0.8, ay / 200)})`
+    } else if (ax > 20 && !disableHorizontal) {
+      color = `rgba(167, 139, 250, ${Math.min(0.8, ax / 200)})`
+    }
+    el.style.borderColor = color
+  }
+
+  function cancelRaf() {
+    if (rafRef.current !== null) {
+      cancelAnimationFrame(rafRef.current)
+      rafRef.current = null
+    }
+  }
+
+  // Spring back magnético até (0, 0) — V9.27 stiffness 500 damping 38.
+  // Equivalente a `animate(x, 0, spring) + animate(y, 0, spring)` em
+  // Framer, mas sem importar `animate` (que requer `dragControls`
+  // pesado em runtime de feature).
+  function springBack() {
+    cancelRaf()
+    if (reducedMotion) {
+      xRef.current = 0
+      yRef.current = 0
+      applyTransform()
+      return
+    }
+    let last = performance.now()
+    let vx = 0
+    let vy = 0
+    const step = (now: number) => {
+      const dt = Math.min(0.064, (now - last) / 1000) // clamp >64ms
+      last = now
+      // Semi-implicit Euler.
+      const ax = -SPRING_STIFFNESS * xRef.current - SPRING_DAMPING * vx
+      const ay = -SPRING_STIFFNESS * yRef.current - SPRING_DAMPING * vy
+      vx += ax * dt
+      vy += ay * dt
+      xRef.current += vx * dt
+      yRef.current += vy * dt
+      applyTransform()
+      const settled =
+        Math.abs(xRef.current) < SPRING_REST_DELTA &&
+        Math.abs(yRef.current) < SPRING_REST_DELTA &&
+        Math.abs(vx) < SPRING_REST_VELOCITY &&
+        Math.abs(vy) < SPRING_REST_VELOCITY
+      if (settled) {
+        xRef.current = 0
+        yRef.current = 0
+        applyTransform()
+        rafRef.current = null
+        return
+      }
+      rafRef.current = requestAnimationFrame(step)
+    }
+    rafRef.current = requestAnimationFrame(step)
+  }
+
+  // Horizontal commit: ease-out-quart 320ms até x = 0 (V9.30). Casa com
+  // slideVariants do SubpostCarousel — paralelos sem briga.
+  function easeXToZero() {
+    cancelRaf()
+    if (reducedMotion) {
+      xRef.current = 0
+      yRef.current = 0
+      applyTransform()
+      return
+    }
+    const fromX = xRef.current
+    const fromY = yRef.current
+    const start = performance.now()
+    const step = (now: number) => {
+      const t = Math.min(1, (now - start) / SWAP_EASE_DURATION_MS)
+      const e = easeOutQuart(t)
+      xRef.current = fromX * (1 - e)
+      yRef.current = fromY * (1 - e)
+      applyTransform()
+      if (t >= 1) {
+        rafRef.current = null
+        return
+      }
+      rafRef.current = requestAnimationFrame(step)
+    }
+    rafRef.current = requestAnimationFrame(step)
+  }
+
+  function pushSample(t: number, x: number, y: number) {
+    const arr = samplesRef.current
+    arr.push({ t, x, y })
+    // Mantém só os últimos ~5 (mais que suficiente p/ janela 80ms).
+    if (arr.length > 8) arr.shift()
+  }
+
+  function estimateVelocity(): { vx: number; vy: number } {
+    const arr = samplesRef.current
+    if (arr.length < 2) return { vx: 0, vy: 0 }
+    const last = arr[arr.length - 1]!
+    // Encontra primeiro sample dentro da janela.
+    let ref = arr[0]!
+    for (let i = arr.length - 2; i >= 0; i--) {
+      if (last.t - arr[i]!.t >= VELOCITY_SAMPLE_MS) {
+        ref = arr[i]!
+        break
+      }
+      ref = arr[i]!
+    }
+    const dt = (last.t - ref.t) / 1000
+    if (dt <= 0) return { vx: 0, vy: 0 }
+    return { vx: (last.x - ref.x) / dt, vy: (last.y - ref.y) / dt }
+  }
+
+  function handlePointerDown(e: ReactPointerEvent<HTMLDivElement>) {
+    // Só primary button / primary touch.
+    if (e.button !== undefined && e.button !== 0) return
+    // Já tem outro pointer ativo — ignora multi-touch (zoom etc.).
+    if (activePointerRef.current !== null) return
+
+    // Cancela animação de retorno anterior (V9.27 equivalent — antes
+    // era x.stop()/y.stop()). Sem isso, novo gesto começa de um valor
+    // sendo animado pra zero, dá sensação de "lag".
+    cancelRaf()
+
+    activePointerRef.current = e.pointerId
+    const t = performance.now()
+    startXRef.current = e.clientX
+    startYRef.current = e.clientY
+    startTimeRef.current = t
+    samplesRef.current = []
+    pushSample(t, 0, 0)
+    // Captura: garante que mesmo se o ponteiro sair do elemento durante
+    // o drag, continuamos recebendo move/up. Crítico p/ desktop e p/
+    // gestos amplos em touch.
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId)
+    } catch {
+      // Alguns browsers tiram do pool antes do up — defensivo.
+    }
+  }
+
+  function handlePointerMove(e: ReactPointerEvent<HTMLDivElement>) {
+    if (activePointerRef.current !== e.pointerId) return
+    const dx = e.clientX - startXRef.current
+    const dy = e.clientY - startYRef.current
+    // Elastic: copiamos o dragElastic 0.6 da V9.x. Em vez de aplicar
+    // elasticity simétrico (que comprime mesmo no eixo dominante), aqui
+    // ambos eixos passam direto — Framer dragElastic 0.6 com
+    // dragConstraints {top: 0, bottom: 0, left: 0, right: 0} significava
+    // que TODA distância era "fora dos constraints" e multiplicada por
+    // 0.6. Replicamos isso na exata mesma proporção:
+    xRef.current = dx * 0.6
+    yRef.current = dy * 0.6
+    applyTransform()
+    pushSample(performance.now(), xRef.current, yRef.current)
+  }
+
+  function commitDecision(offsetX: number, offsetY: number) {
+    const ax = Math.abs(offsetX)
+    const ay = Math.abs(offsetY)
     const verticalDominant = ay > ax
+
+    const { vx, vy } = estimateVelocity()
 
     const verticalPassed =
       !disableVertical &&
-      (ay > SWIPE_THRESHOLD_PX_V || Math.abs(velocity.y) > SWIPE_VELOCITY_PXS)
+      (ay > SWIPE_THRESHOLD_PX_V || Math.abs(vy) > SWIPE_VELOCITY_PXS)
     const horizontalPassed =
       !disableHorizontal &&
-      (ax > SWIPE_THRESHOLD_PX_H || Math.abs(velocity.x) > SWIPE_VELOCITY_PXS)
+      (ax > SWIPE_THRESHOLD_PX_H || Math.abs(vx) > SWIPE_VELOCITY_PXS)
 
     function fireVertical() {
-      if (offset.y < 0 && fireUp) {
+      if (offsetY < 0 && fireUp) {
         if (onSpread) showHint('spread')
         fireUp()
-      } else if (offset.y > 0 && fireDown) {
+      } else if (offsetY > 0 && fireDown) {
         if (onBury) showHint('bury')
         fireDown()
       }
     }
     function fireHorizontal() {
-      if (offset.x < 0 && onNext) {
+      if (offsetX < 0 && onNext) {
         showHint('next')
         onNext()
-      } else if (offset.x > 0 && onPrev) {
+      } else if (offsetX > 0 && onPrev) {
         showHint('prev')
         onPrev()
       }
     }
 
-    // V9.27 (user report 2026-05-14: "o problema de arrastar pra um
-    // lado e animação ir pro outro continua"):
-    //
-    // ROOT CAUSE DEEPER LEVEL — Framer Motion's drag tem seu PRÓPRIO
-    // elastic snap-back interno que anima x/y → 0 em toda release,
-    // independente de `dragMomentum: false` (que só desabilita inercia
-    // de velocidade). x.set(0) NÃO cancela essa animação interna;
-    // precisamos chamar x.stop() / y.stop() explicitamente.
-    //
-    // Sem stop(), no commit vertical: Framer animava y de -150 → 0
-    // (pra BAIXO) ao mesmo tempo que o Wrapper exit animava y de 0 →
-    // -110% (pra CIMA). Resultado visual nos primeiros 100-150ms: card
-    // bouncia pra baixo (snap interno mais rápido que o exit) antes de
-    // voar pra cima — exatamente a ilusão de "foi pro lado errado".
-    //
-    // Fix:
-    //   - Commit (vertical ou horizontal): x.stop() + y.stop() pra
-    //     cancelar Framer drag snap. Vertical deixa motion values onde
-    //     estão (Wrapper exit toma conta). Horizontal seta 0 (próximo
-    //     subpost renderiza centralizado).
-    //   - Sem commit: animate() com spring magnético — Framer
-    //     internamente substitui sua animação pela nossa.
-    const spring = { type: 'spring' as const, stiffness: 500, damping: 38 }
-
-    // V9.30 (user report 2026-05-15: "card não completa movimento de
-    // sair, e o card que entra deveria emergir suavemente"). Horizontal
-    // commit antes fazia x.set(0) instantâneo → o tree saltava de
-    // -150 (drag end) pra 0 num frame, ANTES do SubpostCarousel iniciar
-    // suas variants de slide. Sensação de "snap brusco antes do swap".
-    //
-    // Agora horizontal commit usa animate(x, 0, ease-out-quart 320ms)
-    // — duração casa com slideVariants do carousel. SwipeHandler volta
-    // ao centro suavemente enquanto o carousel desliza old→out + new→in
-    // em paralelo. Cada camada tem seu papel sem brigar.
-    //
-    // Vertical commit fica intocado (x.stop()/y.stop() sem animate):
-    // Wrapper exit translateY 0→±110% toma conta do visual. Mexer
-    // aqui re-introduziria a regressão V9.27 ("vai pro lado oposto").
-    const swapEase = { duration: 0.32, ease: [0.22, 1, 0.36, 1] as const }
-
+    // V9.27 / V9.30 — semântica preservada:
+    //   - Vertical commit: NÃO mexer nas motion values; deixar onde
+    //     estão; Wrapper exit do PostViewer (translateY ±110%) toma
+    //     conta. Mexer aqui re-introduz "bouncing pro lado errado".
+    //   - Horizontal commit: x→0 em ease-out-quart 320ms (casa com
+    //     slideVariants do SubpostCarousel).
+    //   - Sem commit: spring back magnético.
     if (verticalPassed && horizontalPassed) {
-      // Ambos passaram — dominante decide
       if (verticalDominant) {
-        x.stop()
-        y.stop()
         fireVertical()
       } else {
-        x.stop()
-        y.stop()
-        animate(x, 0, swapEase)
-        y.set(0)
+        easeXToZero()
         fireHorizontal()
       }
     } else if (verticalPassed) {
-      x.stop()
-      y.stop()
       fireVertical()
     } else if (horizontalPassed) {
-      x.stop()
-      y.stop()
-      animate(x, 0, swapEase)
-      y.set(0)
+      easeXToZero()
       fireHorizontal()
     } else {
-      // Desistiu: spring back magnético. animate() substitui qualquer
-      // animação Framer-interna em curso pelos nossos valores.
-      animate(x, 0, spring)
-      animate(y, 0, spring)
+      springBack()
     }
+  }
+
+  function handlePointerUp(e: ReactPointerEvent<HTMLDivElement>) {
+    if (activePointerRef.current !== e.pointerId) return
+    const dxRaw = e.clientX - startXRef.current
+    const dyRaw = e.clientY - startYRef.current
+    const dist = Math.hypot(dxRaw, dyRaw)
+    const elapsed = performance.now() - startTimeRef.current
+
+    activePointerRef.current = null
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId)
+    } catch {
+      // ignore
+    }
+
+    // Tap: pouca distância + curto. Não toca xRef/yRef (já devem estar
+    // próximos de zero). Garante reset por via das dúvidas.
+    if (dist < TAP_MAX_DISTANCE_PX && elapsed < TAP_MAX_DURATION_MS) {
+      xRef.current = 0
+      yRef.current = 0
+      applyTransform()
+      if (onTap) onTap(e.nativeEvent)
+      return
+    }
+
+    // Decisão usa offsets dos motion values (já com elasticity aplicado)
+    // — mantém threshold em px visuais idêntico ao da V9.x onde os
+    // thresholds eram comparados contra `info.offset` de Framer, que
+    // também respeitava o `dragElastic 0.6`.
+    commitDecision(xRef.current, yRef.current)
+  }
+
+  function handlePointerCancel(e: ReactPointerEvent<HTMLDivElement>) {
+    if (activePointerRef.current !== e.pointerId) return
+    activePointerRef.current = null
+    samplesRef.current = []
+    springBack()
   }
 
   // Suporte a teclado — acessibilidade básica.
@@ -297,24 +503,33 @@ export function SwipeHandler({
     disableHorizontal,
   ])
 
+  // Cleanup: cancela RAFs em andamento + timer de hint.
+  useEffect(() => {
+    return () => {
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
+      if (hintTimerRef.current) clearTimeout(hintTimerRef.current)
+    }
+  }, [])
+
+  // Style base — transform inicial (0,0,0 + 0deg) garante que o
+  // elemento começa identidade. `touch-action: none` desabilita scroll
+  // nativo no eixo do gesto — equivalente ao `touch-none` Tailwind.
+  // `willChange: transform` dá hint pro browser pra promover layer.
+  const baseStyle: CSSProperties = {
+    transform: 'translate3d(0px, 0px, 0) rotate(0deg)',
+    borderColor: 'rgba(31, 41, 55, 1)',
+    willChange: 'transform',
+  }
+
   return (
-    <m.div
+    <div
+      ref={elRef}
       className="relative h-full w-full touch-none select-none rounded border-2"
-      style={{
-        x,
-        y,
-        borderColor,
-        // Rotação só vale quando horizontal nav é possível. Sem isso,
-        // single-subpost post ainda rota com pequenos deslocamentos
-        // verticais → sensação esquisita.
-        ...(disableHorizontal ? {} : { rotate }),
-      }}
-      drag
-      dragConstraints={{ top: 0, bottom: 0, left: 0, right: 0 }}
-      dragElastic={0.6}
-      dragMomentum={false}
-      onDragEnd={handleDragEnd}
-      onTap={onTap}
+      style={baseStyle}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerCancel}
     >
       {children}
 
@@ -331,11 +546,9 @@ export function SwipeHandler({
           <div className={hintClasses(hint)}>{hintLabel(hint)}</div>
         </div>
       )}
-    </m.div>
+    </div>
   )
 }
-
-type HintKind = 'spread' | 'bury' | 'next' | 'prev'
 
 function hintLabel(h: HintKind): string {
   switch (h) {
