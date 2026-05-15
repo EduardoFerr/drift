@@ -159,7 +159,23 @@ sprint próximo>: confirmar API pública.**
      ~250 KB se barrel as puxar. Verificar se atual import já evita.
 
 Baseline 2026-05-09: `qrcode` listado como **40 KB raw** num chunk
-próprio antes da consolidação V9.21. Atual <PENDENTE-MEDIÇÃO>.
+próprio antes da consolidação V9.21. Atual (2026-05-15 main verde):
+**vendor-identity total 72.70 KB raw / 29.64 KB gzip** (qrcode +
+bip39 + bip32 + secp256k1 deps internas).
+
+**Medição aplicada 2026-05-15:** o swap `qrcode → qrcode/lib/browser`
+foi tentado e revertido — `qrcode/package.json` declara campo `browser`
+que redireciona `./lib/index.js → ./lib/browser.js` automaticamente
+em bundlers com target browser (Vite default). Logo `import 'qrcode'`
+JÁ resolve pra `browser.js`; o swap explícito é cosmético, zero KB
+poupados. Conferi: `grep "renderTerminal\|renderPNG" dist/assets/
+vendor-identity-*.js` retorna 0 matches — renderers Node já estavam
+fora.
+
+**Medição bip39 (item §2.3):** `src/lib/bip39.ts:26` já importa
+`@scure/bip39/wordlists/english.js` explícito (não barrel
+`@scure/bip39/wordlists`). Cortado em commit anterior; mantém-se
+aplicado, zero KB adicionais.
 
 ### 1.5 `nostr-extras` (lazy)
 

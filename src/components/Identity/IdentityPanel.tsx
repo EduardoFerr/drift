@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import QRCode from 'qrcode'
+// Ted bundle audit 2026-05-15 §1.4 — entrypoint canvas-only (sem PNG Node,
+// sem terminal). Corta peso do vendor-identity chunk.
+import QRCode from 'qrcode/lib/browser'
 import { FullPageCard } from '../UI/FullPageCard'
 import { dialog } from '../../lib/dialog'
 import { setIdentityFromNsec } from '../../lib/identity'

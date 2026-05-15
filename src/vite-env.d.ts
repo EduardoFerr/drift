@@ -19,3 +19,19 @@ declare module '*.sql?raw' {
   const content: string
   export default content
 }
+
+// Ted bundle audit 2026-05-15 §1.4 — `qrcode/lib/browser` é o entrypoint
+// canvas-only do qrcode (sem PNG renderer Node, sem terminal). Package
+// `exports` map só expõe ".", então sem declare module TS não acha.
+declare module 'qrcode/lib/browser' {
+  interface QRCodeToDataURLOptions {
+    width?: number
+    margin?: number
+    color?: { dark?: string; light?: string }
+    errorCorrectionLevel?: 'L' | 'M' | 'Q' | 'H'
+  }
+  function toDataURL(text: string, opts?: QRCodeToDataURLOptions): Promise<string>
+  const _default: { toDataURL: typeof toDataURL }
+  export default _default
+  export { toDataURL }
+}
