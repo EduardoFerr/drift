@@ -14,8 +14,15 @@ import './index.css'
 // precisa mais de `drag` ou `layout`. `domAnimation` cobre tudo
 // (animate/exit/initial/whileHover/whileTap) e poupa ~10-15 KB raw
 // no chunk vendor-motion.
+// Destructure named export in `.then(({ domAnimation }))` gives Rollup
+// a tree-shake hint that we only need this binding from the namespace.
+// Plain `mod.domAnimation` retains the full namespace, defeating
+// shaking (V10 measurement: 143 KB raw stuck regardless of feature
+// set used). With destructure, Rollup follows the import graph from
+// `domAnimation` only — drops layout/drag/projection/scroll/inView/
+// MotionValue easings that nothing else consumes.
 const loadMotionFeatures = () =>
-  import('framer-motion').then((mod) => mod.domAnimation)
+  import('framer-motion').then(({ domAnimation }) => domAnimation)
 
 // DEV: expor webrtcTransport pra smoke test e2e em 2 abas.
 // Acesso via console: `window.driftWebRTC.getPeers()` etc.
