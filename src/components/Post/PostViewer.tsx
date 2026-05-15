@@ -171,15 +171,20 @@ export function PostViewer({
   }
   function handleCardPointerDown(e: React.PointerEvent) {
     if (isMine) return // long-press só faz sentido em posts de outros
-    // Ignora taps em controles + áreas opt-out (imagem-botão usa
-    // data-no-longpress pra preservar duplo-clique → lightbox sem
-    // disputa com hold-to-moderate). User report 2026-05-14: "segurar
-    // em posts com imagem conflita com ação de abrir imagem".
+    // V10.6 (user report 2026-05-15: "Pressionar 5s só funciona quando a
+    // camada é só imagem ou só texto, em Portrait/Landscape com imagem
+    // não funciona"). Causa: Image lightbox é <button> cobrindo inset-0;
+    // qualquer toque no card cai nele → closest('button') matchava →
+    // bail. Trocamos pra opt-out EXPLÍCITO via `data-no-longpress` —
+    // image button perde o atributo (long-press inicia sobre ela), mas
+    // dots/ver mais/⋮ ganham (ações explícitas de tap não devem virar
+    // long-press). Links genéricos (`a`) seguem bailing — nunca fazem
+    // sentido como gesto de moderação.
     const target = e.target as Element | null
     if (
       target &&
       target.closest &&
-      (target.closest('button,a') || target.closest('[data-no-longpress]'))
+      (target.closest('a') || target.closest('[data-no-longpress]'))
     )
       return
     pressStartRef.current = { x: e.clientX, y: e.clientY }
@@ -610,6 +615,9 @@ export function PostViewer({
               className="absolute right-4 top-4 z-30"
               aria-label={showActionsMenu ? 'fechar ações' : 'abrir ações'}
               title="ações rápidas"
+              // V10.6 — opt-out de long-press (segurar ⋮ não deve virar
+              // moderation; ⋮ é ação explícita de abrir fan menu).
+              data-no-longpress="true"
             >
               <span aria-hidden="true">{showActionsMenu ? '×' : '⋮'}</span>
             </GlassIconButton>

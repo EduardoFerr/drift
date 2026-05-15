@@ -188,12 +188,15 @@ export function Image({
           ? `abrir imagem em primeiro plano: ${alt} (toque duplo)`
           : 'abrir imagem em primeiro plano (toque duplo)',
         title: 'toque duplo pra abrir',
-        // V9.17 — long-press 5s (em PostViewer) NÃO deve disparar
-        // moderação quando o press é sobre a imagem. data-no-longpress
-        // é o opt-out explícito que PostViewer.handleCardPointerDown
-        // checa via target.closest('[data-no-longpress]'). Belt-and-
-        // suspenders sobre closest('button') que já deveria filtrar.
-        'data-no-longpress': 'true',
+        // V10.6 (2026-05-15) — REMOVIDO data-no-longpress. Antes: V9.17
+        // explicitamente bloqueava long-press sobre imagem ("preservar
+        // double-tap"). Agora: user pediu que long-press 5s funcione em
+        // QUALQUER área do card (incluindo onde imagem está), porque em
+        // Portrait/Landscape com imagem o button cobre o card inteiro
+        // — sem long-press sobre imagem, é impossível acionar moderação.
+        // Double-tap → lightbox e long-press → moderação coexistem por
+        // janelas temporais disjuntas (400ms vs 5000ms). Opt-out fica
+        // SÓ em buttons de tap-direto (dots, ver mais, ⋮).
         // touch-action: 'none' delega TUDO pro JS — necessário pra
         // que o Framer drag do SwipeHandler pai veja os movimentos
         // de pan iniciados sobre a imagem. Com 'manipulation' o

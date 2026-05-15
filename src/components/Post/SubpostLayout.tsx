@@ -329,6 +329,9 @@ function CardText({
           // pro SwipeHandler pai (não bloqueia swipe nav).
           className="pointer-events-auto mb-2 inline-flex items-center self-start font-mono text-[10px] uppercase tracking-meta text-drift-accent2 hover:text-drift-accent focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2 rounded"
           style={{ touchAction: 'none' }}
+          // V10.6 — opt-out de long-press (tap explícito pra expandir
+          // texto não deve virar moderação).
+          data-no-longpress="true"
           aria-label={expanded ? 'recolher texto' : 'expandir texto'}
         >
           {expanded ? 'ver menos' : 'ver mais'}

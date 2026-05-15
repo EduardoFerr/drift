@@ -102,6 +102,10 @@ export function DotsIndicator({
               }}
               className="group/seg flex flex-1 items-center py-1.5 focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2 rounded"
               style={{ touchAction: 'none' }}
+              // V10.6 — opt-out explícito de long-press (tap em dot é
+              // ação rápida pra navegar entre subposts; segurar não deve
+              // virar moderação).
+              data-no-longpress="true"
             >
               {segmentBar}
             </button>
