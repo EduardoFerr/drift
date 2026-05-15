@@ -491,17 +491,17 @@ Aceitar warning de cert auto-assinado uma vez. Cel:
 > *"Se eu quero uma rede livre de censura, eu também devo
 > ser incapaz de censurá-la."* — Manifesto
 
-**Compromissos do Drift (não aspirações; alguns ainda em construção — ver status real abaixo):**
+**Status atual dos 34 princípios — source-of-truth única:**
+[`Docs/manifesto-coverage-matrix-2026-05-15.md`](Docs/manifesto-coverage-matrix-2026-05-15.md)
 
-- ✅ Identidade auto-soberana e portável (§2-3)
-- 🟡 Anonimato por design — sem KYC, multi-identidade ✅; Tor opcional só em Tauri+arti (Fase 6.4) (§4)
-- ✅ Eventos imutáveis assinados (§5-9)
-- 🟡 Múltiplos transportes contra censura — WSS ✅; WebRTC ✅ (Fase 6.1-6.3); Tor ✅ em build Tauri com `--features arti` (smoke e2e VERIFIED 2026-05-01, §15) (§12, §15)
-- 🟡 Disponibilidade distribuída — re-broadcast oportunista ✅; PoI WebRTC seed ✅ (Fase 7.1a); IPFS pin ⛔ (Fase 7+) (§16)
-- 🟡 Sem chave mestra ✅; build reproduzível ✅ Linux (Fase 6.7); Windows/macOS pendente (§17)
-- ✅ Bury não pune (§23)
-- ✅ Score determinístico, sem afinidade, sem bolha (§22, §24)
-- ✅ Compatibilidade com ecossistema Nostr (§28-30)
+Snapshot (2026-05-15): **22 ✅ / 9 🟡 / 0 ⛔ / 3 ⏳**. Maior bloqueio
+remanescente é distribuição binária Tauri pra usuário final
+(§4, §12, §15, §21 dependem). Detalhes, evidências por arquivo:linha,
+gaps específicos e riscos priorizados na matriz.
+
+Não duplicar status aqui — a matriz é mutável e datada; este resumo
+existe só pra apontar pra ela. Quando atualizar, atualize lá e bump
+o "Última atualização" no rodapé deste arquivo.
 
 Quando dúvida sobre uma feature nova, abre o manifesto antes do
 código. Especialmente Fase 6 — várias features aparentemente
