@@ -30,12 +30,17 @@ import { startProbe } from './probe'
 import { evictOldPosts } from './cache'
 import { loadCommentCounts } from './comment-counts'
 import { wssTransport } from './transport/wss'
-import { webrtcTransport } from './transport/webrtc'
 import { registerTransport } from './transport/orchestrator'
 import { isTauri } from './runtime'
-import { torConnect } from './transport/tor'
-import { installTorWebSocketImpl } from './transport/torWebSocket'
 import { getPrefs } from './prefs'
+// CWV-3 (2026-05-15): `webrtcTransport`, `torConnect` e
+// `installTorWebSocketImpl` movidos pra dynamic import() — os 3 só são
+// consumidos APÓS o boot virar `step:'ready'` (webrtc dentro do
+// `scheduleIdle`; tor dentro do bloco guard `isTauri() && mode==='tor'`).
+// Importar eager carregava ~17 KB raw / ~5 KB gzip (a árvore inteira
+// do webrtc, 12 sub-módulos) no entry. Lighthouse 2026-05-15: "Reduce unused
+// JavaScript". `wssTransport` continua eager — é registrado sempre, em
+// todos os modos. Ver §3.2 do CWV-2 RFC.
 
 /** A cada 6h corremos eviction. Manifesto §16: cache local respeita
  *  spreads/pinned. Eviction é decisão local de gestão de espaço, não
@@ -240,6 +245,12 @@ async function doBootstrap(): Promise<void> {
     const networkMode = getPrefs().network_mode
     if (isTauri() && (networkMode === 'tor' || networkMode === 'onion-only')) {
       try {
+        // Lazy: tor.ts + torWebSocket.ts só carregam em Tauri + modo tor.
+        // PWA browser nunca alcança este branch → chunk não baixa.
+        const [{ torConnect }, { installTorWebSocketImpl }] = await Promise.all([
+          import('./transport/tor'),
+          import('./transport/torWebSocket'),
+        ])
         const torStatus = await torConnect()
         if (torStatus.state === 'connected') {
           await installTorWebSocketImpl()
@@ -325,8 +336,18 @@ async function doBootstrap(): Promise<void> {
       //
       // Decisão init-only: se o user trocar `network_mode` em Settings, exige
       // reload (convenção do Drift — `setActiveIdentity` faz o mesmo).
+      //
+      // CWV-3: lazy import — árvore webrtc inteira (~2700 LOC em 12 sub-módulos) sai
+      // do entry chunk. `void` fire-and-forget; ordem de registro não
+      // muda (wssTransport já registrado; orchestrator é multi-transport).
       if (networkMode === 'clearnet') {
-        registerTransport(webrtcTransport, { weight: 5 })
+        void import('./transport/webrtc')
+          .then(({ webrtcTransport }) => {
+            registerTransport(webrtcTransport, { weight: 5 })
+          })
+          .catch((err) => {
+            console.warn('[bootstrap] webrtcTransport lazy import falhou:', err)
+          })
       }
 
       // Antes: `await startSync()` antes de `step:'ready'` → bloqueava
