@@ -22,7 +22,7 @@
  * efeito de flick.
  */
 
-import { useEffect, useRef } from 'react'
+import { memo, useEffect, useRef } from 'react'
 // `m` é o primitive leve do framer-motion (LazyMotion). Features via main.tsx.
 import { m, AnimatePresence } from 'framer-motion'
 import type { Subpost, Post } from '../../types/drift'
@@ -72,7 +72,21 @@ const slideVariants = {
   }),
 }
 
-export function SubpostCarousel({
+/**
+ * Long-task audit 2026-05-15 (lily) — `React.memo` aqui pula re-render
+ * quando `subpostIdx` não mudou. Renderizado a cada render do PostViewer
+ * (pai re-renderiza em todo `myActions/pending/gpsCapturing` change do
+ * App.tsx props chain). Props referencialmente estáveis durante o mount:
+ *  - `subposts`: derived de `post.subposts` — `post` é o mesmo durante o
+ *    PostViewer mount (key={post.id}); `posts[]` da feed store só muda
+ *    referência em `invalidateFeed`, mas o objeto `post` permanece.
+ *  - `index`: primitive number (subpostIdx).
+ *  - `post`: idem.
+ *  - `onSelect`: `setSubpostIdx` do useState — referencialmente estável.
+ * Default shallow compare cobre todos os casos. Tipo preservado via
+ * `as typeof` (memo apaga generics inferidos).
+ */
+function SubpostCarouselComponent({
   subposts,
   index,
   post,
@@ -154,3 +168,5 @@ export function SubpostCarousel({
     </div>
   )
 }
+
+export const SubpostCarousel = memo(SubpostCarouselComponent)
