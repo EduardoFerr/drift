@@ -15,7 +15,11 @@
 // WebRTC signaling (Fase 6.1b, lazy). Vivia em nostr.ts (eager); aqui
 // em arquivo separado, tree-shaking via importação dedicada ajuda
 // Rollup a deixar fora do entry chunk.
-import { nip44 } from 'nostr-tools'
+// V9.34b — import direto do submódulo `nostr-tools/nip44` em vez de
+// `import { nip44 } from 'nostr-tools'`. O barrel inlines TODOS os
+// NIPs (defeat tree-shaking); o submódulo carrega só nip44 + suas
+// deps diretas (@noble/ciphers/chacha + @noble/curves/secp256k1).
+import * as nip44 from 'nostr-tools/nip44'
 
 const { encrypt, decrypt, getConversationKey } = nip44
 

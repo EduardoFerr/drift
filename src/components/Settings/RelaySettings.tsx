@@ -13,7 +13,7 @@ import { useState } from 'react'
 import { FullPageCard } from '../UI/FullPageCard'
 import { addRelay, removeRelay, setRelayEnabled, useRelaysStore } from '../../lib/relays'
 import { entriesFromRecords, fetchRelayList, publishRelayList } from '../../lib/nip65'
-import { nip19 } from 'nostr-tools'
+import * as nip19 from 'nostr-tools/nip19'
 
 export interface RelaySettingsProps {
   onClose: () => void

@@ -12,7 +12,7 @@
  * (setState, network) ficam no chamador. Testável sem mock de window.
  */
 
-import { nip19 } from 'nostr-tools'
+import * as nip19 from 'nostr-tools/nip19'
 
 export type DeepLinkAction = 'compose' | 'settings' | null
 

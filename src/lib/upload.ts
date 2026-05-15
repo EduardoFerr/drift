@@ -56,13 +56,13 @@ async function buildNip98Header(url: string, method: string): Promise<string | n
     const identity = await getOrCreateIdentity()
     const nsecBytes = nsecHexToBytes(identity.nsec)
     const sign = (template: EventTemplate) => finalizeEvent(template, nsecBytes)
-    // V9.33 — lazy import pra adiar nostr-tools/nip98 até o user
-    // escolher imagem no compose, momento fora do critical path do
-    // first paint. Barrel import garante compat com a estrutura
-    // existente do vendor-nostr chunk (sem circular warning).
-    const { nip98 } = await import('nostr-tools')
+    // V9.34b — lazy import do submódulo direto (não do barrel) pra
+    // adiar nip98 + impedir que o barrel inteiro venha junto. Upload
+    // só dispara quando user escolhe imagem no compose, momento fora
+    // do critical path do first paint.
+    const { getToken } = await import('nostr-tools/nip98')
     // includeAuthorizationScheme=true → retorna string já com "Nostr "
-    return await nip98.getToken(url, method, sign, true)
+    return await getToken(url, method, sign, true)
   } catch (err) {
     console.warn('[upload] NIP-98 token build falhou:', err)
     return null

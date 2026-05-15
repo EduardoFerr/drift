@@ -26,7 +26,7 @@ import { generateMnemonic, mnemonicToSeed, validateMnemonic } from '@scure/bip39
 import { wordlist } from '@scure/bip39/wordlists/english.js'
 import { HDKey } from '@scure/bip32'
 import { getPublicKey } from 'nostr-tools/pure'
-import { nip19 } from 'nostr-tools'
+import * as nip19 from 'nostr-tools/nip19'
 
 /** Path NIP-06 padrão. */
 const NIP06_PATH = "m/44'/1237'/0'/0/0"

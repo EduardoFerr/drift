@@ -34,7 +34,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
-import { nip19 } from 'nostr-tools'
+import * as nip19 from 'nostr-tools/nip19'
 import {
   commentOnPost,
   COMMENT_MAX_CHARS,

@@ -314,8 +314,8 @@ export function PostViewer({
   // último fallback clipboard.
   async function handleSharePost() {
     try {
-      const { nip19 } = await import('nostr-tools')
-      const nevent = nip19.neventEncode({
+      const { neventEncode } = await import('nostr-tools/nip19')
+      const nevent = neventEncode({
         id: post.id,
         author: post.authorPub,
         kind: 9078,

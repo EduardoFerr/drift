@@ -19,7 +19,7 @@
  */
 
 import { generateSecretKey, getPublicKey } from 'nostr-tools/pure'
-import { nip19 } from 'nostr-tools'
+import * as nip19 from 'nostr-tools/nip19'
 import { db } from './db'
 import { encrypt, decrypt, resetMasterKey } from './crypto'
 import type { DriftIdentity } from '../types/drift'

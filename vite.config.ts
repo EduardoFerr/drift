@@ -246,7 +246,7 @@ export default defineConfig(async (): Promise<UserConfig> => ({
         //   - maplibre-gl   Mapa overlay (1.1 MB)
         //   - tesselator    Deck.gl ArcLayer (467 KB)
         //   - rebroadcast   re-broadcast oportunista (Fase 5)
-        const lazyChunks = /^(?:helia-deps|maplibre-gl|tesselator|rebroadcast|vendor-identity)/
+        const lazyChunks = /^(?:helia-deps|maplibre-gl|tesselator|rebroadcast|vendor-identity|nostr-extras)/
         return deps.filter((d: string) => !lazyChunks.test(d))
       },
     },
@@ -269,11 +269,25 @@ export default defineConfig(async (): Promise<UserConfig> => ({
           ) {
             return 'vendor-identity'
           }
-          // nostr-tools + crypto primitives. Atenção: @noble/secp256k1
-          // e @noble/hashes saem do regex helia-deps porque nostr-tools
-          // depende deles tb — vendor-nostr é onde vivem agora.
-          // @scure/base fica aqui (nostr-tools depende pra bech32 npub
-          // encoding); apenas bip39/bip32 saíram (V9.21).
+          // V9.34c — pull nip44/nip98 + @noble/ciphers OUT of
+          // vendor-nostr (eager). Only used by lazy code (webrtc
+          // signaling + upload). With source already importing from
+          // submodules (`nostr-tools/nip44`, dynamic `nostr-tools/nip98`),
+          // these files don't get pulled by the eager barrel any more,
+          // and we can give them a separate chunk safely. Circular
+          // observed previously came from including @noble/ciphers in
+          // the lazy chunk while nip44 stayed in vendor-nostr — now
+          // they go together so no back-edge.
+          if (
+            /[\\/]node_modules[\\/]nostr-tools[\\/]lib[\\/](?:cjs|esm)[\\/]nip(?:44|98)\.js/.test(id) ||
+            /[\\/]node_modules[\\/]@noble[\\/]ciphers[\\/]/.test(id)
+          ) {
+            return 'nostr-extras'
+          }
+          // nostr-tools (resto) + crypto primitives. @noble/secp256k1
+          // e @noble/hashes ficam aqui (usados eager por signing).
+          // @scure/base fica aqui (bech32). bip39/bip32 saíram em
+          // V9.21 pra vendor-identity.
           if (
             /[\\/]node_modules[\\/](nostr-tools|@noble[\\/]secp256k1|@noble[\\/]hashes|@scure[\\/]base)[\\/]/.test(id)
           ) {
