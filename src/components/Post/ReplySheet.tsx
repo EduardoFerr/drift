@@ -11,8 +11,10 @@
  * Comportamento:
  *  - Sheet sobe de baixo (translateY 100% → 0) com framer-motion;
  *    backdrop drift-bg/60 backdrop-blur fica atrás (toca pra fechar).
- *  - Drag-down dismiss (>= DRAG_DISMISS_THRESHOLD_PX) com
- *    `dragConstraints` framer-motion.
+ *  - Drag-down dismiss (>= DRAG_DISMISS_THRESHOLD_PX) via pointer
+ *    events nativos + RAF spring-back (mesmo pattern do SwipeHandler
+ *    V10 — sem `drag` feature do framer-motion, permite LazyMotion
+ *    carregar só `domAnimation`).
  *  - Esc fecha; Cmd/Ctrl+Enter publica.
  *  - prefers-reduced-motion: desabilita translate, mantém fade.
  *  - role="dialog" aria-modal="true"; focus na textarea on open;
@@ -32,8 +34,18 @@
  * de coach mark / refresh, NÃO pra side-effect em domínio.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from 'react'
 // `m` é o primitive leve do framer-motion (LazyMotion). Features via main.tsx.
+// NB: removemos `drag={'y'}` daqui (último consumer do feature `drag`
+// no app — agora LazyMotion carrega só `domAnimation`). Bottom-sheet
+// drag-down-to-dismiss agora usa pointer events nativos + RAF spring,
+// mesmo pattern do SwipeHandler V10.
 import { AnimatePresence, m, useReducedMotion } from 'framer-motion'
 import * as nip19 from 'nostr-tools/nip19'
 import {
@@ -143,6 +155,17 @@ const HEADER_ID = 'drift-reply-sheet-header'
 
 /** Threshold pra drag-down dismissar sheet — design-comments.md §10. */
 const DRAG_DISMISS_THRESHOLD_PX = 80
+
+/** Elastic factor: y_visual = y_raw * 0.4 quando y_raw > 0 (replica
+ *  `dragElastic={{ top: 0, bottom: 0.4 }}` da versão framer-drag). */
+const DRAG_ELASTIC_BOTTOM = 0.4
+
+// Spring tuning casa com SwipeHandler V10 (manter feel consistente
+// entre swipes do PostViewer e dismiss da ReplySheet).
+const SPRING_STIFFNESS = 500
+const SPRING_DAMPING = 38
+const SPRING_REST_VELOCITY = 0.5 // px/s
+const SPRING_REST_DELTA = 0.5 // px
 
 export function ReplySheet({
   postId,
@@ -409,6 +432,142 @@ export function ReplySheet({
   const sheetAnimate = reducedMotion ? { opacity: 1 } : { y: 0, opacity: 1 }
   const sheetExit = reducedMotion ? { opacity: 0 } : { y: '100%', opacity: 0 }
 
+  // ── Drag-down-to-dismiss (pointer events nativos) ──────────────────
+  // Refs em vez de state pra não re-renderizar por sample. Aplicamos
+  // transform direto no DOM durante o drag; ao spring-back, limpamos
+  // `el.style.transform` pra deixar o `animate={y:0}` do framer voltar
+  // a vigorar (sem conflito). reducedMotion desabilita drag (mesma
+  // semântica de `drag={false}` da versão framer).
+  const dragYRef = useRef(0)
+  const activePointerRef = useRef<number | null>(null)
+  const startYRef = useRef(0)
+  const rafRef = useRef<number | null>(null)
+
+  function applyDragTransform(y: number) {
+    const el = sheetRef.current
+    if (!el) return
+    el.style.transform = `translate3d(0, ${y}px, 0)`
+  }
+
+  function clearDragTransform() {
+    const el = sheetRef.current
+    if (!el) return
+    // String vazia devolve controle pro `animate` do framer-motion
+    // (que mantém y=0). Sem isso, nosso inline style sobrescreveria
+    // o exit animation pra y=100%.
+    el.style.transform = ''
+  }
+
+  function cancelDragRaf() {
+    if (rafRef.current !== null) {
+      cancelAnimationFrame(rafRef.current)
+      rafRef.current = null
+    }
+  }
+
+  function springBackDrag() {
+    cancelDragRaf()
+    if (reducedMotion) {
+      dragYRef.current = 0
+      clearDragTransform()
+      return
+    }
+    let last = performance.now()
+    let vy = 0
+    const step = (now: number) => {
+      const dt = Math.min(0.064, (now - last) / 1000)
+      last = now
+      const ay = -SPRING_STIFFNESS * dragYRef.current - SPRING_DAMPING * vy
+      vy += ay * dt
+      dragYRef.current += vy * dt
+      applyDragTransform(dragYRef.current)
+      const settled =
+        Math.abs(dragYRef.current) < SPRING_REST_DELTA &&
+        Math.abs(vy) < SPRING_REST_VELOCITY
+      if (settled) {
+        dragYRef.current = 0
+        clearDragTransform()
+        rafRef.current = null
+        return
+      }
+      rafRef.current = requestAnimationFrame(step)
+    }
+    rafRef.current = requestAnimationFrame(step)
+  }
+
+  function handleSheetPointerDown(e: ReactPointerEvent<HTMLDivElement>) {
+    if (reducedMotion) return
+    if (e.button !== undefined && e.button !== 0) return
+    if (activePointerRef.current !== null) return
+    // Não inicia drag se pointer veio de input/textarea/button/etc. —
+    // esses children precisam dos próprios pointer events (focus, click,
+    // scroll de textarea, etc.). Sheet só "puxa" pela área do header
+    // ou margens.
+    const target = e.target as HTMLElement | null
+    if (
+      target &&
+      target.closest(
+        'textarea, input, button, select, a, [role="button"], [role="radio"], [contenteditable="true"]',
+      )
+    ) {
+      return
+    }
+    cancelDragRaf()
+    activePointerRef.current = e.pointerId
+    startYRef.current = e.clientY
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId)
+    } catch {
+      /* noop */
+    }
+  }
+
+  function handleSheetPointerMove(e: ReactPointerEvent<HTMLDivElement>) {
+    if (activePointerRef.current !== e.pointerId) return
+    const dy = e.clientY - startYRef.current
+    // Elastic: só permite arrasto pra baixo (y > 0). y < 0 = hard wall
+    // (= `top: 0` da versão framer). Visual y = raw * 0.4 (replica
+    // dragElastic.bottom = 0.4).
+    const yVisual = dy > 0 ? dy * DRAG_ELASTIC_BOTTOM : 0
+    dragYRef.current = yVisual
+    applyDragTransform(yVisual)
+  }
+
+  function handleSheetPointerUp(e: ReactPointerEvent<HTMLDivElement>) {
+    if (activePointerRef.current !== e.pointerId) return
+    activePointerRef.current = null
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId)
+    } catch {
+      /* noop */
+    }
+    // Decisão usa y visual (replica `info.offset.y` da versão framer-drag,
+    // que também respeitava o elastic 0.4). Pending bloqueia dismiss
+    // (mesma regra: `info.offset.y > X && !pending`).
+    if (dragYRef.current > DRAG_DISMISS_THRESHOLD_PX && !pending) {
+      // Dismiss: deixa framer-motion fazer o exit anim. Limpamos transform
+      // pra não conflitar com `exit={{ y: '100%' }}`.
+      dragYRef.current = 0
+      clearDragTransform()
+      onClose()
+      return
+    }
+    springBackDrag()
+  }
+
+  function handleSheetPointerCancel(e: ReactPointerEvent<HTMLDivElement>) {
+    if (activePointerRef.current !== e.pointerId) return
+    activePointerRef.current = null
+    springBackDrag()
+  }
+
+  // Cleanup: cancela RAF em andamento no unmount.
+  useEffect(() => {
+    return () => {
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
+    }
+  }, [])
+
   return (
     <AnimatePresence>
       {open && (
@@ -428,15 +587,14 @@ export function ReplySheet({
             animate={sheetAnimate}
             exit={sheetExit}
             transition={{ duration: 0.22, ease: 'easeOut' }}
-            // Drag pra baixo dismissa. dragElastic baixo pra feel preso;
-            // onDragEnd avalia DRAG_DISMISS_THRESHOLD_PX pra fechar.
-            drag={reducedMotion ? false : 'y'}
-            dragConstraints={{ top: 0, bottom: 0 }}
-            dragElastic={{ top: 0, bottom: 0.4 }}
-            onDragEnd={(_, info) => {
-              if (info.offset.y > DRAG_DISMISS_THRESHOLD_PX && !pending) onClose()
-            }}
-            className="flex max-h-[85dvh] w-full max-w-md flex-col overflow-hidden rounded-t-2xl border border-b-0 border-drift-border bg-drift-surface"
+            // Drag pra baixo dismissa via pointer events nativos (handlers
+            // abaixo). Elastic 0.4 + threshold 80px + spring back replicam
+            // bit-a-bit a versão framer-drag anterior.
+            className="flex max-h-[85dvh] w-full max-w-md flex-col overflow-hidden rounded-t-2xl border border-b-0 border-drift-border bg-drift-surface touch-pan-y"
+            onPointerDown={handleSheetPointerDown}
+            onPointerMove={handleSheetPointerMove}
+            onPointerUp={handleSheetPointerUp}
+            onPointerCancel={handleSheetPointerCancel}
             onClick={(e) => e.stopPropagation()}
             onKeyDown={handleTrapKey}
             role="dialog"

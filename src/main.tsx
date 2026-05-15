@@ -6,12 +6,16 @@ import { AppErrorBoundary } from './components/UI/AppErrorBoundary'
 import './index.css'
 
 // Lazy-load features de framer-motion num chunk separado. O entry só
-// puxa o `m` primitive (~5 KB) + LazyMotion shell; `domMax` (~35 KB com
-// animate/exit/initial/drag/layout) emite chunk próprio que carrega em
-// paralelo com o React mount. Lighthouse 2026-05-15: vendor-motion
-// virou entry-only ~12 KB raw + chunk separado pelo resto.
+// puxa o `m` primitive (~5 KB) + LazyMotion shell; `domAnimation` emite
+// chunk próprio que carrega em paralelo com o React mount. Antes
+// usávamos `domMax` (= domAnimation + drag + layout), mas após migrar
+// SwipeHandler e ReplySheet pra pointer events nativos + RAF (V10) e
+// FeedTabs pra `animate x` em vez de `layoutId`, nenhum consumer
+// precisa mais de `drag` ou `layout`. `domAnimation` cobre tudo
+// (animate/exit/initial/whileHover/whileTap) e poupa ~10-15 KB raw
+// no chunk vendor-motion.
 const loadMotionFeatures = () =>
-  import('framer-motion').then((mod) => mod.domMax)
+  import('framer-motion').then((mod) => mod.domAnimation)
 
 // DEV: expor webrtcTransport pra smoke test e2e em 2 abas.
 // Acesso via console: `window.driftWebRTC.getPeers()` etc.
@@ -65,9 +69,10 @@ if (import.meta.env.DEV) {
 // `motion.*` (~30 KB). Passando `features` como factory async, o bundler
 // emite as features num chunk próprio que carrega async no mount.
 //
-// `domMax` (resolved lazy) = `domAnimation` + drag + layout. Cobre todos
-// os usos do Drift (animate/exit/initial em ~17 componentes, drag no
-// SwipeHandler, `layoutId` no FeedTabs). `strict` faz `motion.*` direto
+// `domAnimation` (resolved lazy) cobre animate/exit/initial/whileHover/
+// whileTap — todos os usos remanescentes do Drift. drag + layout não
+// estão mais em uso após migrar SwipeHandler, ReplySheet (pointer
+// events + RAF) e FeedTabs (animate x). `strict` faz `motion.*` direto
 // lançar erro em dev — força adoção do `m.*` (evita regressão).
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
