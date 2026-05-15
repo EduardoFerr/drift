@@ -10,6 +10,7 @@ import {
   type GeolocationFailureReason,
 } from './lib/geolocation'
 import { rebuildIdentityHistory, restartSync, useSyncStore } from './lib/sync'
+import { parseDeepLinkSearch, cleanDeepLinkParams } from './lib/deep-link'
 import { createPost, spreadPost, buryPost } from './lib/protocol'
 import { getMyAction, markFeedSeen, refreshFeed, useFeedStore } from './lib/feed'
 import {
@@ -254,31 +255,26 @@ function App() {
   // certo, depois limpamos a URL pra não disparar de novo num refresh.
   useEffect(() => {
     if (boot.step !== 'ready') return
-    const params = new URLSearchParams(window.location.search)
-    const action = params.get('action')
-    if (action === 'compose') {
-      // V7: SubpostEditor agora é modal (não always-mounted). Abre direto
-      // — focus do textarea acontece via autoFocus no SubpostBlock primeiro.
+    // V9.29 — parsing puro extraído pra lib/deep-link.ts (testes
+    // em tests/deep-link.test.ts).
+    const parsed = parseDeepLinkSearch(window.location.search)
+    if (parsed.action === 'compose') {
       setShowCreate(true)
-    } else if (action === 'settings') {
+    } else if (parsed.action === 'settings') {
       setShowSettingsRoot(true)
     }
     // V9.20 — deep link `?p=<nevent>` gerado pelo share post. Fluxo:
-    //   1. Decodifica nevent → eventId.
+    //   1. parseDeepLinkSearch já decodificou pra eventId hex.
     //   2. Tenta SELECT local primeiro (getPostById) — instantâneo se
     //      já está no SQLite (re-share, mesma sessão).
     //   3. Senão, busca o evento via pool.get(relays, {ids:[id]}),
     //      passa por onNostrEvent que persiste no SQLite.
     //   4. Re-tenta getPostById → seta deepLinkedPost → abre
     //      PostViewer em modal mode acima da home.
-    const pParam = params.get('p')
-    if (pParam) {
+    if (parsed.postEventId) {
+      const eventId = parsed.postEventId
       void (async () => {
         try {
-          const { nip19 } = await import('nostr-tools')
-          const decoded = nip19.decode(pParam)
-          if (decoded.type !== 'nevent') return
-          const eventId = decoded.data.id
           const { getPostById } = await import('./lib/feed')
           let post = await getPostById(eventId)
           if (!post) {
@@ -299,11 +295,8 @@ function App() {
         }
       })()
     }
-    if (action || pParam) {
-      const url = new URL(window.location.href)
-      url.searchParams.delete('action')
-      url.searchParams.delete('p')
-      window.history.replaceState({}, '', url.toString())
+    if (parsed.action || parsed.postEventId) {
+      cleanDeepLinkParams()
     }
   }, [boot.step])
 
