@@ -1,6 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.tsx'
+import { AppErrorBoundary } from './components/UI/AppErrorBoundary'
 import './index.css'
 
 // DEV: expor webrtcTransport pra smoke test e2e em 2 abas.
@@ -51,6 +52,8 @@ if (import.meta.env.DEV) {
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <App />
+    <AppErrorBoundary>
+      <App />
+    </AppErrorBoundary>
   </React.StrictMode>,
 )
