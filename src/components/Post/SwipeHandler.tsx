@@ -154,8 +154,16 @@ export function SwipeHandler({
 
   // Pointer ativo + amostras pra cálculo de velocidade no release.
   const activePointerRef = useRef<number | null>(null)
+  // startX/Y ÂNCORA: compensam offset atual de xRef/yRef pra continuação
+  // contínua mid-animation. Usado em pointermove pra delta = clientX -
+  // startX, virando xRef = delta * ELASTICITY (extensão contínua).
   const startXRef = useRef(0)
   const startYRef = useRef(0)
+  // startXRaw/YRaw: posição ABSOLUTA do pointer no down. Usado SÓ pra
+  // tap detection (dist = hypot(clientX - startXRaw, ...)). Independente
+  // de xRef offset — tap real é "finger essentially stayed put no chão".
+  const startXRawRef = useRef(0)
+  const startYRawRef = useRef(0)
   const startTimeRef = useRef(0)
   // Histórico curto de samples: [{ t, x, y }]. Usamos só os últimos
   // dentro de VELOCITY_SAMPLE_MS pra estimar velocidade no release.
@@ -341,11 +349,23 @@ export function SwipeHandler({
 
     activePointerRef.current = e.pointerId
     const t = performance.now()
-    startXRef.current = e.clientX
-    startYRef.current = e.clientY
+    // V10.4 fix: ÂNCORA compensa offset atual (xRef/yRef) pra que o novo
+    // gesto CONTINUE da posição visual onde o card está. Sem isso, se
+    // user interrompe easeXToZero ou springBack mid-flight, o card "pula"
+    // — pointermove computa dx = clientX - startX = 0 e setaria xRef = 0,
+    // mas visivelmente o card estava em xRef=−45.
+    // Fórmula: pointermove faz xRef = (clientX - startX) * ELASTICITY.
+    // Pra extensão contínua, startX = clientX - xRef/ELASTICITY.
+    // V9.x Framer drag fazia equivalente internamente via dragControls.
+    startXRef.current = e.clientX - xRef.current / ELASTICITY
+    startYRef.current = e.clientY - yRef.current / ELASTICITY
+    // Posição absoluta separada pra tap detection — não pode ser
+    // contaminada pelo offset (senão tap durante animação vira "swipe").
+    startXRawRef.current = e.clientX
+    startYRawRef.current = e.clientY
     startTimeRef.current = t
     samplesRef.current = []
-    pushSample(t, 0, 0)
+    pushSample(t, xRef.current, yRef.current)
     // Captura: garante que mesmo se o ponteiro sair do elemento durante
     // o drag, continuamos recebendo move/up. Crítico p/ desktop e p/
     // gestos amplos em touch.
@@ -428,8 +448,10 @@ export function SwipeHandler({
 
   function handlePointerUp(e: ReactPointerEvent<HTMLDivElement>) {
     if (activePointerRef.current !== e.pointerId) return
-    const dxRaw = e.clientX - startXRef.current
-    const dyRaw = e.clientY - startYRef.current
+    // Tap dist usa o startXRaw absoluto, NÃO o âncora — pra "tap real"
+    // ser detectado mesmo quando o gesto começa com o card mid-animation.
+    const dxRaw = e.clientX - startXRawRef.current
+    const dyRaw = e.clientY - startYRawRef.current
     const dist = Math.hypot(dxRaw, dyRaw)
     const elapsed = performance.now() - startTimeRef.current
 
