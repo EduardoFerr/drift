@@ -190,11 +190,13 @@ function PostModeMap({ data, className, mode, onModeChange }: ModeMapProps) {
 
     void (async () => {
       try {
-        const [maplibreModule, deckMapbox, layersModule, aggregationModule] = await Promise.all([
+        // Ted bundle audit 2026-05-15 §1.8 — wrapper `./spreadMapLayers` força
+        // tree-shake estático de `ContourLayer`/`SolidPolygonLayer`/earcut
+        // (~25 KB raw + chunk dedup). Barrel destructure dinâmico mantinha tudo.
+        const [maplibreModule, deckMapbox, layersWrapper] = await Promise.all([
           import('maplibre-gl'),
           import('@deck.gl/mapbox'),
-          import('@deck.gl/layers'),
-          import('@deck.gl/aggregation-layers'),
+          import('./spreadMapLayers'),
         ])
         if (cancelled) return
 
@@ -202,12 +204,8 @@ function PostModeMap({ data, className, mode, onModeChange }: ModeMapProps) {
         const { MapboxOverlay } = deckMapbox as unknown as {
           MapboxOverlay: new (props: { layers: unknown[] }) => unknown
         }
-        const { ScatterplotLayer } = layersModule as unknown as {
-          ScatterplotLayer: LayerCtor
-        }
-        const { HeatmapLayer } = aggregationModule as unknown as {
-          HeatmapLayer: LayerCtor
-        }
+        const ScatterplotLayer = layersWrapper.ScatterplotLayer as unknown as LayerCtor
+        const HeatmapLayer = layersWrapper.HeatmapLayer as unknown as LayerCtor
 
         const centerPoint = data.origin ?? data.destinations[0]?.point ?? null
         const center: [number, number] = centerPoint
@@ -336,10 +334,11 @@ function GlobalModeMap({ data, className, mode, onModeChange }: ModeMapProps) {
 
     void (async () => {
       try {
-        const [maplibreModule, deckMapbox, layersModule] = await Promise.all([
+        // Ted bundle audit 2026-05-15 §1.8 — wrapper estático (vide PostModeMap).
+        const [maplibreModule, deckMapbox, layersWrapper] = await Promise.all([
           import('maplibre-gl'),
           import('@deck.gl/mapbox'),
-          import('@deck.gl/layers'),
+          import('./spreadMapLayers'),
         ])
         if (cancelled) return
 
@@ -347,9 +346,8 @@ function GlobalModeMap({ data, className, mode, onModeChange }: ModeMapProps) {
         const { MapboxOverlay } = deckMapbox as unknown as {
           MapboxOverlay: new (props: { layers: unknown[] }) => OverlayInstance
         }
-        const mods = layersModule as unknown as { LineLayer: LayerCtor; ScatterplotLayer: LayerCtor }
-        LineLayer = mods.LineLayer
-        ScatterplotLayer = mods.ScatterplotLayer
+        LineLayer = layersWrapper.LineLayer as unknown as LayerCtor
+        ScatterplotLayer = layersWrapper.ScatterplotLayer as unknown as LayerCtor
 
         const centerPt = data.destinations[0]?.point ?? null
         const center: [number, number] = centerPt ? [centerPt.lng, centerPt.lat] : [0, 20]
