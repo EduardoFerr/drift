@@ -509,4 +509,4 @@ código. Especialmente Fase 6 — várias features aparentemente
 
 ---
 
-*Última atualização: 2026-05-15 · Manifesto v2.2 · Arquitetura v5.3 · 34 princípios · 980 tests Vitest (+6 todo, 74 files) · entry chunk 201 KB (≤ 250 KB hard ratchet) · lint 0 warnings (hard) · SRI sha384 baseline em dist artifacts · Fase 5 + 5.x fechadas; Fase 6 em curso (6.4 etapas 1-4 shipped pra source-builders) · roadmap vinculante até Fase 7*
+*Última atualização: 2026-05-15 · Manifesto v2.2 · Arquitetura v5.3 · 34 princípios · 1032 tests Vitest (+6 todo, 79 files) · entry chunk 201 KB (≤ 250 KB hard ratchet) · lint 0 warnings (hard) · SRI sha384 baseline em dist artifacts · Fase 5 + 5.x fechadas; Fase 6 em curso (6.4 etapas 1-4 shipped pra source-builders) · roadmap vinculante até Fase 7*

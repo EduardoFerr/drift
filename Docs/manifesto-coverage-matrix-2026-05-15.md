@@ -4,7 +4,7 @@
 **Data da auditoria**: 2026-05-15
 **Auditor**: Robin (research/docs) — análise estruturada
 **Versão do projeto**: `0.6.0-alpha.4`
-**Tests Vitest**: 980 (+6 todo, 74 files)
+**Tests Vitest**: 1032 (+6 todo, 79 files)
 
 > Este documento é a **fonte única de verdade** sobre o status atual de
 > entrega dos 34 princípios do manifesto. Substitui o status espalhado
@@ -102,7 +102,7 @@
 | §31 | Compatibilidade entre Versões Drift — tag `drift-version` | ✅ | `passesSchemaCheck` exige `drift-version`; decisões em `Docs/drift-arquitetura-v4.md` §30; CHANGELOG mantido; auto-update Tauri (§31 preserve) | — |
 | §32 | Compatibilidade entre Clientes Drift — spec pública versionada | ✅ | `Docs/manifesto.md` (CC0) + `Docs/drift-arquitetura-v4.md` + `Docs/protocol-spec.md` públicos; código MIT; sem kinds privados | — |
 | §33 | Anti-Spam Pela Mecânica Social — bury + reports + limite por peso | ✅ | Buries reduzem score em `scoring.ts`; reports via `moderation.ts`; `getMaxSubposts` cresce com peso em `weight.ts`; PoW (NIP-13) é opt-in, não invariante | — |
-| §34 | Simplicidade Operacional | ✅ | Estrutura `src/lib/` com módulos de responsabilidade única; invariantes em `CLAUDE.md`; pipeline `onNostrEvent` linear documentado; 980 tests reproduzíveis | — |
+| §34 | Simplicidade Operacional | ✅ | Estrutura `src/lib/` com módulos de responsabilidade única; invariantes em `CLAUDE.md`; pipeline `onNostrEvent` linear documentado; 1032 tests reproduzíveis | — |
 
 ---
 

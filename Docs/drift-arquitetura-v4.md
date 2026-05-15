@@ -1792,7 +1792,7 @@ saída sempre**. Pra que isso seja propriedade verificável e não promessa,
 funções puras críticas têm tests automatizados rodando em Node via
 Vitest.
 
-**Cobertura atual** (`tests/*.test.ts`, 399 tests passando):
+**Cobertura atual** (`tests/*.test.ts`, 1032 tests passando · 79 files · +6 todo):
 
 - `tests/scoring.test.ts` — `calculateScore` (decay temporal, peso de
   bury 0.3x, simetria de net engagement, idade negativa clampada)

@@ -102,7 +102,7 @@ Ver [`Docs/deploy.md`](Docs/deploy.md) — Vercel (recomendado), GitHub Releases
 
 ```bash
 npm run lint             # tsc -b --noEmit (typecheck strict, sem emitir)
-npm run test             # 399 tests Vitest — funções puras (scoring, weight, moderation, NIP-65, NIP-06, schema check, transport, peer registry, etc.)
+npm run test             # 1032 tests Vitest (+6 todo, 79 files) — funções puras (scoring, weight, moderation, NIP-65, NIP-06, schema check, transport, peer registry, etc.)
 npm run build            # vite build + tsc strict
 ```
 
@@ -149,7 +149,7 @@ src/
 - ✅ **Manifesto v2.2** — 34 princípios + roadmap vinculante
 - ✅ **Fase 3** — Swipes Framer Motion, upload, content-warning, location off-default
 - ✅ **Fase 4** — Mapa, peso de perfil, moderação threshold dinâmico, eviction respeita spreads
-- ✅ **Fase 5** — PWA polish, NIP-65, NIP-02, NIP-06, Passkey, multi-identidade, probe, re-broadcast, pinning, block/mute, feed tabs, kvvfs fallback, **399 tests Vitest**
+- ✅ **Fase 5** — PWA polish, NIP-65, NIP-02, NIP-06, Passkey, multi-identidade, probe, re-broadcast, pinning, block/mute, feed tabs, kvvfs fallback (399 tests Vitest no fechamento da fase; **1032 atuais** após Fase 6 + hardening)
 - ✅ **Fase 5.x** — versionamento, CI, PWA polish, deploy Vercel, release automation
 - 🟡 **Fase 7.1a antecipada** — TWA Android (Bubblewrap CI, infra completa; primeiro APK assinado pendente). **Caveat**: TWA carrega o PWA via Vercel — IP do user visível pra hosting; cliente nativo Tauri (Fase 6) é a via pra §28 completo
 - 🟡 **Fase 6 em curso** — WebRTC ✅ (6.1-6.3); Tauri scaffold ✅ (6.5); build reproduzível ✅ Linux Docker (6.7); Tor 🟡 (6.4 etapas 1-4 shipped pra source-builders, smoke e2e + binary release pendentes)
