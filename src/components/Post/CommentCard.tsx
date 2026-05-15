@@ -267,7 +267,7 @@ export function CommentCard({
                 />
                 {cwBlur && (
                   <span
-                    className="pointer-events-none absolute inset-0 flex items-center justify-center font-mono text-[10px] uppercase tracking-meta text-amber-200"
+                    className="pointer-events-none absolute inset-0 flex items-center justify-center font-mono text-[10px] uppercase tracking-meta text-drift-warning"
                     aria-hidden="true"
                   >
                     toque pra revelar
@@ -358,7 +358,7 @@ function CwHiddenPlaceholder({
 function HiddenPlaceholder({ onReveal }: { onReveal: () => void }) {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
-      <span className="font-mono text-[11px] uppercase tracking-meta text-yellow-300">
+      <span className="font-mono text-[11px] uppercase tracking-meta text-drift-warning">
         [comentário oculto]
       </span>
       <span className="font-mono text-[10px] text-drift-muted">
@@ -480,7 +480,7 @@ function ListVariant({
           </span>
           {node.content_warning && (
             <span
-              className="shrink-0 rounded border border-amber-400/60 bg-amber-500/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-meta text-amber-300"
+              className="shrink-0 rounded border border-drift-warning/60 bg-drift-warning/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-meta text-drift-warning"
               title={`autor marcou: ${node.content_warning}`}
               aria-label={`aviso de conteúdo: ${node.content_warning}`}
             >
@@ -553,7 +553,7 @@ function ListVariant({
               />
               {cwBlur && (
                 <span
-                  className="pointer-events-none absolute inset-0 flex items-center justify-center font-mono text-[10px] uppercase tracking-meta text-amber-200"
+                  className="pointer-events-none absolute inset-0 flex items-center justify-center font-mono text-[10px] uppercase tracking-meta text-drift-warning"
                   aria-hidden="true"
                 >
                   toque pra revelar

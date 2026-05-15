@@ -453,8 +453,8 @@ export function PostViewer({
             disabled={pinned === null}
             className={`inline-flex h-11 min-w-[44px] items-center justify-center rounded border px-2 ${
               pinned
-                ? 'border-yellow-500 text-yellow-300'
-                : 'border-drift-border hover:border-yellow-500 hover:text-yellow-300'
+                ? 'border-drift-warning text-drift-warning'
+                : 'border-drift-border hover:border-drift-warning hover:text-drift-warning'
             } disabled:opacity-40`}
             title={
               pinned
@@ -497,7 +497,7 @@ export function PostViewer({
               </button>
               <button
                 onClick={handleMute}
-                className="inline-flex h-11 min-w-[44px] items-center justify-center rounded border border-drift-border px-2 hover:border-yellow-500 hover:text-yellow-300"
+                className="inline-flex h-11 min-w-[44px] items-center justify-center rounded border border-drift-border px-2 hover:border-drift-warning hover:text-drift-warning"
                 title="silenciar autor — só esconde posts dele do meu feed (manifesto §24)"
                 aria-label="Silenciar"
               >
@@ -505,7 +505,7 @@ export function PostViewer({
               </button>
               <button
                 onClick={handleBlock}
-                className="inline-flex h-11 min-w-[44px] items-center justify-center rounded border border-drift-border px-2 hover:border-orange-500 hover:text-orange-300"
+                className="inline-flex h-11 min-w-[44px] items-center justify-center rounded border border-drift-border px-2 hover:border-drift-danger hover:text-drift-danger"
                 title="bloquear autor — esconde posts e interações dele (manifesto §24)"
                 aria-label="Bloquear"
               >
@@ -513,7 +513,7 @@ export function PostViewer({
               </button>
               <button
                 onClick={() => setShowReport(true)}
-                className="inline-flex h-11 min-w-[44px] items-center justify-center rounded border border-drift-border px-2 hover:border-red-500 hover:text-red-400"
+                className="inline-flex h-11 min-w-[44px] items-center justify-center rounded border border-drift-border px-2 hover:border-drift-danger hover:text-drift-danger"
                 title="denunciar — manifesto §26"
                 aria-label="Denunciar"
               >
@@ -729,7 +729,7 @@ export function PostViewer({
 
             {!revealed && (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-center">
-                <span className="text-xs uppercase tracking-widest text-yellow-300">
+                <span className="text-xs uppercase tracking-widest text-drift-warning">
                   ⚠ {hint.reason ?? 'conteúdo marcado'}
                 </span>
                 <button
@@ -933,7 +933,7 @@ function ModerationModal({
           <li key={item.key}>
             <button
               onClick={item.onClick}
-              className="group flex w-full items-center gap-3 px-1 py-3 text-left text-drift-bury transition-colors hover:text-[#ff6b6b] focus:outline-none focus:ring-1 focus:ring-drift-accent2 focus:ring-offset-2 focus:ring-offset-drift-surface"
+              className="group flex w-full items-center gap-3 px-1 py-3 text-left text-drift-bury transition-colors hover:text-drift-danger focus:outline-none focus:ring-1 focus:ring-drift-accent2 focus:ring-offset-2 focus:ring-offset-drift-surface"
               style={{ touchAction: 'manipulation' }}
             >
               <span aria-hidden="true" className="text-[16px] leading-none">
