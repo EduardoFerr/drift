@@ -40,7 +40,7 @@
  * Sempre uppercase + tracking 2.5px (mockup .c-tag).
  */
 
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { Subpost, Post, LayoutKind } from '../../types/drift'
 import { DEFAULT_LAYOUT } from '../../types/drift'
@@ -212,27 +212,44 @@ function CardText({
   const tag = synthesizeTag(post)
   const { title, body } = splitTitleBody(subpost.text)
   // V9.4 — detecta overflow do body com clamp pra mostrar "ver mais".
-  // useLayoutEffect roda síncrono após mutações DOM, antes da paint —
-  // sem flicker. Re-checa quando body/variant muda (text update,
-  // re-render de subpost). User pedido 2026-05-09: "alguns textos
-  // grande estão com '...' no final, deveria ter '...ver mais' como
-  // ação que abre card com texto completo".
+  // V9.8 (2026-05-15, Lighthouse forced-reflow audit): movido de
+  // useLayoutEffect → useEffect + rAF. Razão: feed com N posts × M
+  // subposts disparava N*M reads sync de scrollHeight/clientHeight na
+  // commit phase, forçando style+layout flush e gerando warning de
+  // forced-reflow no Lighthouse. Agora a medida roda post-paint,
+  // batchada num único rAF que o browser resolve em uma layout pass.
+  // Custo: 1 frame (~16ms) entre paint inicial (texto clampado com
+  // "..." nativo do CSS) e aparição do botão "ver mais". Flicker
+  // imperceptível — o conteúdo do card já está correto, só o toggle
+  // aparece um frame depois. Re-checa quando body/variant/expanded
+  // mudam. User pedido 2026-05-09: "alguns textos grande estão com
+  // '...' no final, deveria ter '...ver mais' como ação que abre card
+  // com texto completo".
   const bodyRef = useRef<HTMLParagraphElement>(null)
   const [bodyOverflows, setBodyOverflows] = useState(false)
-  useLayoutEffect(() => {
-    const el = bodyRef.current
-    if (!el) {
-      setBodyOverflows(false)
-      return
-    }
+  useEffect(() => {
     // Quando expanded, body não tem clamp → não medimos overflow
-    // (sempre cabe). Forçar false libera renderização do "ver menos"
-    // mesmo se o texto antes overflowava.
+    // (sempre cabe). Forçar true libera renderização do "ver menos"
+    // mesmo se o texto antes overflowava. Sync update OK aqui: nenhum
+    // read DOM antes, só write de state.
     if (expanded) {
       setBodyOverflows(true)
       return
     }
-    setBodyOverflows(el.scrollHeight > el.clientHeight + 1)
+    let cancelled = false
+    const rafId = requestAnimationFrame(() => {
+      if (cancelled) return
+      const el = bodyRef.current
+      if (!el) {
+        setBodyOverflows(false)
+        return
+      }
+      setBodyOverflows(el.scrollHeight > el.clientHeight + 1)
+    })
+    return () => {
+      cancelled = true
+      cancelAnimationFrame(rafId)
+    }
   }, [body, variant, expanded])
   const drift = formatStat(post.spreads)
   const subs = post.subposts.length
