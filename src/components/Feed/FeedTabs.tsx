@@ -1,16 +1,14 @@
-﻿/**
+/**
  * FeedTabs — seletor de aba do feed (Global / Seguindo / Trending).
  *
  * V_pre0 extraiu de App.tsx; V3.2 (este reskin) adiciona indicator
  * slide elastic + paleta v0.7:
  * - Active: text-drift-text font-medium em font-mono uppercase tracking-widest
  * - Inativos: text-drift-muted hover→text-drift-text
- * - Indicator: motion.div com layoutId="feed-tab-indicator" — Framer
- *   anima entre tabs com cubic-bezier(0.34, 1.56, 0.64, 1) 280ms
- *   (overshoot elástico, sensação tactile/spring).
- *
- * `layoutId` compartilhado faz Framer reusar o mesmo elemento DOM e
- * animar position/size — não há re-render flicker.
+ * - Indicator: m.span único hoisted no container row, position absolute,
+ *   anima `x` (translate em %) via `animate` prop — feature `animation`
+ *   já está em `domAnimation`. Antes usava `layoutId` (precisa `domMax`
+ *   ~25 KB extra). Spring tem mesma sensação tactile.
  */
 
 import { useState, type ReactNode } from 'react'
@@ -76,26 +74,48 @@ export function FeedTabs({ onActiveTabTap }: FeedTabsProps = {}) {
     { id: 'following', label: 'seguindo' },
     { id: 'trending', label: 'trending' },
   ]
+  const activeIndex = Math.max(
+    0,
+    tabs.findIndex((t) => t.id === tab),
+  )
 
   return (
     <div className="flex items-stretch font-mono text-[10px] uppercase tracking-[2px]">
-      {tabs.map((t) => (
-        <FeedTabBtn
-          key={t.id}
-          active={tab === t.id}
-          unseen={unseenByTab[t.id]}
-          onClick={() => handleTabClick(t.id)}
-          title={
-            tab === t.id
-              ? 'voltar ao topo'
-              : unseenByTab[t.id] > 0
-              ? `${unseenByTab[t.id]} ${unseenByTab[t.id] === 1 ? 'novo' : 'novos'}`
-              : undefined
-          }
-        >
-          {t.label}
-        </FeedTabBtn>
-      ))}
+      <div className="relative flex flex-1 items-stretch">
+        {tabs.map((t) => (
+          <FeedTabBtn
+            key={t.id}
+            active={tab === t.id}
+            unseen={unseenByTab[t.id]}
+            onClick={() => handleTabClick(t.id)}
+            title={
+              tab === t.id
+                ? 'voltar ao topo'
+                : unseenByTab[t.id] > 0
+                ? `${unseenByTab[t.id]} ${unseenByTab[t.id] === 1 ? 'novo' : 'novos'}`
+                : undefined
+            }
+          >
+            {t.label}
+          </FeedTabBtn>
+        ))}
+        {/* Indicator único hoisted no container — anima `x` em % via
+            `animate` prop (feature `animation` está em `domAnimation`).
+            Largura = 1/3 do container das tabs (flex-1 × 3). Antes
+            usava layoutId compartilhado que requer feature `layout`
+            (só em `domMax`, +25 KB). Spring values são equivalentes. */}
+        <m.span
+          aria-hidden="true"
+          className="pointer-events-none absolute -bottom-px left-0 h-[2px] w-1/3 bg-drift-accent"
+          animate={{ x: `${activeIndex * 100}%` }}
+          transition={{
+            type: 'spring',
+            stiffness: 380,
+            damping: 28,
+            mass: 0.6,
+          }}
+        />
+      </div>
       <button
         onClick={() => void handleRefresh()}
         disabled={refreshing}
@@ -169,18 +189,6 @@ function FeedTabBtn({
           />
         )}
       </span>
-      {active && (
-        <m.span
-          layoutId="feed-tab-indicator"
-          className="absolute inset-x-0 -bottom-px h-[2px] bg-drift-accent"
-          transition={{
-            type: 'spring',
-            stiffness: 380,
-            damping: 28,
-            mass: 0.6,
-          }}
-        />
-      )}
     </button>
   )
 }
