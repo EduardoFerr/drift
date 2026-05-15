@@ -28,15 +28,19 @@ async function maybeVisualizer(): Promise<PluginOption[]> {
   if (!useAnalyzer) return []
   try {
     const { visualizer } = await import('rollup-plugin-visualizer')
-    // `template: 'sunburst'` = melhor pra entender hot path; gzipSize
-    // pra estimar transferência real.
+    // `template: 'treemap'` = áreas proporcionais ao tamanho do módulo,
+    // ideal pra spotar chunks gordos e deps duplicadas de relance.
+    // (sunburst/flamegraph existem mas exigem mais cliques pra comparar
+    // tamanhos absolutos.) gzipSize + brotliSize mostram transferência
+    // real, não só uncompressed.
     return [
       visualizer({
         filename: 'dist/stats.html',
-        template: 'sunburst',
+        template: 'treemap',
         gzipSize: true,
         brotliSize: true,
         open: false,
+        title: 'Drift bundle analysis',
       }) as PluginOption,
     ]
   } catch (e) {

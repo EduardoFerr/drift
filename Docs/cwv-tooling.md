@@ -12,7 +12,7 @@ prevenir regressão de performance no Drift.
 |---|---|---|---|
 | Lab measurement | Lighthouse 3-run median, mobile, 4G throttled | `.lighthouserc.cjs` + `.github/workflows/lighthouse.yml` | Cada PR + push pra main |
 | Bundle structure | Estrutura estática do dist (modulepreload, sizes, robots.txt) | `tests/cwv-conformance.test.ts` | `npm run test:bundle-size` (manual hoje; CI futuro) |
-| Bundle inspection | Sunburst dos chunks pra debug | `rollup-plugin-visualizer` (DRIFT_ANALYZE=1) | Local, on-demand |
+| Bundle inspection | Treemap dos chunks pra debug | `rollup-plugin-visualizer` (DRIFT_ANALYZE=1) | Local, on-demand |
 
 ## Como rodar Lighthouse local
 
@@ -40,16 +40,53 @@ Saída:
 ```bash
 npm run build:analyze
 # abre dist/stats.html no browser
+#
+# Windows (PowerShell):    Invoke-Item dist/stats.html
+# Windows (cmd):            start dist\stats.html
+# macOS:                    open dist/stats.html
+# Linux:                    xdg-open dist/stats.html
 ```
 
+Por baixo dos panos `build:analyze` é só `cross-env DRIFT_ANALYZE=1
+npm run build` — `cross-env` deixa o flag passar igual em
+PowerShell/cmd/bash. O plugin é optional-resolved via
+`await import(...)` em `vite.config.ts:maybeVisualizer()`, então
+build normal (sem o flag) não carrega a dep nem emite o HTML.
+
 Saída:
-- `dist/stats.html`: sunburst clicável dos chunks com tamanhos
-  uncompressed / gzip / brotli.
+- `dist/stats.html`: treemap clicável dos chunks com tamanhos
+  uncompressed / gzip / brotli (áreas proporcionais ao tamanho —
+  o que é gordo aparece grande imediatamente).
+- Arquivo é local (`.gitignore` cobre via `dist/`), não é commitado.
+
+Como ler:
+- **Cor por chunk parent** (ex: `vendor-react`, `helia-deps`,
+  `entry`). Quadrado grande = chunk grande.
+- **Click pra zoom** num subdiretório (ex: `node_modules/helia/` →
+  ver quais submódulos pesam mais).
+- **Hover** mostra raw / gzip / brotli em bytes.
 
 Hot questions:
-- "Por que helia-deps tá tão grande?" → expandir sunburst em
-  `helia-deps-*.js`.
-- "Por que entry chunk explodiu?" → comparar antes/depois.
+- "Por que helia-deps tá tão grande?" → drill em
+  `helia-deps-*.js` → procurar libp2p subpackages duplicados.
+- "Por que entry chunk explodiu?" → comparar treemap antes/depois;
+  módulo novo aparece como bloco que não estava lá.
+- "Tenho dep duplicada?" → mesma lib aparece em 2+ chunks com
+  tamanho similar = duplicação. Resolver via `manualChunks` ou
+  `dedupe` em vite config.
+- "Esse import é dynamic mesmo?" → se aparece dentro de
+  `vendor-react` ou `entry`, NÃO é lazy de fato; mover pra chunk
+  separado via `React.lazy` ou `import()`.
+
+O que procurar especificamente em Drift:
+- Entry chunk ≤ 250 KB (S1 hard ratchet — `tests/cwv-conformance.test.ts`).
+- helia-deps, maplibre-gl, tesselator, rebroadcast, vendor-identity,
+  nostr-extras devem ser lazy (sem `<link modulepreload>` em
+  `dist/index.html` — `modulePreload.resolveDependencies` em
+  `vite.config.ts` filtra).
+- `@noble/secp256k1` e `@noble/hashes` em `vendor-nostr` (eager,
+  signing); `@scure/bip39` + `bip32` + `qrcode` em `vendor-identity`
+  (lazy).
 
 ## Como interpretar budget failures
 
