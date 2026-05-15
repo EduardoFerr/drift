@@ -34,15 +34,18 @@ export default {
           accent2: '#5affd4',
           // Type tokens
           text: '#f0f0ea',
-          // muted bumped 2026-05-08: #4a4a46 -> #6b6b66 pra atingir
-          // WCAG AA contrast (4.5:1+) sobre drift-surface (#15151a).
-          // AY-4 do Robin QA #1 confirmava 3.7:1 fail. Bump deliberado
-          // pelos 5 personas HIMYM antes de Round 4 enforcement (slate-*
-          // → drift-muted purge) pra evitar rework duplo.
-          muted: '#6b6b66',
+          // muted: #4a4a46 (V8) → #6b6b66 (2026-05-08) → #828282 (V9.32
+          // 2026-05-15). Cada bump motivado por audit Lighthouse a11y
+          // contrast. Última medida em #6b6b66 deu 3.40:1 sobre
+          // drift-surface (FAIL WCAG AA 4.5:1). Novo #828282 = 4.74:1
+          // (PASS); ainda visualmente "muted" — gray neutro luminance
+          // ~0.227 vs drift-text 0.84.
+          muted: '#828282',
           // Body italic — mockup v0.7. CSS var permite override dinâmico,
-          // fallback estático garante render se var sumir.
-          body: 'var(--drift-body, #787874)',
+          // fallback estático garante render se var sumir. V9.32: bumped
+          // #787874 → #909090 pra preservar hierarquia (muted < body <
+          // text) acima do limiar AA. Body 5.54:1 sobre surface.
+          body: 'var(--drift-body, #909090)',
           // Role tokens (semântica de protocolo — não renomear)
           spread: '#34d399', // ação positiva (kind 9079, label UI = DRIFT)
           bury: '#f87171', // ação negativa (kind 9080, label UI = SINK)

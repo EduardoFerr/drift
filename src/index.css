@@ -74,8 +74,10 @@
   --drift-accent2: #5affd4;
   /* Type */
   --drift-text: #f0f0ea;
-  /* muted bumped 2026-05-08: 3.7:1 -> 4.5:1+ WCAG AA. Vide tailwind.config.js. */
-  --drift-muted: #6b6b66;
+  /* muted bumped novamente 2026-05-15: #6b6b66 → #828282. Lighthouse
+     a11y audit pegou 3.40:1 (FAIL) em vários sites. Novo #828282 →
+     4.74:1 sobre drift-surface (PASS WCAG AA). Vide tailwind.config.js. */
+  --drift-muted: #828282;
   /* Role (protocolo) */
   --drift-spread: #34d399;
   --drift-bury: #f87171;
@@ -99,7 +101,10 @@
   --tracking-title: -0.3px;
   --leading-title: 1.08;
   --leading-body: 1.65;
-  --drift-body: #787874;
+  /* body bumped 2026-05-15: #787874 → #909090. Lighthouse a11y audit
+     2026-05-15 — old 4.10:1 (FAIL AA), new 5.54:1 (PASS AA).
+     Hierarquia preservada: text > body > muted, todos ≥ 4.5:1. */
+  --drift-body: #909090;
   /*
    * Fluid type scale — clamp(min, vw, max). 6 levels canônicos.
    * Espelha tailwind.config.js theme.extend.fontSize.fluid-*.
