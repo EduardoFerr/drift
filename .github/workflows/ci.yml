@@ -57,6 +57,53 @@ jobs:
           path: dist
           retention-days: 7
 
+  audit:
+    # Supply-chain gate: alerta em vulns high+ no npm audit.
+    #
+    # Modo atual: soft-fail (continue-on-error) — registra no log mas
+    # não bloqueia merge. Razão: 2026-05-15 audit baseline tem 5 highs
+    # *todas* em deps de build/dev/CI (workbox-build → @rollup/plugin-terser,
+    # @lhci/cli → lighthouse, esbuild dev server). Nenhuma em runtime.
+    # Hard-fail entra quando os 5 highs forem zerados via bump major de
+    # vite + @lhci/cli (P2 em Docs/security/supply-chain-audit-2026-05-15.md).
+    #
+    # Roda independente do typecheck/test pra não bloquear PRs por dívida
+    # de toolchain herdada. Output sempre visível em GH Actions UI.
+    name: npm audit (supply-chain gate)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install (sem audit/fund pra acelerar — audit roda no step próprio)
+        run: npm install --no-audit --no-fund --prefer-offline
+
+      - name: npm audit (high+) — soft-fail
+        continue-on-error: true
+        run: |
+          echo "::group::npm audit report"
+          npm audit --audit-level=high || AUDIT_EXIT=$?
+          echo "::endgroup::"
+          if [ "${AUDIT_EXIT:-0}" != "0" ]; then
+            echo "::warning title=supply-chain::npm audit reportou vulns high+. Veja Docs/security/supply-chain-audit-*.md"
+          fi
+
+      - name: Summary (sempre visível, mesmo em soft-fail)
+        run: |
+          echo "## npm audit summary" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          npm audit --json 2>/dev/null \
+            | node -e 'const d=JSON.parse(require("fs").readFileSync(0,"utf8")); console.log(JSON.stringify(d.metadata.vulnerabilities, null, 2))' \
+            >> "$GITHUB_STEP_SUMMARY" || echo "(audit summary indisponível)" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
   rust-check:
     # Sprint 1 do roadmap pós-auditoria: garantir que ninguém commita Rust
     # quebrado em src-tauri/. O bug do Dockerfile.reproducible (run

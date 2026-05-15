@@ -81,3 +81,7 @@ src-tauri/gen/schemas/
 # notas privadas — análise jurídica, threat models pessoais, conversation transcripts
 # (saíram do remoto em 2026-05-02 pra reduzir surface de exposição pessoal)
 /local/
+
+# sbom — gerado em release via scripts/gen-sbom.mjs, anexado em GH Release
+# (não comitar; é artefato de build, não código fonte)
+sbom.json
