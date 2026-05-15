@@ -1145,6 +1145,7 @@ function ModalWrapper({ children, exitVariant }: WrapperProps) {
       className="fixed inset-0 z-50 flex flex-col bg-drift-bg/95 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
+      aria-label="post"
     >
       {children}
     </motion.div>

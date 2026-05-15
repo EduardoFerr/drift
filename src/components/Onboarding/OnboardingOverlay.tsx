@@ -182,6 +182,7 @@ export function OnboardingOverlay({ onClose, onOpenIdentity }: OnboardingOverlay
       className="fixed inset-0 z-[60] flex items-center justify-center bg-drift-bg/95 p-4 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
+      aria-label="onboarding do drift"
     >
       <div className="flex max-h-[85dvh] w-full max-w-md flex-col overflow-y-auto overscroll-contain rounded border border-drift-border bg-drift-surface p-5">
         {/* Progress bar estilo Stories */}
