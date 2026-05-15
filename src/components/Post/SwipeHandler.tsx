@@ -44,6 +44,7 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
 } from 'react'
 // `useReducedMotion` é hook puro do core do framer-motion (não vem
@@ -79,23 +80,12 @@ function easeOutQuart(t: number): number {
   return 1 - Math.pow(1 - t, 4)
 }
 
-// V10.1 rubber-band — replica feel do Framer `dragElastic={0.6}` com
-// constraints zeradas. Curva clássica iOS: f(d) = d·dim·c / (dim + c·|d|).
-// Near zero é quase linear com slope ≈ 0.6; cresce mais devagar à medida
-// que |d| aumenta, criando a resistência tátil que o linear plano não
-// reproduzia. Sem isso o gesto vira "lap travado a 60% do deslocamento"
-// — feel rígido que o user reclamou após a migração pra pointer events.
-const RUBBER_DIMENSION_PX = 800
-const RUBBER_ELASTICITY = 0.6
-function rubberBand(d: number): number {
-  const sign = Math.sign(d)
-  const abs = Math.abs(d)
-  // f(0) = 0; f'(0) = elasticity; lim_{|d|→∞} f(d)/|d| → 0
-  return (
-    (sign * abs * RUBBER_DIMENSION_PX * RUBBER_ELASTICITY) /
-    (RUBBER_DIMENSION_PX + RUBBER_ELASTICITY * abs)
-  )
-}
+// Elasticity 0.6 — mesma constante do Framer `dragElastic={0.6}` que V9.x
+// usava com constraints zeradas. Linear é a aproximação que Framer
+// internamente também usava nesse cenário (constraints {0,0,0,0} colapsa
+// a rubber-band em multiplicação simples). Rubber-band complexo só vale
+// quando há constraint real (top/bottom finitos).
+const ELASTICITY = 0.6
 
 // Spring tuning V9.27 — stiffness 500 / damping 38 (subcritico, com
 // pouco overshoot). Implementação semi-implícita de Euler com dt
@@ -175,6 +165,18 @@ export function SwipeHandler({
   // Cancelado se um novo gesto começa — comportamento equivalente ao
   // `x.stop()` da Framer (V9.27).
   const rafRef = useRef<number | null>(null)
+
+  // V10.2 — Suprime o click "fantasma" que o browser dispara DEPOIS de
+  // pointerup, mesmo quando capturamos o ponteiro. iOS/Chrome dispara
+  // click no target original (a `<img>` lightbox, dots, "ver mais"
+  // button) ainda que SwipeHandler tenha capturado o ponteiro. Sem
+  // este flag, cada swipe horizontal fazia o `lastTapRef` da Image
+  // somar um tap; dois swipes em <400ms acionavam o double-tap →
+  // lightbox abria durante navegação. User report 2026-05-15: "swipe
+  // ficou bagunçado novamente". V9.13 já removeu tap-to-advance em
+  // PostViewer pela mesma razão, mas a fuga vivia em children
+  // interativos abaixo do SwipeHandler.
+  const wasSwipeRef = useRef(false)
 
   const [hint, setHint] = useState<HintKind | null>(null)
   const hintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -352,20 +354,11 @@ export function SwipeHandler({
     if (activePointerRef.current !== e.pointerId) return
     const dx = e.clientX - startXRef.current
     const dy = e.clientY - startYRef.current
-    // V10.1 fix (user pedido 2026-05-15: "swip ficou bagunçado novamente"):
-    // antes era linear `dx * 0.6` — comportamento RÍGIDO, sem progressão
-    // de resistência. Framer `dragElastic={0.6}` com constraints zeradas
-    // aplica RUBBER-BAND (curva iOS): perto da origem, slope ~constant
-    // (0.6 here); longe, slope cai progressivamente até quase 0. Essa
-    // assinatura tátil é o que diferencia "drag natural" de "drag linear
-    // truncado". Reimplementamos com a fórmula clássica de rubber-band:
-    //   f(d) = (d * dim * c) / (dim + c * |d|)
-    // dim = 800px (dimensão de referência), c = 0.6 (mesma elasticity
-    // antiga). Threshold horizontal de 80px = ~93px raw (era ~133px no
-    // linear 0.6); vertical 160px = ~232px raw (era ~267px). Levemente
-    // mais responsivo no commit, mais natural no não-commit.
-    xRef.current = rubberBand(dx)
-    yRef.current = rubberBand(dy)
+    // Elasticity 0.6 linear — V9.x Framer drag com constraints zeradas
+    // se comportava assim. O threshold (80h / 160v) é em coord visual,
+    // então 80 visual = 133 raw. Mantemos.
+    xRef.current = dx * ELASTICITY
+    yRef.current = dy * ELASTICITY
     applyTransform()
     pushSample(performance.now(), xRef.current, yRef.current)
   }
@@ -442,20 +435,45 @@ export function SwipeHandler({
     }
 
     // Tap: pouca distância + curto. Não toca xRef/yRef (já devem estar
-    // próximos de zero). Garante reset por via das dúvidas.
+    // próximos de zero). Garante reset por via das dúvidas. NÃO seta
+    // wasSwipeRef — tap deve propagar normalmente pra onClick dos
+    // children (lightbox double-tap, "ver mais", dots indicator).
     if (dist < TAP_MAX_DISTANCE_PX && elapsed < TAP_MAX_DURATION_MS) {
       xRef.current = 0
       yRef.current = 0
       applyTransform()
+      wasSwipeRef.current = false
       if (onTap) onTap(e.nativeEvent)
       return
     }
+
+    // Foi swipe real (não tap). Marca pra suprimir o `click` fantasma
+    // que o browser ainda vai disparar no target original. Capture-
+    // phase handler em onClickCapture do wrapper consome o flag.
+    // Flag se autoreset no próximo click ou após 100ms (defensive
+    // timeout caso nenhum click venha — p.ex. swipe que saiu da tela).
+    wasSwipeRef.current = true
+    window.setTimeout(() => {
+      wasSwipeRef.current = false
+    }, 100)
 
     // Decisão usa offsets dos motion values (já com elasticity aplicado)
     // — mantém threshold em px visuais idêntico ao da V9.x onde os
     // thresholds eram comparados contra `info.offset` de Framer, que
     // também respeitava o `dragElastic 0.6`.
     commitDecision(xRef.current, yRef.current)
+  }
+
+  // Capture-phase click handler — roda ANTES dos onClick dos children
+  // no caminho do DOM. Se foi swipe (não tap), consome o click ali
+  // mesmo — Image lightbox onClick, "ver mais" button, dots, etc. não
+  // recebem o evento fantasma.
+  function handleClickCapture(e: ReactMouseEvent<HTMLDivElement>) {
+    if (wasSwipeRef.current) {
+      e.preventDefault()
+      e.stopPropagation()
+      wasSwipeRef.current = false
+    }
   }
 
   function handlePointerCancel(e: ReactPointerEvent<HTMLDivElement>) {
@@ -554,6 +572,7 @@ export function SwipeHandler({
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerCancel}
+      onClickCapture={handleClickCapture}
     >
       {children}
 
