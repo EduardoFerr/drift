@@ -929,7 +929,10 @@ function App() {
               icon: <SlidersIcon size={18} />,
               label: 'config',
               onClick: () => setShowSettingsRoot(true),
-              ariaLabel: 'abrir settings',
+              // WCAG 2.5.3 (Label in Name): a11y label deve incluir o
+              // texto visível ("config") pra voice control. "abrir
+              // settings" não batia.
+              ariaLabel: 'abrir config',
             },
           ]}
           onCompose={() => setShowCreate(true)}
@@ -1378,7 +1381,9 @@ function StatusIndicators({
         onClick={onOpenStatus}
         className="flex items-center gap-1 font-mono text-[10px] uppercase tracking-[1px] text-drift-muted transition-colors hover:text-drift-text focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2"
         title={`${events} eventos recebidos · subscribe ${active ? 'ativo' : 'offline'}`}
-        aria-label="painel de status"
+        // WCAG 2.5.3 — aria-label inclui o número visível "ev" pra
+        // bater com o texto que voice control users veem.
+        aria-label={`${events} ev — abrir painel de status`}
       >
         <span
           className={active ? 'text-drift-spread' : 'text-drift-muted'}
