@@ -26,9 +26,21 @@
 
 // `m` é o primitive leve do framer-motion (LazyMotion). Features via main.tsx.
 import { m, AnimatePresence } from 'framer-motion'
+import { useEffect, useRef } from 'react'
 import { useRegisterSW } from 'virtual:pwa-register/react'
 
+// Lily memory-leak audit 2026-05-15: timer global, idempotente. Guarda
+// fora do componente porque `onRegisteredSW` pode ser chamado mais de uma
+// vez em StrictMode dev / HMR (re-mount do componente), e o timer original
+// vivia capturado no callback sem `clearInterval` correspondente → 2+
+// intervals acumulavam por sessão dev. Em prod o leak era teórico (single
+// mount), mas mantemos guard pra robustez. Cleanup no unmount via useEffect
+// abaixo cobre o caso de `UpdatePrompt` ser desmontado deliberadamente.
+let swUpdateTimer: ReturnType<typeof setInterval> | null = null
+
 export function UpdatePrompt() {
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
   const {
     needRefresh: [needRefresh, setNeedRefresh],
     updateServiceWorker,
@@ -40,12 +52,16 @@ export function UpdatePrompt() {
       // entre detectar fix de segurança razoavelmente rápido e não
       // hammerar o servidor.
       if (registration && swUrl) {
-        setInterval(
+        // Idempotência: se já há timer ativo (StrictMode re-run, HMR),
+        // não cria um segundo — evita N intervals empilhados.
+        if (swUpdateTimer) return
+        swUpdateTimer = setInterval(
           () => {
             void registration.update()
           },
           60 * 60 * 1000,
         )
+        timerRef.current = swUpdateTimer
       }
     },
     onRegisterError(error) {
@@ -57,6 +73,21 @@ export function UpdatePrompt() {
       }
     },
   })
+
+  // Cleanup do timer no unmount. UpdatePrompt em prática é singleton no
+  // root da App, mas se for desmontado (test harness, route swap futuro),
+  // libera o interval.
+  useEffect(() => {
+    return () => {
+      const t = timerRef.current
+      if (t) {
+        clearInterval(t)
+        timerRef.current = null
+        // Sincroniza guard global pra próximo mount poder re-criar.
+        if (swUpdateTimer === t) swUpdateTimer = null
+      }
+    }
+  }, [])
 
   // V5 polish: toast slide-up bottom com border-left accent + paleta v0.7
   // (drift-surface/border/accent), font-mono, AnimatePresence pra entrada/saída
