@@ -475,12 +475,16 @@ export function SwipeHandler({
       return
     }
 
-    // Foi swipe real (não tap). Timestamp do release pra suprimir o
-    // `click` fantasma que o browser ainda vai disparar no target
-    // original. Capture-phase handler em onClickCapture do wrapper
-    // checa janela. Timestamp evita race condition com swipes em
-    // sequência (timer-based reset poderia truncar lifetime do flag).
-    swipeEndAtRef.current = performance.now()
+    // Suprimir click fantasma SÓ quando houve MOVIMENTO de fato. Sem
+    // isso, um long-press release (dist=0, elapsed>350) — que técnicamente
+    // não é tap nem swipe — marcaria swipeEndAt e suprimiria o próximo
+    // click válido (ex: user holds 5s pra abrir moderation modal, depois
+    // tapeia opção do modal — sem essa condição, o tap seria descartado).
+    // Threshold = TAP_MAX_DISTANCE_PX (8px) garante que só drags reais
+    // contam.
+    if (dist > TAP_MAX_DISTANCE_PX) {
+      swipeEndAtRef.current = performance.now()
+    }
 
     // Decisão usa offsets dos motion values (já com elasticity aplicado)
     // — mantém threshold em px visuais idêntico ao da V9.x onde os
