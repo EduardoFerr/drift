@@ -176,7 +176,13 @@ export function SwipeHandler({
   // ficou bagunçado novamente". V9.13 já removeu tap-to-advance em
   // PostViewer pela mesma razão, mas a fuga vivia em children
   // interativos abaixo do SwipeHandler.
-  const wasSwipeRef = useRef(false)
+  //
+  // V10.3 — Trocado boolean+setTimeout por timestamp pra resolver race
+  // condition: swipe-em-sequência onde o timer do primeiro reseta o flag
+  // do segundo antes do click vir. Janela de 200ms cobre tanto Chrome
+  // (~30ms) quanto iOS Safari (até ~150ms em throttling de CPU).
+  const swipeEndAtRef = useRef(0)
+  const CLICK_SUPPRESSION_WINDOW_MS = 200
 
   const [hint, setHint] = useState<HintKind | null>(null)
   const hintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -435,27 +441,24 @@ export function SwipeHandler({
     }
 
     // Tap: pouca distância + curto. Não toca xRef/yRef (já devem estar
-    // próximos de zero). Garante reset por via das dúvidas. NÃO seta
-    // wasSwipeRef — tap deve propagar normalmente pra onClick dos
+    // próximos de zero). Garante reset por via das dúvidas. NÃO marca
+    // swipeEndAt — tap deve propagar normalmente pra onClick dos
     // children (lightbox double-tap, "ver mais", dots indicator).
     if (dist < TAP_MAX_DISTANCE_PX && elapsed < TAP_MAX_DURATION_MS) {
       xRef.current = 0
       yRef.current = 0
       applyTransform()
-      wasSwipeRef.current = false
+      swipeEndAtRef.current = 0
       if (onTap) onTap(e.nativeEvent)
       return
     }
 
-    // Foi swipe real (não tap). Marca pra suprimir o `click` fantasma
-    // que o browser ainda vai disparar no target original. Capture-
-    // phase handler em onClickCapture do wrapper consome o flag.
-    // Flag se autoreset no próximo click ou após 100ms (defensive
-    // timeout caso nenhum click venha — p.ex. swipe que saiu da tela).
-    wasSwipeRef.current = true
-    window.setTimeout(() => {
-      wasSwipeRef.current = false
-    }, 100)
+    // Foi swipe real (não tap). Timestamp do release pra suprimir o
+    // `click` fantasma que o browser ainda vai disparar no target
+    // original. Capture-phase handler em onClickCapture do wrapper
+    // checa janela. Timestamp evita race condition com swipes em
+    // sequência (timer-based reset poderia truncar lifetime do flag).
+    swipeEndAtRef.current = performance.now()
 
     // Decisão usa offsets dos motion values (já com elasticity aplicado)
     // — mantém threshold em px visuais idêntico ao da V9.x onde os
@@ -465,14 +468,15 @@ export function SwipeHandler({
   }
 
   // Capture-phase click handler — roda ANTES dos onClick dos children
-  // no caminho do DOM. Se foi swipe (não tap), consome o click ali
-  // mesmo — Image lightbox onClick, "ver mais" button, dots, etc. não
-  // recebem o evento fantasma.
+  // no caminho do DOM. Se foi swipe (não tap) dentro da janela de
+  // supressão, consome o click ali mesmo — Image lightbox onClick,
+  // "ver mais" button, dots, etc. não recebem o evento fantasma.
   function handleClickCapture(e: ReactMouseEvent<HTMLDivElement>) {
-    if (wasSwipeRef.current) {
+    const sinceSwipe = performance.now() - swipeEndAtRef.current
+    if (swipeEndAtRef.current > 0 && sinceSwipe < CLICK_SUPPRESSION_WINDOW_MS) {
       e.preventDefault()
       e.stopPropagation()
-      wasSwipeRef.current = false
+      swipeEndAtRef.current = 0
     }
   }
 
