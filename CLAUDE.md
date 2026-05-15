@@ -509,4 +509,4 @@ código. Especialmente Fase 6 — várias features aparentemente
 
 ---
 
-*Última atualização: Maio 2026 · Manifesto v2.2 · Arquitetura v5.3 · 34 princípios · 399 tests Vitest · Fase 5 + 5.x fechadas; Fase 6 em curso (6.4 etapas 1-4 shipped pra source-builders) · roadmap vinculante até Fase 7*
+*Última atualização: 2026-05-14 · Manifesto v2.2 · Arquitetura v5.3 · 34 princípios · 963 tests Vitest (+6 todo, 72 files) · Fase 5 + 5.x fechadas; Fase 6 em curso (6.4 etapas 1-4 shipped pra source-builders) · roadmap vinculante até Fase 7*
