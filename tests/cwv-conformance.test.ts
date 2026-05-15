@@ -42,11 +42,10 @@ const DIST_INDEX = join(DIST, 'index.html')
 // Margens conservadoras pra dar buffer de ~10% antes do hard gate.
 const ENTRY_CHUNK_BUDGET_HARD = 300 * 1024 // 300 KB — S1 ceiling
 const ENTRY_CHUNK_BUDGET_SOFT = 250 * 1024 // 250 KB — target manifesto perf
-// V9.31 ratchet (2026-05-15): 800 KB → 700 KB. Medido 653 KB após
-// lazy ThreadView (23f8e6c) + vendor-identity split (24302f1). Folga
-// de 47 KB acomoda nova vendor dep ocasional sem fail imediato; bumps
-// maiores forçam debate explícito.
-const TOTAL_INITIAL_TRANSFER_BUDGET = 700 * 1024 // 700 KB total scripts initial route
+// V9.34 ratchet (2026-05-15): 700 KB → 600 KB. Medido 534 KB após
+// split nip44+nip98+@noble/ciphers em nostr-extras lazy (213f90d).
+// Folga de 66 KB pra novas deps.
+const TOTAL_INITIAL_TRANSFER_BUDGET = 600 * 1024 // 600 KB total scripts initial route
 
 interface DistInspection {
   hasDist: boolean
