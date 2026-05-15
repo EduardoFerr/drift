@@ -123,16 +123,6 @@ const INITIAL: BootState = {
  */
 export const useBootStore = create<BootState>(() => INITIAL)
 
-// API legada — mantida para módulos que ainda usam pubsub estilo antigo.
-// Internamente delega para o store Zustand.
-export const getBootState = useBootStore.getState
-
-export function subscribeBootState(
-  listener: (s: BootState) => void,
-): () => void {
-  return useBootStore.subscribe(listener)
-}
-
 function setBoot(updater: (s: BootState) => BootState): void {
   useBootStore.setState(updater)
 }
