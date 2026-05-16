@@ -1136,7 +1136,9 @@ interface WrapperProps {
   // pré-computado. Wrappers decidem como aplicar — EmbeddedWrapper usa
   // variants funções (corretas em alternância de direção), ModalWrapper
   // computa estático (uso modal não tem AnimatePresence direcional).
-  custom: QueueExitDir
+  // Optional porque PostViewerProps.custom também é optional (X/ESC
+  // close sem direção). Wrappers tratam `undefined` como fade simples.
+  custom?: QueueExitDir
 }
 
 /**
