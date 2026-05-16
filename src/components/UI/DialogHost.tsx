@@ -167,7 +167,7 @@ function DialogModal() {
           {showCancel && (
             <button
               onClick={handleCancel}
-              className="flex-1 rounded border border-drift-border px-3 py-2 font-mono text-[10px] uppercase tracking-meta text-slate-400 transition-colors hover:border-drift-text hover:text-drift-text focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2"
+              className="flex-1 rounded border border-drift-border px-3 py-2 font-mono text-[12px] uppercase tracking-meta text-slate-400 transition-colors hover:border-drift-text hover:text-drift-text focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2"
             >
               {cancelLabel}
             </button>
@@ -177,8 +177,8 @@ function DialogModal() {
             onClick={handleOk}
             className={
               danger
-                ? 'flex-1 rounded border border-drift-bury bg-drift-bury/10 px-3 py-2 font-mono text-[10px] uppercase tracking-meta text-drift-bury transition-colors hover:bg-drift-bury hover:text-drift-bg focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-bury focus-visible:ring-offset-2 focus-visible:ring-offset-drift-bg'
-                : 'flex-1 rounded bg-drift-accent px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-meta text-drift-bg transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2 focus-visible:ring-offset-2 focus-visible:ring-offset-drift-bg'
+                ? 'flex-1 rounded border border-drift-bury bg-drift-bury/10 px-3 py-2 font-mono text-[12px] uppercase tracking-meta text-drift-bury transition-colors hover:bg-drift-bury hover:text-drift-bg focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-bury focus-visible:ring-offset-2 focus-visible:ring-offset-drift-bg'
+                : 'flex-1 rounded bg-drift-accent px-3 py-2 font-mono text-[12px] font-bold uppercase tracking-meta text-drift-bg transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2 focus-visible:ring-offset-2 focus-visible:ring-offset-drift-bg'
             }
           >
             {okLabel}

@@ -48,14 +48,14 @@ export function ModalHeader({ title, subtitle, onClose, tone = 'default', hideCl
           {title}
         </h2>
         {subtitle && (
-          <p className="mt-1 text-[10px] text-drift-muted">{subtitle}</p>
+          <p className="mt-1 text-[12px] text-drift-muted">{subtitle}</p>
         )}
       </div>
       {!hideClose && (
         <m.button
           whileTap={{ scale: 0.92 }}
           onClick={onClose}
-          className="shrink-0 rounded border border-drift-border px-2 py-1 text-[10px] text-drift-muted transition-colors hover:border-drift-accent hover:text-drift-accent focus:border-drift-accent focus:text-drift-accent focus:outline-none"
+          className="shrink-0 rounded border border-drift-border px-2 py-1 text-[12px] text-drift-muted transition-colors hover:border-drift-accent hover:text-drift-accent focus:border-drift-accent focus:text-drift-accent focus:outline-none"
           aria-label="fechar"
         >
           ✕

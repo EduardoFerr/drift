@@ -82,7 +82,7 @@ export function ReportModal({ post, pending, onSubmit, onClose }: ReportModalPro
 
       {!confirmStep && (
         <>
-          <div className="mb-4 rounded border border-drift-border bg-drift-bg/50 p-3 text-[10px] text-drift-muted">
+          <div className="mb-4 rounded border border-drift-border bg-drift-bg/50 p-3 text-[12px] text-drift-muted">
             <div className="mb-1 text-drift-muted">post sendo denunciado:</div>
             <div className="line-clamp-3 text-drift-text">
               {post.subposts[0]?.text ?? '(imagem)'}
@@ -102,7 +102,7 @@ export function ReportModal({ post, pending, onSubmit, onClose }: ReportModalPro
                   {selected === opt.value ? '✓ ' : ''}
                   {opt.label}
                 </div>
-                <div className="mt-0.5 text-[10px] leading-relaxed opacity-80">
+                <div className="mt-0.5 text-[12px] leading-relaxed opacity-80">
                   {opt.description}
                 </div>
               </button>
@@ -156,7 +156,7 @@ function ConfirmStep({
         confirmar denúncia: <span className="text-drift-accent">{reason}</span>
       </div>
 
-      <p className="mb-4 text-[10px] leading-relaxed text-drift-muted">
+      <p className="mb-4 text-[12px] leading-relaxed text-drift-muted">
         O report vai ser publicado como evento Nostr assinado pela sua
         identidade. Não pode ser desfeito — eventos Drift são imutáveis
         (manifesto §6).
@@ -203,7 +203,7 @@ function AuthoritiesBlock() {
       <div className="mb-2 text-[12px] font-semibold text-drift-warning">
         ⚠ conteúdo ilegal — denuncie também a autoridades
       </div>
-      <p className="mb-3 text-[10px] leading-relaxed text-drift-warning/80">
+      <p className="mb-3 text-[12px] leading-relaxed text-drift-warning/80">
         O Drift não substitui denúncia formal. Se viu conteúdo crime
         (especialmente CSAM), denuncie ao canal oficial do seu país —
         eles têm capacidade de investigação e ação que nenhuma rede
@@ -216,7 +216,7 @@ function AuthoritiesBlock() {
             href={a.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center justify-between rounded border border-drift-warning/40 bg-drift-warning/5 px-2 py-1 text-[10px] text-drift-warning hover:border-drift-warning/60 hover:bg-drift-warning/15"
+            className="flex items-center justify-between rounded border border-drift-warning/40 bg-drift-warning/5 px-2 py-1 text-[12px] text-drift-warning hover:border-drift-warning/60 hover:bg-drift-warning/15"
           >
             <span className="truncate">{a.name}</span>
             <span className="ml-2 shrink-0 text-drift-warning/70">{a.region} ↗</span>

@@ -44,7 +44,7 @@ export function IdentityPanel({ identity, onClose }: Props) {
   return (
     <FullPageCard onClose={onClose} title="sua identidade" ariaLabel="sua identidade">
       <div className="p-5">
-      <div className="mb-5 flex gap-1 text-[10px] uppercase tracking-widest">
+      <div className="mb-5 flex gap-1 text-[12px] uppercase tracking-widest">
           <button
             onClick={() => setTab('backup')}
             className={`flex-1 rounded border px-3 py-1.5 ${
@@ -149,7 +149,7 @@ function BackupTab({ identity }: { identity: DriftIdentity }) {
   return (
     <div className="space-y-4">
       <div>
-        <div className="mb-1 text-[10px] uppercase tracking-widest text-drift-muted">
+        <div className="mb-1 text-[12px] uppercase tracking-widest text-drift-muted">
           npub público
         </div>
         <div className="break-all rounded border border-drift-border bg-black/30 p-2 text-[12px] text-drift-text">
@@ -159,12 +159,12 @@ function BackupTab({ identity }: { identity: DriftIdentity }) {
 
       <div>
         <div className="mb-1 flex items-center justify-between">
-          <span className="text-[10px] uppercase tracking-widest text-drift-danger/80">
+          <span className="text-[12px] uppercase tracking-widest text-drift-danger/80">
             nsec privado
           </span>
           <button
             onClick={() => setReveal((r) => !r)}
-            className="text-[10px] uppercase tracking-widest text-drift-muted hover:text-drift-text"
+            className="text-[12px] uppercase tracking-widest text-drift-muted hover:text-drift-text"
           >
             {reveal ? 'ocultar' : 'revelar'}
           </button>
@@ -186,7 +186,7 @@ function BackupTab({ identity }: { identity: DriftIdentity }) {
                   height={240}
                 />
               ) : (
-                <div className="grid h-[240px] w-[240px] place-items-center rounded border border-drift-border text-[10px] text-drift-muted">
+                <div className="grid h-[240px] w-[240px] place-items-center rounded border border-drift-border text-[12px] text-drift-muted">
                   gerando QR…
                 </div>
               )}
@@ -232,7 +232,7 @@ function BackupTab({ identity }: { identity: DriftIdentity }) {
         </label>
       )}
 
-      <div className="rounded border border-drift-warning/60 bg-drift-warning/10 p-3 text-[10px] leading-relaxed text-drift-warning/80">
+      <div className="rounded border border-drift-warning/60 bg-drift-warning/10 p-3 text-[12px] leading-relaxed text-drift-warning/80">
         Esta é a sua identidade na rede Drift. Quem tiver acesso a ela
         controla a sua conta — pode publicar como você, drift e
         sink como você. Guarde offline (papel, gerenciador de
@@ -333,7 +333,7 @@ function ImportTab({ onClose }: { onClose: () => void }) {
           ⤓ carregar arquivo de backup (.json)
         </button>
         {loadedFrom && (
-          <div className="mt-1 truncate font-mono text-[10px] text-drift-accent2/80" title={loadedFrom}>
+          <div className="mt-1 truncate font-mono text-[12px] text-drift-accent2/80" title={loadedFrom}>
             ✓ carregado: {loadedFrom}
           </div>
         )}
@@ -341,14 +341,14 @@ function ImportTab({ onClose }: { onClose: () => void }) {
 
       <div className="flex items-center gap-3">
         <div className="h-px flex-1 bg-drift-border" />
-        <span className="font-mono text-[9px] uppercase tracking-widest text-drift-muted">
+        <span className="font-mono text-[12px] uppercase tracking-widest text-drift-muted">
           ou cole manual
         </span>
         <div className="h-px flex-1 bg-drift-border" />
       </div>
 
       <div>
-        <div className="mb-1 text-[10px] uppercase tracking-widest text-drift-muted">
+        <div className="mb-1 text-[12px] uppercase tracking-widest text-drift-muted">
           chave nsec
         </div>
         <textarea
@@ -369,7 +369,7 @@ function ImportTab({ onClose }: { onClose: () => void }) {
         </div>
       )}
 
-      <div className="rounded border border-drift-warning/60 bg-drift-warning/10 p-3 text-[10px] leading-relaxed text-drift-warning/80">
+      <div className="rounded border border-drift-warning/60 bg-drift-warning/10 p-3 text-[12px] leading-relaxed text-drift-warning/80">
         Importar substitui a identidade atual. Posts publicados com a
         chave atual deixam de ser exibidos como "seus". Se você ainda
         não fez backup, volta na aba "backup" antes.
@@ -466,7 +466,7 @@ function PasskeyTab({ npub }: { npub: string }) {
         ao boot do app. Usa biometria (Touch ID, Face ID, Windows Hello)
         ou security key (YubiKey, etc.).
       </p>
-      <p className="mb-3 text-[10px] leading-relaxed text-drift-muted">
+      <p className="mb-3 text-[12px] leading-relaxed text-drift-muted">
         ⚠ Passkey NÃO é a sua identidade — sua identidade é o nsec. Passkey
         só é gate local pra abrir o app aqui. Se você perder o device + nunca
         fez backup do nsec1, identidade some. Manifesto §3.

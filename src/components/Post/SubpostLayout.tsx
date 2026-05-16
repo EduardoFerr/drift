@@ -296,7 +296,7 @@ function CardText({
 
   return (
     <div className={`relative ${wrapperBg} ${padding} ${flex}`}>
-      <div className="mb-[5px] font-mono text-[9px] uppercase tracking-tag text-drift-muted">
+      <div className="mb-[5px] font-mono text-[12px] uppercase tracking-tag text-drift-muted">
         {tag}
       </div>
       {title && (
@@ -327,7 +327,7 @@ function CardText({
           // imagem). Sem este override o botão herda none → não clica.
           // User report 2026-05-09. touch-action:none delega gestos
           // pro SwipeHandler pai (não bloqueia swipe nav).
-          className="pointer-events-auto mb-2 inline-flex items-center self-start font-mono text-[10px] uppercase tracking-meta text-drift-accent2 hover:text-drift-accent focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2 rounded"
+          className="pointer-events-auto mb-2 inline-flex items-center self-start font-mono text-[12px] uppercase tracking-meta text-drift-accent2 hover:text-drift-accent focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2 rounded"
           style={{ touchAction: 'none' }}
           // V10.6 — opt-out de long-press (tap explícito pra expandir
           // texto não deve virar moderação).
@@ -342,7 +342,7 @@ function CardText({
           abreviações em três idiomas conceituais (verbo PT/EN, plural EN,
           advérbio PT). Agora: símbolos universais + número.
           Tooltips preservam significado pra screen readers. */}
-      <div className="flex gap-3 font-mono text-[9px] uppercase tracking-meta text-drift-muted">
+      <div className="flex gap-3 font-mono text-[12px] uppercase tracking-meta text-drift-muted">
         <span title={`drifts: ${drift}`} aria-label={`${drift} drifts`}>
           <span aria-hidden="true">↑</span>{' '}
           <span className="text-drift-accent2">{drift}</span>

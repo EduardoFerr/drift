@@ -91,11 +91,11 @@ describe('driftButtonVariantClass', () => {
 })
 
 describe('driftButtonSizeClass', () => {
-  it('sm = px-2 py-1 text-[10px], sem uppercase tracking (mini button inline)', () => {
+  it('sm = px-2 py-1 text-[12px], sem uppercase tracking (mini button inline)', () => {
     const cls = driftButtonSizeClass('sm')
     expect(cls).toContain('px-2')
     expect(cls).toContain('py-1')
-    expect(cls).toContain('text-[10px]')
+    expect(cls).toContain('text-[12px]')
     expect(cls).not.toContain('uppercase')
     expect(cls).not.toContain('tracking-')
   })

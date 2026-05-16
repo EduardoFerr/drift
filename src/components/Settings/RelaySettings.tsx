@@ -139,7 +139,7 @@ export function RelaySettings({ onClose }: RelaySettingsProps) {
             return (
               <div
                 key={r.url}
-                className={`flex items-center gap-2 rounded border border-drift-border/60 bg-drift-bg/30 px-2 py-1 text-[10px] ${
+                className={`flex items-center gap-2 rounded border border-drift-border/60 bg-drift-bg/30 px-2 py-1 text-[12px] ${
                   r.enabled ? '' : 'opacity-50'
                 }`}
               >
@@ -148,11 +148,11 @@ export function RelaySettings({ onClose }: RelaySettingsProps) {
                   {r.url}
                 </span>
                 {isDemoted && (
-                  <span className="rounded bg-drift-warning/20 px-1 text-[9px] text-drift-warning">
+                  <span className="rounded bg-drift-warning/20 px-1 text-[12px] text-drift-warning">
                     demoted {demotedMin}m
                   </span>
                 )}
-                <span className="rounded bg-drift-border/40 px-1 text-[9px] text-drift-muted">
+                <span className="rounded bg-drift-border/40 px-1 text-[12px] text-drift-muted">
                   {r.source}
                 </span>
                 <button
@@ -174,7 +174,7 @@ export function RelaySettings({ onClose }: RelaySettingsProps) {
 
         {/* Adicionar */}
         <section className="mb-4 border-t border-drift-border pt-3">
-          <div className="mb-2 text-[10px] uppercase tracking-widest text-drift-muted">
+          <div className="mb-2 text-[12px] uppercase tracking-widest text-drift-muted">
             adicionar relay
           </div>
           <div className="flex gap-2">
@@ -194,14 +194,14 @@ export function RelaySettings({ onClose }: RelaySettingsProps) {
             </button>
           </div>
           {error && (
-            <div className="mt-2 text-[10px] text-drift-danger">{error}</div>
+            <div className="mt-2 text-[12px] text-drift-danger">{error}</div>
           )}
         </section>
 
         {/* NIP-65 */}
         <section className="mb-4 border-t border-drift-border pt-3">
           <div
-            className="mb-2 text-[10px] uppercase tracking-widest text-drift-muted"
+            className="mb-2 text-[12px] uppercase tracking-widest text-drift-muted"
             title="NIP-65 — Relay List Metadata"
           >
             descobrir relays via NIP-65
@@ -223,7 +223,7 @@ export function RelaySettings({ onClose }: RelaySettingsProps) {
             </button>
           </div>
           {importMsg && (
-            <div className="text-[10px] text-drift-muted">{importMsg}</div>
+            <div className="text-[12px] text-drift-muted">{importMsg}</div>
           )}
 
           <button
@@ -234,7 +234,7 @@ export function RelaySettings({ onClose }: RelaySettingsProps) {
             {publishing ? 'publicando…' : '↗ publicar minha lista (NIP-65)'}
           </button>
           {publishMsg && (
-            <div className="mt-1 text-[10px] text-drift-muted">{publishMsg}</div>
+            <div className="mt-1 text-[12px] text-drift-muted">{publishMsg}</div>
           )}
         </section>
       </div>

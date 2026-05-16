@@ -119,7 +119,7 @@ export function ThreadHeader({
             </h2>
             {postIdShort && (
               <span
-                className="shrink-0 font-mono text-[9px] uppercase tracking-meta text-drift-muted"
+                className="shrink-0 font-mono text-[12px] uppercase tracking-meta text-drift-muted"
                 title={`post id …${post!.id.slice(-12)}`}
                 aria-hidden="true"
               >
@@ -171,7 +171,7 @@ export function ThreadHeader({
         </div>
 
         {/* Counter + badge */}
-        <div className="flex items-center gap-2 font-mono text-[10px] tracking-meta text-drift-muted">
+        <div className="flex items-center gap-2 font-mono text-[12px] tracking-meta text-drift-muted">
           {total > 0 && (
             <span>
               <span className="text-drift-text">{position}</span>/{total}
@@ -228,7 +228,7 @@ export function ThreadHeader({
         {onNewTopLevelComment && (
           <button
             onClick={onNewTopLevelComment}
-            className="shrink-0 rounded border border-drift-accent px-2 py-1 font-mono text-[10px] uppercase tracking-meta text-drift-accent hover:bg-drift-accent/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2"
+            className="shrink-0 rounded border border-drift-accent px-2 py-1 font-mono text-[12px] uppercase tracking-meta text-drift-accent hover:bg-drift-accent/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2"
             aria-label="comentar no post (top-level)"
             title="comentar no post (top-level)"
           >

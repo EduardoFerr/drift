@@ -225,7 +225,7 @@ export function IdentitySwitcher({ onRequestExport, onClose }: IdentitySwitcherP
                       isActive ? 'border-drift-accent' : 'border-drift-border/60'
                     }`}
                   >
-                    <div className="mb-1 flex items-center justify-between text-[10px]">
+                    <div className="mb-1 flex items-center justify-between text-[12px]">
                       <div className="flex items-center gap-2">
                         <span className={isActive ? 'text-drift-accent' : 'text-drift-muted'}>
                           {isActive ? '● ativa' : '○'}
@@ -235,7 +235,7 @@ export function IdentitySwitcher({ onRequestExport, onClose }: IdentitySwitcherP
                         </span>
                         {id.imported && (
                           <span
-                            className="rounded bg-drift-border/60 px-1 text-[9px] text-drift-muted"
+                            className="rounded bg-drift-border/60 px-1 text-[12px] text-drift-muted"
                             title="importada via nsec1"
                           >
                             importada
@@ -243,10 +243,10 @@ export function IdentitySwitcher({ onRequestExport, onClose }: IdentitySwitcherP
                         )}
                       </div>
                     </div>
-                    <div className="mb-1 break-all text-[9px] text-drift-muted">
+                    <div className="mb-1 break-all text-[12px] text-drift-muted">
                       {id.npubBech32}
                     </div>
-                    <div className="flex flex-wrap gap-1 text-[10px]">
+                    <div className="flex flex-wrap gap-1 text-[12px]">
                       {!isActive && (
                         <button
                           onClick={() => void handleSwitch(id)}
@@ -393,7 +393,7 @@ export function IdentitySwitcher({ onRequestExport, onClose }: IdentitySwitcherP
               (NIP-06). Mais fácil de anotar que <code>nsec1</code>;
               compatível com Damus/Snort/Coracle/Iris/Amethyst.
             </p>
-            <p className="mb-3 text-[10px] text-drift-warning">
+            <p className="mb-3 text-[12px] text-drift-warning">
               ⚠ Anote ou guarde as palavras em local seguro. Quem tem as
               12 palavras tem a identidade.
             </p>
@@ -438,7 +438,7 @@ export function IdentitySwitcher({ onRequestExport, onClose }: IdentitySwitcherP
                 ))}
               </div>
             </div>
-            <div className="mb-2 break-all text-[10px] text-drift-muted">
+            <div className="mb-2 break-all text-[12px] text-drift-muted">
               npub: <span className="text-drift-text">{bip39ShowResult.npub}</span>
             </div>
             <div className="flex gap-2">

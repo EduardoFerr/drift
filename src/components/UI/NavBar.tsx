@@ -10,7 +10,7 @@
  *   border-top drift-border, padding 12px
  * - Plus central: 48×48 rounded-full bg drift-accent text drift-bg,
  *   shadow [0_0_22px_rgba(232,255,90,0.22)] (glow accent)
- * - Side buttons: SVG icon 20×20 + label DM Mono text-[10px]
+ * - Side buttons: SVG icon 20×20 + label DM Mono text-[12px]
  *   uppercase tracking-widest text-drift-muted
  * - Hover: text-drift-text + scale 1.02
  *
@@ -135,7 +135,7 @@ function NavBtn({ action }: { action: NavAction }) {
       }`}
     >
       <span className="text-[18px] leading-none">{action.icon}</span>
-      <span className="font-mono text-[10px] uppercase tracking-widest">
+      <span className="font-mono text-[12px] uppercase tracking-widest">
         {action.label}
       </span>
     </m.button>

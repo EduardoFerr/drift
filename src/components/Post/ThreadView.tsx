@@ -709,7 +709,7 @@ function CoachContent() {
           <span className="text-drift-accent">↓</span> subir / sair
         </li>
       </ul>
-      <span className="font-mono text-[10px] text-drift-muted">
+      <span className="font-mono text-[12px] text-drift-muted">
         toque pra fechar
       </span>
     </div>

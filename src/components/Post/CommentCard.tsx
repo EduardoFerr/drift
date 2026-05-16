@@ -219,7 +219,7 @@ export function CommentCard({
               {node.content_warning}
             </DriftChip>
           )}
-          <span className="font-mono text-[10px] uppercase tracking-meta text-drift-muted">
+          <span className="font-mono text-[12px] uppercase tracking-meta text-drift-muted">
             {timeAgo(node.created_at)}
           </span>
         </div>
@@ -268,7 +268,7 @@ export function CommentCard({
                 />
                 {cwBlur && (
                   <span
-                    className="pointer-events-none absolute inset-0 flex items-center justify-center font-mono text-[10px] uppercase tracking-meta text-drift-warning"
+                    className="pointer-events-none absolute inset-0 flex items-center justify-center font-mono text-[12px] uppercase tracking-meta text-drift-warning"
                     aria-hidden="true"
                   >
                     toque pra revelar
@@ -298,7 +298,7 @@ export function CommentCard({
           <button
             type="button"
             onClick={onDescend}
-            className="flex items-center gap-2 rounded font-mono text-[10px] uppercase tracking-meta text-drift-accent2 hover:text-drift-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2"
+            className="flex items-center gap-2 rounded font-mono text-[12px] uppercase tracking-meta text-drift-accent2 hover:text-drift-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2"
             aria-label={`ver ${childCount} ${childCount === 1 ? 'resposta' : 'respostas'} (ou swipe para cima)`}
             aria-keyshortcuts="ArrowUp"
             title="ver respostas (toque ou swipe ↑)"
@@ -312,12 +312,12 @@ export function CommentCard({
           </button>
         ) : (
           <>
-            <span className="font-mono text-[10px] uppercase tracking-meta text-drift-muted">
+            <span className="font-mono text-[12px] uppercase tracking-meta text-drift-muted">
               ↳ {childCount} {childCount === 1 ? 'resposta' : 'respostas'}
             </span>
             {childCount > 0 && (
               <span
-                className="font-mono text-[10px] uppercase tracking-meta text-drift-accent2"
+                className="font-mono text-[12px] uppercase tracking-meta text-drift-accent2"
                 title="swipe ↑ pra descer na thread"
                 aria-hidden="true"
               >
@@ -343,12 +343,12 @@ function CwHiddenPlaceholder({
       <DriftChip variant="warning" size="sm" active icon="⚠" ariaLabel={`aviso de conteúdo: ${warning}`}>
         {warning}
       </DriftChip>
-      <span className="font-mono text-[10px] text-drift-muted">
+      <span className="font-mono text-[12px] text-drift-muted">
         autor marcou — manifesto §27
       </span>
       <button
         onClick={onReveal}
-        className="rounded border border-drift-accent2 px-3 py-1.5 font-mono text-[10px] uppercase tracking-meta text-drift-accent2 hover:bg-drift-accent2/10"
+        className="rounded border border-drift-accent2 px-3 py-1.5 font-mono text-[12px] uppercase tracking-meta text-drift-accent2 hover:bg-drift-accent2/10"
       >
         ver mesmo assim
       </button>
@@ -362,12 +362,12 @@ function HiddenPlaceholder({ onReveal }: { onReveal: () => void }) {
       <span className="font-mono text-[12px] uppercase tracking-meta text-drift-warning">
         [comentário oculto]
       </span>
-      <span className="font-mono text-[10px] text-drift-muted">
+      <span className="font-mono text-[12px] text-drift-muted">
         moderado pela comunidade — manifesto §26
       </span>
       <button
         onClick={onReveal}
-        className="rounded border border-drift-accent2 px-3 py-1.5 font-mono text-[10px] uppercase tracking-meta text-drift-accent2 hover:bg-drift-accent2/10"
+        className="rounded border border-drift-accent2 px-3 py-1.5 font-mono text-[12px] uppercase tracking-meta text-drift-accent2 hover:bg-drift-accent2/10"
       >
         ver oculto
       </button>
@@ -476,12 +476,12 @@ function ListVariant({
           <span className="truncate font-display text-fluid-base font-bold uppercase tracking-tag text-drift-text">
             anon{truncate(node.author_pub)}
           </span>
-          <span className="shrink-0 font-mono text-[10px] uppercase tracking-meta text-drift-muted">
+          <span className="shrink-0 font-mono text-[12px] uppercase tracking-meta text-drift-muted">
             {timeAgo(node.created_at)}
           </span>
           {node.content_warning && (
             <span
-              className="shrink-0 rounded border border-drift-warning/60 bg-drift-warning/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-meta text-drift-warning"
+              className="shrink-0 rounded border border-drift-warning/60 bg-drift-warning/10 px-1.5 py-0.5 font-mono text-[12px] uppercase tracking-meta text-drift-warning"
               title={`autor marcou: ${node.content_warning}`}
               aria-label={`aviso de conteúdo: ${node.content_warning}`}
             >
@@ -490,7 +490,7 @@ function ListVariant({
           )}
           {isNew && (
             <span
-              className="shrink-0 rounded border border-drift-accent2/60 bg-drift-accent2/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-meta text-drift-accent2"
+              className="shrink-0 rounded border border-drift-accent2/60 bg-drift-accent2/10 px-1.5 py-0.5 font-mono text-[12px] uppercase tracking-meta text-drift-accent2"
               aria-label="comentário novo"
             >
               NOVO
@@ -504,7 +504,7 @@ function ListVariant({
               e.stopPropagation()
               onToggleExpand()
             }}
-            className="shrink-0 rounded border border-drift-border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-meta text-drift-muted hover:border-drift-accent2 hover:text-drift-accent2 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2"
+            className="shrink-0 rounded border border-drift-border px-1.5 py-0.5 font-mono text-[12px] uppercase tracking-meta text-drift-muted hover:border-drift-accent2 hover:text-drift-accent2 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2"
             aria-label={
               isExpanded
                 ? `colapsar ${childCount} ${childCount === 1 ? 'resposta' : 'respostas'}`
@@ -554,7 +554,7 @@ function ListVariant({
               />
               {cwBlur && (
                 <span
-                  className="pointer-events-none absolute inset-0 flex items-center justify-center font-mono text-[10px] uppercase tracking-meta text-drift-warning"
+                  className="pointer-events-none absolute inset-0 flex items-center justify-center font-mono text-[12px] uppercase tracking-meta text-drift-warning"
                   aria-hidden="true"
                 >
                   toque pra revelar
@@ -581,7 +581,7 @@ function ListVariant({
       )}
 
       {/* Footer meta */}
-      <footer className="flex items-center gap-3 font-mono text-[10px] uppercase tracking-meta text-drift-muted">
+      <footer className="flex items-center gap-3 font-mono text-[12px] uppercase tracking-meta text-drift-muted">
         {childCount > 0 && (
           <span className="text-drift-accent2">
             ↳ {childCount} {childCount === 1 ? 'resposta' : 'respostas'}

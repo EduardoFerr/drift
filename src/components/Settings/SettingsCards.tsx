@@ -64,7 +64,7 @@ function Toggle({
     >
       <div className="flex-1 min-w-0">
         <div className="font-mono text-[12px] text-drift-text">{label}</div>
-        <div className="mt-0.5 font-mono text-[10px] leading-relaxed text-drift-muted">
+        <div className="mt-0.5 font-mono text-[12px] leading-relaxed text-drift-muted">
           {hint}
         </div>
       </div>
@@ -207,7 +207,7 @@ export function LocationCard({ onClose }: CardProps) {
           })}
         </div>
         {/* Detalhe do valor selecionado — explica o que vai pra rede. */}
-        <div className="rounded border border-drift-border bg-drift-bg/50 p-3 font-mono text-[10px] leading-relaxed text-drift-muted">
+        <div className="rounded border border-drift-border bg-drift-bg/50 p-3 font-mono text-[12px] leading-relaxed text-drift-muted">
           <span className="text-drift-text">
             {GRANULARITY_OPTIONS.find((o) => o.value === prefs.location_granularity)?.label}
           </span>
@@ -352,7 +352,7 @@ export function NetworkModeCard({ onClose }: CardProps) {
             )
           })}
         </div>
-        <p className="font-mono text-[10px] leading-relaxed text-drift-warning/70">
+        <p className="font-mono text-[12px] leading-relaxed text-drift-warning/70">
           Status atual: scaffold/stub em PWA. Tor real funciona em build
           Tauri com <code>--features arti</code>. Trocar de modo exige
           reload (limitação do <code>SimplePool</code> global).
@@ -425,7 +425,7 @@ function Alert({
       : 'border-drift-warning/60 bg-drift-warning/10 text-drift-warning'
   const titleColor = tone === 'error' ? 'text-drift-danger' : 'text-drift-warning'
   return (
-    <div role="alert" className={`rounded border px-3 py-2 font-mono text-[10px] leading-relaxed ${colors}`}>
+    <div role="alert" className={`rounded border px-3 py-2 font-mono text-[12px] leading-relaxed ${colors}`}>
       <strong className={`block ${titleColor}`}>{title}</strong>
       <span className="mt-1 block opacity-80">{children}</span>
     </div>
@@ -593,7 +593,7 @@ export function BlobsCard({ onClose }: CardProps) {
             <div className="mt-2 flex gap-2">
               <button
                 onClick={() => void refresh()}
-                className="flex-1 rounded border border-drift-border px-3 py-2 text-[10px] uppercase tracking-meta text-drift-muted transition-colors hover:text-drift-text focus:outline-none focus:ring-1 focus:ring-drift-accent2"
+                className="flex-1 rounded border border-drift-border px-3 py-2 text-[12px] uppercase tracking-meta text-drift-muted transition-colors hover:text-drift-text focus:outline-none focus:ring-1 focus:ring-drift-accent2"
               >
                 ↻ atualizar
               </button>
@@ -602,7 +602,7 @@ export function BlobsCard({ onClose }: CardProps) {
                   onClick={() => void handleStop()}
                   disabled={stopping}
                   title="encerra libp2p — para WS chatter; blobs pinados ficam no disco"
-                  className="flex-1 rounded border border-drift-bury/60 bg-drift-bury/5 px-3 py-2 text-[10px] uppercase tracking-meta text-drift-bury transition-colors hover:bg-drift-bury/10 disabled:opacity-40 focus:outline-none focus:ring-1 focus:ring-drift-bury"
+                  className="flex-1 rounded border border-drift-bury/60 bg-drift-bury/5 px-3 py-2 text-[12px] uppercase tracking-meta text-drift-bury transition-colors hover:bg-drift-bury/10 disabled:opacity-40 focus:outline-none focus:ring-1 focus:ring-drift-bury"
                 >
                   {stopping ? 'desligando…' : '⊗ desligar'}
                 </button>
@@ -626,7 +626,7 @@ function Row({
 }) {
   return (
     <div className="flex items-center justify-between">
-      <span className="text-[10px] uppercase tracking-meta text-drift-muted">
+      <span className="text-[12px] uppercase tracking-meta text-drift-muted">
         {label}
       </span>
       <span className={valueClass}>{value}</span>

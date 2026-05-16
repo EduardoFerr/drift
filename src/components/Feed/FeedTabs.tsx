@@ -80,7 +80,7 @@ export function FeedTabs({ onActiveTabTap }: FeedTabsProps = {}) {
   )
 
   return (
-    <div className="flex items-stretch font-mono text-[10px] uppercase tracking-[2px]">
+    <div className="flex items-stretch font-mono text-[12px] uppercase tracking-[2px]">
       <div className="relative flex flex-1 items-stretch">
         {tabs.map((t) => (
           <FeedTabBtn
@@ -141,7 +141,7 @@ export function FeedTabs({ onActiveTabTap }: FeedTabsProps = {}) {
         {unseenCount > 0 && (
           <span
             aria-hidden="true"
-            className="absolute -right-0.5 -top-0.5 min-w-[16px] rounded-full bg-drift-accent px-1 text-center text-[8px] font-bold leading-[14px] text-drift-bg"
+            className="absolute -right-0.5 -top-0.5 min-w-[16px] rounded-full bg-drift-accent px-1 text-center text-[12px] font-bold leading-[16px] text-drift-bg"
           >
             {unseenCount > 99 ? '99+' : unseenCount}
           </span>

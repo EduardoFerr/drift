@@ -446,3 +446,14 @@ function scheduleEviction(currentNpub: string): void {
       })
   }, EVICTION_INTERVAL_MS)
 }
+
+/**
+ * Para o timer de eviction periódica. Chamado por `stopBoot()` pra
+ * cleanup em teardown (hot-reload dev, testes, troca de identidade).
+ */
+export function stopEviction(): void {
+  if (evictionTimer) {
+    clearInterval(evictionTimer)
+    evictionTimer = null
+  }
+}

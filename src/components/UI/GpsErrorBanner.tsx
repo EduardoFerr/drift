@@ -53,13 +53,13 @@ export function GpsErrorBanner({ reason, onDismiss }: GpsErrorBannerProps) {
         </span>
         <div className="flex-1 font-mono text-[12px]">
           <div className="text-amber-200">{message}</div>
-          <div className="text-[10px] text-amber-200/60">
+          <div className="text-[12px] text-amber-200/60">
             Post foi publicado sem location.
           </div>
         </div>
         <button
           onClick={() => setShowHelp(true)}
-          className="rounded border border-amber-500/60 px-3 py-1 font-mono text-[10px] uppercase tracking-widest text-amber-300 hover:bg-amber-500/10"
+          className="rounded border border-amber-500/60 px-3 py-1 font-mono text-[12px] uppercase tracking-widest text-amber-300 hover:bg-amber-500/10"
         >
           como ajustar
         </button>
@@ -176,14 +176,14 @@ function GpsHelpModal({ onClose }: { onClose: () => void }) {
             </li>
             <li>Feche e reabra a aba do Drift</li>
           </ol>
-          <p className="mt-2 text-[10px] text-slate-500">
+          <p className="mt-2 text-[12px] text-slate-500">
             Nota: iOS Safari não tem permissions API — não dá pra detectar
             estado de antemão. Se permissão foi negada, a única forma de
             reabilitar é via Ajustes do sistema.
           </p>
         </section>
 
-        <div className="mt-4 border-t border-drift-border pt-3 text-[10px] text-slate-500">
+        <div className="mt-4 border-t border-drift-border pt-3 text-[12px] text-slate-500">
           Drift NUNCA envia coordenada precisa por padrão — você escolheu
           a granularidade em Settings (manifesto §28).
         </div>

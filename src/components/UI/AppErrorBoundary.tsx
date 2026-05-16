@@ -116,7 +116,7 @@ export class AppErrorBoundary extends Component<Props, State> {
           </div>
 
           <div className="rounded border border-drift-border bg-drift-bg/60 p-3">
-            <div className="font-mono text-[9px] uppercase tracking-meta text-drift-muted">
+            <div className="font-mono text-[12px] uppercase tracking-meta text-drift-muted">
               mensagem
             </div>
             <pre className="mt-1 whitespace-pre-wrap break-all font-mono text-[12px] text-drift-text">
@@ -126,10 +126,10 @@ export class AppErrorBoundary extends Component<Props, State> {
 
           {stack && (
             <details className="rounded border border-drift-border bg-drift-bg/60 p-3">
-              <summary className="cursor-pointer font-mono text-[9px] uppercase tracking-meta text-drift-muted hover:text-drift-text">
+              <summary className="cursor-pointer font-mono text-[12px] uppercase tracking-meta text-drift-muted hover:text-drift-text">
                 stack trace (debug)
               </summary>
-              <pre className="mt-2 max-h-48 overflow-y-auto whitespace-pre-wrap break-all font-mono text-[9px] leading-relaxed text-drift-muted">
+              <pre className="mt-2 max-h-48 overflow-y-auto whitespace-pre-wrap break-all font-mono text-[12px] leading-relaxed text-drift-muted">
                 {stack}
               </pre>
             </details>

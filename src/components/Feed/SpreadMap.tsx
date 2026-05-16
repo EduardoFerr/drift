@@ -515,11 +515,11 @@ function MapShell({
         </div>
       )}
 
-      <div className="pointer-events-none absolute bottom-2 left-2 rounded bg-drift-bg/80 px-2 py-1 font-mono text-[10px] text-drift-muted backdrop-blur-sm">
+      <div className="pointer-events-none absolute bottom-2 left-2 rounded bg-drift-bg/80 px-2 py-1 font-mono text-[12px] text-drift-muted backdrop-blur-sm">
         {stats}
       </div>
       <div
-        className="pointer-events-auto absolute bottom-2 right-2 rounded bg-drift-bg/80 px-2 py-1 text-[9px] text-drift-muted backdrop-blur-sm [&_a]:underline [&_a]:hover:text-drift-text"
+        className="pointer-events-auto absolute bottom-2 right-2 rounded bg-drift-bg/80 px-2 py-1 text-[12px] text-drift-muted backdrop-blur-sm [&_a]:underline [&_a]:hover:text-drift-text"
         dangerouslySetInnerHTML={{ __html: MAP_ATTRIBUTION }}
       />
     </div>
@@ -540,7 +540,7 @@ function ModeBtn({
   return (
     <button
       onClick={onClick}
-      className={`px-[10px] py-[5px] font-mono text-[9px] uppercase tracking-meta transition-colors ${
+      className={`px-[10px] py-[5px] font-mono text-[12px] uppercase tracking-meta transition-colors ${
         active ? 'bg-drift-accent/15 text-drift-accent' : 'text-drift-muted hover:text-drift-text'
       }`}
     >
@@ -570,7 +570,7 @@ function Placeholder({
       {action && (
         <button
           onClick={action.onClick}
-          className="mt-1 rounded border border-drift-accent px-3 py-1 text-[10px] uppercase tracking-widest text-drift-accent hover:bg-drift-accent/10"
+          className="mt-1 rounded border border-drift-accent px-3 py-1 text-[12px] uppercase tracking-widest text-drift-accent hover:bg-drift-accent/10"
         >
           {action.label}
         </button>

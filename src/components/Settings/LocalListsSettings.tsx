@@ -113,7 +113,7 @@ function TabBtn({
   return (
     <button
       onClick={onClick}
-      className={`flex-1 px-2 py-1 text-[10px] uppercase tracking-widest transition-colors ${
+      className={`flex-1 px-2 py-1 text-[12px] uppercase tracking-widest transition-colors ${
         active
           ? 'border-b-2 border-drift-accent text-drift-accent'
           : 'border-b-2 border-transparent text-drift-muted hover:text-drift-text'
@@ -146,7 +146,7 @@ function PinnedList({
       {list.map((p) => (
         <div
           key={p.postId}
-          className="flex items-center gap-2 rounded border border-drift-border/60 bg-drift-bg/30 px-2 py-1 text-[10px]"
+          className="flex items-center gap-2 rounded border border-drift-border/60 bg-drift-bg/30 px-2 py-1 text-[12px]"
         >
           <span className="text-drift-warning">📌</span>
           <span className="flex-1 truncate font-mono text-drift-muted">
@@ -202,7 +202,7 @@ function ModList({
         return (
           <div
             key={e.npub}
-            className="flex items-center gap-2 rounded border border-drift-border/60 bg-drift-bg/30 px-2 py-1 text-[10px]"
+            className="flex items-center gap-2 rounded border border-drift-border/60 bg-drift-bg/30 px-2 py-1 text-[12px]"
           >
             <span className="flex-1 truncate font-mono text-drift-muted" title={e.reason ?? ''}>
               {bech32.slice(0, 18)}…

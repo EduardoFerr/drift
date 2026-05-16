@@ -333,7 +333,7 @@ function attachImetasToSubposts(subposts: Subpost[], rawEvent: string): void {
 
   // parseImetaTag é puro e síncrono (string ops); import estático é OK
   // porque nip94.ts não tem deps pesadas (sem Helia).
-  const tags = event.tags as unknown as string[][]
+  const tags = event.tags as string[][]
   const metas: BlobMeta[] = []
   for (const tag of tags) {
     if (!Array.isArray(tag) || tag[0] !== 'imeta') continue

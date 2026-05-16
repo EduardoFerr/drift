@@ -78,11 +78,11 @@ export function ProfileModal({ identity, onClose }: ProfileModalProps) {
           {label && (
             <div className="mb-1 text-[12px] text-drift-text">{label}</div>
           )}
-          <div className="break-all font-mono text-[10px] text-drift-muted">
+          <div className="break-all font-mono text-[12px] text-drift-muted">
             {identity.npubBech32}
           </div>
           <div className="mt-2 flex items-center justify-between">
-            <span className="text-[10px] text-drift-muted">
+            <span className="text-[12px] text-drift-muted">
               criada: {new Date(identity.createdAt).toLocaleString()}
             </span>
             <TierBadge tier={getWeightTier(userWeight.weight)} />
@@ -111,7 +111,7 @@ export function ProfileModal({ identity, onClose }: ProfileModalProps) {
         )}
 
         {(aggregate?.pinned_count || blockedCount || mutedCount) ? (
-          <section className="mb-2 flex flex-wrap gap-2 border-t border-drift-border pt-3 text-[10px] text-drift-muted">
+          <section className="mb-2 flex flex-wrap gap-2 border-t border-drift-border pt-3 text-[12px] text-drift-muted">
             {aggregate && aggregate.pinned_count > 0 && (
               <span>📌 {aggregate.pinned_count} fixados</span>
             )}
@@ -120,7 +120,7 @@ export function ProfileModal({ identity, onClose }: ProfileModalProps) {
           </section>
         ) : null}
 
-      <p className="mt-3 text-[10px] leading-relaxed text-drift-muted">
+      <p className="mt-3 text-[12px] leading-relaxed text-drift-muted">
         Manifesto §22 — score determinístico. Esses números vêm de eventos
         Nostr públicos; qualquer cliente Drift calcula os mesmos a partir
         do mesmo conjunto.
@@ -139,7 +139,7 @@ function TierBadge({ tier }: { tier: WeightTier | null }) {
       : { emoji: '🌱', label: 'novo', color: 'text-drift-spread border-drift-spread/40' }
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded border px-2 py-0.5 text-[10px] ${config.color}`}
+      className={`inline-flex items-center gap-1 rounded border px-2 py-0.5 text-[12px] ${config.color}`}
       title="weight é determinístico — função pura de antiquity (semanas) + spreads recebidos. Manifesto §22."
     >
       <span aria-hidden>{config.emoji}</span>
@@ -170,7 +170,7 @@ function Stat({
   return (
     <div className="rounded border border-drift-border/60 bg-drift-bg/30 p-2" title={tooltip}>
       <div className={`text-lg font-semibold tabular-nums ${color}`}>{value}</div>
-      <div className="text-[9px] uppercase tracking-widest text-drift-muted">{label}</div>
+      <div className="text-[12px] uppercase tracking-widest text-drift-muted">{label}</div>
     </div>
   )
 }

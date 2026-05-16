@@ -226,7 +226,7 @@ export function ComposeOverlay({
     <button
       onClick={onClose}
       disabled={publishing}
-      className="rounded border border-drift-border px-3 py-[5px] font-mono text-[10px] uppercase tracking-[2px] text-drift-muted transition-colors hover:text-drift-text disabled:opacity-40 focus:outline-none focus:ring-1 focus:ring-drift-accent2"
+      className="rounded border border-drift-border px-3 py-[5px] font-mono text-[12px] uppercase tracking-[2px] text-drift-muted transition-colors hover:text-drift-text disabled:opacity-40 focus:outline-none focus:ring-1 focus:ring-drift-accent2"
       aria-label="cancelar"
     >
       cancelar
@@ -240,7 +240,7 @@ export function ComposeOverlay({
         <button
           onClick={removeCurrent}
           disabled={publishing}
-          className="rounded border border-drift-border px-[14px] font-mono text-[10px] uppercase tracking-[1px] text-drift-bury transition-colors hover:border-drift-bury disabled:opacity-40 focus:outline-none focus:ring-1 focus:ring-drift-accent2"
+          className="rounded border border-drift-border px-[14px] font-mono text-[12px] uppercase tracking-[1px] text-drift-bury transition-colors hover:border-drift-bury disabled:opacity-40 focus:outline-none focus:ring-1 focus:ring-drift-accent2"
           aria-label="remover subpost atual"
         >
           - SUB
@@ -298,7 +298,7 @@ export function ComposeOverlay({
                 // Chips de subpost usam drift-bg pra inset visual contra drift-surface
                 // do painel parent (#15151a vs #0c0c0b). Diff sutil mas suficiente
                 // pra delimitar; antes era #1e1e1c custom — consolidado em token.
-                className={`relative flex h-[27px] w-[27px] shrink-0 items-center justify-center rounded-full border-[1.5px] font-mono text-[10px] transition-colors focus:outline-none focus:ring-1 focus:ring-drift-accent2 focus:ring-offset-1 focus:ring-offset-drift-bg ${
+                className={`relative flex h-[27px] w-[27px] shrink-0 items-center justify-center rounded-full border-[1.5px] font-mono text-[12px] transition-colors focus:outline-none focus:ring-1 focus:ring-drift-accent2 focus:ring-offset-1 focus:ring-offset-drift-bg ${
                   isActive
                     ? 'border-drift-accent bg-drift-accent font-bold text-drift-bg'
                     : isFilled
@@ -328,7 +328,7 @@ export function ComposeOverlay({
               +
             </button>
           )}
-          <span className="ml-auto shrink-0 font-mono text-[9px] uppercase tracking-meta text-drift-muted">
+          <span className="ml-auto shrink-0 font-mono text-[12px] uppercase tracking-meta text-drift-muted">
             {drafts.length}/{maxSubposts}
           </span>
         </div>
@@ -365,7 +365,7 @@ export function ComposeOverlay({
               // Textarea usa drift-bg pra inset visual vs drift-surface do painel.
               className="min-h-[85px] flex-1 resize-none rounded-sm border-[1.5px] border-drift-border bg-drift-bg p-3 font-mono text-fluid-lg leading-[1.6] text-drift-text placeholder:text-drift-muted focus:border-drift-accent focus:outline-none"
             />
-            <div className="mt-1 flex items-center justify-between text-[10px]">
+            <div className="mt-1 flex items-center justify-between text-[12px]">
               <span
                 className={
                   overLimit
@@ -402,7 +402,7 @@ export function ComposeOverlay({
             <div
               role="note"
               aria-label="sugestão de aviso de conteúdo"
-              className="rounded border border-drift-warning/40 bg-drift-warning/5 px-3 py-2 font-mono text-[10px] leading-snug text-drift-warning"
+              className="rounded border border-drift-warning/40 bg-drift-warning/5 px-3 py-2 font-mono text-[12px] leading-snug text-drift-warning"
             >
               <span className="mr-1" aria-hidden="true">⚠</span>
               Seu post tem imagem mas nenhum aviso de conteúdo. Considere
@@ -456,7 +456,7 @@ function ImageDrop({
               e.preventDefault()
               onClear()
             }}
-            className="absolute right-[7px] top-[7px] z-[2] rounded border border-drift-border bg-[rgba(0,0,0,0.75)] px-2 py-[3px] font-mono text-[10px] text-drift-bury transition-colors hover:border-drift-bury"
+            className="absolute right-[7px] top-[7px] z-[2] rounded border border-drift-border bg-[rgba(0,0,0,0.75)] px-2 py-[3px] font-mono text-[12px] text-drift-bury transition-colors hover:border-drift-bury"
           >
             REMOVER
           </button>
@@ -466,7 +466,7 @@ function ImageDrop({
           <span aria-hidden="true" className="text-[24px] opacity-35">
             🖼
           </span>
-          <span className="font-mono text-[10px] uppercase tracking-meta text-drift-muted">
+          <span className="font-mono text-[12px] uppercase tracking-meta text-drift-muted">
             {draft.uploading ? 'fazendo upload…' : 'adicionar imagem'}
           </span>
         </>
@@ -498,7 +498,7 @@ function ContentWarningRow({
   return (
     <div className="shrink-0 border-t border-drift-border pt-[10px]">
       <div
-        className="mb-[7px] font-mono text-[9px] uppercase tracking-[2px] text-drift-muted"
+        className="mb-[7px] font-mono text-[12px] uppercase tracking-[2px] text-drift-muted"
         title="manifesto §27 — autor declara, leitor filtra"
       >
         marcar conteúdo (opcional)
@@ -511,7 +511,7 @@ function ContentWarningRow({
               key={cw}
               type="button"
               onClick={() => onChange(active ? null : cw)}
-              className={`rounded-sm border-[1.5px] px-[10px] py-[5px] font-mono text-[9px] uppercase tracking-meta transition-colors focus:outline-none focus:ring-1 focus:ring-drift-accent2 ${
+              className={`rounded-sm border-[1.5px] px-[10px] py-[5px] font-mono text-[12px] uppercase tracking-meta transition-colors focus:outline-none focus:ring-1 focus:ring-drift-accent2 ${
                 active
                   ? 'border-drift-warning bg-drift-warning/15 text-drift-warning'
                   : 'border-drift-border text-drift-muted hover:border-drift-text hover:text-drift-text'

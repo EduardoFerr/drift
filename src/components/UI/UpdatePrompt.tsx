@@ -109,7 +109,7 @@ export function UpdatePrompt() {
               <p className="text-[12px] font-medium text-drift-text">
                 Nova versão do Drift disponível
               </p>
-              <p className="mt-1 text-[10px] leading-relaxed text-drift-muted">
+              <p className="mt-1 text-[12px] leading-relaxed text-drift-muted">
                 Atualização propaga fixes de segurança e features. Você decide
                 quando aplicar — manifesto §17 (sem update silencioso).
               </p>

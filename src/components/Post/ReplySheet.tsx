@@ -615,7 +615,7 @@ export function ReplySheet({
                 >
                   responder
                 </h2>
-                <p className="mt-1 truncate font-mono text-[10px] text-drift-muted">
+                <p className="mt-1 truncate font-mono text-[12px] text-drift-muted">
                   para {shortNpub(
                     /* UX-3: header reflete o snapshot, não o cursor live.
                        Mantém consistência com o destinatário que vai ser
@@ -631,7 +631,7 @@ export function ReplySheet({
               <button
                 onClick={onClose}
                 disabled={pending}
-                className="shrink-0 rounded border border-drift-border px-2 py-1 text-[10px] text-drift-muted transition-colors hover:border-drift-accent hover:text-drift-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2 disabled:opacity-40"
+                className="shrink-0 rounded border border-drift-border px-2 py-1 text-[12px] text-drift-muted transition-colors hover:border-drift-accent hover:text-drift-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2 disabled:opacity-40"
                 aria-label="fechar"
                 aria-keyshortcuts="Escape"
               >
@@ -675,7 +675,7 @@ export function ReplySheet({
                 aria-label="aviso de conteúdo (opcional)"
               >
                 <div
-                  className="mb-1 font-mono text-[9px] uppercase tracking-[2px] text-drift-muted"
+                  className="mb-1 font-mono text-[12px] uppercase tracking-[2px] text-drift-muted"
                   title="manifesto §27 — autor declara, leitor filtra"
                 >
                   marcar conteúdo (opcional)
@@ -691,7 +691,7 @@ export function ReplySheet({
                         aria-checked={active}
                         disabled={pending}
                         onClick={() => setContentWarning(active ? null : cw)}
-                        className={`rounded-sm border-[1.5px] px-2.5 py-1 font-mono text-[9px] uppercase tracking-meta transition-colors focus:outline-none focus:ring-1 focus:ring-drift-accent2 disabled:opacity-40 ${
+                        className={`rounded-sm border-[1.5px] px-2.5 py-1 font-mono text-[12px] uppercase tracking-meta transition-colors focus:outline-none focus:ring-1 focus:ring-drift-accent2 disabled:opacity-40 ${
                           active
                             ? 'border-drift-warning bg-drift-warning/15 text-drift-warning'
                             : 'border-drift-border text-drift-muted hover:border-drift-text hover:text-drift-text'
@@ -708,7 +708,7 @@ export function ReplySheet({
               {error && (
                 <div
                   role="alert"
-                  className="rounded border border-drift-bury/60 bg-drift-bury/10 px-2 py-1 text-[10px] text-drift-bury"
+                  className="rounded border border-drift-bury/60 bg-drift-bury/10 px-2 py-1 text-[12px] text-drift-bury"
                 >
                   {error}
                 </div>
@@ -718,7 +718,7 @@ export function ReplySheet({
             {/* Footer */}
             <footer className="flex items-center justify-between gap-3 border-t border-drift-border bg-drift-bg/40 px-4 py-3">
               <span
-                className={`font-mono text-[10px] ${
+                className={`font-mono text-[12px] ${
                   overLimit ? 'text-drift-bury' : 'text-drift-muted'
                 }`}
                 aria-live={overLimit ? 'assertive' : 'off'}
@@ -730,7 +730,7 @@ export function ReplySheet({
                   na UI; antes só estava em comentário de código. */}
               <div className="flex items-center gap-2">
                 <span
-                  className="hidden font-mono text-[9px] uppercase tracking-meta text-drift-muted sm:inline"
+                  className="hidden font-mono text-[12px] uppercase tracking-meta text-drift-muted sm:inline"
                   aria-hidden="true"
                 >
                   ⌘↵
@@ -791,7 +791,7 @@ function ReplyImagePicker({
             type="button"
             onClick={onClear}
             disabled={disabled}
-            className="absolute right-1 top-1 rounded border border-drift-border bg-drift-bg/80 px-2 py-0.5 font-mono text-[9px] uppercase tracking-meta text-drift-muted hover:text-drift-bury focus:outline-none focus:ring-1 focus:ring-drift-accent2 disabled:opacity-40"
+            className="absolute right-1 top-1 rounded border border-drift-border bg-drift-bg/80 px-2 py-0.5 font-mono text-[12px] uppercase tracking-meta text-drift-muted hover:text-drift-bury focus:outline-none focus:ring-1 focus:ring-drift-accent2 disabled:opacity-40"
             aria-label="remover imagem"
           >
             remover
@@ -806,7 +806,7 @@ function ReplyImagePicker({
           maxLength={280}
           placeholder="descrição da imagem (alt) — opcional"
           aria-label="descrição da imagem para acessibilidade"
-          className="w-full rounded border border-drift-border bg-drift-bg px-2 py-1 font-mono text-[10px] text-drift-text placeholder:text-drift-muted/60 focus:border-drift-accent2 focus:outline-none disabled:opacity-60"
+          className="w-full rounded border border-drift-border bg-drift-bg px-2 py-1 font-mono text-[12px] text-drift-text placeholder:text-drift-muted/60 focus:border-drift-accent2 focus:outline-none disabled:opacity-60"
         />
       </div>
     )
@@ -822,12 +822,12 @@ function ReplyImagePicker({
       <span aria-hidden="true" className="text-[18px] opacity-40">
         🖼
       </span>
-      <span className="font-mono text-[9px] uppercase tracking-meta text-drift-muted">
+      <span className="font-mono text-[12px] uppercase tracking-meta text-drift-muted">
         {uploading ? 'fazendo upload…' : 'anexar imagem (opcional)'}
       </span>
       {uploadError && (
         <span
-          className="px-2 text-center font-mono text-[9px] text-drift-bury"
+          className="px-2 text-center font-mono text-[12px] text-drift-bury"
           title={uploadError}
         >
           {uploadError}

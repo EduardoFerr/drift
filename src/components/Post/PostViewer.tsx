@@ -596,7 +596,7 @@ export function PostViewer({
                 exit={{ opacity: 0, y: -4 }}
                 transition={{ duration: 0.18, delay: 0.6 }}
               >
-                <span className="rounded-full border border-drift-bury/60 bg-drift-bg/85 px-3 py-1 font-mono text-[10px] uppercase tracking-meta text-drift-bury backdrop-blur-sm">
+                <span className="rounded-full border border-drift-bury/60 bg-drift-bg/85 px-3 py-1 font-mono text-[12px] uppercase tracking-meta text-drift-bury backdrop-blur-sm">
                   segure pra moderar
                 </span>
               </m.div>
@@ -751,7 +751,7 @@ export function PostViewer({
                 >
                   toque pra revelar
                 </button>
-                <span className="text-[10px] text-drift-muted">
+                <span className="text-[12px] text-drift-muted">
                   você pode mudar isso em settings
                 </span>
               </div>
@@ -763,7 +763,7 @@ export function PostViewer({
       {/* Footer com ações + dicas — V3.1 paleta v0.7.
           V8: hidden em embedded mode (swipe é o único input no home view). */}
       {!embedded && (
-      <div className="flex items-center justify-between border-t border-drift-border px-4 py-3 font-mono text-[10px] text-drift-muted">
+      <div className="flex items-center justify-between border-t border-drift-border px-4 py-3 font-mono text-[12px] text-drift-muted">
         <div className="flex gap-3">
           <span className="text-drift-spread">↑ {displaySpreads}</span>
           <span className="text-drift-bury">↓ {displayBuries}</span>
@@ -956,7 +956,7 @@ function ModerationModal({
                 <span className="font-mono text-[12px] uppercase tracking-[2px]">
                   {item.label}
                 </span>
-                <span className="font-mono text-[10px] normal-case tracking-normal text-drift-muted">
+                <span className="font-mono text-[12px] normal-case tracking-normal text-drift-muted">
                   {item.hint}
                 </span>
               </span>
@@ -1091,10 +1091,10 @@ function ActionsFan({
                   className="pointer-events-none absolute right-[52px] top-1/2 -translate-y-1/2 w-[180px] rounded border border-drift-accent/60 bg-drift-surface/95 px-3 py-2 backdrop-blur-sm shadow-lg"
                   role="tooltip"
                 >
-                  <div className="font-mono text-[10px] uppercase tracking-[2px] text-drift-accent">
+                  <div className="font-mono text-[12px] uppercase tracking-[2px] text-drift-accent">
                     {item.label}
                   </div>
-                  <div className="mt-1 font-mono text-[10px] leading-snug text-drift-muted">
+                  <div className="mt-1 font-mono text-[12px] leading-snug text-drift-muted">
                     {item.hint}
                   </div>
                 </m.div>
