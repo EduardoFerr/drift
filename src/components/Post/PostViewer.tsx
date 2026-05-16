@@ -63,7 +63,9 @@ import { GlassIconButton } from '../UI/GlassIconButton'
 import { SlideUpOverlay } from '../UI/SlideUpOverlay'
 import { ModalHeader } from '../UI/ModalHeader'
 import { DriftChip } from '../UI/DriftChip'
-import { computeInitialFromExit } from '../../lib/post-viewer-motion'
+// V10.7 — `computeInitialFromExit` removido daqui (lógica inline em
+// EmbeddedWrapper.variants.initial). Função pura preservada em
+// `lib/post-viewer-motion.ts` por compatibilidade dos testes.
 import { buildFanItems, type FanItem } from '../../lib/actions-fan'
 
 /** 'up' = espalhou; 'down' = enterrou. Sai sem direção (X/ESC) = undefined. */
@@ -414,8 +416,10 @@ export function PostViewer({
   // discreto scale-up — sensação de "card que estava na pilha subindo
   // pra frente". Saída voa pra cima (espalhou) ou pra baixo (enterrou)
   // conforme `custom` do AnimatePresence parent. Sem `custom` (X/ESC),
-  // fade out simples.
-  const exitVariant = custom ? EXIT_VARIANTS[custom] : EXIT_VARIANTS.none
+  // fade out simples. V10.7 — passamos `custom` direto pros wrappers;
+  // EmbeddedWrapper usa variants pra ler o custom MAIS RECENTE no exit
+  // (antes era exitVariant estático, congelado em snapshot antiga →
+  // direção errada ao alternar swipes).
 
   // V8 embedded mode: home view, sem fixed-inset / sem role=dialog /
   // sem backdrop. Modal mode (default) preserva retrocompat caso outra
@@ -423,7 +427,7 @@ export function PostViewer({
   const Wrapper = embedded ? EmbeddedWrapper : ModalWrapper
 
   return (
-    <Wrapper exitVariant={exitVariant}>
+    <Wrapper custom={custom}>
       {/* Header bulky com pin/follow/mute/block/report — só em modal mode.
           Em embedded (V8), o header global do app + a tag row dentro do
           card já entregam contexto; ações secundárias migram pra menu
@@ -1128,7 +1132,11 @@ function ActionsFan({
 
 interface WrapperProps {
   children: React.ReactNode
-  exitVariant: { y?: string; opacity: number; scale?: number }
+  // V10.7 — `custom` (direção da exit-action) substitui o `exitVariant`
+  // pré-computado. Wrappers decidem como aplicar — EmbeddedWrapper usa
+  // variants funções (corretas em alternância de direção), ModalWrapper
+  // computa estático (uso modal não tem AnimatePresence direcional).
+  custom: QueueExitDir
 }
 
 /**
@@ -1136,7 +1144,7 @@ interface WrapperProps {
  * resto do app — fixed inset z-50, role=dialog, animate enter/exit
  * direcional.
  */
-function ModalWrapper({ children, exitVariant }: WrapperProps) {
+function ModalWrapper({ children, custom }: WrapperProps) {
   // Round 4 Fase B (B1): tokenizado via MOTION.emphasis (320ms drift-spring).
   // Reduced motion respeitado — duration 0 colapsa entrada para fade
   // simples. Convergente com Lily RFC §1.2 (PostViewer 0.32 → motion-emphasis).
@@ -1145,6 +1153,11 @@ function ModalWrapper({ children, exitVariant }: WrapperProps) {
   // user em swipe vertical (spread/bury). swap (500ms ease-out-quart)
   // dá sensação papel-no-deck. User feedback 2026-05-09.
   const transition = reduced ? { duration: 0 } : MOTION.swap
+  // ModalWrapper não roda dentro de AnimatePresence direcional (uso é
+  // de overlay singleton). Computa exit estático aqui — mesma snapshot
+  // do mount basta. Para o caso embedded direcional, EmbeddedWrapper
+  // usa variants pattern (V10.7).
+  const exitVariant = custom ? EXIT_VARIANTS[custom] : EXIT_VARIANTS.none
   return (
     <m.div
       initial={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.96, y: 20 }}
@@ -1166,25 +1179,56 @@ function ModalWrapper({ children, exitVariant }: WrapperProps) {
  * fixed-inset (parent provê layout flex), sem role=dialog, sem
  * backdrop. Anima exit direcional (Tinder-style "voa pra cima/baixo")
  * quando custom='up'|'down'.
+ *
+ * V10.7 (user report 2026-05-15: "alternando up/down a animação buga,
+ * sai rápido e às vezes na direção contrária"). Causa: `exit` era um
+ * OBJETO ESTÁTICO computado em PostViewer render. Quando user alterna
+ * direção, o PostViewer antigo já foi renderizado com a direção
+ * ANTERIOR — seu exit prop ficou congelado nessa snapshot. Framer usa
+ * o exit do snapshot durante exit, mesmo que a direção atual seja
+ * outra → card sai pra direção errada. Fix: trocar pra `variants`
+ * com funções que recebem `custom`. AnimatePresence passa o `custom`
+ * MAIS RECENTE pra essas funções durante exit (mesmo que o motion.div
+ * tenha sido renderizado com snapshot antigo). Pattern idêntico ao
+ * SubpostCarousel slideVariants.
  */
-function EmbeddedWrapper({ children, exitVariant }: WrapperProps) {
-  const reduced = useReducedMotion()
+function EmbeddedWrapper({ children, custom }: WrapperProps) {
+  const reduced = useReducedMotion() ?? false
   // V9.6: emphasis 320ms percebido como "saindo muito rápido" pelo
   // user em swipe vertical (spread/bury). swap (500/750ms ease-out-
   // quart) dá sensação papel-no-deck. User feedback 2026-05-09.
   const transition = reduced ? { duration: 0 } : MOTION.swap
-  // V9.23 (user report 2026-05-14: "após bury perdeu a suavidade na
-  // troca de cards"). Lógica direcional extraída pra
-  // `lib/post-viewer-motion.ts:computeInitialFromExit` — função pura
-  // com testes (manifesto §7 + §16). Exit pra cima (spread) → entry
-  // de baixo; exit pra baixo (bury) → entry de cima; none mantém
-  // y=+20.
-  const initial = computeInitialFromExit(exitVariant, reduced ?? false)
+  // Variants com fechamento em `reduced`. Funções (não objetos) garantem
+  // que Framer chama-as no momento do exit COM o custom da
+  // AnimatePresence (não com o que estava congelado na snapshot).
+  // V9.23 direção: exit ↑ (spread) → próximo entra de baixo (y=+20);
+  // exit ↓ (bury) → próximo entra de cima (y=-20). `none` (X/ESC) só
+  // fade. Lógica equivalente a computeInitialFromExit mas inline pra
+  // variants pattern (não precisa converter dir → exit obj → initial).
+  type Dir = 'up' | 'down' | undefined
+  const variants = {
+    initial: (c: Dir) => {
+      if (reduced) return { opacity: 0 }
+      const enterFromAbove = c === 'down' // bury → entry de cima
+      return { opacity: 0, scale: 0.96, y: enterFromAbove ? -20 : 20 }
+    },
+    animate: reduced
+      ? { opacity: 1 }
+      : { opacity: 1, scale: 1, y: 0 },
+    exit: (c: Dir) => {
+      if (!c) return { opacity: 0 }
+      return c === 'up'
+        ? { y: '-110%', opacity: 0, scale: 0.95 }
+        : { y: '110%', opacity: 0, scale: 0.95 }
+    },
+  }
   return (
     <m.div
-      initial={initial as unknown as Record<string, number>}
-      animate={{ opacity: 1, scale: 1, y: 0 }}
-      exit={exitVariant}
+      custom={custom}
+      variants={variants}
+      initial="initial"
+      animate="animate"
+      exit="exit"
       transition={transition}
       className="relative flex h-full w-full flex-col overflow-hidden"
     >
