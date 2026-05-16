@@ -25,6 +25,10 @@ export interface DeepLinkParse {
    *   - decoded.type !== 'nevent' (ex.: npub1, note1, nprofile1)
    */
   postEventId: string | null
+  /** Relay hints encoded no nevent (NIP-19). Recipient consulta esses
+   *  relays primeiro — resolve posts antigos que os relays locais
+   *  podem ter evictado. */
+  relayHints: string[]
 }
 
 /**
@@ -39,18 +43,20 @@ export function parseDeepLinkSearch(search: string): DeepLinkParse {
 
   const pParam = params.get('p')
   let postEventId: string | null = null
+  let relayHints: string[] = []
   if (pParam) {
     try {
       const decoded = nip19.decode(pParam)
       if (decoded.type === 'nevent') {
         postEventId = decoded.data.id
+        relayHints = decoded.data.relays ?? []
       }
     } catch {
       // String malformada — silenciosamente null. App.tsx loga.
     }
   }
 
-  return { action, postEventId }
+  return { action, postEventId, relayHints }
 }
 
 /**

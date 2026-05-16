@@ -323,10 +323,12 @@ export function PostViewer({
   async function handleSharePost() {
     try {
       const { neventEncode } = await import('nostr-tools/nip19')
+      const { activeWriteRelays } = await import('../../lib/relays')
       const nevent = neventEncode({
         id: post.id,
         author: post.authorPub,
         kind: 9078,
+        relays: activeWriteRelays().slice(0, 3),
       })
       // V9.20 (user pedido 2026-05-14): URL volta pro domínio do app
       // com `?p=<nevent>` — quem clicar abre o Drift direto, fora do

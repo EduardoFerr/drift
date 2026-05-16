@@ -78,4 +78,30 @@ describe('parseDeepLinkSearch', () => {
     const b = parseDeepLinkSearch(`?p=${nevent}`)
     expect(a).toEqual(b)
   })
+
+  it('nevent sem relay hints → relayHints=[]', () => {
+    const fakeId = 'a'.repeat(64)
+    const nevent = nip19.neventEncode({ id: fakeId, kind: 9078 })
+    const r = parseDeepLinkSearch(`?p=${nevent}`)
+    expect(r.relayHints).toEqual([])
+  })
+
+  it('nevent com relay hints → relayHints preservados', () => {
+    const fakeId = 'b'.repeat(64)
+    const relays = ['wss://relay1.example.com', 'wss://relay2.example.com']
+    const nevent = nip19.neventEncode({ id: fakeId, kind: 9078, relays })
+    const r = parseDeepLinkSearch(`?p=${nevent}`)
+    expect(r.postEventId).toBe(fakeId)
+    expect(r.relayHints).toEqual(relays)
+  })
+
+  it('string vazia → relayHints=[]', () => {
+    const r = parseDeepLinkSearch('')
+    expect(r.relayHints).toEqual([])
+  })
+
+  it('?p=<malformado> → relayHints=[]', () => {
+    const r = parseDeepLinkSearch('?p=lixoaleatorio123')
+    expect(r.relayHints).toEqual([])
+  })
 })

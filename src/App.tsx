@@ -308,7 +308,7 @@ function App() {
             const { pool } = await import('./lib/nostr')
             const { activeReadRelays } = await import('./lib/relays')
             const { onNostrEvent } = await import('./lib/events')
-            const relays = activeReadRelays()
+            const relays = [...new Set([...parsed.relayHints, ...activeReadRelays()])]
             const ev = await pool.get(relays, { ids: [eventId] })
             if (ev) {
               await onNostrEvent(ev)
