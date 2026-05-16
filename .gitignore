@@ -85,3 +85,11 @@ src-tauri/gen/schemas/
 # sbom — gerado em release via scripts/gen-sbom.mjs, anexado em GH Release
 # (não comitar; é artefato de build, não código fonte)
 sbom.json
+
+# claude code worktrees (parallel agent sandboxes) — embedded repos, não
+# devem virar gitlink no main; ficam local
+.claude/worktrees/
+
+# Lighthouse report HTMLs baixados pra análise local (artifacts já vivem
+# no CI; arquivo local é descartável e gera ruído em git status)
+lhr-*.html
