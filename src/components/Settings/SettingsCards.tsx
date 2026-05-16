@@ -1231,7 +1231,15 @@ export function PermissionsCard({ onClose }: CardProps) {
         })
         next[item.key] = status.state as PermState
       } catch {
-        next[item.key] = 'unsupported'
+        // Safari/iOS não suporta permissions.query pra camera/mic.
+        // Se a API nativa existe (getUserMedia / geolocation), mostra
+        // como 'prompt' pra que o botão "solicitar" apareça. Caso
+        // contrário, marca como 'unsupported'.
+        const hasNativeApi =
+          item.key === 'geolocation'
+            ? !!navigator.geolocation
+            : !!navigator.mediaDevices?.getUserMedia
+        next[item.key] = hasNativeApi ? 'prompt' : 'unsupported'
       }
     }
     setPerms(next)
@@ -1256,12 +1264,20 @@ export function PermissionsCard({ onClose }: CardProps) {
 
   async function handleRequest(item: (typeof PERM_ITEMS)[number]) {
     setRequesting(item.key)
+    let granted = false
     try {
       await item.requestFn()
+      granted = true
     } catch {
-      // denied ou erro — queryAll vai pegar o estado atualizado
+      // denied ou erro
     }
+    // Tenta queryAll primeiro (Chrome/Firefox atualizam via Permissions API).
+    // Se query não suportar esse name (Safari), usa resultado do request.
     await queryAll()
+    setPerms((prev) => {
+      if (prev[item.key] !== 'prompt' && prev[item.key] !== 'unsupported') return prev
+      return { ...prev, [item.key]: granted ? 'granted' : 'denied' }
+    })
     setRequesting(null)
   }
 
