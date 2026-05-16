@@ -377,26 +377,30 @@ function App() {
     }
     if (parsed.peerLink) {
       const peer = parsed.peerLink
-      void import('./components/UI/PeerInterstitial').then(({ PeerInterstitial }) => {
-        pushLayer({
-          id: 'peer-interstitial',
-          component: () => (
-            <PeerInterstitial
-              npubHex={peer.npubHex}
-              relayHints={peer.relayHints}
-              onConfirm={() => {
-                popLayer({ id: 'peer-interstitial' })
-                void import('./lib/transport/webrtc').then(({ connectTo }) => {
-                  void connectTo(peer.npubHex).catch((err: unknown) => {
-                    console.warn('[peer-link] connectTo falhou:', err)
+      if (boot.identity && peer.npubHex === boot.identity.npub) {
+        console.info('[peer-link] link é do próprio user — ignorando')
+      } else {
+        void import('./components/UI/PeerInterstitial').then(({ PeerInterstitial }) => {
+          pushLayer({
+            id: 'peer-interstitial',
+            component: () => (
+              <PeerInterstitial
+                npubHex={peer.npubHex}
+                relayHints={peer.relayHints}
+                onConfirm={() => {
+                  popLayer({ id: 'peer-interstitial' })
+                  void import('./lib/transport/webrtc').then(({ connectTo }) => {
+                    void connectTo(peer.npubHex).catch((err: unknown) => {
+                      console.warn('[peer-link] connectTo falhou:', err)
+                    })
                   })
-                })
-              }}
-              onCancel={() => popLayer({ id: 'peer-interstitial' })}
-            />
-          ),
+                }}
+                onCancel={() => popLayer({ id: 'peer-interstitial' })}
+              />
+            ),
+          })
         })
-      })
+      }
     }
     if (parsed.action || parsed.postEventId || parsed.peerLink) {
       cleanDeepLinkParams()

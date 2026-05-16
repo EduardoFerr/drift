@@ -18,6 +18,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
 // `m` é o primitive leve do framer-motion (LazyMotion). Features via main.tsx.
 import { m, AnimatePresence, useReducedMotion } from 'framer-motion'
@@ -295,19 +296,15 @@ export function Image({
       />
     </Wrapper>
 
-    {/* Lightbox fullscreen — backdrop preto, imagem centralizada limpa,
-        click-out / ESC / botão X fecham. Usa portal-like fixed inset-0
-        com z alto pra ficar acima de tudo (incluindo NavBar fixed).
-        Round 4 Fase B (B4): fade-in tokenizado (motion-fast backdrop +
-        motion-base image scale) substitui o "pop" abrupto que existia
-        antes (UX hostil — RFC §2.1 P1). Reduced motion respeitado
-        via factories. */}
-    <LightboxOverlay
-      open={lightboxOpen}
-      src={resolvedSrc}
-      alt={alt ?? ''}
-      onClose={() => setLightboxOpen(false)}
-    />
+    {createPortal(
+      <LightboxOverlay
+        open={lightboxOpen}
+        src={resolvedSrc}
+        alt={alt ?? ''}
+        onClose={() => setLightboxOpen(false)}
+      />,
+      document.body,
+    )}
     </>
   )
 }

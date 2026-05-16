@@ -718,6 +718,10 @@ export function PeersCard({ onClose }: CardProps) {
         setConnectError('formato invalido — cole um npub1... ou nprofile1...')
         return
       }
+      if (identity && parsed.npubHex === identity.npub) {
+        setConnectError('esse link é seu — compartilhe com outro peer')
+        return
+      }
       await connectTo(parsed.npubHex)
       setConnectOk(true)
       setPeerInput('')
@@ -752,8 +756,10 @@ export function PeersCard({ onClose }: CardProps) {
     } catch (err) {
       setScanning(false)
       const msg = err instanceof Error ? err.message : String(err)
-      if (msg.includes('Permission') || msg.includes('NotAllowed')) {
-        setScanError('permissao de camera negada')
+      if (msg.includes('NotFound') || msg.includes('Requested device')) {
+        setScanError('câmera não encontrada — use "da foto" ou cole o link')
+      } else if (msg.includes('Permission') || msg.includes('NotAllowed') || msg.includes('denied')) {
+        setScanError('permissão de câmera negada — libere nas configurações do navegador e tente novamente')
       } else {
         setScanError(msg)
       }

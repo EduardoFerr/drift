@@ -388,7 +388,7 @@ src/
 - ✅ **Fase 4** — Mapa, peso de perfil, moderação threshold dinâmico, eviction respeita spreads, onboarding, denúncia autoridades
 - ✅ **Fase 5** — PWA polish, NIP-65, NIP-02, NIP-06 (BIP39 opt-in), Passkey opt-in, multi-identidade, probe anti-eclipse, re-broadcast oportunista, pinning UI, block/mute, feed tabs (Global/Seguindo/Trending), Profile, kvvfs fallback, 399 tests Vitest
 - ✅ **Fase 5.x (operacional)** — versionamento + CHANGELOG, CI GitHub Actions (tsc + tests + build), PWA polish (manifest enriched + shortcuts + meta description + ?action= URL handling), deploy Vercel + GitHub integration, release automation (tag v* → GitHub Release com dist.zip + SHA256SUMS)
-- ⏳ **Fase 6** — Cliente nativo Tauri (Tor via arti, WebRTC P2P, multi-transport orchestration), build reproduzível. **Capacidade técnica** de §15 (anti-censura por país)
+- ⏳ **Fase 6** — Cliente nativo Tauri (Tor via arti, WebRTC P2P, multi-transport orchestration), build reproduzível. PeersCard UI (QR, link direto, bundle offline, auto-discovery). **Capacidade técnica** de §15 (anti-censura por país)
 - ⏳ **Fase 7** — Distribuição do cliente E do protocolo: TWA Android (✅ antecipada — Bubblewrap CI), Capacitor (alternativa), F-Droid manifest, Play Store opcional, IPFS pin via helia, run-your-own-relay, sneakernet bundle. **Garantia política** de §16 (disponibilidade distribuída) e §17 (sem chave mestra na distribuição)
 
 Fase 6 + Fase 7 são compromissos do manifesto, não opções:
@@ -509,4 +509,4 @@ código. Especialmente Fase 6 — várias features aparentemente
 
 ---
 
-*Última atualização: 2026-05-16 · Manifesto v2.2 · Arquitetura v5.3 · 34 princípios · 1318 tests Vitest (+6 todo, 93 files) · entry chunk 172 KB (≤ 250 KB hard ratchet) · lint 0 warnings (hard) · SRI sha384 baseline em dist artifacts · Fase 5 + 5.x fechadas; Fase 6 em curso (6.4 etapas 1-4 shipped + P2P discovery 4 mecanismos) · roadmap vinculante até Fase 7*
+*Última atualização: 2026-05-16 · Manifesto v2.2 · Arquitetura v5.3 · 34 princípios · 1324 tests Vitest (+6 todo, 93 files) · entry chunk 172 KB (≤ 250 KB hard ratchet) · lint 0 warnings (hard) · SRI sha384 baseline em dist artifacts · Fase 5 + 5.x fechadas; Fase 6 em curso (6.4 etapas 1-4 shipped + P2P discovery 4 mecanismos + PeersCard UI) · roadmap vinculante até Fase 7*
