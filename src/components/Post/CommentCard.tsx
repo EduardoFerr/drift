@@ -15,7 +15,7 @@
  * Spec: `Docs/design-comments.md` §4.1, §5.4.
  */
 
-import { useState } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 // `m` é o primitive leve do framer-motion (LazyMotion). Features via main.tsx.
 import { AnimatePresence, m, useReducedMotion } from 'framer-motion'
 import type { CommentNode } from '../../lib/thread-cursor'
@@ -441,6 +441,32 @@ function ListVariant({
   onToggleExpand,
   onTap,
 }: ListVariantProps) {
+  // "ver mais" / "ver menos" — expand/collapse for truncated text.
+  // Detection: ref on <p> compares scrollHeight > clientHeight after
+  // render+layout. Falls back to content length heuristic (>150 chars)
+  // for the initial render before layout measurement fires.
+  const [expanded, setExpanded] = useState(false)
+  const [isTruncated, setIsTruncated] = useState(false)
+  const textRef = useRef<HTMLParagraphElement>(null)
+
+  const checkTruncation = useCallback(() => {
+    const el = textRef.current
+    if (!el) return
+    // scrollHeight > clientHeight means CSS line-clamp is hiding text.
+    setIsTruncated(el.scrollHeight > el.clientHeight + 1)
+  }, [])
+
+  useEffect(() => {
+    // Skip detection when already expanded (no clamp to measure against).
+    if (expanded) return
+    // Measure after layout paint.
+    checkTruncation()
+    // Re-check on resize (font size / container width may change).
+    const ro = new ResizeObserver(checkTruncation)
+    if (textRef.current) ro.observe(textRef.current)
+    return () => ro.disconnect()
+  }, [expanded, checkTruncation, node.content])
+
   const indentLevel = Math.min(depth, LIST_INDENT_MAX_DEPTH)
   const paddingLeft = indentLevel * LIST_INDENT_PER_LEVEL_PX
   const hasIndentLine = depth > 0
@@ -563,7 +589,8 @@ function ListVariant({
             </div>
           )}
           <p
-            className={`line-clamp-6 whitespace-pre-wrap break-words font-mono text-fluid-base leading-relaxed text-drift-text ${
+            ref={textRef}
+            className={`${expanded ? '' : 'line-clamp-6'} whitespace-pre-wrap break-words font-mono text-fluid-base leading-relaxed text-drift-text ${
               cwBlur ? 'blur-sm' : ''
             }`}
             onClick={
@@ -577,6 +604,22 @@ function ListVariant({
           >
             {node.content}
           </p>
+          {/* "ver mais" / "ver menos" toggle — only when text is actually
+              truncated by line-clamp-6 (measured via scrollHeight) or when
+              already expanded (so user can collapse back). */}
+          {(isTruncated || expanded) && !cwBlur && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                setExpanded((v) => !v)
+              }}
+              className="mt-1 font-mono text-[12px] text-drift-accent hover:text-drift-accent2 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2"
+              aria-label={expanded ? 'ver menos do comentário' : 'ver mais do comentário'}
+            >
+              {expanded ? 'ver menos' : 'ver mais'}
+            </button>
+          )}
         </div>
       )}
 
