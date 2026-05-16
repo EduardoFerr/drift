@@ -203,6 +203,29 @@ export { closeAll } from './boot'
 export { WEBRTC_LIMITS } from './config'
 export type { PeerStatus } from './types'
 
+// ─── Discovery mechanisms (Fase 6 — P2P pairing) ────────────────────
+
+export {
+  encodePeerLink,
+  decodePeerLink,
+  buildPeerURL,
+  generatePeerQR,
+} from './peerLink'
+export type { PeerLinkData } from './peerLink'
+
+export {
+  discoverFollowsPeers,
+  startFollowsDiscovery,
+  stopFollowsDiscovery,
+} from './followsDiscovery'
+
+export {
+  exportBundle,
+  importBundle,
+  reassembleChunks,
+} from './bundle'
+export type { BundleExport } from './bundle'
+
 // ─── Re-exports test-only (`_*` prefix) ──────────────────────────────
 //
 // Marshall §4: barrel re-exporta TODOS os 22 símbolos que webrtc.ts

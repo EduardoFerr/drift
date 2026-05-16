@@ -16,6 +16,11 @@ import * as nip19 from 'nostr-tools/nip19'
 
 export type DeepLinkAction = 'compose' | 'settings' | null
 
+export interface PeerLinkData {
+  npubHex: string
+  relayHints: string[]
+}
+
 export interface DeepLinkParse {
   action: DeepLinkAction
   /**
@@ -29,6 +34,12 @@ export interface DeepLinkParse {
    *  relays primeiro — resolve posts antigos que os relays locais
    *  podem ter evictado. */
   relayHints: string[]
+  /**
+   * Peer pairing data decodificado do `?peer=<nprofile|npub>`. `null`
+   * quando param ausente ou decode falha. Fase 6 P2P discovery:
+   * interstitial deve confirmar antes de chamar connectTo().
+   */
+  peerLink: PeerLinkData | null
 }
 
 /**
@@ -56,7 +67,25 @@ export function parseDeepLinkSearch(search: string): DeepLinkParse {
     }
   }
 
-  return { action, postEventId, relayHints }
+  const peerParam = params.get('peer')
+  let peerLink: PeerLinkData | null = null
+  if (peerParam) {
+    try {
+      const decoded = nip19.decode(peerParam)
+      if (decoded.type === 'npub') {
+        peerLink = { npubHex: decoded.data, relayHints: [] }
+      } else if (decoded.type === 'nprofile') {
+        peerLink = {
+          npubHex: decoded.data.pubkey,
+          relayHints: decoded.data.relays ?? [],
+        }
+      }
+    } catch {
+      // String malformada — silenciosamente null.
+    }
+  }
+
+  return { action, postEventId, relayHints, peerLink }
 }
 
 /**
@@ -69,5 +98,6 @@ export function cleanDeepLinkParams(): void {
   const url = new URL(window.location.href)
   url.searchParams.delete('action')
   url.searchParams.delete('p')
+  url.searchParams.delete('peer')
   window.history.replaceState({}, '', url.toString())
 }

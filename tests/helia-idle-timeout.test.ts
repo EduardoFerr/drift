@@ -26,7 +26,7 @@ const stopMock = vi.fn(async () => {})
 const heliaNode = {
   stop: stopMock,
   pins: { ls: async function* () {} },
-  libp2p: { getPeers: () => [], status: 'started' as const },
+  libp2p: { getPeers: () => [], getConnections: () => [], addEventListener: () => {}, status: 'started' as const },
 }
 
 vi.mock('helia', () => ({

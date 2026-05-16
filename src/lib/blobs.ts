@@ -195,6 +195,7 @@ export async function uploadBlob(
   const url = urlResult.value
   const cid = cidResult.status === 'fulfilled' ? cidResult.value : undefined
 
+  console.info('[blobs] upload ok — url:', url.slice(0, 60), cid ? `cid: ${cid.slice(0, 12)}…` : '(sem cid)')
   return { url, cid, hash, size, mime }
 }
 
@@ -319,11 +320,24 @@ export async function fetchBlobUrl(
   return url
 }
 
+const HELIA_FETCH_TIMEOUT_MS = 8_000
+
 async function fetchViaHelia(cid: string, signal?: AbortSignal): Promise<Uint8Array> {
   const helia = await import('./helia')
   const cidObj = await helia.cidFromString(cid)
   if (signal?.aborted) throw new BlobError('cancelado', 'aborted')
-  return helia.getBlob(cidObj)
+
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), HELIA_FETCH_TIMEOUT_MS)
+  const onUserAbort = () => ctrl.abort()
+  signal?.addEventListener('abort', onUserAbort, { once: true })
+
+  try {
+    return await helia.getBlob(cidObj, ctrl.signal)
+  } finally {
+    clearTimeout(timer)
+    signal?.removeEventListener('abort', onUserAbort)
+  }
 }
 
 async function fetchViaHttp(
@@ -393,13 +407,15 @@ export async function pinBlobsFromMeta(metas: BlobMeta[]): Promise<void> {
     return
   }
 
+  let pinned = 0
   for (const cidStr of cids) {
     try {
       const cidObj = await helia.cidFromString(cidStr)
       await helia.pinBlob(cidObj)
+      pinned++
     } catch (err) {
       console.warn(`[blobs] pin falhou pra ${cidStr}:`, err)
-      // continua próximo — pin é opt-in, não obrigatório
     }
   }
+  if (pinned > 0) console.info(`[blobs] ${pinned}/${cids.length} blobs pinados`)
 }

@@ -356,7 +356,7 @@ src/
 │   ├── transport/         abstração de transporte (Fase 6)
 │   │   ├── wss.ts         WSS clearnet (atual)
 │   │   ├── tor.ts         WSS via Tor (Fase 6, cliente nativo)
-│   │   └── webrtc/        P2P direto Fase 6 (12 arquivos: index/types/state/config/ice/peer/pipeline/rateLimit/health/reconnect/discovery/boot)
+│   │   └── webrtc/        P2P direto Fase 6 (15 arquivos: index/types/state/config/ice/peer/pipeline/rateLimit/health/reconnect/discovery/boot/peerLink/followsDiscovery/bundle)
 │   ├── relays.ts          gerenciamento dinâmico de relays (Fase 5) — store + CRUD + activeRelays
 │   ├── nip65.ts           NIP-65 publish/parse de relay list (Fase 5)
 │   ├── follows.ts         NIP-02 (kind 3) follows + store (Fase 5)
@@ -509,4 +509,4 @@ código. Especialmente Fase 6 — várias features aparentemente
 
 ---
 
-*Última atualização: 2026-05-15 · Manifesto v2.2 · Arquitetura v5.3 · 34 princípios · 1032 tests Vitest (+6 todo, 79 files) · entry chunk 201 KB (≤ 250 KB hard ratchet) · lint 0 warnings (hard) · SRI sha384 baseline em dist artifacts · Fase 5 + 5.x fechadas; Fase 6 em curso (6.4 etapas 1-4 shipped pra source-builders) · roadmap vinculante até Fase 7*
+*Última atualização: 2026-05-16 · Manifesto v2.2 · Arquitetura v5.3 · 34 princípios · 1318 tests Vitest (+6 todo, 93 files) · entry chunk 172 KB (≤ 250 KB hard ratchet) · lint 0 warnings (hard) · SRI sha384 baseline em dist artifacts · Fase 5 + 5.x fechadas; Fase 6 em curso (6.4 etapas 1-4 shipped + P2P discovery 4 mecanismos) · roadmap vinculante até Fase 7*

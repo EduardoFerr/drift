@@ -297,6 +297,16 @@ export interface UserPrefs {
    */
   use_ipfs: boolean
   /**
+   * NIP-02 auto-discovery: conectar automaticamente via P2P com follows
+   * online. Default false — manifesto §28 (privacidade pelo mínimo).
+   *
+   * Riscos (Barney deliberação 2026-05-16):
+   *   1. Follow graph vaza via timing correlation no signaling
+   *   2. IP vaza pra cada follow via ICE candidates
+   *   3. Follows comprometidos facilitam eclipse
+   */
+  p2p_auto_follows: boolean
+  /**
    * Round Comments Nav Redesign — Phase A (RFC `2026-05-rfc-comments-navigation-redesign`).
    *
    * Modo de renderização do `<ThreadView>`:
@@ -345,5 +355,6 @@ export const DEFAULT_USER_PREFS: UserPrefs = {
   network_mode: 'clearnet',
   thread_coach_seen: false,
   use_ipfs: false,
+  p2p_auto_follows: false,
   thread_view_mode: 'list',
 }

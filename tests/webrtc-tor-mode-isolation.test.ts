@@ -153,6 +153,7 @@ vi.mock('../src/lib/transport/wss', () => ({
 
 vi.mock('../src/lib/transport/webrtc', () => ({
   webrtcTransport: webrtcTransportRef,
+  startFollowsDiscovery: vi.fn(),
 }))
 
 vi.mock('../src/lib/transport/orchestrator', () => ({

@@ -338,8 +338,9 @@ async function doBootstrap(): Promise<void> {
       // muda (wssTransport já registrado; orchestrator é multi-transport).
       if (networkMode === 'clearnet') {
         void import('./transport/webrtc')
-          .then(({ webrtcTransport }) => {
+          .then(({ webrtcTransport, startFollowsDiscovery }) => {
             registerTransport(webrtcTransport, { weight: 5 })
+            startFollowsDiscovery()
           })
           .catch((err) => {
             console.warn('[bootstrap] webrtcTransport lazy import falhou:', err)

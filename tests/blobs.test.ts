@@ -139,7 +139,7 @@ describe('fetchBlob', () => {
 
     mockFetch({
       'https://example.test/missing.jpg': { status: 500 },
-      [`https://cloudflare-ipfs.com/ipfs/${cid}`]: bytes,
+      [`https://dweb.link/ipfs/${cid}`]: bytes,
     })
 
     const out = await fetchBlob({

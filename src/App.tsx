@@ -57,8 +57,10 @@ const DialogHost = lazy(() =>
   })),
 )
 import { dialog } from './lib/dialog'
+import { pushLayer, popLayer, hasLayer } from './lib/layer-stack'
 import { NavBar } from './components/UI/NavBar'
 import { FullPageCard } from './components/UI/FullPageCard'
+import { LayerRenderer } from './components/UI/LayerRenderer'
 import { LazyBoundary } from './components/UI/LazyBoundary'
 import { DriftSkeleton } from './components/UI/DriftSkeleton'
 
@@ -148,6 +150,61 @@ import type {
   ContentWarning,
 } from './types/drift'
 
+async function handleClearLocal() {
+  const ok = await dialog.confirm(
+    'Apagar TODOS os posts/spreads/buries locais? (identidade preservada)',
+    { title: 'limpar local', dangerous: true, okLabel: 'apagar' },
+  )
+  if (!ok) return
+  await db.run(`DELETE FROM posts`)
+  await db.run(`DELETE FROM spreads`)
+  await db.run(`DELETE FROM buries`)
+  await db.run(`DELETE FROM reports`)
+  await db.run(`DELETE FROM sync_log`)
+  location.reload()
+}
+
+function StatusCardLayer({ onClose }: { onClose: () => void }) {
+  const boot = useBootStore()
+  return (
+    <FullPageCard onClose={onClose} title="status" ariaLabel="painel de diagnóstico">
+      <div className="p-5">
+        <DiagnosticPanel boot={boot} />
+      </div>
+    </FullPageCard>
+  )
+}
+
+function AboutCardLayer({ onClose }: { onClose: () => void }) {
+  return (
+    <FullPageCard onClose={onClose} title="sobre" ariaLabel="sobre o cliente Drift">
+      <div className="space-y-4 p-5 font-mono">
+        <div className="rounded border border-drift-border bg-drift-bg/50 p-4">
+          <div className="text-[10px] uppercase tracking-[2px] text-drift-muted">
+            versão do cliente
+          </div>
+          <div className="mt-1 font-display text-[20px] font-extrabold text-drift-text">
+            {CLIENT_VERSION}
+          </div>
+          <div className="mt-2 text-[10px] leading-relaxed text-drift-muted">
+            cliente oficial Drift (
+            <code className="text-drift-text">drift-official</code>) —
+            vocab user-facing DRIFT/SINK/DERIVA · vocab spec SPREAD/
+            BURY (kinds 9079/9080).
+          </div>
+        </div>
+        <p className="text-[10px] leading-relaxed text-drift-muted">
+          Drift é decentralized social network sobre Nostr.
+          Eventos imutáveis assinados, score determinístico,
+          sem afinidade no feed (manifesto §22), sem chave mestra
+          (§17). Cliente PWA + Tauri opcional. Identidade portável
+          via nsec1.
+        </p>
+      </div>
+    </FullPageCard>
+  )
+}
+
 function App() {
   const boot = useBootStore()
   const posts = useFeedStore((s) => s.posts)
@@ -180,47 +237,14 @@ function App() {
   // de Record porque é só um boolean por id. publishing usa o mesmo
   // mecanismo via key especial '__publish__' (não colide com event.id hex).
   const [gpsCapturing, setGpsCapturing] = useState<Set<string>>(new Set())
-  // V9.2e/V10a: showDiagnostic state legacy removido — substituído
-  // por showStatusCard (card próprio acionado via SettingsRoot ou
-  // status indicator do HomeHeader).
-  const [showIdentity, setShowIdentity] = useState(false)
-  const [showRelays, setShowRelays] = useState(false)
-  const [showSwitcher, setShowSwitcher] = useState(false)
-  const [showLists, setShowLists] = useState(false)
-  const [showProfile, setShowProfile] = useState(false)
-  const [showOnboarding, setShowOnboarding] = useState(false)
-  // V7 structural: SubpostEditor migrou de always-mounted no top do feed
-  // pra modal acionado pelo botão `+` central da NavBar (mockup v0.7).
-  // Default false; PWA shortcut `?action=compose` abre direto.
   const [showCreate, setShowCreate] = useState(false)
-  // V8: mapa global de propagação (acionado pelo MAPA da NavBar).
-  // Overlay fullscreen separado — agrega eventos de todos os posts.
-  const [showMap, setShowMap] = useState(false)
-  // V8: SettingsRoot menu consolidador (acionado pelo CONFIG da NavBar).
-  // V9.2c: 11 opções organizadas em 4 grupos.
-  // V9.2d: cada opção abre seu próprio card focado (em vez de routar
-  // pra ContentSettings overlay grande). 5 cards novos (Filters/
-  // Location/MapView/NetworkMode/Diagnostic) substituem o "settings"
-  // monolítico — UX mais limpa, menos overflow.
-  const [showSettingsRoot, setShowSettingsRoot] = useState(false)
-  const [showInstallModal, setShowInstallModal] = useState(false)
 
   useEffect(() => {
     if (installPrompt.available && !installAutoOpenedRef.current) {
       installAutoOpenedRef.current = true
-      setShowInstallModal(true)
+      pushLayer({ id: 'install', component: InstallModal })
     }
   }, [installPrompt.available])
-  const [showFilters, setShowFilters] = useState(false)
-  const [showLocation, setShowLocation] = useState(false)
-  const [showMapView, setShowMapView] = useState(false)
-  const [showNetworkMode, setShowNetworkMode] = useState(false)
-  const [showBlobsCard, setShowBlobsCard] = useState(false)
-  const [showDiagnosticCard, setShowDiagnosticCard] = useState(false)
-  // V9.2e: status agora é card próprio (não mais toggle inline no home).
-  const [showStatusCard, setShowStatusCard] = useState(false)
-  // V9.2e: sobre = versão do cliente + manifesto link.
-  const [showAboutCard, setShowAboutCard] = useState(false)
   // V9.20 / V10.9 — post linkado via `?p=<nevent>`. Compartilhamento
   // (share menu → URL ?p=) faz user chegar nesse post como CARD ATUAL
   // do home view (V8 embedded UX). Antes (V9.20-V10.8) renderizava em
@@ -266,7 +290,17 @@ function App() {
   // o boot fica ready.
   useEffect(() => {
     if (boot.step !== 'ready') return
-    if (!onboardingDone) setShowOnboarding(true)
+    if (!onboardingDone) pushLayer({
+      id: 'onboarding',
+      component: OnboardingOverlay,
+      dismiss: [],
+      props: {
+        onOpenIdentity: () => {
+          popLayer({ id: 'onboarding' })
+          pushLayer({ id: 'identity', component: IdentityPanel })
+        },
+      },
+    })
   }, [boot.step, onboardingDone])
 
   // Bootstrap: dispara o boot (idempotente). useBootStore re-renderiza
@@ -286,7 +320,7 @@ function App() {
     if (parsed.action === 'compose') {
       setShowCreate(true)
     } else if (parsed.action === 'settings') {
-      setShowSettingsRoot(true)
+      pushLayer({ id: 'settings', component: SettingsRoot })
     }
     // V9.20 / V10.9 — deep link `?p=<nevent>` gerado pelo share post.
     // Fluxo:
@@ -337,7 +371,30 @@ function App() {
         }
       })()
     }
-    if (parsed.action || parsed.postEventId) {
+    if (parsed.peerLink) {
+      const peer = parsed.peerLink
+      void import('./components/UI/PeerInterstitial').then(({ PeerInterstitial }) => {
+        pushLayer({
+          id: 'peer-interstitial',
+          component: () => (
+            <PeerInterstitial
+              npubHex={peer.npubHex}
+              relayHints={peer.relayHints}
+              onConfirm={() => {
+                popLayer({ id: 'peer-interstitial' })
+                void import('./lib/transport/webrtc').then(({ connectTo }) => {
+                  void connectTo(peer.npubHex).catch((err: unknown) => {
+                    console.warn('[peer-link] connectTo falhou:', err)
+                  })
+                })
+              }}
+              onCancel={() => popLayer({ id: 'peer-interstitial' })}
+            />
+          ),
+        })
+      })
+    }
+    if (parsed.action || parsed.postEventId || parsed.peerLink) {
       cleanDeepLinkParams()
     }
   }, [boot.step])
@@ -769,20 +826,6 @@ function App() {
     }
   }
 
-  async function handleClearLocal() {
-    const ok = await dialog.confirm(
-      'Apagar TODOS os posts/spreads/buries locais? (identidade preservada)',
-      { title: 'limpar local', dangerous: true, okLabel: 'apagar' },
-    )
-    if (!ok) return
-    await db.run(`DELETE FROM posts`)
-    await db.run(`DELETE FROM spreads`)
-    await db.run(`DELETE FROM buries`)
-    await db.run(`DELETE FROM reports`)
-    await db.run(`DELETE FROM sync_log`)
-    location.reload()
-  }
-
   // Render ─────────────────────────────────────────────────────────────
 
   if (boot.step === 'error' && boot.error === 'MULTI_TAB_CONFLICT') {
@@ -808,11 +851,11 @@ function App() {
         userWeight={userWeight}
         currentScore={currentPost?.score ?? null}
         locationGranularity={locationGranularity}
-        onOpenLocation={() => setShowLocation(true)}
-        onOpenNetworkMode={() => setShowNetworkMode(true)}
-        onOpenStatus={() => setShowStatusCard(true)}
-        onOpenIdentity={() => setShowIdentity(true)}
-        onOpenProfile={() => setShowProfile(true)}
+        onOpenLocation={() => pushLayer({ id: 'location', component: LocationCard })}
+        onOpenNetworkMode={() => pushLayer({ id: 'network', component: NetworkModeCard })}
+        onOpenStatus={() => pushLayer({ id: 'status', component: StatusCardLayer })}
+        onOpenIdentity={() => pushLayer({ id: 'identity', component: IdentityPanel })}
+        onOpenProfile={() => pushLayer({ id: 'profile', component: ProfileModal })}
         onActiveTabTap={() => setPostByIndex(0)}
       />
 
@@ -857,22 +900,7 @@ function App() {
         <DialogHost />
       </LazyBoundary>
 
-      <AnimatePresence>
-        {showInstallModal && installPrompt.kind !== 'unavailable' && (
-          <InstallModal
-            kind={installPrompt.kind}
-            onInstall={async () => {
-              await installPrompt.install()
-              setShowInstallModal(false)
-            }}
-            onClose={() => setShowInstallModal(false)}
-            onDismiss={() => {
-              installPrompt.setDismissed(true)
-              setShowInstallModal(false)
-            }}
-          />
-        )}
-      </AnimatePresence>
+      <LayerRenderer />
 
       {/* Stack — área central que contém o card atual. flex:1 expande
           até a navbar bottom. Card visual = PostViewer embedded.
@@ -935,7 +963,7 @@ function App() {
                     next: nextHomePost,
                   }}
                   onOpenLocationSettings={() => {
-                    setShowLocation(true)
+                    pushLayer({ id: 'location', component: LocationCard })
                   }}
                   onSpread={() => {
                     handleSpread(currentPost)
@@ -980,13 +1008,13 @@ function App() {
           futuro V10).
           Hidden quando showCreate ou showMap em vôo (não competir com
           modais fullscreen). */}
-      {!showCreate && !showMap && (
+      {!showCreate && !hasLayer('map') && (
         <NavBar
           left={[
             {
               icon: <MapIcon size={18} />,
               label: 'mapa',
-              onClick: () => setShowMap(true),
+              onClick: () => pushLayer({ id: 'map', component: MapOverlay, props: { currentPost } }),
               ariaLabel: 'abrir mapa de propagação',
             },
           ]}
@@ -994,10 +1022,7 @@ function App() {
             {
               icon: <SlidersIcon size={18} />,
               label: 'config',
-              onClick: () => setShowSettingsRoot(true),
-              // WCAG 2.5.3 (Label in Name): a11y label deve incluir o
-              // texto visível ("config") pra voice control. "abrir
-              // settings" não batia.
+              onClick: () => pushLayer({ id: 'settings', component: SettingsRoot }),
               ariaLabel: 'abrir config',
             },
           ]}
@@ -1016,271 +1041,7 @@ function App() {
           intocado. Lógica vive em `currentPost` useMemo + advanceHome
           gate em deepLinkedPost. */}
 
-      {/* V8 — Mapa overlay (acionado pelo MAPA da NavBar). Mostra a
-          propagação do post atualmente visível + contador de eventos
-          rede no header. Mockup v0.7: header "propagação" + FECHAR. */}
-      <AnimatePresence>
-        {showMap && (
-          <MapOverlay
-            currentPost={currentPost}
-            onClose={() => setShowMap(false)}
-            onOpenLocationSettings={() => {
-              setShowMap(false)
-              setShowLocation(true)
-            }}
-          />
-        )}
-      </AnimatePresence>
-
-      {/* V8 — SettingsRoot menu (acionado pelo CONFIG da NavBar). Lista
-          7 opções consolidando o que estava no header legado. Cada item
-          fecha o root e abre o overlay específico. */}
-      <AnimatePresence>
-        {showSettingsRoot && (
-          <SettingsRoot
-            onClose={() => setShowSettingsRoot(false)}
-            installAvailable={installPrompt.available}
-            escDismissible={
-              !showFilters &&
-              !showLocation &&
-              !showMapView &&
-              !showNetworkMode &&
-              !showBlobsCard &&
-              !showDiagnosticCard &&
-              !showStatusCard &&
-              !showAboutCard &&
-              !showIdentity &&
-              !showSwitcher &&
-              !showRelays &&
-              !showLists
-            }
-            onSelect={(target) => {
-              // V9.2e — UX: NÃO fechar SettingsRoot ao abrir sub-card.
-              // Sub-cards renderizam ON TOP (z-40 + DOM order) do root;
-              // ao fechar o sub-card, user volta naturalmente pra lista
-              // de configurações, sem hop brusco pro home view. Apenas
-              // ações destrutivas (limpar local) fecham o root via
-              // reload da página.
-              switch (target) {
-                case 'chave':
-                  setShowIdentity(true)
-                  break
-                case 'identidades':
-                  setShowSwitcher(true)
-                  break
-                case 'relays':
-                  setShowRelays(true)
-                  break
-                case 'listas':
-                  setShowLists(true)
-                  break
-                case 'filtros':
-                  setShowFilters(true)
-                  break
-                case 'location':
-                  setShowLocation(true)
-                  break
-                case 'mapa':
-                  setShowMapView(true)
-                  break
-                case 'rede':
-                  setShowNetworkMode(true)
-                  break
-                case 'blobs':
-                  setShowBlobsCard(true)
-                  break
-                case 'diagnostico':
-                  setShowDiagnosticCard(true)
-                  break
-                case 'status':
-                  setShowStatusCard(true)
-                  break
-                case 'sobre':
-                  setShowAboutCard(true)
-                  break
-                case 'instalar':
-                  // Reabre modal mesmo se previamente dispensado.
-                  installPrompt.setDismissed(false)
-                  setShowInstallModal(true)
-                  break
-                case 'limpar':
-                  void handleClearLocal()
-                  break
-              }
-            }}
-          />
-        )}
-      </AnimatePresence>
-
-      {/* V9.2d — cards focados (substituem routing pra ContentSettings
-          monolítica). Cada um abre como FullPageCard próprio. */}
-      <AnimatePresence>
-        {showFilters && (
-          <LazyBoundary fallback={<DriftSkeleton variant="card" />}>
-            <FiltersCard onClose={() => setShowFilters(false)} />
-          </LazyBoundary>
-        )}
-      </AnimatePresence>
-      <AnimatePresence>
-        {showLocation && (
-          <LazyBoundary fallback={<DriftSkeleton variant="card" />}>
-            <LocationCard onClose={() => setShowLocation(false)} />
-          </LazyBoundary>
-        )}
-      </AnimatePresence>
-      <AnimatePresence>
-        {showMapView && (
-          <LazyBoundary fallback={<DriftSkeleton variant="card" />}>
-            <MapViewCard onClose={() => setShowMapView(false)} />
-          </LazyBoundary>
-        )}
-      </AnimatePresence>
-      <AnimatePresence>
-        {showNetworkMode && (
-          <LazyBoundary fallback={<DriftSkeleton variant="card" />}>
-            <NetworkModeCard onClose={() => setShowNetworkMode(false)} />
-          </LazyBoundary>
-        )}
-      </AnimatePresence>
-      <AnimatePresence>
-        {showBlobsCard && (
-          <LazyBoundary fallback={<DriftSkeleton variant="card" />}>
-            <BlobsCard onClose={() => setShowBlobsCard(false)} />
-          </LazyBoundary>
-        )}
-      </AnimatePresence>
-      <AnimatePresence>
-        {showDiagnosticCard && (
-          <LazyBoundary fallback={<DriftSkeleton variant="card" />}>
-            <DiagnosticCard onClose={() => setShowDiagnosticCard(false)} />
-          </LazyBoundary>
-        )}
-      </AnimatePresence>
-
-      {/* V9.2e — Status card (substitui inline DiagnosticPanel). */}
-      <AnimatePresence>
-        {showStatusCard && (
-          <FullPageCard
-            onClose={() => setShowStatusCard(false)}
-            title="status"
-            ariaLabel="painel de diagnóstico"
-          >
-            <div className="p-5">
-              <DiagnosticPanel boot={boot} />
-            </div>
-          </FullPageCard>
-        )}
-      </AnimatePresence>
-
-      {/* V9.2e — Sobre card (versão + manifesto link). */}
-      <AnimatePresence>
-        {showAboutCard && (
-          <FullPageCard
-            onClose={() => setShowAboutCard(false)}
-            title="sobre"
-            ariaLabel="sobre o cliente Drift"
-          >
-            <div className="space-y-4 p-5 font-mono">
-              <div className="rounded border border-drift-border bg-drift-bg/50 p-4">
-                <div className="text-[10px] uppercase tracking-[2px] text-drift-muted">
-                  versão do cliente
-                </div>
-                <div className="mt-1 font-display text-[20px] font-extrabold text-drift-text">
-                  {CLIENT_VERSION}
-                </div>
-                <div className="mt-2 text-[10px] leading-relaxed text-drift-muted">
-                  cliente oficial Drift (
-                  <code className="text-drift-text">drift-official</code>) —
-                  vocab user-facing DRIFT/SINK/DERIVA · vocab spec SPREAD/
-                  BURY (kinds 9079/9080).
-                </div>
-              </div>
-              <a
-                href="https://github.com/anthropics/claude-code"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block rounded border border-drift-border bg-drift-bg/30 p-4 text-[12px] leading-relaxed text-drift-text transition-colors hover:border-drift-accent hover:text-drift-accent"
-              >
-                manifesto + arquitetura ↗
-                <div className="mt-1 text-[10px] text-drift-muted">
-                  34 princípios públicos. Compromissos vinculantes.
-                </div>
-              </a>
-              <p className="text-[10px] leading-relaxed text-drift-muted">
-                Drift é decentralized social network sobre Nostr.
-                Eventos imutáveis assinados, score determinístico,
-                sem afinidade no feed (manifesto §22), sem chave mestra
-                (§17). Cliente PWA + Tauri opcional. Identidade portável
-                via nsec1.
-              </p>
-            </div>
-          </FullPageCard>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {showRelays && (
-          <LazyBoundary fallback={<DriftSkeleton variant="card" />}>
-            <RelaySettings onClose={() => setShowRelays(false)} />
-          </LazyBoundary>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {showSwitcher && (
-          <LazyBoundary fallback={<DriftSkeleton variant="card" />}>
-            <IdentitySwitcher
-              onClose={() => setShowSwitcher(false)}
-              onRequestExport={() => {
-                setShowSwitcher(false)
-                setShowIdentity(true)
-              }}
-            />
-          </LazyBoundary>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {showLists && (
-          <LazyBoundary fallback={<DriftSkeleton variant="card" />}>
-            <LocalListsSettings onClose={() => setShowLists(false)} />
-          </LazyBoundary>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {showProfile && boot.identity && (
-          <LazyBoundary fallback={<DriftSkeleton variant="card" />}>
-            <ProfileModal
-              identity={boot.identity}
-              onClose={() => setShowProfile(false)}
-            />
-          </LazyBoundary>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {showOnboarding && (
-          <LazyBoundary fallback={<DriftSkeleton variant="card" />}>
-            <OnboardingOverlay
-              onClose={() => setShowOnboarding(false)}
-              onOpenIdentity={() => {
-                setShowOnboarding(false)
-                setShowIdentity(true)
-              }}
-            />
-          </LazyBoundary>
-        )}
-      </AnimatePresence>
-
-      {showIdentity && boot.identity && (
-        <LazyBoundary fallback={<DriftSkeleton variant="card" />}>
-          <IdentityPanel
-            identity={boot.identity}
-            onClose={() => setShowIdentity(false)}
-          />
-        </LazyBoundary>
-      )}
+      {/* Overlays managed by LayerStack — see <LayerRenderer /> above */}
     </div>
   )
 }
@@ -1658,11 +1419,9 @@ function EndOfFeed({
 function MapOverlay({
   currentPost,
   onClose,
-  onOpenLocationSettings,
 }: {
-  currentPost: Post | null
+  currentPost?: Post | null
   onClose: () => void
-  onOpenLocationSettings: () => void
 }) {
   const events = useSyncStore((s) => s.eventsReceived)
   const [mapMode, setMapMode] = useState<'post' | 'global'>('post')
@@ -1701,7 +1460,10 @@ function MapOverlay({
             mode={mapMode}
             onModeChange={setMapMode}
             className="h-full w-full"
-            onOpenLocationSettings={onOpenLocationSettings}
+            onOpenLocationSettings={() => {
+              popLayer({ id: 'map' })
+              pushLayer({ id: 'location', component: LocationCard })
+            }}
             {...(currentPost ? { currentPostId: currentPost.id } : {})}
           />
         </LazyBoundary>
@@ -1744,27 +1506,66 @@ type SettingsTarget =
   | 'instalar'
   | 'limpar'
 
-function SettingsRoot({
-  onClose,
-  onSelect,
-  escDismissible = true,
-  installAvailable = false,
-}: {
-  onClose: () => void
-  onSelect: (target: SettingsTarget) => void
-  /**
-   * V9.2e — quando um sub-card está aberto sobre o root, root NÃO
-   * deve responder ao ESC (sub-card é o topmost; senão ESC fecha
-   * ambos). App.tsx passa false quando algum sub-card está aberto.
-   */
-  escDismissible?: boolean
-  /**
-   * V10b — quando PWA ainda é instalável (não-standalone, prompt
-   * disponível), expõe item "instalar app" no grupo sistema. Some
-   * automaticamente após instalação (evento `appinstalled`).
-   */
-  installAvailable?: boolean
-}) {
+function SettingsRoot({ onClose }: { onClose: () => void }) {
+  const installPromptLocal = useInstallPrompt()
+
+  function handleSettingsSelect(target: SettingsTarget) {
+    const p = 'settings'
+    switch (target) {
+      case 'chave':
+        pushLayer({ id: 'identity', component: IdentityPanel, parent: p })
+        break
+      case 'identidades':
+        pushLayer({
+          id: 'switcher', component: IdentitySwitcher, parent: p,
+          props: {
+            onRequestExport: () => {
+              popLayer({ id: 'switcher' })
+              pushLayer({ id: 'identity', component: IdentityPanel, parent: p })
+            },
+          },
+        })
+        break
+      case 'relays':
+        pushLayer({ id: 'relays', component: RelaySettings, parent: p })
+        break
+      case 'listas':
+        pushLayer({ id: 'lists', component: LocalListsSettings, parent: p })
+        break
+      case 'filtros':
+        pushLayer({ id: 'filters', component: FiltersCard, parent: p })
+        break
+      case 'location':
+        pushLayer({ id: 'location', component: LocationCard, parent: p })
+        break
+      case 'mapa':
+        pushLayer({ id: 'mapview', component: MapViewCard, parent: p })
+        break
+      case 'rede':
+        pushLayer({ id: 'network', component: NetworkModeCard, parent: p })
+        break
+      case 'blobs':
+        pushLayer({ id: 'blobs', component: BlobsCard, parent: p })
+        break
+      case 'diagnostico':
+        pushLayer({ id: 'diagnostic', component: DiagnosticCard, parent: p })
+        break
+      case 'status':
+        pushLayer({ id: 'status', component: StatusCardLayer, parent: p })
+        break
+      case 'sobre':
+        pushLayer({ id: 'about', component: AboutCardLayer, parent: p })
+        break
+      case 'instalar':
+        installPromptLocal.setDismissed(false)
+        pushLayer({ id: 'install', component: InstallModal, parent: p })
+        break
+      case 'limpar':
+        void handleClearLocal()
+        break
+    }
+  }
+
   // V9: agrupado por categoria visual (mockup s-row pattern). Identidade
   // primeiro pq é o caminho mais comum; Sistema (status/limpar) por
   // último porque diagnostic + destrutivo. Cada categoria tem header
@@ -1873,7 +1674,7 @@ function SettingsRoot({
           hint: 'cliente Drift, manifesto + licença',
           icon: InfoIcon,
         },
-        ...(installAvailable
+        ...(installPromptLocal.available
           ? [
               {
                 target: 'instalar' as SettingsTarget,
@@ -1899,7 +1700,6 @@ function SettingsRoot({
       onClose={onClose}
       title="configurações"
       ariaLabel="configurações"
-      escDismissible={escDismissible}
     >
       <div className="px-5 py-[18px]">
         {groups.map((group, gi) => (
@@ -1920,7 +1720,7 @@ function SettingsRoot({
                 return (
                   <li key={item.target}>
                     <button
-                      onClick={() => onSelect(item.target)}
+                      onClick={() => handleSettingsSelect(item.target)}
                       className="group flex w-full items-center gap-3 px-1 py-[14px] text-left transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2 focus-visible:ring-offset-2 focus-visible:ring-offset-drift-bg"
                     >
                       <span
@@ -1972,29 +1772,10 @@ function SettingsRoot({
 
 // ─── Install Banner ──────────────────────────────────────────────────
 
-function InstallModal({
-  kind,
-  onInstall,
-  onClose,
-  onDismiss,
-}: {
-  kind: 'native' | 'ios-safari' | 'unavailable'
-  onInstall: () => void
-  /** Fecha o modal sem persistir dispensa (reaparece via Settings). */
-  onClose: () => void
-  /** Persiste dispensa em localStorage (não reaparece em auto-open). */
-  onDismiss: () => void
-}) {
+function InstallModal({ onClose }: { onClose: () => void }) {
+  const ip = useInstallPrompt()
+  const kind = ip.kind === 'unavailable' ? 'ios-safari' : ip.kind
   const [showIosHelp, setShowIosHelp] = useState(kind === 'ios-safari')
-
-  // ESC fecha (sem persist).
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
 
   return (
     <div
@@ -2062,7 +1843,7 @@ function InstallModal({
           </>
         ) : (
           <button
-            onClick={onInstall}
+            onClick={async () => { await ip.install(); onClose() }}
             className="mb-3 w-full rounded border border-drift-accent bg-drift-accent/10 px-3 py-2 text-[12px] uppercase tracking-widest text-drift-accent hover:bg-drift-accent/20"
           >
             instalar agora
@@ -2070,7 +1851,7 @@ function InstallModal({
         )}
 
         <button
-          onClick={onDismiss}
+          onClick={() => { ip.setDismissed(true); onClose() }}
           className="w-full font-mono text-[10px] uppercase tracking-widest text-drift-muted hover:text-drift-text"
         >
           não mostrar de novo

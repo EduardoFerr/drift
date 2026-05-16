@@ -174,7 +174,7 @@ export function attachDataChannel(peer: PeerState, dc: RTCDataChannel): void {
   peer.dc = dc
   dc.onopen = () => {
     peer.status = 'open'
-    // Fase 6.3-B: reset reconnect counter em sucesso.
+    console.info('[webrtc] DataChannel aberto com', peer.id.slice(0, 8))
     _resetReconnectCounter(peer.id)
     // Fase 6.2 integration: registra handshake bem-sucedido no peerRegistry
     // pra alimentar scoring (manifesto §20). ASN/country ficam null em
@@ -204,6 +204,7 @@ export function attachDataChannel(peer: PeerState, dc: RTCDataChannel): void {
     )
   }
   dc.onclose = () => {
+    console.info('[webrtc] DataChannel fechou com', peer.id.slice(0, 8))
     if (peer.status !== 'failed') peer.status = 'closed'
     peer.outboundQueue.length = 0
   }

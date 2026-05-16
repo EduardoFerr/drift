@@ -33,16 +33,14 @@ export interface IpfsGateway {
 }
 
 /**
- * Lista default de gateways clearnet. Ordem reflete preferência
- * (Cloudflare costuma ser mais rápido, dweb.link estável, ipfs.io
- * fallback canônico).
+ * Lista default de gateways clearnet. Ordem reflete preferência.
  *
  * **CARE:** lista curta e auditável. Não inflar — cada gateway novo
  * é um vetor de privacidade adicional.
  */
 export const DEFAULT_IPFS_GATEWAYS: IpfsGateway[] = [
-  { name: 'Cloudflare', url: 'https://cloudflare-ipfs.com', timeoutMs: 5000 },
   { name: 'dweb.link', url: 'https://dweb.link', timeoutMs: 5000 },
+  { name: 'w3s.link', url: 'https://w3s.link', timeoutMs: 5000 },
   { name: 'ipfs.io', url: 'https://ipfs.io', timeoutMs: 8000 },
 ]
 

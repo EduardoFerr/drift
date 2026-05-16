@@ -147,7 +147,12 @@ export function getHelia(): Promise<HeliaBundle> {
  */
 export async function disposeHelia(): Promise<void> {
   stopIdleWatcher()
+  if (connectionCapTimer) {
+    clearInterval(connectionCapTimer)
+    connectionCapTimer = null
+  }
   if (!heliaPromise) return
+  console.info('[helia] dispose — idle timeout ou reset')
   const promise = heliaPromise
   heliaPromise = null
   try {
@@ -159,6 +164,32 @@ export async function disposeHelia(): Promise<void> {
 }
 
 // ─── Init ────────────────────────────────────────────────────────────
+
+const LIBP2P_MAX_CONNECTIONS = 20
+
+interface Libp2pRuntime {
+  getPeers(): unknown[]
+  getConnections(): { id: string; close(): Promise<void> }[]
+  addEventListener(event: string, handler: () => void): void
+  status: string
+}
+
+type HeliaWithLibp2p = { libp2p?: Libp2pRuntime }
+
+let connectionCapTimer: ReturnType<typeof setInterval> | null = null
+
+function enforceConnectionCap(libp2p: Libp2pRuntime): void {
+  if (connectionCapTimer) return
+  connectionCapTimer = setInterval(() => {
+    const conns = libp2p.getConnections()
+    if (conns.length <= LIBP2P_MAX_CONNECTIONS) return
+    const excess = conns.slice(LIBP2P_MAX_CONNECTIONS)
+    console.info(`[helia] pruning ${excess.length} connections (${conns.length}/${LIBP2P_MAX_CONNECTIONS})`)
+    for (const conn of excess) {
+      conn.close().catch(() => {})
+    }
+  }, 10_000)
+}
 
 async function initHelia(): Promise<HeliaBundle> {
   // Dynamic imports SEMPRE — garante code-splitting via Vite. Cada chunk
@@ -179,14 +210,22 @@ async function initHelia(): Promise<HeliaBundle> {
   const datastore = new IDBDatastore('drift-helia-datastore')
   await Promise.all([blockstore.open(), datastore.open()])
 
+  console.info('[helia] inicializando node...')
+
   const node = await createHelia({
     blockstore,
     datastore,
-    // libp2p defaults do Helia browser (WebRTC + WebSockets + relay).
-    // Em B.2 podemos passar config customizada (Tor/onion-only mode
-    // desliga P2P, fica gateway-only).
+    libp2p: {
+      connectionManager: {
+        maxConnections: LIBP2P_MAX_CONNECTIONS,
+      },
+    },
     start: true,
   })
+
+  const libp2p = (node as HeliaWithLibp2p).libp2p
+  if (libp2p) enforceConnectionCap(libp2p)
+  console.info('[helia] node pronto —', libp2p?.getPeers().length ?? 0, 'peers')
 
   const fs = unixfs(node)
 
@@ -211,18 +250,16 @@ export async function addBlob(bytes: Uint8Array): Promise<CID> {
 
 /**
  * Recupera bytes pelo CID. Tenta blockstore local primeiro; se não tem,
- * libp2p busca em peers conhecidos. Timeout deixado pro caller (Helia
- * default é "espera indefinidamente" — em B.2 vamos passar AbortSignal).
+ * libp2p busca em peers conhecidos.
  *
- * **Atenção:** B.2 vai adicionar verify SHA-256 contra `x` da tag NIP-94.
- * Em B.1 retornamos os bytes sem verify — uso interno/spike só.
+ * `signal` permite timeout externo — sem ele, Helia espera indefinidamente
+ * (trustless gateway pode levar 30s+ pra 504).
  */
-export async function getBlob(cid: CID): Promise<Uint8Array> {
+export async function getBlob(cid: CID, signal?: AbortSignal): Promise<Uint8Array> {
   const { fs } = await getHelia()
-  // unixfs.cat retorna AsyncIterable<Uint8Array>; concatena tudo.
   const chunks: Uint8Array[] = []
   let total = 0
-  for await (const chunk of fs.cat(cid)) {
+  for await (const chunk of fs.cat(cid, { signal })) {
     chunks.push(chunk)
     total += chunk.byteLength
   }
@@ -293,7 +330,7 @@ export interface HeliaStats {
 export async function heliaStats(): Promise<HeliaStats> {
   const { node } = await getHelia()
   // libp2p é opcional na interface Helia 6.x; guardamos defensivamente.
-  const libp2p = (node as { libp2p?: { getPeers(): unknown[]; status: string } }).libp2p
+  const libp2p = (node as HeliaWithLibp2p).libp2p
   const peerCount = libp2p?.getPeers().length ?? 0
   const running = libp2p?.status === 'started'
 

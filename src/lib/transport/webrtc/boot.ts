@@ -117,20 +117,17 @@ export async function ensureSignalingAsync(): Promise<SignalingChannel> {
       setSignalingUnsub(ch.onMessage(handleSignalingMessage))
       registerPagehideOnce()
       startRandomWalkTimer()
-      // Fase 6.3-C: health checks ping/pong (15s interval).
       startHealthCheckTimer()
-      // Sem hello broadcast em modo Nostr — discovery é PoI-only
-      // (caller chama connectTo(peerNpub) sabendo o alvo).
+      console.info('[webrtc] signaling booted (nostr) — peerId:', ch.peerId.slice(0, 8))
       return ch
     }
-    // Mock fallback (default em DEV).
     const ch = createMockSignalingChannel(myPeerId())
     setSignalingChannel(ch)
     setSignalingUnsub(ch.onMessage(handleSignalingMessage))
     registerPagehideOnce()
     startRandomWalkTimer()
     startHealthCheckTimer()
-    // Mock: anuncia presença ao boot.
+    console.info('[webrtc] signaling booted (mock) — peerId:', ch.peerId.slice(0, 8))
     void ch.send({
       type: 'hello',
       from: ch.peerId,
@@ -189,9 +186,9 @@ function handleSignalingMessage(msg: SignalingMessage): void {
   const me = myPeerId()
   switch (msg.type) {
     case 'hello': {
-      // Cria peer entry preventivamente (mesmo se a gente não inicia).
+      console.info('[webrtc] hello de', msg.from.slice(0, 8))
       const peer = getOrCreatePeer(msg.from)
-      if (!peer) return // cap atingido — ignora hello
+      if (!peer) return
       if (shouldInitiateOffer(me, msg.from)) {
         void initiateOffer(peer)
       }
