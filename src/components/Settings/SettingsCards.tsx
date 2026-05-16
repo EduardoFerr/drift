@@ -460,7 +460,8 @@ export function BlobsCard({ onClose }: CardProps) {
    * (UI atualiza sincronamente).
    */
   async function handleToggleIpfs(v: boolean) {
-    await setPref('use_ipfs', v)
+    usePrefsStore.setState({ use_ipfs: v })
+    setPref('use_ipfs', v).catch(() => {})
     if (!v && stats?.running) {
       // dispose silencioso — falha não importa, watcher pega depois
       try {
@@ -513,10 +514,13 @@ export function BlobsCard({ onClose }: CardProps) {
     }
   }
 
+  // Auto-fetch stats on mount quando pref está ativa — sem isso,
+  // fechar e reabrir o card mostra "inicializar" em vez do estado real.
+  useEffect(() => {
+    if (useIpfs && !stats && !loading) void refresh()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Auto-refresh a cada 5s enquanto card está aberto E Helia rodando.
-  // Cleanup quando user fecha o card OU quando stats muda. NÃO chama
-  // disposeHelia — outros call sites (Image fetchBlobUrl, uploadBlob)
-  // podem ainda estar usando o singleton. User desliga via botão.
   useEffect(() => {
     if (!stats?.running) return
     const id = setInterval(() => void refresh(), 5_000)
