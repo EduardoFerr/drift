@@ -2264,30 +2264,71 @@ function BootView({ state }: { state: BootState }) {
         />
 
         {state.step === 'error' && state.error && (
-          <div className="mt-6 rounded border border-drift-bury/60 bg-drift-bury/10 p-4 text-drift-bury">
-            <div className="mb-2 text-xs uppercase tracking-widest">erro · bootstrap interrompido</div>
-            <pre className="mb-4 whitespace-pre-wrap break-words text-xs">{state.error}</pre>
-            <p className="mb-3 font-mono text-[12px] text-drift-muted">
-              tente uma das ações abaixo. se o erro persistir, exporte a
-              identidade nsec antes de limpar local.
+          <div className="mt-6 rounded-lg border border-drift-bury/60 bg-drift-bury/10 p-5 text-drift-bury">
+            <div className="mb-1 text-[12px] font-bold uppercase tracking-widest">
+              erro · bootstrap interrompido
+            </div>
+            <p className="mb-3 text-[12px] text-drift-muted">
+              Erro na etapa{' '}
+              <span className="font-bold text-drift-bury">
+                {
+                  ({
+                    idle: '0/5 · inicialização',
+                    isolation: '1/5 · cross-origin isolation',
+                    db: '2/5 · sqlite wasm',
+                    identity: '3/5 · identidade nostr',
+                    sync: '4/5 · sync nostr',
+                    relays: '5/5 · relays nostr',
+                    ready: '—',
+                    error: '—',
+                  } as Record<string, string>)[state.error === 'MULTI_TAB_CONFLICT' ? 'db' : (
+                    // Infer failed step: last step before error. The error string
+                    // itself doesn't encode the step, but we can approximate from
+                    // the check states visible above.
+                    state.isolated === false ? 'isolation'
+                    : state.storage === null ? 'db'
+                    : !state.identity ? 'identity'
+                    : !state.relays ? 'sync'
+                    : 'relays'
+                  )]
+                }
+              </span>
             </p>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={reloadPage}
-                className="rounded border border-drift-accent bg-drift-bg/40 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[2px] text-drift-accent transition-colors hover:bg-drift-accent/10 focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2"
-                title="recarrega a página — resolve race conditions transientes"
-              >
-                ↻ recarregar página
-              </button>
+            <pre className="mb-4 whitespace-pre-wrap break-words rounded border border-drift-border bg-drift-bg/60 p-3 text-[12px] text-drift-muted">
+              {state.error}
+            </pre>
+
+            {/* Primary CTA: limpar local — most likely to fix persistent errors */}
+            <div className="mb-4 flex flex-col gap-3">
               <button
                 type="button"
                 onClick={() => void clearLocalAndReload()}
-                className="rounded border border-drift-bury bg-drift-bg/40 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[2px] text-drift-bury transition-colors hover:bg-drift-bury/10 focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2"
+                className="flex w-full items-center justify-center gap-2 rounded-lg border border-drift-bury bg-drift-bury/15 px-4 py-3 font-mono text-[13px] font-bold uppercase tracking-[2px] text-drift-bury transition-colors hover:bg-drift-bury/25 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-bury"
                 title="apaga OPFS + IndexedDB + localStorage e recarrega — destrói dados locais"
               >
-                ⚠ limpar local + recarregar
+                <span className="text-base">🗑️</span>
+                limpar local + recarregar
               </button>
+              <p className="text-center text-[12px] leading-relaxed text-drift-muted">
+                Remove o cache local (posts, feed, configurações).
+                <br />
+                Sua identidade sera preservada se ja foi exportada.
+              </p>
+            </div>
+
+            {/* Secondary CTA: simple reload — for transient errors */}
+            <div className="flex flex-col items-center gap-2 border-t border-drift-border pt-4">
+              <button
+                type="button"
+                onClick={reloadPage}
+                className="rounded border border-drift-accent/60 bg-drift-bg/40 px-4 py-2 font-mono text-[12px] uppercase tracking-[2px] text-drift-accent transition-colors hover:border-drift-accent hover:bg-drift-accent/10 focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2"
+                title="recarrega a página — resolve race conditions transientes"
+              >
+                ↻ recarregar pagina
+              </button>
+              <p className="text-[12px] text-drift-muted">
+                Se o erro for passageiro, recarregar pode resolver.
+              </p>
             </div>
           </div>
         )}

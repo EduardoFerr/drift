@@ -35,10 +35,17 @@ export function MultiTabModal() {
         onClose={() => {}}
         hideClose
       />
-      <p className="mb-4 text-[12px] text-drift-text">
-        Cada aba precisa do mesmo banco local (OPFS), e só uma pode segurar
-        por vez. Feche uma das abas pra continuar.
+      <p className="mb-3 text-[12px] leading-relaxed text-drift-text">
+        O banco local (OPFS) so pode ser usado por uma aba de cada vez.
+        Outra aba do Drift ja esta segurando o banco.
       </p>
+      <div className="mb-4 rounded border border-drift-border bg-drift-surface p-3">
+        <p className="text-[12px] font-bold text-drift-muted">O que fazer:</p>
+        <ol className="mt-1 list-inside list-decimal text-[12px] leading-relaxed text-drift-muted">
+          <li>Feche a outra aba do Drift no navegador</li>
+          <li>Clique em <strong className="text-drift-accent">Recarregar</strong> abaixo</li>
+        </ol>
+      </div>
       <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
         <button
           onClick={() => window.close()}
@@ -48,7 +55,7 @@ export function MultiTabModal() {
         </button>
         <button
           onClick={() => location.reload()}
-          className="rounded border border-drift-accent bg-drift-accent/10 px-3 py-2 text-[12px] uppercase tracking-widest text-drift-accent hover:bg-drift-accent/20"
+          className="rounded border border-drift-accent bg-drift-accent/10 px-3 py-2 text-[12px] font-bold uppercase tracking-widest text-drift-accent hover:bg-drift-accent/20"
         >
           Recarregar
         </button>
