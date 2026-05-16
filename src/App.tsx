@@ -92,6 +92,9 @@ const PeersCard = lazy(() =>
 const DiagnosticCard = lazy(() =>
   import('./components/Settings/SettingsCards').then((m) => ({ default: m.DiagnosticCard })),
 )
+const PermissionsCard = lazy(() =>
+  import('./components/Settings/SettingsCards').then((m) => ({ default: m.PermissionsCard })),
+)
 const RelaySettings = lazy(() =>
   import('./components/Settings/RelaySettings').then((m) => ({ default: m.RelaySettings })),
 )
@@ -1512,6 +1515,7 @@ type SettingsTarget =
   | 'diagnostico'
   | 'status'
   | 'sobre'
+  | 'permissoes'
   | 'instalar'
   | 'limpar'
 
@@ -1558,6 +1562,9 @@ function SettingsRoot({ onClose }: { onClose: () => void }) {
         break
       case 'blobs':
         pushLayer({ id: 'blobs', component: BlobsCard, parent: p })
+        break
+      case 'permissoes':
+        pushLayer({ id: 'permissions', component: PermissionsCard, parent: p })
         break
       case 'diagnostico':
         pushLayer({ id: 'diagnostic', component: DiagnosticCard, parent: p })
@@ -1668,6 +1675,12 @@ function SettingsRoot({ onClose }: { onClose: () => void }) {
     {
       title: 'sistema',
       items: [
+        {
+          target: 'permissoes',
+          label: 'permissões',
+          hint: 'GPS / câmera / áudio',
+          icon: ShieldIcon,
+        },
         {
           target: 'status',
           label: 'status',

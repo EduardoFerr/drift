@@ -24,7 +24,7 @@
  * dos indicadores 📍🌐 do header pré-V8.
  */
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { setPref, usePrefsStore } from '../../lib/prefs'
 import { dialog } from '../../lib/dialog'
 import { db } from '../../lib/db'
@@ -1118,11 +1118,6 @@ export function DiagnosticCard({ onClose }: CardProps) {
       escDismissible={!rebuilding}
     >
       <div className="space-y-5 p-5">
-        {/* Backfill histórico — V9.10 user report cliente 0.2-0.4 com
-            posts não aparecendo no cliente novo. startSync usa janela
-            de 7d; este botão chama rebuildIdentityHistory que busca
-            sem cap temporal (authors=[npub]) e materializa via
-            onNostrEvent. */}
         <div className="space-y-2">
           <p className="font-mono text-[12px] leading-relaxed text-drift-muted">
             Cliente novo só sincroniza dos últimos 7 dias por default. Se
@@ -1152,6 +1147,173 @@ export function DiagnosticCard({ onClose }: CardProps) {
           >
             {rebuilding ? 'reconstruindo…' : '↻ redefinir cache local'}
           </button>
+        </div>
+      </div>
+    </FullPageCard>
+  )
+}
+
+// ─── PermissionsCard ────────────────────────────────────────────
+
+type PermissionKey = 'geolocation' | 'camera' | 'microphone'
+type PermState = 'granted' | 'denied' | 'prompt' | 'unsupported'
+
+const PERM_ITEMS: {
+  key: PermissionKey
+  label: string
+  hint: string
+  requestFn: () => Promise<void>
+}[] = [
+  {
+    key: 'geolocation',
+    label: 'GPS / localização',
+    hint: 'necessário pra location nos posts e mapa de spread',
+    requestFn: () =>
+      new Promise<void>((resolve, reject) =>
+        navigator.geolocation.getCurrentPosition(
+          () => resolve(),
+          (err) => reject(new Error(err.message)),
+          { timeout: 10000 },
+        ),
+      ),
+  },
+  {
+    key: 'camera',
+    label: 'câmera',
+    hint: 'usada pelo scanner QR em peers P2P',
+    requestFn: async () => {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true })
+      stream.getTracks().forEach((t) => t.stop())
+    },
+  },
+  {
+    key: 'microphone',
+    label: 'áudio / microfone',
+    hint: 'reservado — speech e notas de voz (futuro)',
+    requestFn: async () => {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      stream.getTracks().forEach((t) => t.stop())
+    },
+  },
+]
+
+function stateLabel(s: PermState): { text: string; color: string } {
+  switch (s) {
+    case 'granted':
+      return { text: 'permitido', color: 'text-green-400' }
+    case 'denied':
+      return { text: 'bloqueado', color: 'text-red-400' }
+    case 'prompt':
+      return { text: 'não solicitado', color: 'text-drift-muted' }
+    case 'unsupported':
+      return { text: 'indisponível', color: 'text-drift-muted' }
+  }
+}
+
+export function PermissionsCard({ onClose }: CardProps) {
+  const [perms, setPerms] = useState<Record<PermissionKey, PermState>>({
+    geolocation: 'prompt',
+    camera: 'prompt',
+    microphone: 'prompt',
+  })
+  const [requesting, setRequesting] = useState<PermissionKey | null>(null)
+
+  const queryAll = useCallback(async () => {
+    const next: Record<PermissionKey, PermState> = {
+      geolocation: 'prompt',
+      camera: 'prompt',
+      microphone: 'prompt',
+    }
+    for (const item of PERM_ITEMS) {
+      try {
+        const status = await navigator.permissions.query({
+          name: item.key as PermissionName,
+        })
+        next[item.key] = status.state as PermState
+      } catch {
+        next[item.key] = 'unsupported'
+      }
+    }
+    setPerms(next)
+  }, [])
+
+  useEffect(() => {
+    void queryAll()
+
+    const cleanups: (() => void)[] = []
+    for (const item of PERM_ITEMS) {
+      void navigator.permissions
+        .query({ name: item.key as PermissionName })
+        .then((status) => {
+          const handler = () => void queryAll()
+          status.addEventListener('change', handler)
+          cleanups.push(() => status.removeEventListener('change', handler))
+        })
+        .catch(() => {})
+    }
+    return () => cleanups.forEach((fn) => fn())
+  }, [queryAll])
+
+  async function handleRequest(item: (typeof PERM_ITEMS)[number]) {
+    setRequesting(item.key)
+    try {
+      await item.requestFn()
+    } catch {
+      // denied ou erro — queryAll vai pegar o estado atualizado
+    }
+    await queryAll()
+    setRequesting(null)
+  }
+
+  return (
+    <FullPageCard onClose={onClose} title="permissões" ariaLabel="permissões do navegador">
+      <div className="space-y-2 p-5">
+        <p className="font-mono text-[12px] leading-relaxed text-drift-muted">
+          Drift só solicita permissão quando você usa a feature.
+          Nenhuma é obrigatória. Se bloqueou por engano, libere nas
+          configurações do navegador.
+        </p>
+
+        <div className="space-y-3 pt-2">
+          {PERM_ITEMS.map((item) => {
+            const s = perms[item.key]
+            const { text, color } = stateLabel(s)
+            const canRequest = s === 'prompt'
+            const isRequesting = requesting === item.key
+
+            return (
+              <div
+                key={item.key}
+                className="flex items-start justify-between gap-3 rounded border border-drift-border px-4 py-3"
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="font-mono text-[12px] text-drift-text">{item.label}</div>
+                  <div className="mt-0.5 font-mono text-[11px] leading-relaxed text-drift-muted">
+                    {item.hint}
+                  </div>
+                  <div className={`mt-1 font-mono text-[11px] font-medium ${color}`}>
+                    {text}
+                  </div>
+                </div>
+
+                {canRequest && (
+                  <button
+                    onClick={() => void handleRequest(item)}
+                    disabled={isRequesting}
+                    className="mt-1 shrink-0 rounded border border-drift-accent/60 bg-drift-accent/10 px-3 py-1.5 font-mono text-[11px] uppercase tracking-meta text-drift-accent transition-colors hover:bg-drift-accent/20 disabled:opacity-50 focus:outline-none focus:ring-1 focus:ring-drift-accent2"
+                  >
+                    {isRequesting ? '…' : 'solicitar'}
+                  </button>
+                )}
+
+                {s === 'denied' && (
+                  <span className="mt-1 shrink-0 font-mono text-[10px] text-drift-muted">
+                    libere no navegador
+                  </span>
+                )}
+              </div>
+            )
+          })}
         </div>
       </div>
     </FullPageCard>
