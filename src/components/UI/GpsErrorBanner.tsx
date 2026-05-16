@@ -51,7 +51,7 @@ export function GpsErrorBanner({ reason, onDismiss }: GpsErrorBannerProps) {
         <span className="text-base" aria-hidden="true">
           📍
         </span>
-        <div className="flex-1 font-mono text-[11px]">
+        <div className="flex-1 font-mono text-[12px]">
           <div className="text-amber-200">{message}</div>
           <div className="text-[10px] text-amber-200/60">
             Post foi publicado sem location.
@@ -102,16 +102,16 @@ function GpsHelpModal({ onClose }: { onClose: () => void }) {
           </button>
         </div>
 
-        <p className="mb-4 text-[11px] text-slate-400">
+        <p className="mb-4 text-[12px] text-slate-400">
           Drift não pode forçar permissão de GPS — só o navegador permite.
           Siga os passos do seu navegador:
         </p>
 
         <section className="mb-4">
-          <h3 className="mb-1 text-[11px] uppercase tracking-widest text-slate-300">
+          <h3 className="mb-1 text-[12px] uppercase tracking-widest text-slate-300">
             Chrome / Edge (desktop e Android)
           </h3>
-          <ol className="ml-5 list-decimal space-y-1 text-[11px] text-slate-400">
+          <ol className="ml-5 list-decimal space-y-1 text-[12px] text-slate-400">
             <li>
               Toque no ícone de <strong>cadeado</strong> (ou ⓘ) à esquerda da
               URL
@@ -128,10 +128,10 @@ function GpsHelpModal({ onClose }: { onClose: () => void }) {
         </section>
 
         <section className="mb-4">
-          <h3 className="mb-1 text-[11px] uppercase tracking-widest text-slate-300">
+          <h3 className="mb-1 text-[12px] uppercase tracking-widest text-slate-300">
             Firefox
           </h3>
-          <ol className="ml-5 list-decimal space-y-1 text-[11px] text-slate-400">
+          <ol className="ml-5 list-decimal space-y-1 text-[12px] text-slate-400">
             <li>Clique no ícone de cadeado à esquerda da URL</li>
             <li>
               Em <strong>Permissões</strong>, encontre{' '}
@@ -145,10 +145,10 @@ function GpsHelpModal({ onClose }: { onClose: () => void }) {
         </section>
 
         <section className="mb-4">
-          <h3 className="mb-1 text-[11px] uppercase tracking-widest text-slate-300">
+          <h3 className="mb-1 text-[12px] uppercase tracking-widest text-slate-300">
             Safari (macOS)
           </h3>
-          <ol className="ml-5 list-decimal space-y-1 text-[11px] text-slate-400">
+          <ol className="ml-5 list-decimal space-y-1 text-[12px] text-slate-400">
             <li>
               Menu <strong>Safari → Preferências → Sites</strong>
             </li>
@@ -162,10 +162,10 @@ function GpsHelpModal({ onClose }: { onClose: () => void }) {
         </section>
 
         <section className="mb-4">
-          <h3 className="mb-1 text-[11px] uppercase tracking-widest text-slate-300">
+          <h3 className="mb-1 text-[12px] uppercase tracking-widest text-slate-300">
             Safari (iOS / iPadOS)
           </h3>
-          <ol className="ml-5 list-decimal space-y-1 text-[11px] text-slate-400">
+          <ol className="ml-5 list-decimal space-y-1 text-[12px] text-slate-400">
             <li>
               <strong>Ajustes → Safari → Localização</strong> (precisa estar em{' '}
               <em>Perguntar</em> ou <em>Permitir</em>)
@@ -190,7 +190,7 @@ function GpsHelpModal({ onClose }: { onClose: () => void }) {
 
         <button
           onClick={onClose}
-          className="mt-4 w-full rounded border border-drift-border px-3 py-2 text-[11px] uppercase tracking-widest text-slate-300 hover:border-drift-accent hover:text-drift-accent"
+          className="mt-4 w-full rounded border border-drift-border px-3 py-2 text-[12px] uppercase tracking-widest text-slate-300 hover:border-drift-accent hover:text-drift-accent"
         >
           fechar
         </button>

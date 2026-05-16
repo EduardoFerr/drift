@@ -121,14 +121,14 @@ export function UpdatePrompt() {
               onClick={() => {
                 void updateServiceWorker(true)
               }}
-              className="flex-1 rounded border border-drift-accent bg-drift-accent px-3 py-2 font-mono text-[11px] uppercase tracking-widest text-drift-bg transition hover:bg-drift-accent/90 focus:outline-none focus:ring-2 focus:ring-drift-accent2 focus:ring-offset-2 focus:ring-offset-drift-surface"
+              className="flex-1 rounded border border-drift-accent bg-drift-accent px-3 py-2 font-mono text-[12px] uppercase tracking-widest text-drift-bg transition hover:bg-drift-accent/90 focus:outline-none focus:ring-2 focus:ring-drift-accent2 focus:ring-offset-2 focus:ring-offset-drift-surface"
             >
               Atualizar agora
             </button>
             <button
               type="button"
               onClick={() => setNeedRefresh(false)}
-              className="rounded border border-drift-border px-3 py-2 font-mono text-[11px] uppercase tracking-widest text-drift-muted transition hover:border-drift-text hover:text-drift-text focus:outline-none focus:ring-1 focus:ring-drift-accent2"
+              className="rounded border border-drift-border px-3 py-2 font-mono text-[12px] uppercase tracking-widest text-drift-muted transition hover:border-drift-text hover:text-drift-text focus:outline-none focus:ring-1 focus:ring-drift-accent2"
             >
               Mais tarde
             </button>

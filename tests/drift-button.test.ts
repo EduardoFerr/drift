@@ -100,11 +100,14 @@ describe('driftButtonSizeClass', () => {
     expect(cls).not.toContain('tracking-')
   })
 
-  it('md = px-3 py-[5px] text-[11px] uppercase tracking-[2px] (default — match FECHAR)', () => {
+  it('md = px-3 py-[5px] text-[12px] uppercase tracking-[2px] (default — match FECHAR)', () => {
     const cls = driftButtonSizeClass('md')
     expect(cls).toContain('px-3')
     expect(cls).toContain('py-[5px]')
-    expect(cls).toContain('text-[11px]')
+    // V10.10 (Lighthouse font-size audit): 11px era 29% do texto da page,
+    // abaixo do limiar de 12px de legibilidade mobile. Bump pra 12px (1px
+    // visual delta) leva legível de 53% pra 83%, passa audit.
+    expect(cls).toContain('text-[12px]')
     expect(cls).toContain('uppercase')
     expect(cls).toContain('tracking-[2px]')
   })

@@ -1172,7 +1172,7 @@ function App() {
                 href="https://github.com/anthropics/claude-code"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="block rounded border border-drift-border bg-drift-bg/30 p-4 text-[11px] leading-relaxed text-drift-text transition-colors hover:border-drift-accent hover:text-drift-accent"
+                className="block rounded border border-drift-border bg-drift-bg/30 p-4 text-[12px] leading-relaxed text-drift-text transition-colors hover:border-drift-accent hover:text-drift-accent"
               >
                 manifesto + arquitetura ↗
                 <div className="mt-1 text-[10px] text-drift-muted">
@@ -1495,7 +1495,7 @@ function HomeEmpty({ tab }: { tab: 'global' | 'following' | 'trending' }) {
       : 'Nenhum post no feed ainda. Toque ➕ pra publicar o primeiro — ele vai dar a volta pelos relays e voltar.'
   return (
     <div className="flex h-full items-center justify-center px-8">
-      <p className="max-w-prose text-center font-mono text-[11px] leading-relaxed text-drift-muted">
+      <p className="max-w-prose text-center font-mono text-[12px] leading-relaxed text-drift-muted">
         {msg}
       </p>
     </div>
@@ -1574,7 +1574,7 @@ function EndOfFeed({
         <h2 className="font-display text-xl font-bold leading-title tracking-title text-drift-text">
           Você viu tudo por aqui.
         </h2>
-        <p className="max-w-prose font-mono text-[11px] leading-relaxed text-drift-muted">
+        <p className="max-w-prose font-mono text-[12px] leading-relaxed text-drift-muted">
           Posts novos chegam continuamente via relays. Atualize pra
           checar agora, ou volte pro topo pra reler o feed atual —
           manifesto §6 (verdade por eventos).
@@ -1583,7 +1583,7 @@ function EndOfFeed({
           <button
             onClick={() => void handleRefresh()}
             disabled={refreshing}
-            className="rounded bg-drift-accent px-4 py-2.5 font-mono text-[11px] font-bold uppercase tracking-meta text-drift-bg transition-opacity hover:opacity-90 disabled:cursor-wait disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2 focus-visible:ring-offset-2 focus-visible:ring-offset-drift-bg"
+            className="rounded bg-drift-accent px-4 py-2.5 font-mono text-[12px] font-bold uppercase tracking-meta text-drift-bg transition-opacity hover:opacity-90 disabled:cursor-wait disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2 focus-visible:ring-offset-2 focus-visible:ring-offset-drift-bg"
           >
             {refreshing ? '⟳ verificando…' : '↻ atualizar feed'}
           </button>
@@ -1906,7 +1906,7 @@ function SettingsRoot({
                       </span>
                       <div className="flex min-w-0 flex-1 flex-col gap-[2px]">
                         <span
-                          className={`font-mono text-[11px] uppercase tracking-[2px] ${
+                          className={`font-mono text-[12px] uppercase tracking-[2px] ${
                             item.danger ? 'text-drift-bury' : 'text-drift-text'
                           }`}
                         >
@@ -1986,7 +1986,7 @@ function InstallModal({
         <div className="mb-3 flex items-start gap-3">
           <span className="text-xl" aria-hidden="true">📥</span>
           <div className="flex-1">
-            <h2 className="font-mono text-[11px] uppercase tracking-[2px] text-drift-accent">
+            <h2 className="font-mono text-[12px] uppercase tracking-[2px] text-drift-accent">
               instalar Drift
             </h2>
             <p className="mt-1 font-mono text-[10px] text-drift-muted">
@@ -2027,7 +2027,7 @@ function InstallModal({
             {!showIosHelp && (
               <button
                 onClick={() => setShowIosHelp(true)}
-                className="mb-3 w-full rounded border border-drift-accent px-3 py-2 text-[11px] uppercase tracking-widest text-drift-accent hover:bg-drift-accent/10"
+                className="mb-3 w-full rounded border border-drift-accent px-3 py-2 text-[12px] uppercase tracking-widest text-drift-accent hover:bg-drift-accent/10"
               >
                 como instalar
               </button>
@@ -2036,7 +2036,7 @@ function InstallModal({
         ) : (
           <button
             onClick={onInstall}
-            className="mb-3 w-full rounded border border-drift-accent bg-drift-accent/10 px-3 py-2 text-[11px] uppercase tracking-widest text-drift-accent hover:bg-drift-accent/20"
+            className="mb-3 w-full rounded border border-drift-accent bg-drift-accent/10 px-3 py-2 text-[12px] uppercase tracking-widest text-drift-accent hover:bg-drift-accent/20"
           >
             instalar agora
           </button>
@@ -2240,7 +2240,7 @@ function BootView({ state }: { state: BootState }) {
           <div className="mt-6 rounded border border-drift-bury/60 bg-drift-bury/10 p-4 text-drift-bury">
             <div className="mb-2 text-xs uppercase tracking-widest">erro · bootstrap interrompido</div>
             <pre className="mb-4 whitespace-pre-wrap break-words text-xs">{state.error}</pre>
-            <p className="mb-3 font-mono text-[11px] text-drift-muted">
+            <p className="mb-3 font-mono text-[12px] text-drift-muted">
               tente uma das ações abaixo. se o erro persistir, exporte a
               identidade nsec antes de limpar local.
             </p>
@@ -2327,12 +2327,12 @@ function DiagnosticPanel({ boot }: { boot: BootState }) {
   const relaysTotal = boot.relays?.length ?? '?'
   return (
     <div className="space-y-4">
-      <p className="font-mono text-[11px] leading-relaxed text-drift-muted">
+      <p className="font-mono text-[12px] leading-relaxed text-drift-muted">
         Estado do cliente em tempo real. Use os botões abaixo se UI parecer
         stale ou eventos pararem de chegar.
       </p>
 
-      <div className="space-y-2 rounded border border-drift-border bg-drift-surface p-4 font-mono text-[11px]">
+      <div className="space-y-2 rounded border border-drift-border bg-drift-surface p-4 font-mono text-[12px]">
         <Row label="storage" value={storageLabel} />
         <Row
           label="sync"
@@ -2389,7 +2389,7 @@ function DiagnosticPanel({ boot }: { boot: BootState }) {
           (relay/network) e não rendering. */}
       {sync.recent.length > 0 && (
         <details className="rounded border border-drift-border bg-drift-surface p-3">
-          <summary className="cursor-pointer font-mono text-[11px] text-drift-muted hover:text-drift-text">
+          <summary className="cursor-pointer font-mono text-[12px] text-drift-muted hover:text-drift-text">
             últimos eventos ({sync.recent.length})
           </summary>
           <div className="mt-2 max-h-48 overflow-y-auto font-mono text-[10px]">
@@ -2511,7 +2511,7 @@ function Check({
     <div className="mb-3 rounded border border-drift-border bg-drift-surface p-4">
       <div className="mb-2 flex items-center gap-3">
         <span className={`text-base ${color}`}>{dot}</span>
-        <span className="text-[11px] uppercase tracking-[0.2em] text-drift-muted">{label}</span>
+        <span className="text-[12px] uppercase tracking-[0.2em] text-drift-muted">{label}</span>
       </div>
       <pre className="ml-6 whitespace-pre-wrap break-all text-xs text-drift-muted">{detail}</pre>
       {action && (state === 'fail' || state === 'partial') && (

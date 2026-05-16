@@ -678,7 +678,7 @@ export function PostViewer({
             >
               <span className="text-[16px] leading-none">💬</span>
               {commentCount > 0 && (
-                <span className="text-[11px] leading-none font-mono tabular-nums">
+                <span className="text-[12px] leading-none font-mono tabular-nums">
                   {commentCount}
                 </span>
               )}
@@ -953,7 +953,7 @@ function ModerationModal({
                 {item.icon}
               </span>
               <span className="flex flex-1 flex-col gap-[2px]">
-                <span className="font-mono text-[11px] uppercase tracking-[2px]">
+                <span className="font-mono text-[12px] uppercase tracking-[2px]">
                   {item.label}
                 </span>
                 <span className="font-mono text-[10px] normal-case tracking-normal text-drift-muted">

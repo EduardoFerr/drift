@@ -461,7 +461,7 @@ export function ThreadView({ postId, postAuthorPub, post, onClose }: ThreadViewP
             whileTap={{ scale: 0.95 }}
             transition={{ duration: 0.18, ease: [0.0, 0.0, 0.2, 1] }}
             onClick={openReplyToCursor}
-            className="absolute bottom-5 right-5 z-30 rounded-full border-2 border-drift-accent bg-drift-surface px-4 py-2 font-mono text-[11px] uppercase tracking-meta text-drift-accent shadow-lg hover:bg-drift-accent/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2 motion-reduce:!scale-100"
+            className="absolute bottom-5 right-5 z-30 rounded-full border-2 border-drift-accent bg-drift-surface px-4 py-2 font-mono text-[12px] uppercase tracking-meta text-drift-accent shadow-lg hover:bg-drift-accent/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2 motion-reduce:!scale-100"
             aria-label="responder este comentário"
             aria-keyshortcuts="Enter"
             title="responder (Enter)"
@@ -665,12 +665,12 @@ function EmptyState({ onReply }: { onReply: () => void }) {
       <span className="font-display text-base font-bold uppercase tracking-tag text-drift-muted">
         sem comentários ainda
       </span>
-      <span className="font-mono text-[11px] text-drift-muted">
+      <span className="font-mono text-[12px] text-drift-muted">
         seja o primeiro a comentar.
       </span>
       <button
         onClick={onReply}
-        className="rounded border-2 border-drift-accent px-4 py-2 font-mono text-[11px] uppercase tracking-meta text-drift-accent hover:bg-drift-accent/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2"
+        className="rounded border-2 border-drift-accent px-4 py-2 font-mono text-[12px] uppercase tracking-meta text-drift-accent hover:bg-drift-accent/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2"
       >
         ↵ comentar
       </button>
@@ -697,7 +697,7 @@ function CoachContent() {
       <span className="font-display text-base font-bold uppercase tracking-tag text-drift-text">
         navegação por swipe
       </span>
-      <ul className="flex flex-col gap-2 font-mono text-[11px] tracking-meta text-drift-muted">
+      <ul className="flex flex-col gap-2 font-mono text-[12px] tracking-meta text-drift-muted">
         <li>
           <span className="text-drift-accent">←</span> irmão anterior ·{' '}
           <span className="text-drift-accent">→</span> próximo

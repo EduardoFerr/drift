@@ -563,7 +563,7 @@ function Placeholder({
   action?: { label: string; onClick: () => void }
 }) {
   return (
-    <div className={`flex flex-col items-center justify-center gap-2 rounded border border-dashed border-drift-border bg-drift-surface/40 p-6 text-center text-[11px] text-drift-muted ${className}`}>
+    <div className={`flex flex-col items-center justify-center gap-2 rounded border border-dashed border-drift-border bg-drift-surface/40 p-6 text-center text-[12px] text-drift-muted ${className}`}>
       <span className="text-base">🗺️</span>
       <strong className="text-drift-text">{title}</strong>
       <p className="max-w-xs leading-relaxed">{body}</p>

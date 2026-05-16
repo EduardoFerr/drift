@@ -42,13 +42,13 @@ export function MultiTabModal() {
       <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
         <button
           onClick={() => window.close()}
-          className="rounded border border-drift-border px-3 py-2 text-[11px] uppercase tracking-widest text-drift-text hover:border-drift-accent hover:text-drift-accent"
+          className="rounded border border-drift-border px-3 py-2 text-[12px] uppercase tracking-widest text-drift-text hover:border-drift-accent hover:text-drift-accent"
         >
           Fechar esta aba
         </button>
         <button
           onClick={() => location.reload()}
-          className="rounded border border-drift-accent bg-drift-accent/10 px-3 py-2 text-[11px] uppercase tracking-widest text-drift-accent hover:bg-drift-accent/20"
+          className="rounded border border-drift-accent bg-drift-accent/10 px-3 py-2 text-[12px] uppercase tracking-widest text-drift-accent hover:bg-drift-accent/20"
         >
           Recarregar
         </button>

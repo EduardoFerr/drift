@@ -152,7 +152,7 @@ function BackupTab({ identity }: { identity: DriftIdentity }) {
         <div className="mb-1 text-[10px] uppercase tracking-widest text-drift-muted">
           npub público
         </div>
-        <div className="break-all rounded border border-drift-border bg-black/30 p-2 text-[11px] text-drift-text">
+        <div className="break-all rounded border border-drift-border bg-black/30 p-2 text-[12px] text-drift-text">
           {identity.npubBech32}
         </div>
       </div>
@@ -172,7 +172,7 @@ function BackupTab({ identity }: { identity: DriftIdentity }) {
 
         {reveal ? (
           <div className="space-y-3">
-            <div className="break-all rounded border border-drift-danger/60 bg-drift-danger/10 p-2 text-[11px] text-drift-danger">
+            <div className="break-all rounded border border-drift-danger/60 bg-drift-danger/10 p-2 text-[12px] text-drift-danger">
               {identity.nsecBech32}
             </div>
 
@@ -195,13 +195,13 @@ function BackupTab({ identity }: { identity: DriftIdentity }) {
             <div className="flex gap-2">
               <button
                 onClick={handleCopy}
-                className="flex-1 rounded border border-drift-border px-3 py-2 text-[11px] uppercase tracking-widest text-drift-muted transition-colors hover:border-drift-accent hover:text-drift-accent"
+                className="flex-1 rounded border border-drift-border px-3 py-2 text-[12px] uppercase tracking-widest text-drift-muted transition-colors hover:border-drift-accent hover:text-drift-accent"
               >
                 {copied ? 'copiado ✓' : 'copiar nsec'}
               </button>
               <button
                 onClick={handleDownload}
-                className="flex-1 rounded border border-drift-accent2 px-3 py-2 text-[11px] uppercase tracking-widest text-drift-accent2 transition-colors hover:bg-drift-accent2/10"
+                className="flex-1 rounded border border-drift-accent2 px-3 py-2 text-[12px] uppercase tracking-widest text-drift-accent2 transition-colors hover:bg-drift-accent2/10"
                 title="Baixa um arquivo .json com nsec + npub + metadados. Guarde em local seguro."
               >
                 {downloaded ? 'baixado ✓' : 'baixar arquivo'}
@@ -209,14 +209,14 @@ function BackupTab({ identity }: { identity: DriftIdentity }) {
             </div>
           </div>
         ) : (
-          <div className="rounded border border-drift-border bg-black/30 p-2 text-[11px] text-drift-muted">
+          <div className="rounded border border-drift-border bg-black/30 p-2 text-[12px] text-drift-muted">
             ••••••••••••••••••••••••••••••••••••••••••••••••••••••••
           </div>
         )}
       </div>
 
       {reveal && (
-        <label className="flex cursor-pointer items-start gap-3 rounded border border-drift-border p-3 text-[11px] leading-relaxed text-drift-text transition-colors hover:border-drift-accent2/40">
+        <label className="flex cursor-pointer items-start gap-3 rounded border border-drift-border p-3 text-[12px] leading-relaxed text-drift-text transition-colors hover:border-drift-accent2/40">
           <input
             type="checkbox"
             checked={confirmed}
@@ -328,7 +328,7 @@ function ImportTab({ onClose }: { onClose: () => void }) {
         <button
           onClick={() => fileInputRef.current?.click()}
           disabled={busy}
-          className="w-full rounded border border-drift-accent2 bg-drift-accent2/5 px-3 py-2 text-[11px] uppercase tracking-widest text-drift-accent2 transition-colors hover:bg-drift-accent2/10 disabled:opacity-40"
+          className="w-full rounded border border-drift-accent2 bg-drift-accent2/5 px-3 py-2 text-[12px] uppercase tracking-widest text-drift-accent2 transition-colors hover:bg-drift-accent2/10 disabled:opacity-40"
         >
           ⤓ carregar arquivo de backup (.json)
         </button>
@@ -359,12 +359,12 @@ function ImportTab({ onClose }: { onClose: () => void }) {
           spellCheck={false}
           autoCapitalize="off"
           autoCorrect="off"
-          className="w-full break-all rounded border border-drift-border bg-black/30 p-2 font-mono text-[11px] text-drift-text placeholder:text-drift-muted/60 focus:border-drift-accent focus:outline-none"
+          className="w-full break-all rounded border border-drift-border bg-black/30 p-2 font-mono text-[12px] text-drift-text placeholder:text-drift-muted/60 focus:border-drift-accent focus:outline-none"
         />
       </div>
 
       {error && (
-        <div className="rounded border border-drift-danger/60 bg-drift-danger/10 p-2 text-[11px] text-drift-danger">
+        <div className="rounded border border-drift-danger/60 bg-drift-danger/10 p-2 text-[12px] text-drift-danger">
           {error}
         </div>
       )}
@@ -379,14 +379,14 @@ function ImportTab({ onClose }: { onClose: () => void }) {
         <button
           onClick={onClose}
           disabled={busy}
-          className="flex-1 rounded border border-drift-border px-3 py-2 text-[11px] uppercase tracking-widest text-drift-muted hover:text-drift-text disabled:opacity-40"
+          className="flex-1 rounded border border-drift-border px-3 py-2 text-[12px] uppercase tracking-widest text-drift-muted hover:text-drift-text disabled:opacity-40"
         >
           cancelar
         </button>
         <button
           onClick={handleImport}
           disabled={busy || !nsec.trim()}
-          className="flex-1 rounded border border-drift-accent px-3 py-2 text-[11px] uppercase tracking-widest text-drift-accent transition-colors hover:bg-drift-accent/10 disabled:cursor-not-allowed disabled:opacity-30"
+          className="flex-1 rounded border border-drift-accent px-3 py-2 text-[12px] uppercase tracking-widest text-drift-accent transition-colors hover:bg-drift-accent/10 disabled:cursor-not-allowed disabled:opacity-30"
         >
           {busy ? 'importando…' : 'importar'}
         </button>
@@ -451,7 +451,7 @@ function PasskeyTab({ npub }: { npub: string }) {
 
   if (!supported) {
     return (
-      <div className="rounded border border-drift-warning/60 bg-drift-warning/15 p-3 text-[11px] text-drift-warning">
+      <div className="rounded border border-drift-warning/60 bg-drift-warning/15 p-3 text-[12px] text-drift-warning">
         ⚠ WebAuthn não suportado neste browser. Passkey requer browser
         moderno (Chrome 67+, Safari 14+, Firefox 60+) em contexto seguro
         (HTTPS ou localhost).
@@ -461,7 +461,7 @@ function PasskeyTab({ npub }: { npub: string }) {
 
   return (
     <div>
-      <p className="mb-3 text-[11px] leading-relaxed text-drift-muted">
+      <p className="mb-3 text-[12px] leading-relaxed text-drift-muted">
         Passkey opt-in (WebAuthn) — adiciona um gate de autenticação local
         ao boot do app. Usa biometria (Touch ID, Face ID, Windows Hello)
         ou security key (YubiKey, etc.).
@@ -473,22 +473,22 @@ function PasskeyTab({ npub }: { npub: string }) {
       </p>
 
       {error && (
-        <div className="mb-3 rounded border border-drift-danger/60 bg-drift-danger/10 p-2 text-[11px] text-drift-danger">
+        <div className="mb-3 rounded border border-drift-danger/60 bg-drift-danger/10 p-2 text-[12px] text-drift-danger">
           {error}
         </div>
       )}
 
       {enabled === null ? (
-        <div className="text-[11px] text-drift-muted">verificando…</div>
+        <div className="text-[12px] text-drift-muted">verificando…</div>
       ) : enabled ? (
         <div>
-          <div className="mb-3 rounded border border-drift-spread/60 bg-drift-spread/10 p-2 text-[11px] text-drift-spread">
+          <div className="mb-3 rounded border border-drift-spread/60 bg-drift-spread/10 p-2 text-[12px] text-drift-spread">
             ✓ Passkey ativo. Boot do app pede autenticação.
           </div>
           <button
             onClick={handleDisable}
             disabled={working}
-            className="w-full rounded border border-drift-danger/60 px-3 py-2 text-[11px] uppercase tracking-widest text-drift-danger hover:bg-drift-danger/15 disabled:opacity-50"
+            className="w-full rounded border border-drift-danger/60 px-3 py-2 text-[12px] uppercase tracking-widest text-drift-danger hover:bg-drift-danger/15 disabled:opacity-50"
           >
             {working ? 'desabilitando…' : 'desabilitar passkey'}
           </button>
@@ -497,7 +497,7 @@ function PasskeyTab({ npub }: { npub: string }) {
         <button
           onClick={handleEnable}
           disabled={working}
-          className="w-full rounded border border-drift-accent px-3 py-2 text-[11px] uppercase tracking-widest text-drift-accent hover:bg-drift-accent/10 disabled:opacity-50"
+          className="w-full rounded border border-drift-accent px-3 py-2 text-[12px] uppercase tracking-widest text-drift-accent hover:bg-drift-accent/10 disabled:opacity-50"
         >
           {working ? 'registrando…' : '+ habilitar passkey'}
         </button>

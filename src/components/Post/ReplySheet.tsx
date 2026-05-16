@@ -738,7 +738,7 @@ export function ReplySheet({
                 <button
                   onClick={doPublish}
                   disabled={!canPublish}
-                  className="rounded bg-drift-accent px-4 py-1.5 text-[11px] font-semibold uppercase tracking-widest text-drift-bg transition-opacity hover:opacity-90 focus:outline-none focus:ring-1 focus:ring-drift-accent2 disabled:cursor-not-allowed disabled:opacity-30"
+                  className="rounded bg-drift-accent px-4 py-1.5 text-[12px] font-semibold uppercase tracking-widest text-drift-bg transition-opacity hover:opacity-90 focus:outline-none focus:ring-1 focus:ring-drift-accent2 disabled:cursor-not-allowed disabled:opacity-30"
                   aria-keyshortcuts="Meta+Enter Control+Enter"
                   title="publicar (⌘/Ctrl + Enter)"
                 >

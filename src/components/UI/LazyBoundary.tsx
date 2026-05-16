@@ -51,7 +51,7 @@ class LazyErrorBoundary extends Component<
     if (this.state.hasError) {
       return (
         <div
-          className="flex flex-col items-center justify-center gap-3 p-6 font-mono text-[11px] text-drift-muted"
+          className="flex flex-col items-center justify-center gap-3 p-6 font-mono text-[12px] text-drift-muted"
           role="alert"
         >
           <p className="text-center leading-relaxed">

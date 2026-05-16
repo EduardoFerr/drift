@@ -133,7 +133,7 @@ function PinnedList({
 }) {
   if (list.length === 0) {
     return (
-      <p className="py-6 text-center text-[11px] text-drift-muted">
+      <p className="py-6 text-center text-[12px] text-drift-muted">
         nenhum post fixado.
         <br />
         no PostViewer, clique em 📍 pra fixar — protege de eviction local
@@ -184,7 +184,7 @@ function ModList({
 }) {
   if (list.length === 0) {
     return (
-      <p className="py-6 text-center text-[11px] text-drift-muted">
+      <p className="py-6 text-center text-[12px] text-drift-muted">
         nenhum {kind === 'blocked' ? 'bloqueado' : 'silenciado'}. Filtros
         locais (manifesto §24) — não mudam o score, só sua visualização.
       </p>

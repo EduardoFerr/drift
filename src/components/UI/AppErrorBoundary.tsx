@@ -108,7 +108,7 @@ export class AppErrorBoundary extends Component<Props, State> {
             <h1 className="font-display text-lg font-bold uppercase tracking-tag text-drift-danger">
               algo quebrou
             </h1>
-            <p className="font-mono text-[11px] leading-relaxed text-drift-muted">
+            <p className="font-mono text-[12px] leading-relaxed text-drift-muted">
               Drift travou aqui. Não é a internet — algo no app local. Tenta
               recarregar primeiro; se persistir, limpe o cache (perde estado
               local — backup do nsec recupera identidade).
@@ -119,7 +119,7 @@ export class AppErrorBoundary extends Component<Props, State> {
             <div className="font-mono text-[9px] uppercase tracking-meta text-drift-muted">
               mensagem
             </div>
-            <pre className="mt-1 whitespace-pre-wrap break-all font-mono text-[11px] text-drift-text">
+            <pre className="mt-1 whitespace-pre-wrap break-all font-mono text-[12px] text-drift-text">
               {msg}
             </pre>
           </div>
@@ -138,13 +138,13 @@ export class AppErrorBoundary extends Component<Props, State> {
           <div className="flex flex-col gap-2">
             <button
               onClick={this.handleReload}
-              className="w-full rounded border border-drift-accent px-4 py-2 font-mono text-[11px] uppercase tracking-meta text-drift-accent hover:bg-drift-accent/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2"
+              className="w-full rounded border border-drift-accent px-4 py-2 font-mono text-[12px] uppercase tracking-meta text-drift-accent hover:bg-drift-accent/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2"
             >
               ↻ Recarregar
             </button>
             <button
               onClick={() => void this.handleClearAndReload()}
-              className="w-full rounded border border-drift-danger/60 bg-drift-danger/5 px-4 py-2 font-mono text-[11px] uppercase tracking-meta text-drift-danger hover:bg-drift-danger/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2"
+              className="w-full rounded border border-drift-danger/60 bg-drift-danger/5 px-4 py-2 font-mono text-[12px] uppercase tracking-meta text-drift-danger hover:bg-drift-danger/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2"
             >
               ↻ Limpar cache e recarregar
             </button>

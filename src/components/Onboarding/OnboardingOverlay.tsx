@@ -213,7 +213,7 @@ export function OnboardingOverlay({ onClose, onOpenIdentity }: OnboardingOverlay
             <h2 className="mb-3 text-xs uppercase tracking-[0.2em] text-drift-accent">
               {currentStep?.title}
             </h2>
-            <div className="space-y-3 text-sm text-drift-text [&_code]:text-[11px] [&_p]:leading-relaxed">
+            <div className="space-y-3 text-sm text-drift-text [&_code]:text-[12px] [&_p]:leading-relaxed">
               {currentStep?.body}
             </div>
           </m.div>

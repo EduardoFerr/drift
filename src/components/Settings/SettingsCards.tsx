@@ -141,7 +141,7 @@ export function FiltersCard({ onClose }: CardProps) {
   return (
     <FullPageCard onClose={onClose} title="filtros" ariaLabel="filtros de conteúdo">
       <div className="space-y-3 p-5">
-        <p className="font-mono text-[11px] leading-relaxed text-drift-muted">
+        <p className="font-mono text-[12px] leading-relaxed text-drift-muted">
           Manifesto §27 — autor declara via tag <code>content-warning</code>;
           aqui você decide o que faz com cada categoria. Nada sai deste
           dispositivo.
@@ -176,7 +176,7 @@ export function LocationCard({ onClose }: CardProps) {
   return (
     <FullPageCard onClose={onClose} title="location nos meus posts" ariaLabel="granularidade de location">
       <div className="space-y-4 p-5">
-        <p className="font-mono text-[11px] leading-relaxed text-drift-muted">
+        <p className="font-mono text-[12px] leading-relaxed text-drift-muted">
           Manifesto §28 — default <code>off</code>. Cidade pequena +
           opinião política = identificável. Ative só se entender o
           tradeoff.
@@ -194,7 +194,7 @@ export function LocationCard({ onClose }: CardProps) {
                 role="radio"
                 aria-checked={active}
                 onClick={() => void setPref('location_granularity', opt.value)}
-                className={`rounded border px-2 py-3 font-mono text-[11px] uppercase tracking-meta transition-colors focus:outline-none focus:ring-1 focus:ring-drift-accent2 focus:ring-offset-2 focus:ring-offset-drift-bg ${
+                className={`rounded border px-2 py-3 font-mono text-[12px] uppercase tracking-meta transition-colors focus:outline-none focus:ring-1 focus:ring-drift-accent2 focus:ring-offset-2 focus:ring-offset-drift-bg ${
                   active
                     ? 'border-drift-accent bg-drift-accent/10 text-drift-accent'
                     : 'border-drift-border text-drift-muted hover:border-drift-text hover:text-drift-text'
@@ -226,7 +226,7 @@ export function MapViewCard({ onClose }: CardProps) {
   return (
     <FullPageCard onClose={onClose} title="mapa de spread" ariaLabel="enquadramento do mapa">
       <div className="space-y-4 p-5">
-        <p className="font-mono text-[11px] leading-relaxed text-drift-muted">
+        <p className="font-mono text-[12px] leading-relaxed text-drift-muted">
           Como o mapa enquadra os pontos do post. <code>fechado</code>{' '}
           foca na região onde houve deriva; <code>aberto</code> mostra o
           globo todo (útil pra posts intercontinentais).
@@ -244,7 +244,7 @@ export function MapViewCard({ onClose }: CardProps) {
                 role="radio"
                 aria-checked={active}
                 onClick={() => void setPref('map_view', opt.value)}
-                className={`rounded border px-2 py-3 font-mono text-[11px] uppercase tracking-meta transition-colors focus:outline-none focus:ring-1 focus:ring-drift-accent2 focus:ring-offset-2 focus:ring-offset-drift-bg ${
+                className={`rounded border px-2 py-3 font-mono text-[12px] uppercase tracking-meta transition-colors focus:outline-none focus:ring-1 focus:ring-drift-accent2 focus:ring-offset-2 focus:ring-offset-drift-bg ${
                   active
                     ? 'border-drift-accent bg-drift-accent/10 text-drift-accent'
                     : 'border-drift-border text-drift-muted hover:border-drift-text hover:text-drift-text'
@@ -314,7 +314,7 @@ export function NetworkModeCard({ onClose }: CardProps) {
   return (
     <FullPageCard onClose={onClose} title="modo de rede" ariaLabel="modo de rede">
       <div className="space-y-4 p-5">
-        <p className="font-mono text-[11px] leading-relaxed text-drift-muted">
+        <p className="font-mono text-[12px] leading-relaxed text-drift-muted">
           Manifesto §15 — em país que bloqueia relays Nostr, Tor
           contorna. Default <code>clearnet</code> (sem overhead).{' '}
           <code>tor</code> rota via SOCKS5 local (latência +500ms-2s;
@@ -340,7 +340,7 @@ export function NetworkModeCard({ onClose }: CardProps) {
                   void changeMode(opt.value)
                 }}
                 disabled={disabled}
-                className={`rounded border px-2 py-3 font-mono text-[11px] uppercase tracking-meta transition-colors focus:outline-none focus:ring-1 focus:ring-drift-accent2 focus:ring-offset-2 focus:ring-offset-drift-bg ${
+                className={`rounded border px-2 py-3 font-mono text-[12px] uppercase tracking-meta transition-colors focus:outline-none focus:ring-1 focus:ring-drift-accent2 focus:ring-offset-2 focus:ring-offset-drift-bg ${
                   active
                     ? 'border-drift-accent bg-drift-accent/10 text-drift-accent'
                     : 'border-drift-border text-drift-muted hover:border-drift-text hover:text-drift-text'
@@ -530,7 +530,7 @@ export function BlobsCard({ onClose }: CardProps) {
       ariaLabel="status helia ipfs"
     >
       <div className="space-y-4 p-5">
-        <p className="font-mono text-[11px] leading-relaxed text-drift-muted">
+        <p className="font-mono text-[12px] leading-relaxed text-drift-muted">
           Drift hospeda imagens via IPFS (Helia) com fallback HTTP.
           Quando você dá DRIFT em um post, sua cópia local também serve
           aquele blob a outros usuários — manifesto §16 (disponibilidade
@@ -545,7 +545,7 @@ export function BlobsCard({ onClose }: CardProps) {
         />
 
         {!useIpfs && (
-          <div className="rounded border border-drift-border bg-drift-surface p-4 font-mono text-[11px] leading-relaxed text-drift-muted">
+          <div className="rounded border border-drift-border bg-drift-surface p-4 font-mono text-[12px] leading-relaxed text-drift-muted">
             IPFS desativado nas configurações. Imagens continuam sendo
             servidas via HTTP (host + gateways) — só o path libp2p local
             está dormindo.
@@ -555,26 +555,26 @@ export function BlobsCard({ onClose }: CardProps) {
         {useIpfs && !stats && !loading && (
           <button
             onClick={() => void refresh()}
-            className="w-full rounded border border-drift-accent2 bg-drift-surface px-3 py-3 font-mono text-[11px] uppercase tracking-meta text-drift-accent2 transition-colors hover:bg-drift-accent2/10 focus:outline-none focus:ring-1 focus:ring-drift-accent2 focus:ring-offset-2 focus:ring-offset-drift-bg"
+            className="w-full rounded border border-drift-accent2 bg-drift-surface px-3 py-3 font-mono text-[12px] uppercase tracking-meta text-drift-accent2 transition-colors hover:bg-drift-accent2/10 focus:outline-none focus:ring-1 focus:ring-drift-accent2 focus:ring-offset-2 focus:ring-offset-drift-bg"
           >
             ⊕ inicializar helia
           </button>
         )}
 
         {useIpfs && loading && (
-          <div className="font-mono text-[11px] text-drift-muted">
+          <div className="font-mono text-[12px] text-drift-muted">
             inicializando helia… (~950 KiB no primeiro uso)
           </div>
         )}
 
         {useIpfs && error && (
-          <div className="rounded border border-drift-danger/60 bg-drift-danger/10 p-3 font-mono text-[11px] leading-relaxed text-drift-danger">
+          <div className="rounded border border-drift-danger/60 bg-drift-danger/10 p-3 font-mono text-[12px] leading-relaxed text-drift-danger">
             falha: {error}
           </div>
         )}
 
         {useIpfs && stats && (
-          <div className="space-y-2 rounded border border-drift-border bg-drift-surface p-4 font-mono text-[11px]">
+          <div className="space-y-2 rounded border border-drift-border bg-drift-surface p-4 font-mono text-[12px]">
             <Row
               label="estado"
               value={stats.running ? '● rodando' : '○ parado'}
@@ -707,7 +707,7 @@ export function DiagnosticCard({ onClose }: CardProps) {
             sem cap temporal (authors=[npub]) e materializa via
             onNostrEvent. */}
         <div className="space-y-2">
-          <p className="font-mono text-[11px] leading-relaxed text-drift-muted">
+          <p className="font-mono text-[12px] leading-relaxed text-drift-muted">
             Cliente novo só sincroniza dos últimos 7 dias por default. Se
             você usou Drift em outro device/versão e tá faltando posts
             antigos do seu nsec, force a reconstrução.
@@ -715,14 +715,14 @@ export function DiagnosticCard({ onClose }: CardProps) {
           <button
             onClick={handleFetchHistory}
             disabled={historyRebuilding || !npub}
-            className="w-full rounded border border-drift-accent/60 bg-drift-accent/10 px-3 py-3 font-mono text-[11px] uppercase tracking-meta text-drift-accent transition-colors hover:bg-drift-accent/20 disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus:ring-1 focus:ring-drift-accent2 focus:ring-offset-2 focus:ring-offset-drift-bg"
+            className="w-full rounded border border-drift-accent/60 bg-drift-accent/10 px-3 py-3 font-mono text-[12px] uppercase tracking-meta text-drift-accent transition-colors hover:bg-drift-accent/20 disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus:ring-1 focus:ring-drift-accent2 focus:ring-offset-2 focus:ring-offset-drift-bg"
           >
             {historyRebuilding ? 'reconstruindo histórico…' : '↻ buscar histórico do meu nsec'}
           </button>
         </div>
 
         <div className="border-t border-drift-border/60 pt-4 space-y-2">
-          <p className="font-mono text-[11px] leading-relaxed text-drift-muted">
+          <p className="font-mono text-[12px] leading-relaxed text-drift-muted">
             Se a app travar com erro de schema (ex:{' '}
             <code>no such column</code>), reconstrói o banco local.
             Identidade e preferências preservadas; posts re-sincronizam dos
@@ -731,7 +731,7 @@ export function DiagnosticCard({ onClose }: CardProps) {
           <button
             onClick={handleRebuild}
             disabled={rebuilding}
-            className="w-full rounded border border-drift-warning/60 bg-drift-warning/10 px-3 py-3 font-mono text-[11px] uppercase tracking-meta text-drift-warning transition-colors hover:bg-drift-warning/20 disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus:ring-1 focus:ring-drift-accent2 focus:ring-offset-2 focus:ring-offset-drift-bg"
+            className="w-full rounded border border-drift-warning/60 bg-drift-warning/10 px-3 py-3 font-mono text-[12px] uppercase tracking-meta text-drift-warning transition-colors hover:bg-drift-warning/20 disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus:ring-1 focus:ring-drift-accent2 focus:ring-offset-2 focus:ring-offset-drift-bg"
           >
             {rebuilding ? 'reconstruindo…' : '↻ redefinir cache local'}
           </button>

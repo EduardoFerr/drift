@@ -104,7 +104,7 @@ export function driftChipSizeClass(size: DriftChipSize): string {
     case 'sm':
       return 'px-2 py-1 text-[10px] tracking-meta'
     case 'md':
-      return 'px-3 py-1.5 text-[11px] tracking-meta'
+      return 'px-3 py-1.5 text-[12px] tracking-meta'
   }
 }
 

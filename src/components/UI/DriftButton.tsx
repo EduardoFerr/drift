@@ -22,7 +22,7 @@
  *
  * Sizes:
  *   - `sm` → mini-buttons inline (px-2 py-1, text-[10px], no tracking)
- *   - `md` → default (px-3 py-[5px], text-[11px], tracking-[2px])
+ *   - `md` → default (px-3 py-[5px], text-[12px], tracking-[2px])
  *   - `lg` → CTA primário (px-4 py-2, text-xs, tracking-widest)
  *
  * Adoção: este primitive existe pra usar gradualmente. Não quebra nada;
@@ -96,7 +96,7 @@ export function driftButtonSizeClass(size: DriftButtonSize): string {
       return 'px-2 py-1 text-[10px]'
     case 'md':
       // Default: alinhado ao FECHAR original (.btn-x mockup v0.7).
-      return 'px-3 py-[5px] text-[11px] uppercase tracking-[2px]'
+      return 'px-3 py-[5px] text-[12px] uppercase tracking-[2px]'
     case 'lg':
       return 'px-4 py-2 text-xs uppercase tracking-widest'
   }

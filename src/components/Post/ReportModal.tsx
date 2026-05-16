@@ -73,7 +73,7 @@ export function ReportModal({ post, pending, onSubmit, onClose }: ReportModalPro
     <SlideUpOverlay onClose={onClose} ariaLabel="denunciar post">
       <ModalHeader title="denunciar post" onClose={onClose} tone="danger" />
 
-      <p className="mb-4 text-[11px] leading-relaxed text-drift-muted">
+      <p className="mb-4 text-[12px] leading-relaxed text-drift-muted">
         Reports são eventos públicos assinados (manifesto §26).
         Quando o threshold dinâmico é atingido, o post some do feed
         default — mas continua na rede. Cliente alternativo pode
@@ -112,14 +112,14 @@ export function ReportModal({ post, pending, onSubmit, onClose }: ReportModalPro
           <div className="mt-5 flex justify-end gap-2">
             <button
               onClick={onClose}
-              className="rounded border border-drift-border px-3 py-1 text-[11px] text-drift-muted hover:border-drift-text hover:text-drift-text"
+              className="rounded border border-drift-border px-3 py-1 text-[12px] text-drift-muted hover:border-drift-text hover:text-drift-text"
             >
               cancelar
             </button>
             <button
               onClick={() => selected && setConfirmStep(true)}
               disabled={!selected}
-              className="rounded border border-drift-accent px-3 py-1 text-[11px] uppercase tracking-widest text-drift-accent hover:bg-drift-accent/10 disabled:cursor-not-allowed disabled:opacity-30"
+              className="rounded border border-drift-accent px-3 py-1 text-[12px] uppercase tracking-widest text-drift-accent hover:bg-drift-accent/10 disabled:cursor-not-allowed disabled:opacity-30"
             >
               continuar →
             </button>
@@ -152,7 +152,7 @@ function ConfirmStep({
 }) {
   return (
     <div>
-      <div className="mb-3 text-[11px] text-drift-text">
+      <div className="mb-3 text-[12px] text-drift-text">
         confirmar denúncia: <span className="text-drift-accent">{reason}</span>
       </div>
 
@@ -168,14 +168,14 @@ function ConfirmStep({
         <button
           onClick={onBack}
           disabled={pending}
-          className="rounded border border-drift-border px-3 py-1 text-[11px] text-drift-muted hover:border-drift-border disabled:opacity-50"
+          className="rounded border border-drift-border px-3 py-1 text-[12px] text-drift-muted hover:border-drift-border disabled:opacity-50"
         >
           ← voltar
         </button>
         <button
           onClick={onSubmit}
           disabled={pending}
-          className="rounded border border-drift-danger/60 bg-drift-danger/15 px-3 py-1 text-[11px] uppercase tracking-widest text-drift-danger hover:bg-drift-danger/25 disabled:opacity-50"
+          className="rounded border border-drift-danger/60 bg-drift-danger/15 px-3 py-1 text-[12px] uppercase tracking-widest text-drift-danger hover:bg-drift-danger/25 disabled:opacity-50"
         >
           {pending ? 'enviando…' : 'denunciar'}
         </button>
@@ -200,7 +200,7 @@ const AUTHORITIES: Authority[] = [
 function AuthoritiesBlock() {
   return (
     <div className="mb-2 rounded border border-drift-warning/60 bg-drift-warning/10 p-3">
-      <div className="mb-2 text-[11px] font-semibold text-drift-warning">
+      <div className="mb-2 text-[12px] font-semibold text-drift-warning">
         ⚠ conteúdo ilegal — denuncie também a autoridades
       </div>
       <p className="mb-3 text-[10px] leading-relaxed text-drift-warning/80">

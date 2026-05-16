@@ -359,7 +359,7 @@ function CwHiddenPlaceholder({
 function HiddenPlaceholder({ onReveal }: { onReveal: () => void }) {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
-      <span className="font-mono text-[11px] uppercase tracking-meta text-drift-warning">
+      <span className="font-mono text-[12px] uppercase tracking-meta text-drift-warning">
         [comentário oculto]
       </span>
       <span className="font-mono text-[10px] text-drift-muted">

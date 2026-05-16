@@ -101,7 +101,7 @@ export function RelaySettings({ onClose }: RelaySettingsProps) {
   return (
     <FullPageCard onClose={onClose} title="relays" ariaLabel="settings · relays">
       <div className="p-5">
-        <p className="mb-4 text-[11px] leading-relaxed text-drift-muted">
+        <p className="mb-4 text-[12px] leading-relaxed text-drift-muted">
           Manifesto §14 — bootstrap distribuído. Relays são intercambiáveis;
           remover um não tira você da rede. Cliente sempre mantém ao
           menos um seed externo se sua lista ficar muito pequena (anti-eclipse §20).
@@ -109,9 +109,9 @@ export function RelaySettings({ onClose }: RelaySettingsProps) {
 
         {/* Lista atual */}
         <section className="mb-4 max-h-64 space-y-1 overflow-y-auto">
-          {!loaded && <div className="text-[11px] text-drift-muted">carregando…</div>}
+          {!loaded && <div className="text-[12px] text-drift-muted">carregando…</div>}
           {loaded && list.length === 0 && (
-            <div className="text-[11px] text-drift-muted">nenhum relay configurado</div>
+            <div className="text-[12px] text-drift-muted">nenhum relay configurado</div>
           )}
           {list.map((r) => {
             const now = Date.now()
@@ -183,12 +183,12 @@ export function RelaySettings({ onClose }: RelaySettingsProps) {
               value={newUrl}
               onChange={(e) => setNewUrl(e.target.value)}
               placeholder="wss://relay.exemplo.com"
-              className="flex-1 rounded border border-drift-border bg-drift-bg px-2 py-1 text-[11px] text-drift-text placeholder:text-drift-muted/60 focus:border-drift-accent focus:outline-none"
+              className="flex-1 rounded border border-drift-border bg-drift-bg px-2 py-1 text-[12px] text-drift-text placeholder:text-drift-muted/60 focus:border-drift-accent focus:outline-none"
             />
             <button
               onClick={handleAdd}
               disabled={adding || !newUrl.trim()}
-              className="rounded border border-drift-accent px-3 py-1 text-[11px] uppercase tracking-widest text-drift-accent hover:bg-drift-accent/10 disabled:opacity-30"
+              className="rounded border border-drift-accent px-3 py-1 text-[12px] uppercase tracking-widest text-drift-accent hover:bg-drift-accent/10 disabled:opacity-30"
             >
               {adding ? '…' : '+'}
             </button>
@@ -212,12 +212,12 @@ export function RelaySettings({ onClose }: RelaySettingsProps) {
               value={importNpub}
               onChange={(e) => setImportNpub(e.target.value)}
               placeholder="npub1... — buscar lista de relays desse user"
-              className="flex-1 rounded border border-drift-border bg-drift-bg px-2 py-1 text-[11px] text-drift-text placeholder:text-drift-muted/60 focus:border-drift-accent focus:outline-none"
+              className="flex-1 rounded border border-drift-border bg-drift-bg px-2 py-1 text-[12px] text-drift-text placeholder:text-drift-muted/60 focus:border-drift-accent focus:outline-none"
             />
             <button
               onClick={handleImport}
               disabled={importing || !importNpub.trim()}
-              className="rounded border border-drift-accent px-3 py-1 text-[11px] text-drift-accent hover:bg-drift-accent/10 disabled:opacity-30"
+              className="rounded border border-drift-accent px-3 py-1 text-[12px] text-drift-accent hover:bg-drift-accent/10 disabled:opacity-30"
             >
               {importing ? '…' : 'buscar'}
             </button>
@@ -229,7 +229,7 @@ export function RelaySettings({ onClose }: RelaySettingsProps) {
           <button
             onClick={handlePublish}
             disabled={publishing || list.filter((r) => r.enabled).length === 0}
-            className="mt-2 w-full rounded border border-drift-border px-3 py-1 text-[11px] text-drift-muted hover:border-drift-accent hover:text-drift-accent disabled:opacity-30"
+            className="mt-2 w-full rounded border border-drift-border px-3 py-1 text-[12px] text-drift-muted hover:border-drift-accent hover:text-drift-accent disabled:opacity-30"
           >
             {publishing ? 'publicando…' : '↗ publicar minha lista (NIP-65)'}
           </button>
