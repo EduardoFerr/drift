@@ -25,7 +25,12 @@ import { loadRelays } from './relays'
 import { loadIdentities } from './identities'
 import { loadFollows } from './follows'
 import { loadModLocal } from './moderation-local'
-import { isPasskeyEnabled, verifyPasskey } from './passkey'
+// V10.11 — passkey movido pra dynamic import. ~3.58 KB raw / 1.4 KB gz
+// fica fora do entry chunk; só carrega se user efetivamente habilitou
+// Passkey em Settings (manifesto §13.5 opt-in puro). Maioria dos users
+// nunca toca esse módulo. WebAuthn API + IndexedDB access ficam lazy.
+// (Import original abaixo, comentado pra referência histórica.)
+// import { isPasskeyEnabled, verifyPasskey } from './passkey'
 import { startProbe } from './probe'
 import { evictOldPosts } from './cache'
 import { loadCommentCounts } from './comment-counts'
@@ -188,6 +193,7 @@ async function doBootstrap(): Promise<void> {
     // a identidade. Falha de Passkey = boot fica em 'error' e user
     // precisa cancelar e (eventualmente) remover passkey via recuperação
     // (fluxo: clear-site-data + import nsec1 backup).
+    const { isPasskeyEnabled, verifyPasskey } = await import('./passkey')
     if (await isPasskeyEnabled()) {
       try {
         await verifyPasskey()
