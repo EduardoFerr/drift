@@ -200,11 +200,15 @@ function App() {
   const [showStatusCard, setShowStatusCard] = useState(false)
   // V9.2e: sobre = versão do cliente + manifesto link.
   const [showAboutCard, setShowAboutCard] = useState(false)
-  // V9.20 — post linkado via `?p=<nevent>`. Renderiza PostViewer em
-  // modal mode (não-embedded) acima da home view. onClose volta pro
-  // feed normal. State import desnecessário porque resolvemos no
-  // mount effect, mas o `Post` carrega state local (myAction, etc.)
-  // via PostViewer interno.
+  // V9.20 / V10.9 — post linkado via `?p=<nevent>`. Compartilhamento
+  // (share menu → URL ?p=) faz user chegar nesse post como CARD ATUAL
+  // do home view (V8 embedded UX). Antes (V9.20-V10.8) renderizava em
+  // modal mode V7 sobre o feed — visualmente parecia "outro app".
+  // V10.9: deepLinkedPost passa a OVERLAYAR o cursor do feed em
+  // `currentPost`, com mesma UX (swipe, ⋮, fan, long-press, slide).
+  // Quando user swipa (spread/bury), overlay é limpo e cursor do feed
+  // continua intocado. Se o post já está no feed, dedup repositioning
+  // cursor em vez de overlay (ver effect de boot).
   const [deepLinkedPost, setDeepLinkedPost] = useState<Post | null>(null)
 
   // Banner de erro GPS (Lily 29-04): user habilita location_granularity
@@ -263,14 +267,16 @@ function App() {
     } else if (parsed.action === 'settings') {
       setShowSettingsRoot(true)
     }
-    // V9.20 — deep link `?p=<nevent>` gerado pelo share post. Fluxo:
+    // V9.20 / V10.9 — deep link `?p=<nevent>` gerado pelo share post.
+    // Fluxo:
     //   1. parseDeepLinkSearch já decodificou pra eventId hex.
     //   2. Tenta SELECT local primeiro (getPostById) — instantâneo se
     //      já está no SQLite (re-share, mesma sessão).
     //   3. Senão, busca o evento via pool.get(relays, {ids:[id]}),
     //      passa por onNostrEvent que persiste no SQLite.
-    //   4. Re-tenta getPostById → seta deepLinkedPost → abre
-    //      PostViewer em modal mode acima da home.
+    //   4. Re-tenta getPostById → setDeepLinkedPost OU reposiciona
+    //      cursor se o post já está no feed atual (V10.9 dedup —
+    //      evita render duplicado overlay + feed item).
     if (parsed.postEventId) {
       const eventId = parsed.postEventId
       void (async () => {
@@ -288,8 +294,23 @@ function App() {
               post = await getPostById(eventId)
             }
           }
-          if (post) setDeepLinkedPost(post)
-          else console.warn('[deep-link] evento não encontrado:', eventId)
+          if (post) {
+            // V10.9 dedup: snapshot atual do feed pode já conter o post
+            // (re-share na mesma sessão, ou autor é alguém que o user
+            // segue). Reposicionar cursor evita overlay+feed showing
+            // PostX duas vezes. Quando ainda não está no feed (caso
+            // mais comum — link de stranger), overlay fica.
+            const snapshot = useFeedStore.getState().posts
+            const alreadyInFeed = snapshot.some((p) => p.id === post.id)
+            if (alreadyInFeed) {
+              setCursorByTab((prev) => ({
+                ...prev,
+                [feedTab]: { postId: post.id, atEnd: false },
+              }))
+            } else {
+              setDeepLinkedPost(post)
+            }
+          } else console.warn('[deep-link] evento não encontrado:', eventId)
         } catch (err) {
           console.warn('[deep-link] falha ao resolver ?p=', err)
         }
@@ -451,13 +472,24 @@ function App() {
   }, [currentIdx, posts.length, atEnd, feedTab])
 
   const { currentPost, nextHomePost } = useMemo(() => {
+    // V10.9 deep-link overlay: quando user chega via ?p=<nevent>, o post
+    // compartilhado vira o card atual do home view. Shadow cards atrás
+    // mostram o que era o card atual do feed normal — depois do swipe,
+    // o user "entra" no feed dele a partir dali.
+    if (deepLinkedPost) {
+      const safeIdx = Math.max(0, Math.min(currentIdx, posts.length - 1))
+      return {
+        currentPost: deepLinkedPost,
+        nextHomePost: posts.length > 0 && !atEnd ? posts[safeIdx]! : null,
+      }
+    }
     if (posts.length === 0 || atEnd) return { currentPost: null, nextHomePost: null }
     const safeIdx = Math.max(0, Math.min(currentIdx, posts.length - 1))
     return {
       currentPost: posts[safeIdx]!,
       nextHomePost: safeIdx + 1 < posts.length ? posts[safeIdx + 1]! : null,
     }
-  }, [currentIdx, posts, atEnd])
+  }, [currentIdx, posts, atEnd, deepLinkedPost])
   // Inicialização lazy — quando posts carrega pela primeira vez E o
   // user ainda não tem post selecionado naquela tab, ancora em posts[0].
   // Ancorar em ID (em vez de deixar `null` permanente) é importante:
@@ -513,6 +545,13 @@ function App() {
    */
   function advanceHome(dir: 'up' | 'down') {
     setExitDir(dir)
+    // V10.9: deep-link overlay tem cursor próprio. Swipe SÓ limpa o
+    // overlay — cursor do feed permanece onde estava (no shadow card).
+    // Próximo render mostra posts[currentIdx] naturalmente.
+    if (deepLinkedPost) {
+      setDeepLinkedPost(null)
+      return
+    }
     const snapshot = posts
     const idxAtSwipe = currentIdx
     setCursorByTab((prev) => ({
@@ -943,34 +982,12 @@ function App() {
       {/* V8: modal viewer overlay deletado — home view embedded
           substituiu o paradigma "tap to open". */}
 
-      {/* V9.20 — deep-link viewer (modal mode). Renderiza quando
-          ?p=<nevent> resolveu pra um Post no SQLite. Fica acima da
-          home view. onClose volta pro feed. spread/bury fecham o modal
-          e disparam os handlers normais; o feed embedded segue intocado. */}
-      <AnimatePresence>
-        {deepLinkedPost && (
-          <PostViewer
-            key={`deep-${deepLinkedPost.id}`}
-            post={deepLinkedPost}
-            isMine={deepLinkedPost.authorPub === boot.identity?.npub}
-            pendingAction={pending[deepLinkedPost.id] ?? null}
-            myAction={myActions[deepLinkedPost.id] ?? null}
-            capturingLocation={gpsCapturing.has(deepLinkedPost.id)}
-            onOpenLocationSettings={() => {
-              setShowLocation(true)
-            }}
-            onSpread={() => {
-              handleSpread(deepLinkedPost)
-              setDeepLinkedPost(null)
-            }}
-            onBury={() => {
-              handleBury(deepLinkedPost)
-              setDeepLinkedPost(null)
-            }}
-            onClose={() => setDeepLinkedPost(null)}
-          />
-        )}
-      </AnimatePresence>
+      {/* V10.9 — deep-link modal removido. Post compartilhado agora
+          renderiza como `currentPost` do home view (overlay sobre o
+          cursor do feed) usando o mesmo PostViewer embedded. Spread/
+          bury limpam o overlay e o feed continua a partir do cursor
+          intocado. Lógica vive em `currentPost` useMemo + advanceHome
+          gate em deepLinkedPost. */}
 
       {/* V8 — Mapa overlay (acionado pelo MAPA da NavBar). Mostra a
           propagação do post atualmente visível + contador de eventos
