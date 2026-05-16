@@ -1,10 +1,12 @@
 # Manifesto Drift — Coverage Matrix
 
 **Versão analisada**: Manifesto v2.2 (Abril 2026) — 34 princípios
-**Data da auditoria**: 2026-05-15
+**Data da auditoria**: 2026-05-15 (revisado 2026-05-16 — round 11 perf)
 **Auditor**: Robin (research/docs) — análise estruturada
 **Versão do projeto**: `0.6.0-alpha.4`
-**Tests Vitest**: 1032 (+6 todo, 79 files)
+**Tests Vitest**: 1051 (+6 todo, 81 files)
+**Lighthouse atual** (drift-wheat-one.vercel.app, device real, 2026-05-16):
+Perf **98** · A11y **100** · Best Practices **100** · SEO **100**
 
 > Este documento é a **fonte única de verdade** sobre o status atual de
 > entrega dos 34 princípios do manifesto. Substitui o status espalhado
