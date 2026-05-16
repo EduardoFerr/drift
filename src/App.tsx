@@ -31,7 +31,15 @@ import { getPrefs, usePrefsStore } from './lib/prefs'
 import { useUserWeight } from './hooks/useUserWeight'
 import { useInstallPrompt } from './hooks/useInstallPrompt'
 import { PostViewer } from './components/Post/PostViewer'
-import { GpsErrorBanner } from './components/UI/GpsErrorBanner'
+// V10.10 — GpsErrorBanner lazy (Lighthouse unused-js audit). Banner só
+// renderiza quando getCurrentLocation falha durante spread/bury. Boot
+// não precisa do componente em memória. Economia: ~9 KB raw / ~2 KB gz
+// no entry chunk.
+const GpsErrorBanner = lazy(() =>
+  import('./components/UI/GpsErrorBanner').then((m) => ({
+    default: m.GpsErrorBanner,
+  })),
+)
 import { MultiTabModal } from './components/UI/MultiTabModal'
 import { UpdatePrompt } from './components/UI/UpdatePrompt'
 import { DialogHost } from './components/UI/DialogHost'
@@ -804,18 +812,20 @@ function App() {
           if (gpsFailedAt === null || gpsFailReason === null) return null
           if (Date.now() - gpsFailedAt > 60_000) return null
           return (
-            <GpsErrorBanner
-              reason={gpsFailReason}
-              onDismiss={() => {
-                setGpsBannerDismissed(true)
-                if (typeof window !== 'undefined') {
-                  window.sessionStorage.setItem(
-                    'drift:gps-banner-dismissed',
-                    '1',
-                  )
-                }
-              }}
-            />
+            <LazyBoundary fallback={null}>
+              <GpsErrorBanner
+                reason={gpsFailReason}
+                onDismiss={() => {
+                  setGpsBannerDismissed(true)
+                  if (typeof window !== 'undefined') {
+                    window.sessionStorage.setItem(
+                      'drift:gps-banner-dismissed',
+                      '1',
+                    )
+                  }
+                }}
+              />
+            </LazyBoundary>
           )
         })()}
 
