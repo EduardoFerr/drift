@@ -19,8 +19,8 @@
  */
 
 import { DRIFT_KIND_SET } from '../../../config/constants'
-import { verifyDriftEvent } from '../../nostr'
 import type { SignedEvent } from '../../../types/nostr'
+import { verifyEventAsync } from '../../verify'
 import { matchFilter } from '../matchFilter'
 import { PING_PREFIX, PONG_PREFIX, SEEN_IDS_CAP } from './config'
 import { _handlePong } from './health'
@@ -29,7 +29,18 @@ import { consumeRateBudget } from './rateLimit'
 import { iterSubscriptions } from './state'
 import type { PeerState } from './types'
 
-export function handleDataChannelMessage(peer: PeerState, raw: string): void {
+/**
+ * Migrado pra async em 2026-05-16 (Ted RFC verify worker + Barney threat
+ * model): Schnorr verify agora roda no `verify.worker.ts`. Caller em
+ * `peer.ts:202` já descarta o return via `void import().then(...)` —
+ * compatível sem mudança lá. Sincronia interna dos passos 0-2.5
+ * preservada — `await` só dispara depois das checks cheap (invariante
+ * #5).
+ */
+export async function handleDataChannelMessage(
+  peer: PeerState,
+  raw: string,
+): Promise<void> {
   // Barney 🔴 #1 (Sprint 4 review): defesa em profundidade contra
   // pong/frame chegando depois que peer foi marcado failed/closed
   // (cleanupPeer pode ter rodado entre `dc.onmessage` disparar e este
@@ -87,8 +98,11 @@ export function handleDataChannelMessage(peer: PeerState, raw: string): void {
     return
   }
 
-  // 3. Schnorr verify
-  if (!verifyDriftEvent(event)) {
+  // 3. Schnorr verify — off-main-thread (verify.worker via verify.ts).
+  //    Invariante #5 preservada: passos 0-2.5 acima continuam sync
+  //    (cheap). Caller (`peer.ts:202`) descarta Promise via `void`,
+  //    compatível sem mudança.
+  if (!(await verifyEventAsync(event))) {
     console.warn('[webrtc] sig invalid from', peer.id, event.id?.slice(0, 8))
     return
   }

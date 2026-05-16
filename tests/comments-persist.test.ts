@@ -25,6 +25,11 @@ vi.mock('../src/lib/nostr', async () => {
   )
   return { ...actual, verifyDriftEvent: vi.fn(() => true) }
 })
+// 2026-05-16: verify movido pra worker (Ted RFC). events.ts consome
+// verifyEventAsync de verify.ts. Mock cobre o novo caller.
+vi.mock('../src/lib/verify', () => ({
+  verifyEventAsync: vi.fn(async () => true),
+}))
 vi.mock('../src/lib/scoring', () => ({ calculateScoreNow: vi.fn(() => 0) }))
 vi.mock('../src/lib/feed', () => ({ invalidateFeed: vi.fn() }))
 vi.mock('../src/lib/moderation', () => ({

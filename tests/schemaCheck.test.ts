@@ -14,6 +14,12 @@ vi.mock('../src/lib/nostr', async () => {
     verifyDriftEvent: vi.fn(() => true),
   }
 })
+// 2026-05-16: verify movido pra worker (Ted RFC). passesSchemaCheck
+// (testado neste arquivo) é puro e não depende de verify, mas events.ts
+// importa verify.ts no top — sem mock o spawn de Worker em jsdom falha.
+vi.mock('../src/lib/verify', () => ({
+  verifyEventAsync: vi.fn(async () => true),
+}))
 vi.mock('../src/lib/scoring', () => ({
   calculateScoreNow: vi.fn(() => 0),
 }))

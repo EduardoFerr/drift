@@ -250,7 +250,11 @@ export default defineConfig(async (): Promise<UserConfig> => ({
         //   - maplibre-gl   Mapa overlay (1.1 MB)
         //   - tesselator    Deck.gl ArcLayer (467 KB)
         //   - rebroadcast   re-broadcast oportunista (Fase 5)
-        const lazyChunks = /^(?:helia-deps|maplibre-gl|tesselator|rebroadcast|vendor-identity|nostr-extras)/
+        //   - verify.worker verify Schnorr off-main (Ted RFC 2026-05).
+        //     `new Worker(url)` emite chunk separado; modulepreload do
+        //     main NÃO deve baixá-lo (worker carrega seu próprio módulo
+        //     ao spawnar — pre-loading antecipa custo sem necessidade).
+        const lazyChunks = /^(?:helia-deps|maplibre-gl|tesselator|rebroadcast|vendor-identity|nostr-extras|verify\.worker|verify-worker)/
         return deps.filter((d: string) => !lazyChunks.test(d))
       },
     },

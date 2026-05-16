@@ -16,7 +16,14 @@
  * de runtime IDÊNTICO ao anterior — tests provam isso.
  */
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+
+// events.ts importa verify.ts (que tenta spawn Worker via import.meta.url)
+// top-level — mock pra evitar resolver de URL em Node.
+vi.mock('../src/lib/verify', () => ({
+  verifyEventAsync: vi.fn(async () => true),
+}))
+
 import { selectLatestActionByUser, type ActionRow } from '../src/lib/events'
 
 const USER_A = '02'.repeat(32) // 64 hex chars (npub válido fake)

@@ -25,6 +25,13 @@ vi.mock('../src/lib/nostr', async () => {
   )
   return { ...actual, verifyDriftEvent: vi.fn(() => true) }
 })
+// 2026-05-16: verify movido pra worker (Ted RFC). events.ts agora
+// consome `verifyEventAsync` de `verify.ts` em vez de `verifyDriftEvent`
+// sync de `nostr.ts`. Mock cobre o novo caller; `verifyMock` abaixo
+// referencia este aqui pra os asserts existentes seguirem.
+vi.mock('../src/lib/verify', () => ({
+  verifyEventAsync: vi.fn(async () => true),
+}))
 vi.mock('../src/lib/scoring', () => ({
   calculateScoreNow: vi.fn(() => 0),
   applyCommentReceived: vi.fn((args: { currentScore: number }) => args.currentScore),
@@ -51,7 +58,7 @@ import {
   NIP22_COMMENT_KIND,
 } from '../src/lib/events'
 import { db } from '../src/lib/db'
-import { verifyDriftEvent } from '../src/lib/nostr'
+import { verifyEventAsync } from '../src/lib/verify'
 import { DRIFT_KIND } from '../src/config/constants'
 import type { SignedEvent } from '../src/types/nostr'
 
@@ -60,7 +67,7 @@ const dbMock = db as unknown as {
   run: ReturnType<typeof vi.fn>
   get: ReturnType<typeof vi.fn>
 }
-const verifyMock = verifyDriftEvent as unknown as ReturnType<typeof vi.fn>
+const verifyMock = verifyEventAsync as unknown as ReturnType<typeof vi.fn>
 
 const HEX = (c: string) => c.repeat(64)
 const POST_ID = HEX('a')
@@ -75,7 +82,7 @@ beforeEach(() => {
   dbMock.exec.mockResolvedValue([])
   dbMock.get.mockResolvedValue(null)
   verifyMock.mockReset()
-  verifyMock.mockReturnValue(true)
+  verifyMock.mockResolvedValue(true)
 })
 
 function makeEvent(opts: {
@@ -237,7 +244,7 @@ describe('KIND_DISPATCH — pipeline cheap → expensive → persist', () => {
   })
 
   it('verify falhando NÃO chega ao persist', async () => {
-    verifyMock.mockReturnValue(false)
+    verifyMock.mockResolvedValueOnce(false)
     await onNostrEvent(makeSpread())
     expect(verifyMock).toHaveBeenCalledTimes(1) // chegou ao verify
     expect(runCallsMatching(/INSERT/i).length).toBe(0) // mas não persistiu

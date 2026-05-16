@@ -40,6 +40,11 @@ vi.mock('../src/lib/nostr', async () => {
     publishToRelays: vi.fn(async () => undefined),
   }
 })
+// 2026-05-16: verify movido pra worker (Ted RFC) — events.ts consome
+// verifyEventAsync de verify.ts em vez de verifyDriftEvent de nostr.ts.
+vi.mock('../src/lib/verify', () => ({
+  verifyEventAsync: vi.fn(async () => true),
+}))
 vi.mock('../src/lib/scoring', () => ({ calculateScoreNow: vi.fn(() => 0) }))
 vi.mock('../src/lib/feed', async () => {
   const actual = await vi.importActual<typeof import('../src/lib/feed')>(

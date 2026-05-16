@@ -25,7 +25,8 @@
 
 import type { SignedEvent } from '../types/nostr'
 import { db } from './db'
-import { verifyDriftEvent, getTag } from './nostr'
+import { getTag } from './nostr'
+import { verifyEventAsync } from './verify'
 import { DRIFT_KIND, SCORE_RECALC_DEBOUNCE_MS } from '../config/constants'
 import { applyCommentReceived, calculateScoreNow } from './scoring'
 import { bumpUnseenCount, invalidateFeed } from './feed'
@@ -77,14 +78,14 @@ interface KindHandler {
   /** Nome legível pra debugging — corresponde ao kind do protocolo. */
   name: string
   /**
-   * Validação cheap, ANTES de `verifyDriftEvent`. Sem db, sem await
+   * Validação cheap, ANTES de `verifyEventAsync`. Sem db, sem await
    * (CLAUDE.md invariante #5 — manter ordem cheap→expensive). Pode ler
    * tags + `JSON.parse(content)`. Retorna `false` pra rejeitar
    * silenciosamente (manifesto §29 — cliente não fala com atacante).
    */
   validate(event: SignedEvent): boolean
   /**
-   * Persiste no SQLite. Roda APÓS `verifyDriftEvent` ter passado.
+   * Persiste no SQLite. Roda APÓS `verifyEventAsync` ter passado.
    * DEVE ser idempotente (`INSERT OR IGNORE`). Responsável por chamar
    * `invalidateFeed()` e `scheduleScoreRecalc(postId)` quando aplicável
    * (cada handler decide a semântica — REPORT chama `maybeModerate`,
@@ -124,14 +125,20 @@ const KIND_DISPATCH: Readonly<Record<number, KindHandler>> = {
 export async function onNostrEvent(event: SignedEvent): Promise<void> {
   // 1. Cheap: kind check (Record lookup, O(1)). Kinds desconhecidos
   //    (incluindo qualquer non-Drift, non-NIP-22-comment) são noop.
+  //    SYNC — antes do primeiro `await` pra preservar invariante #5
+  //    (cheap antes de qualquer round-trip caro).
   const handler = KIND_DISPATCH[event.kind]
   if (!handler) return
 
-  // 2. Cheap: schema check (sem db, sem crypto)
+  // 2. Cheap: schema check (sem db, sem crypto). SYNC pela mesma razão.
   if (!handler.validate(event)) return
 
-  // 3. Expensive: signature check (~1ms — só agora que sabemos que vale)
-  if (!verifyDriftEvent(event)) return
+  // 3. Expensive: signature check (~1ms NO WORKER + ~0.1-0.3ms postMessage
+  //    round-trip). Off-main-thread via `verify.worker.ts` — Ted RFC
+  //    2026-05 + Barney threat model 2026-05-16. Pipeline cheap→caro
+  //    preservado: o `await` aqui só dispara após kind+schema sync.
+  //    Worker init falha lança Error (Barney P1.5, sem fallback sync).
+  if (!(await verifyEventAsync(event))) return
 
   // 4. Persist (handler decide INSERT + invalidateFeed + recalc).
   //    Pipeline preservado: invariantes #1, #5, #6 do CLAUDE.md.
