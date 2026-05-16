@@ -201,8 +201,17 @@ export function SwipeHandler({
     hintTimerRef.current = setTimeout(() => setHint(null), 600)
   }
 
-  // Aplica transform + border-color direto no DOM. Chamado de RAF e dos
-  // handlers de pointer — evita re-render por sample (motion value style).
+  // V10.8 — feedback border overlay separado do wrapper. Antes o
+  // `border-2` ficava na div principal de SwipeHandler — durante o
+  // swipe horizontal, o user via essa borda "retornando ao centro"
+  // (easeXToZero) ao mesmo tempo que o conteúdo dentro slidava. Cancel
+  // visual. Agora: border do CARD vive em SubpostCarousel (vai com o
+  // slide), e a borda de FEEDBACK de gesto vive aqui como overlay
+  // transparent-default que só pinta durante drag ativo.
+  const feedbackBorderRef = useRef<HTMLDivElement | null>(null)
+
+  // Aplica transform direto no DOM. Chamado de RAF e dos handlers de
+  // pointer — evita re-render por sample (motion value style).
   function applyTransform() {
     const el = elRef.current
     if (!el) return
@@ -217,20 +226,24 @@ export function SwipeHandler({
     }
     el.style.transform = `translate3d(${x}px, ${y}px, 0) rotate(${rotate}deg)`
 
-    // Border-color: feedback visual progressivo (verde spread, vermelho
-    // bury, lilás nav, default cinza). Mesma curva da V9.x.
-    const ax = Math.abs(x)
-    const ay = Math.abs(y)
-    let color = 'rgba(31, 41, 55, 1)'
-    if (ay > ax && ay > 20 && !disableVertical) {
-      color =
-        y < 0
-          ? `rgba(52, 211, 153, ${Math.min(0.8, ay / 200)})`
-          : `rgba(248, 113, 113, ${Math.min(0.8, ay / 200)})`
-    } else if (ax > 20 && !disableHorizontal) {
-      color = `rgba(167, 139, 250, ${Math.min(0.8, ax / 200)})`
+    // Border-color do OVERLAY de feedback: verde spread, vermelho bury,
+    // lilás nav, ou TRANSPARENT (default — não polui visual durante
+    // slide entre subposts). Mesma curva de cor da V9.x.
+    const overlay = feedbackBorderRef.current
+    if (overlay) {
+      const ax = Math.abs(x)
+      const ay = Math.abs(y)
+      let color = 'transparent'
+      if (ay > ax && ay > 20 && !disableVertical) {
+        color =
+          y < 0
+            ? `rgba(52, 211, 153, ${Math.min(0.8, ay / 200)})`
+            : `rgba(248, 113, 113, ${Math.min(0.8, ay / 200)})`
+      } else if (ax > 20 && !disableHorizontal) {
+        color = `rgba(167, 139, 250, ${Math.min(0.8, ax / 200)})`
+      }
+      overlay.style.borderColor = color
     }
-    el.style.borderColor = color
   }
 
   function cancelRaf() {
@@ -389,7 +402,7 @@ export function SwipeHandler({
     pushSample(performance.now(), xRef.current, yRef.current)
   }
 
-  function commitDecision(offsetX: number, offsetY: number) {
+  function commitDecision(offsetX: number, offsetY: number): boolean {
     const ax = Math.abs(offsetX)
     const ay = Math.abs(offsetY)
     const verticalDominant = ay > ax
@@ -429,6 +442,9 @@ export function SwipeHandler({
     //   - Horizontal commit: x→0 em ease-out-quart 320ms (casa com
     //     slideVariants do SubpostCarousel).
     //   - Sem commit: spring back magnético.
+    // V10.8 — retorna boolean: true se COMITOU (suprime click pós-gesto),
+    // false se só voltou (não suprime — jitter de dedo não deve quebrar
+    // double-tap do lightbox).
     if (verticalPassed && horizontalPassed) {
       if (verticalDominant) {
         fireVertical()
@@ -436,13 +452,17 @@ export function SwipeHandler({
         easeXToZero()
         fireHorizontal()
       }
+      return true
     } else if (verticalPassed) {
       fireVertical()
+      return true
     } else if (horizontalPassed) {
       easeXToZero()
       fireHorizontal()
+      return true
     } else {
       springBack()
+      return false
     }
   }
 
@@ -475,22 +495,19 @@ export function SwipeHandler({
       return
     }
 
-    // Suprimir click fantasma SÓ quando houve MOVIMENTO de fato. Sem
-    // isso, um long-press release (dist=0, elapsed>350) — que técnicamente
-    // não é tap nem swipe — marcaria swipeEndAt e suprimiria o próximo
-    // click válido (ex: user holds 5s pra abrir moderation modal, depois
-    // tapeia opção do modal — sem essa condição, o tap seria descartado).
-    // Threshold = TAP_MAX_DISTANCE_PX (8px) garante que só drags reais
-    // contam.
-    if (dist > TAP_MAX_DISTANCE_PX) {
+    // V10.8 fix (user report 2026-05-15: "double-click para abrir a
+    // imagem parou de funcionar"). Antes: marcávamos swipeEndAt em
+    // QUALQUER gesto > 8px. Mas em touch há micro-jitter no tap (10-15px
+    // facilmente) — o gesto cai aqui (NÃO tap path), porém springBack
+    // sem commit. Marcar swipeEndAt nesses casos suprimia o click,
+    // quebrando o double-tap counter da Image (lastTapRef nunca seta).
+    // Fix: commitDecision retorna boolean — só suprime click quando o
+    // gesto efetivamente COMITOU (fireVertical ou fireHorizontal
+    // chamados). Springback (sem commit) não suprime.
+    const fired = commitDecision(xRef.current, yRef.current)
+    if (fired) {
       swipeEndAtRef.current = performance.now()
     }
-
-    // Decisão usa offsets dos motion values (já com elasticity aplicado)
-    // — mantém threshold em px visuais idêntico ao da V9.x onde os
-    // thresholds eram comparados contra `info.offset` de Framer, que
-    // também respeitava o `dragElastic 0.6`.
-    commitDecision(xRef.current, yRef.current)
   }
 
   // Capture-phase click handler — roda ANTES dos onClick dos children
@@ -587,16 +604,17 @@ export function SwipeHandler({
   // elemento começa identidade. `touch-action: none` desabilita scroll
   // nativo no eixo do gesto — equivalente ao `touch-none` Tailwind.
   // `willChange: transform` dá hint pro browser pra promover layer.
+  // V10.8: borderColor removido — borda do card agora vive em
+  // SubpostCarousel (vai com o slide); aqui é só wrapper transparente.
   const baseStyle: CSSProperties = {
     transform: 'translate3d(0px, 0px, 0) rotate(0deg)',
-    borderColor: 'rgba(31, 41, 55, 1)',
     willChange: 'transform',
   }
 
   return (
     <div
       ref={elRef}
-      className="relative h-full w-full touch-none select-none rounded border-2"
+      className="relative h-full w-full touch-none select-none"
       style={baseStyle}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
@@ -605,6 +623,18 @@ export function SwipeHandler({
       onClickCapture={handleClickCapture}
     >
       {children}
+
+      {/* V10.8 — overlay de feedback de gesto. Default transparent;
+          applyTransform pinta com verde/vermelho/lilás durante drag.
+          inset-0 + pointer-events-none + z-[3] (acima do SubpostCarousel
+          z-[2] gradient e do card content) garante que a cor pinta
+          POR CIMA do card sem bloquear gestos. rounded espelha o card. */}
+      <div
+        ref={feedbackBorderRef}
+        className="pointer-events-none absolute inset-0 z-[3] rounded border-2"
+        style={{ borderColor: 'transparent' }}
+        aria-hidden="true"
+      />
 
       {/* Overlay de feedback do gesto — badges estilizados (V3.5).
           - i-drift (top-left): bg drift-accent, color drift-bg, Syne 800, rotate -5deg

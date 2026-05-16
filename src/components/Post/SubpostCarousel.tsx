@@ -143,7 +143,17 @@ function SubpostCarouselComponent({
           motion.divs: old saindo + new entrando rodam EM PARALELO sobre
           o mesmo espaço, padrão Instagram. duration 0.32 + ease casa
           com o swap do SwipeHandler. Container outer mantém
-          overflow-hidden pra cortar o slide além das bordas. */}
+          overflow-hidden pra cortar o slide além das bordas.
+
+          V10.8 — `rounded border-2 border-drift-border bg-drift-surface`
+          movido pra cá (era da SwipeHandler wrapper). Razão: user
+          report 2026-05-15 "no swipe left/right o card não está saindo,
+          ele acaba voltando e o post troca". O border vivendo no
+          wrapper fazia easeXToZero (wrapper -90 → 0) PARECER que o
+          card retornava ao centro mesmo com o conteúdo deslizando.
+          Agora a borda vai COM o slide variants — old card slide off
+          completo (borda + content), new card emerge da direção
+          oposta. Padrão Tinder real. */}
       <AnimatePresence custom={customValue}>
         <m.div
           key={current?.id ?? clampedIdx}
@@ -153,7 +163,7 @@ function SubpostCarouselComponent({
           animate="center"
           exit="exit"
           transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
-          className="absolute inset-0"
+          className="absolute inset-0 overflow-hidden rounded border-2 border-drift-border bg-drift-surface"
         >
           {current && (
             <SubpostLayout
