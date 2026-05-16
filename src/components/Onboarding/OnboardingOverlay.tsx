@@ -17,7 +17,7 @@
 import { useState } from 'react'
 // `m` é o primitive leve do framer-motion (LazyMotion). Features via main.tsx.
 import { m, AnimatePresence } from 'framer-motion'
-import { setPref } from '../../lib/prefs'
+import { setPref, usePrefsStore } from '../../lib/prefs'
 
 export interface OnboardingOverlayProps {
   onClose: () => void
@@ -145,19 +145,16 @@ export function OnboardingOverlay({ onClose, onOpenIdentity }: OnboardingOverlay
   const currentStep = steps[step]
   const isLast = step === steps.length - 1
 
-  async function finish() {
-    // try/catch defensivo (user report 2026-05-09 "Pular/Começar não
-    // avança"): se setPref falhar (lock SQLite, OPFS contention,
-    // migration in-flight), o await rejeita e onClose NUNCA roda →
-    // user clica de novo no mesmo botão e nada acontece. Catch garante
-    // que o overlay fecha mesmo nesse cenário; pior caso o user vê
-    // onboarding em próxima boot.
-    try {
-      await setPref('onboarding_done', true)
-    } catch (err) {
-      console.warn('[OnboardingOverlay] setPref onboarding_done falhou:', err)
-    }
+  function finish() {
+    // Store primeiro (síncrono) → onClose segundo (síncrono) → persist
+    // ao SQLite fire-and-forget. Versão anterior (await setPref →
+    // onClose) travava quando o worker demorava a responder (OPFS
+    // contention, sync pesado no boot).
+    usePrefsStore.setState({ onboarding_done: true })
     onClose()
+    setPref('onboarding_done', true).catch((err) => {
+      console.warn('[OnboardingOverlay] setPref onboarding_done falhou:', err)
+    })
   }
 
   function next() {
@@ -222,7 +219,7 @@ export function OnboardingOverlay({ onClose, onOpenIdentity }: OnboardingOverlay
         <div className="mt-6 flex items-center justify-between">
           <button
             onClick={skip}
-            className="text-[10px] uppercase tracking-widest text-drift-muted hover:text-drift-muted"
+            className="rounded px-3 py-2 text-[12px] uppercase tracking-widest text-drift-muted hover:text-drift-text"
           >
             pular
           </button>
