@@ -15,6 +15,7 @@
  *   S1 = budget hard quando S0 resolvido
  *   S2 = budget total transfer
  *   S3 = artifact integrity (robots.txt)
+ *   S5 = verify.worker chunk (Ted RFC 2026-05) — lazy, ≤ 60 KB raw
  *
  * **Soft mode hoje:** alguns asserts são SKIP_IF_DIST_MISSING ou
  * `it.skip` quando o invariante depende do bundle otimizado que ainda
@@ -246,5 +247,64 @@ describe('CWV conformance — bundle size budget + dist artifacts', () => {
     it.skipIf(!inspection.hasDist)('robots.txt presente em dist/', () => {
       expect(existsSync(join(DIST, 'robots.txt'))).toBe(true)
     })
+  })
+
+  // ─── S5 — verify-worker chunk (Ted RFC 2026-05) ─────────────────────
+  //
+  // Worker chunk (`verify.worker-*.js` ou `verify-worker-*.js` dependendo
+  // do Vite chunk naming) deve ser:
+  //  - Emitido em dist/assets/ pós-build (gate de presença).
+  //  - NÃO incluído em <link rel="modulepreload"> do index.html (lazy).
+  //  - ≤ 60 KB raw — cap defensivo. Ted RFC §4.1 estima 40-55 KB; reserva
+  //    de ~10% pra deps mexerem.
+  //
+  // Worker carrega seu próprio módulo via `new Worker(new URL(...))` no
+  // first call de `verifyEventAsync`. Pre-loading antecipa custo sem
+  // necessidade — verify só dispara pós-EOSE quando primeiro event
+  // chega via subscribe.
+  describe('S5 — verify-worker chunk (Ted RFC 2026-05)', () => {
+    const WORKER_CHUNK_BUDGET = 60 * 1024 // 60 KB raw
+
+    function findWorkerChunk(): { name: string; size: number } | null {
+      // Vite emite chunk com nome baseado no source filename.
+      // Possíveis padrões: verify.worker-*.js, verify-worker-*.js
+      const match = inspection.assetFiles.find((f) =>
+        /^verify[.-]worker-[A-Za-z0-9_-]+\.js$/.test(f.name),
+      )
+      return match ?? null
+    }
+
+    it.skipIf(!inspection.hasDist)('verify.worker chunk emitido em dist/assets/', () => {
+      const chunk = findWorkerChunk()
+      expect(
+        chunk,
+        'esperado dist/assets/verify[.-]worker-*.js — `new Worker(new URL(...))` em verify.ts gera o chunk',
+      ).not.toBeNull()
+    })
+
+    it.skipIf(!inspection.hasDist)(
+      'verify.worker chunk NÃO em <link rel="modulepreload"> (lazy)',
+      () => {
+        // vite.config.ts filter exclui /^verify\.worker|^verify-worker/
+        // do modulepreload (linha ~250). Regression = filter quebrou.
+        const preloaded = inspection.modulepreloads.filter((p) =>
+          /^verify[.-]worker-/.test(p),
+        )
+        expect(preloaded).toEqual([])
+      },
+    )
+
+    it.skipIf(!inspection.hasDist || !findWorkerChunk())(
+      `verify.worker chunk ≤ ${WORKER_CHUNK_BUDGET / 1024} KB raw (Ted RFC §4.1 estima 40-55 KB + 10% margem)`,
+      () => {
+        const chunk = findWorkerChunk()!
+        const sizeKB = (chunk.size / 1024).toFixed(1)
+        expect(
+          chunk.size,
+          `verify.worker chunk ${chunk.name} = ${sizeKB} KB > ${WORKER_CHUNK_BUDGET / 1024} KB. ` +
+            `Verifique se dep nova entrou ou nostr-tools/pure bumped.`,
+        ).toBeLessThanOrEqual(WORKER_CHUNK_BUDGET)
+      },
+    )
   })
 })
