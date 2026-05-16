@@ -20,6 +20,13 @@ import sqlite3InitModule, {
   type OpfsDatabase,
 } from '@sqlite.org/sqlite-wasm'
 
+// V10.11 — schema importado DENTRO do worker (antes db.ts importava e
+// enviava via postMessage). Schema ficava no entry chunk ~13 KB raw +
+// 4 KB gz, em memória eternamente após boot. Movendo pra cá: schema
+// vive só no chunk do worker (lazy, fora do critical path do FCP/LCP)
+// e é garbage-collected após init naturalmente.
+import schema from './schema.sql?raw'
+
 type Sqlite3Static = Awaited<ReturnType<typeof sqlite3InitModule>>
 
 /**
@@ -48,7 +55,10 @@ interface InMessage {
   type: 'init' | 'exec' | 'run' | 'get' | 'rebuild'
   sql?: string
   params?: unknown[]
-  schema?: string
+  // V10.11 — `schema` field removido. Schema é importado direto no
+  // worker via `import schema from './schema.sql?raw'` no topo do
+  // arquivo. Antes db.ts mandava via postMessage, deixando o string
+  // de schema (~13 KB raw) eternamente no entry chunk.
 }
 
 interface OutMessage {
@@ -479,8 +489,8 @@ self.onmessage = async (e: MessageEvent<InMessage>) => {
   const { id, type } = e.data
   try {
     if (type === 'init') {
-      if (!e.data.schema) throw new Error('init: missing schema')
-      const result = await init(e.data.schema)
+      // V10.11 — schema importado direto no worker; payload não traz mais.
+      const result = await init(schema)
       reply({ id, ok: true, result })
       return
     }
@@ -490,9 +500,8 @@ self.onmessage = async (e: MessageEvent<InMessage>) => {
     if (type === 'rebuild') {
       // Recuperação manual disparada pela UI (Settings →
       // "redefinir cache local"). Drop + recreate dos domain tables;
-      // identity + user_prefs intactos.
-      if (!e.data.schema) throw new Error('rebuild: missing schema')
-      rebuildDomainSchema(e.data.schema)
+      // identity + user_prefs intactos. Schema vem do import top-level.
+      rebuildDomainSchema(schema)
       reply({ id, ok: true })
       return
     }

@@ -13,8 +13,11 @@
  *    (caso contrário um worker que falha silenciosamente trava o boot)
  */
 
-import schema from './schema.sql?raw'
-
+// V10.11 — schema importado AGORA dentro do worker (db.worker.ts).
+// Antes ficava aqui no main thread só pra ser enviado via postMessage,
+// inchando o entry chunk em ~13 KB raw / ~4 KB gz sem benefício
+// (schema é usado uma única vez no init e nunca mais — desperdício de
+// parse + heap). Lighthouse `unused-javascript` audit identificou.
 const INIT_TIMEOUT_MS = 15_000
 
 interface Pending {
@@ -118,7 +121,8 @@ export function initDb(): Promise<InitResult> {
 
   // Timeout no init evita travar pra sempre se o worker engasgar.
   // Operações subsequentes não usam timeout — assumem que o canal está saudável.
-  const initCall = call<InitResult>('init', { schema })
+  // V10.11 — payload `schema` removido; worker importa direto.
+  const initCall = call<InitResult>('init')
   const timeout = new Promise<never>((_, reject) => {
     setTimeout(() => {
       reject(
@@ -162,5 +166,5 @@ export const db = {
    * Após chamar, é típico fazer `location.reload()` pro sync ressincar
    * dos relays a partir do zero.
    */
-  rebuildDomainSchema: () => call<void>('rebuild', { schema }),
+  rebuildDomainSchema: () => call<void>('rebuild'),
 }
