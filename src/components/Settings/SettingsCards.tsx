@@ -638,6 +638,413 @@ function Row({
   )
 }
 
+// ─── PeersCard (Fase 6 — P2P discovery) ─────────────────────────
+
+/**
+ * PeersCard — UI para os 4 mecanismos de discovery P2P.
+ *
+ * Manifesto §12 (multi-transport), §15 (anti-censura), §16
+ * (disponibilidade distribuída), §31.3 (resiliência offline).
+ *
+ * Seções:
+ *  1. Meu QR / Link — exibe QR + copy/share link
+ *  2. Conectar — scan QR (camera/foto) + paste nprofile/npub
+ *  3. Bundle offline — export + import .json (sneakernet)
+ *  4. Auto-discovery — toggle p2p_auto_follows (NIP-02)
+ */
+export function PeersCard({ onClose }: CardProps) {
+  const identity = useBootStore((s) => s.identity)
+  const prefs = usePrefsStore()
+  const [qrUrl, setQrUrl] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
+  const [peerInput, setPeerInput] = useState('')
+  const [connecting, setConnecting] = useState(false)
+  const [connectError, setConnectError] = useState<string | null>(null)
+  const [connectOk, setConnectOk] = useState(false)
+  const [scanning, setScanning] = useState(false)
+  const [scanError, setScanError] = useState<string | null>(null)
+  const scanRegionRef = useState<string>(() => 'qr-scan-region-' + Math.random().toString(36).slice(2, 8))[0]
+  const scannerRef = { current: null as { stop: () => Promise<void>; clear: () => void } | null }
+  const [importing, setImporting] = useState(false)
+  const [importResult, setImportResult] = useState<string | null>(null)
+  const [exporting, setExporting] = useState(false)
+  const [exportResult, setExportResult] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!identity) return
+    void import('../../lib/transport/webrtc').then(({ generatePeerQR }) => {
+      void import('../../lib/relays').then(({ activeWriteRelays }) => {
+        const hints = activeWriteRelays().slice(0, 3)
+        void generatePeerQR(identity.npub, hints).then(setQrUrl)
+      })
+    })
+  }, [identity])
+
+  useEffect(() => {
+    return () => {
+      if (scannerRef.current) {
+        void scannerRef.current.stop().catch(() => {})
+        scannerRef.current.clear()
+        scannerRef.current = null
+      }
+    }
+  }, [])
+
+  async function handleCopyLink() {
+    if (!identity) return
+    const { buildPeerURL } = await import('../../lib/transport/webrtc')
+    const { activeWriteRelays } = await import('../../lib/relays')
+    const hints = activeWriteRelays().slice(0, 3)
+    const url = buildPeerURL(identity.npub, hints)
+    if (typeof navigator.share === 'function') {
+      await navigator.share({ url, title: 'drift peer' })
+    } else if (navigator.clipboard) {
+      await navigator.clipboard.writeText(url)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
+  }
+
+  async function handleConnect() {
+    const raw = peerInput.trim()
+    if (!raw) return
+    setConnecting(true)
+    setConnectError(null)
+    setConnectOk(false)
+    try {
+      const { decodePeerLink, connectTo } = await import('../../lib/transport/webrtc')
+      const parsed = decodePeerLink(raw)
+      if (!parsed) {
+        setConnectError('formato invalido — cole um npub1... ou nprofile1...')
+        return
+      }
+      await connectTo(parsed.npubHex)
+      setConnectOk(true)
+      setPeerInput('')
+      setTimeout(() => setConnectOk(false), 3000)
+    } catch (err) {
+      setConnectError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setConnecting(false)
+    }
+  }
+
+  async function handleScanStart() {
+    setScanError(null)
+    setScanning(true)
+    try {
+      const { Html5Qrcode } = await import('html5-qrcode')
+      const scanner = new Html5Qrcode(scanRegionRef)
+      scannerRef.current = scanner
+      await scanner.start(
+        { facingMode: 'environment' },
+        { fps: 10, qrbox: { width: 220, height: 220 } },
+        (decoded) => {
+          void scanner.stop().then(() => {
+            scanner.clear()
+            scannerRef.current = null
+            setScanning(false)
+            setPeerInput(decoded)
+          })
+        },
+        () => {},
+      )
+    } catch (err) {
+      setScanning(false)
+      const msg = err instanceof Error ? err.message : String(err)
+      if (msg.includes('Permission') || msg.includes('NotAllowed')) {
+        setScanError('permissao de camera negada')
+      } else {
+        setScanError(msg)
+      }
+    }
+  }
+
+  async function handleScanStop() {
+    if (scannerRef.current) {
+      await scannerRef.current.stop().catch(() => {})
+      scannerRef.current.clear()
+      scannerRef.current = null
+    }
+    setScanning(false)
+  }
+
+  async function handleScanFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setScanError(null)
+    try {
+      const { Html5Qrcode } = await import('html5-qrcode')
+      const scanner = new Html5Qrcode(scanRegionRef)
+      const result = await scanner.scanFile(file, false)
+      scanner.clear()
+      setPeerInput(result)
+    } catch {
+      setScanError('nenhum QR encontrado na imagem')
+    }
+    e.target.value = ''
+  }
+
+  async function handleExport() {
+    if (!identity) return
+    setExporting(true)
+    setExportResult(null)
+    try {
+      const { db } = await import('../../lib/db')
+      const { exportBundle } = await import('../../lib/transport/webrtc')
+      type RawRow = { raw_event: string | null }
+      const npub = identity.npub
+      const rows = await db.exec<RawRow>(
+        `SELECT raw_event FROM posts WHERE author_pub = ? AND raw_event IS NOT NULL
+         UNION ALL
+         SELECT raw_event FROM spreads WHERE spreader_pub = ? AND raw_event IS NOT NULL
+         UNION ALL
+         SELECT raw_event FROM buries WHERE burier_pub = ? AND raw_event IS NOT NULL
+         LIMIT 500`,
+        [npub, npub, npub],
+      )
+      const seen = new Set<string>()
+      const events: import('../../types/nostr').SignedEvent[] = []
+      for (const row of rows) {
+        if (!row.raw_event) continue
+        try {
+          const ev = JSON.parse(row.raw_event) as import('../../types/nostr').SignedEvent
+          if (!ev.id || seen.has(ev.id)) continue
+          seen.add(ev.id)
+          events.push(ev)
+        } catch { /* malformed */ }
+      }
+      if (events.length === 0) {
+        setExportResult('nenhum evento pra exportar')
+        return
+      }
+      const bundle = exportBundle(events)
+      const blob = new Blob([bundle.json], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `drift-bundle-${new Date().toISOString().slice(0, 10)}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+      setExportResult(`${bundle.eventCount} evento${bundle.eventCount !== 1 ? 's' : ''} exportado${bundle.eventCount !== 1 ? 's' : ''}`)
+    } catch (err) {
+      setExportResult(`falha: ${err instanceof Error ? err.message : String(err)}`)
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  async function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setImporting(true)
+    setImportResult(null)
+    try {
+      const text = await file.text()
+      const { importBundle } = await import('../../lib/transport/webrtc')
+      const { onNostrEvent } = await import('../../lib/events')
+      const events = await importBundle(text)
+      for (const ev of events) {
+        onNostrEvent(ev)
+      }
+      setImportResult(`${events.length} evento${events.length !== 1 ? 's' : ''} importado${events.length !== 1 ? 's' : ''}`)
+    } catch (err) {
+      setImportResult(`falha: ${err instanceof Error ? err.message : String(err)}`)
+    } finally {
+      setImporting(false)
+      e.target.value = ''
+    }
+  }
+
+  return (
+    <FullPageCard onClose={onClose} title="peers P2P" ariaLabel="conexao peer-to-peer">
+      <div className="space-y-5 p-5">
+        <p className="font-mono text-[12px] leading-relaxed text-drift-muted">
+          Conecte diretamente com outros usuarios via WebRTC. Conexao
+          P2P funciona mesmo se relays cairem — manifesto §12, §15.
+        </p>
+
+        {/* ── 1. Meu QR / Link ──────────────────────────────────── */}
+        <div className="space-y-3">
+          <div className="font-mono text-[11px] uppercase tracking-widest text-drift-accent">
+            meu qr
+          </div>
+          <p className="font-mono text-[12px] leading-relaxed text-drift-muted">
+            Escaneie pra conectar. Mostra sua chave publica.
+          </p>
+          {qrUrl ? (
+            <div className="flex flex-col items-center gap-3">
+              <img
+                src={qrUrl}
+                alt="QR code do meu perfil"
+                width={200}
+                height={200}
+                className="rounded"
+              />
+              <span className="font-mono text-[10px] text-drift-muted break-all text-center px-4">
+                {identity?.npubBech32
+                  ? identity.npubBech32.slice(0, 20) + '...' + identity.npubBech32.slice(-8)
+                  : ''}
+              </span>
+            </div>
+          ) : (
+            <div className="font-mono text-[12px] text-drift-muted text-center py-4">
+              gerando QR…
+            </div>
+          )}
+          <button
+            onClick={() => void handleCopyLink()}
+            className="w-full rounded border border-drift-accent2 bg-drift-surface px-3 py-3 font-mono text-[12px] uppercase tracking-meta text-drift-accent2 transition-colors hover:bg-drift-accent2/10 focus:outline-none focus:ring-1 focus:ring-drift-accent2 focus:ring-offset-2 focus:ring-offset-drift-bg"
+          >
+            {copied ? 'copiado ✓' : typeof navigator.share === 'function' ? '↗ compartilhar link' : '⎘ copiar link'}
+          </button>
+        </div>
+
+        <div className="border-t border-drift-border/60" />
+
+        {/* ── 2. Conectar (scan + paste) ─────────────────────────── */}
+        <div className="space-y-3">
+          <div className="font-mono text-[11px] uppercase tracking-widest text-drift-accent">
+            conectar a peer
+          </div>
+
+          {/* Camera scanner region */}
+          <div id={scanRegionRef} className={scanning ? '' : 'hidden'} />
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                if (scanning) {
+                  void handleScanStop()
+                } else {
+                  void handleScanStart()
+                }
+              }}
+              className="flex-1 rounded border border-drift-accent2 bg-drift-surface px-3 py-3 font-mono text-[12px] uppercase tracking-meta text-drift-accent2 transition-colors hover:bg-drift-accent2/10 focus:outline-none focus:ring-1 focus:ring-drift-accent2 focus:ring-offset-2 focus:ring-offset-drift-bg"
+            >
+              {scanning ? '■ parar camera' : '◉ escanear qr'}
+            </button>
+            <label className="flex flex-1 cursor-pointer items-center justify-center rounded border border-drift-border bg-drift-surface px-3 py-3 font-mono text-[12px] uppercase tracking-meta text-drift-muted transition-colors hover:border-drift-accent2/40 hover:text-drift-accent2 focus-within:ring-1 focus-within:ring-drift-accent2">
+              ▣ da foto
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => void handleScanFile(e)}
+                className="sr-only"
+              />
+            </label>
+          </div>
+          {scanError && (
+            <div className="rounded border border-drift-danger/60 bg-drift-danger/10 p-2 font-mono text-[11px] text-drift-danger">
+              {scanError}
+            </div>
+          )}
+
+          <p className="font-mono text-[12px] leading-relaxed text-drift-muted">
+            Ou cole um <code>npub1...</code> ou <code>nprofile1...</code>
+          </p>
+          <input
+            type="text"
+            value={peerInput}
+            onChange={(e) => {
+              setPeerInput(e.target.value)
+              setConnectError(null)
+              setConnectOk(false)
+            }}
+            placeholder="npub1... ou nprofile1..."
+            className="w-full rounded border border-drift-border bg-black/20 px-3 py-2 font-mono text-[12px] text-drift-text placeholder:text-drift-muted/50 focus:border-drift-accent focus:outline-none focus:ring-1 focus:ring-drift-accent"
+          />
+          <div className="rounded-lg border border-yellow-700/40 bg-yellow-900/10 px-3 py-2">
+            <p className="font-mono text-[11px] leading-relaxed text-yellow-300/90">
+              Conexao direta — seu IP sera visivel para este peer.
+            </p>
+          </div>
+          <button
+            onClick={() => void handleConnect()}
+            disabled={connecting || !peerInput.trim()}
+            className="w-full rounded border border-drift-accent bg-drift-accent/10 px-3 py-3 font-mono text-[12px] uppercase tracking-meta text-drift-accent transition-colors hover:bg-drift-accent/20 disabled:cursor-not-allowed disabled:opacity-40 focus:outline-none focus:ring-1 focus:ring-drift-accent2 focus:ring-offset-2 focus:ring-offset-drift-bg"
+          >
+            {connecting ? 'conectando…' : connectOk ? 'conectado ✓' : '⊕ conectar'}
+          </button>
+          {connectError && (
+            <div className="rounded border border-drift-danger/60 bg-drift-danger/10 p-2 font-mono text-[11px] text-drift-danger">
+              {connectError}
+            </div>
+          )}
+        </div>
+
+        <div className="border-t border-drift-border/60" />
+
+        {/* ── 3. Bundle offline ──────────────────────────────────── */}
+        <div className="space-y-3">
+          <div className="font-mono text-[11px] uppercase tracking-widest text-drift-accent">
+            bundle offline
+          </div>
+          <p className="font-mono text-[12px] leading-relaxed text-drift-muted">
+            Funciona offline — nada e enviado pela rede. Exporte seus
+            eventos ou importe de outro dispositivo — manifesto §31.3.
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => void handleExport()}
+              disabled={exporting || !identity}
+              className="flex-1 rounded border border-drift-accent2 bg-drift-surface px-3 py-3 font-mono text-[12px] uppercase tracking-meta text-drift-accent2 transition-colors hover:bg-drift-accent2/10 disabled:cursor-not-allowed disabled:opacity-40 focus:outline-none focus:ring-1 focus:ring-drift-accent2 focus:ring-offset-2 focus:ring-offset-drift-bg"
+            >
+              {exporting ? 'exportando…' : '↑ exportar .json'}
+            </button>
+            <label className="flex flex-1 cursor-pointer items-center justify-center rounded border border-drift-accent2 bg-drift-surface px-3 py-3 font-mono text-[12px] uppercase tracking-meta text-drift-accent2 transition-colors hover:bg-drift-accent2/10 focus-within:ring-1 focus-within:ring-drift-accent2 focus-within:ring-offset-2 focus-within:ring-offset-drift-bg">
+              {importing ? 'importando…' : '↓ importar .json'}
+              <input
+                type="file"
+                accept=".json,application/json"
+                onChange={(e) => void handleImportFile(e)}
+                className="sr-only"
+                disabled={importing}
+              />
+            </label>
+          </div>
+          {exportResult && (
+            <div
+              className={`rounded border p-2 font-mono text-[11px] ${
+                exportResult.startsWith('falha') || exportResult.startsWith('nenhum')
+                  ? 'border-drift-warning/60 bg-drift-warning/10 text-drift-warning'
+                  : 'border-drift-spread/60 bg-drift-spread/10 text-drift-spread'
+              }`}
+            >
+              {exportResult}
+            </div>
+          )}
+          {importResult && (
+            <div
+              className={`rounded border p-2 font-mono text-[11px] ${
+                importResult.startsWith('falha')
+                  ? 'border-drift-danger/60 bg-drift-danger/10 text-drift-danger'
+                  : 'border-drift-spread/60 bg-drift-spread/10 text-drift-spread'
+              }`}
+            >
+              {importResult}
+            </div>
+          )}
+        </div>
+
+        <div className="border-t border-drift-border/60" />
+
+        {/* ── 4. Auto-discovery (NIP-02) ─────────────────────────── */}
+        <div className="space-y-3">
+          <div className="font-mono text-[11px] uppercase tracking-widest text-drift-accent">
+            auto-discovery
+          </div>
+          <Toggle
+            label="conectar com quem voce segue"
+            hint="Quem voce segue pode ver seu IP e que voce os segue. Default OFF — manifesto §28 (privacidade)."
+            value={prefs.p2p_auto_follows}
+            onChange={(v) => void setPref('p2p_auto_follows', v)}
+          />
+        </div>
+      </div>
+    </FullPageCard>
+  )
+}
+
 // ─── DiagnosticCard ──────────────────────────────────────────────
 
 export function DiagnosticCard({ onClose }: CardProps) {

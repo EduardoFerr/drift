@@ -86,6 +86,9 @@ const NetworkModeCard = lazy(() =>
 const BlobsCard = lazy(() =>
   import('./components/Settings/SettingsCards').then((m) => ({ default: m.BlobsCard })),
 )
+const PeersCard = lazy(() =>
+  import('./components/Settings/SettingsCards').then((m) => ({ default: m.PeersCard })),
+)
 const DiagnosticCard = lazy(() =>
   import('./components/Settings/SettingsCards').then((m) => ({ default: m.DiagnosticCard })),
 )
@@ -136,6 +139,7 @@ import {
   OnionIcon,
   ShieldIcon,
   PinOffIcon,
+  LinkIcon,
 } from './components/UI/Icons'
 // SpreadMap pull MapLibre GL (1.1 MB) + Deck.gl ArcLayer (467 KB) —
 // só carrega quando user abre overlay de mapa. Ver MapOverlay abaixo.
@@ -1499,6 +1503,7 @@ type SettingsTarget =
   | 'location'
   | 'mapa'
   | 'rede'
+  | 'peers'
   | 'blobs'
   | 'diagnostico'
   | 'status'
@@ -1543,6 +1548,9 @@ function SettingsRoot({ onClose }: { onClose: () => void }) {
         break
       case 'rede':
         pushLayer({ id: 'network', component: NetworkModeCard, parent: p })
+        break
+      case 'peers':
+        pushLayer({ id: 'peers', component: PeersCard, parent: p })
         break
       case 'blobs':
         pushLayer({ id: 'blobs', component: BlobsCard, parent: p })
@@ -1615,6 +1623,12 @@ function SettingsRoot({ onClose }: { onClose: () => void }) {
           label: 'modo de rede',
           hint: 'clearnet / tor / onion-only — manifesto §15',
           icon: GlobeIcon,
+        },
+        {
+          target: 'peers',
+          label: 'peers P2P',
+          hint: 'QR, link direto, bundle offline — §12',
+          icon: LinkIcon,
         },
       ],
     },
