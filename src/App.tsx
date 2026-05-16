@@ -41,8 +41,21 @@ const GpsErrorBanner = lazy(() =>
   })),
 )
 import { MultiTabModal } from './components/UI/MultiTabModal'
-import { UpdatePrompt } from './components/UI/UpdatePrompt'
-import { DialogHost } from './components/UI/DialogHost'
+// V10.11 — UpdatePrompt + DialogHost lazy (Lighthouse unused-js audit).
+// UpdatePrompt só renderiza quando virtual:pwa-register sinaliza nova
+// versão (raríssimo). DialogHost é singleton portal — só renderiza
+// dentro de Suspense ao primeiro `dialog.show()`. Economia conjunta:
+// ~9 KB raw / ~3 KB gz no entry chunk.
+const UpdatePrompt = lazy(() =>
+  import('./components/UI/UpdatePrompt').then((m) => ({
+    default: m.UpdatePrompt,
+  })),
+)
+const DialogHost = lazy(() =>
+  import('./components/UI/DialogHost').then((m) => ({
+    default: m.DialogHost,
+  })),
+)
 import { dialog } from './lib/dialog'
 import { NavBar } from './components/UI/NavBar'
 import { FullPageCard } from './components/UI/FullPageCard'
@@ -837,8 +850,12 @@ function App() {
             SettingsRoot quando ainda instalável. */}
       </div>
 
-      <UpdatePrompt />
-      <DialogHost />
+      <LazyBoundary fallback={null}>
+        <UpdatePrompt />
+      </LazyBoundary>
+      <LazyBoundary fallback={null}>
+        <DialogHost />
+      </LazyBoundary>
 
       <AnimatePresence>
         {showInstallModal && installPrompt.kind !== 'unavailable' && (
