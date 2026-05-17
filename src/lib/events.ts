@@ -35,6 +35,7 @@ import { calculateUserWeight, calculateWeight } from './weight'
 import { bumpCommentCount } from './comment-counts'
 import { addCommentToStore } from './comments'
 import { parseImetaTags } from './nip94'
+import { bumpProfileVersion } from './profiles'
 import type { CommentRecord, ContentWarning, ReportReason } from '../types/drift'
 
 /**
@@ -119,6 +120,14 @@ const KIND_DISPATCH: Readonly<Record<number, KindHandler>> = {
     name: 'COMMENT',
     validate: validateCommentShape,
     persist: persistCommentRow,
+  },
+  // Kind 0 NIP-01 — profile metadata (opt-in identity).
+  // Replaceable event: ingestão LWW por created_at. NUNCA participa de
+  // score/weight (LOCK_VIA_TEST). Manifesto §5.3 / §28.
+  0: {
+    name: 'METADATA',
+    validate: validateKind0Shape,
+    persist: persistUserMetadata,
   },
 }
 
@@ -213,6 +222,26 @@ function validateReportShape(event: SignedEvent): boolean {
  */
 function validateCommentShape(event: SignedEvent): boolean {
   return passesNip22SchemaCheck(event)
+}
+
+/**
+ * NIP-01 kind 0: content é JSON com campos opcionais. Drift aceita o
+ * subset whitelisted (KIND_0_ALLOWED_KEYS). Cap defensivo de 4 KB no
+ * content cru pra evitar payloads ridículos.
+ *
+ * Rejeita silenciosamente (manifesto §29) se:
+ * - content não é JSON válido
+ * - parsed não é objeto
+ * - content > 4096 chars
+ */
+function validateKind0Shape(event: SignedEvent): boolean {
+  if (event.content.length > 4096) return false
+  try {
+    const parsed = JSON.parse(event.content)
+    return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)
+  } catch {
+    return false
+  }
 }
 
 // ─── NIP-22 schema/parse (puro, testável) ───────────────────────────
@@ -601,6 +630,65 @@ const VALID_REASONS: ReadonlySet<ReportReason> = new Set<ReportReason>([
 
 function isValidReason(v: string | null): v is ReportReason {
   return v !== null && (VALID_REASONS as ReadonlySet<string>).has(v)
+}
+
+// ─── User metadata kind 0 (NIP-01) — opt-in identity ──────────────
+//
+// Replaceable event: LWW por `created_at`. Não invalida feed nem
+// dispara recálculo de score (manifesto §22 / §24 — metadata NÃO afeta
+// ranking). UI consome via `useUserMetadata` hook.
+//
+// Whitelist NIP-01 puro na ingestão: apenas extrai chaves conhecidas
+// do content JSON. Chaves não-listadas são silenciosamente ignoradas
+// — defesa contra eventos kind 0 mal-formados ou de clientes que
+// inventam campos. raw_event preservado pra re-broadcast §16.
+
+async function persistUserMetadata(event: SignedEvent): Promise<void> {
+  let parsed: Record<string, unknown>
+  try {
+    parsed = JSON.parse(event.content) as Record<string, unknown>
+  } catch {
+    return
+  }
+  const str = (k: string): string | null => {
+    const v = parsed[k]
+    return typeof v === 'string' && v.length > 0 ? v : null
+  }
+  const now = Math.floor(Date.now() / 1000)
+  await db.run(
+    `INSERT INTO users_metadata
+     (npub, name, display_name, about, picture, banner, website, nip05, lud16, raw_event, event_created_at, fetched_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(npub) DO UPDATE SET
+       name             = excluded.name,
+       display_name     = excluded.display_name,
+       about            = excluded.about,
+       picture          = excluded.picture,
+       banner           = excluded.banner,
+       website          = excluded.website,
+       nip05            = excluded.nip05,
+       lud16            = excluded.lud16,
+       raw_event        = excluded.raw_event,
+       event_created_at = excluded.event_created_at,
+       fetched_at       = excluded.fetched_at
+     WHERE excluded.event_created_at > users_metadata.event_created_at`,
+    [
+      event.pubkey,
+      str('name'),
+      str('display_name'),
+      str('about'),
+      str('picture'),
+      str('banner'),
+      str('website'),
+      str('nip05'),
+      str('lud16'),
+      JSON.stringify(event),
+      event.created_at,
+      now,
+    ],
+  )
+  // Notify reactive consumers (useUserMetadata hook) — re-query.
+  bumpProfileVersion(event.pubkey)
 }
 
 // ─── Users — atividade agregada (Fase 4) ─────────────────────────────

@@ -240,3 +240,32 @@ CREATE TABLE IF NOT EXISTS peers_known (
 );
 CREATE INDEX IF NOT EXISTS idx_peers_last_seen    ON peers_known(last_seen DESC);
 CREATE INDEX IF NOT EXISTS idx_peers_score_inputs ON peers_known(latency_ms, fail_count);
+
+-- ── User metadata kind 0 (NIP-01) — opt-in identity ───────────────
+-- Cache de eventos kind 0 (perfil público Nostr canônico). Replaceable
+-- event: LWW por `event_created_at` na ingestão. Tabela SEPARADA de
+-- `users` (que é agregado de eventos Drift) — manifesto §17 sem chave
+-- mestra: metadata é claim do user, não atributo derivado.
+--
+-- IMPORTANTE: nenhum campo aqui participa de score/weight/feed ranking
+-- (LOCK_VIA_TEST). É puramente decorativo + opt-in. Default = vazio
+-- = modo Anônimo (§5.3 drift-arquitetura-v4).
+--
+-- Whitelist NIP-01 puro: `name`, `display_name`, `about`, `picture`,
+-- `nip05`, `banner`, `website`, `lud16`. Drift NÃO inventa campos
+-- próprios em kind 0 (manifesto §30 compat Nostr).
+CREATE TABLE IF NOT EXISTS users_metadata (
+  npub             TEXT PRIMARY KEY,
+  name             TEXT,                 -- handle curto
+  display_name     TEXT,                 -- nome de exibição
+  about            TEXT,                 -- bio (≤140 chars no client)
+  picture          TEXT,                 -- URL avatar (https://, sem data:)
+  banner           TEXT,                 -- URL banner (MVP+1)
+  website          TEXT,                 -- URL externa (MVP+1)
+  nip05            TEXT,                 -- handle@domain (display claim — sem verify externo §28)
+  lud16            TEXT,                 -- Lightning address (MVP+1)
+  raw_event        TEXT NOT NULL,        -- JSON do kind 0 original (re-broadcast §16)
+  event_created_at INTEGER NOT NULL,     -- unix sec — tiebreaker LWW
+  fetched_at       INTEGER NOT NULL      -- quando o cliente cacheou
+);
+CREATE INDEX IF NOT EXISTS idx_users_metadata_nip05 ON users_metadata(nip05);

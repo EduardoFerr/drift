@@ -175,6 +175,7 @@ const DOMAIN_TABLES = [
   'reports',
   'comments',
   'users',
+  'users_metadata', // cache kind 0 NIP-01 — reconstruível via re-fetch
   'follows',
   'sync_log',
   'pinned',

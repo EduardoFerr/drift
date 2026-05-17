@@ -166,12 +166,6 @@ describe('KIND_DISPATCH — kinds desconhecidos são noop', () => {
     expect(verifyMock).not.toHaveBeenCalled() // early return antes do expensive
   })
 
-  it('kind 0 (metadata Nostr) → noop', async () => {
-    await onNostrEvent(makeEvent({ kind: 0, content: '{}' }))
-    expect(dbMock.run).not.toHaveBeenCalled()
-    expect(verifyMock).not.toHaveBeenCalled()
-  })
-
   it('kind 9082 (boost futuro, não registrado ainda) → noop', async () => {
     // Quando 9082 entrar no roadmap, este test deve quebrar (sinal de
     // que falta registrar handler em KIND_DISPATCH).
@@ -184,6 +178,26 @@ describe('KIND_DISPATCH — kinds desconhecidos são noop', () => {
     expect(passesSchemaCheck(makeEvent({ kind: 1 }))).toBe(false)
     expect(passesSchemaCheck(makeEvent({ kind: 9082 }))).toBe(false)
     expect(passesSchemaCheck(makeEvent({ kind: 30078 }))).toBe(false)
+  })
+})
+
+describe('KIND_DISPATCH — kind 0 (metadata NIP-01, opt-in identity)', () => {
+  it('kind 0 com content vazio "{}" → ingestão (LWW)', async () => {
+    await onNostrEvent(makeEvent({ kind: 0, content: '{}' }))
+    expect(runCallsMatching(/INSERT INTO users_metadata\b/i).length).toBe(1)
+  })
+
+  it('kind 0 com content inválido (não-JSON) → rejeita silenciosamente', async () => {
+    await onNostrEvent(makeEvent({ kind: 0, content: 'not json' }))
+    expect(dbMock.run).not.toHaveBeenCalled()
+    expect(verifyMock).not.toHaveBeenCalled()
+  })
+
+  it('kind 0 com content > 4096 chars → rejeita (cap defensivo)', async () => {
+    await onNostrEvent(
+      makeEvent({ kind: 0, content: JSON.stringify({ about: 'x'.repeat(5000) }) }),
+    )
+    expect(dbMock.run).not.toHaveBeenCalled()
   })
 })
 

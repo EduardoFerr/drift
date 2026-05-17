@@ -1,29 +1,37 @@
 /**
- * ProfileModal — perfil do user atual.
+ * ProfileModal — perfil expandido (MVP pós-deliberação HIMYM 2026-05-17).
  *
- * Mostra:
- *   - npub (identidade ativa, formato bech32)
- *   - Label (se multi-identidade tem nome)
- *   - Peso composto + breakdown (antiguidade + engajamento + max subposts)
- *   - Contadores: posts publicados, spreads dados, buries dados,
- *     reports recebidos
- *   - Listas: quantos seguindo, quantos pinned, blocked, muted
- *   - Identidade criada em
+ * Hero sempre visível (avatar + display_name + npub + tier + idade)
+ * seguido de 4 seções accordion: identidade / atividade / peso & alcance /
+ * minhas listas.
  *
- * Manifesto §22: tudo aqui vem de eventos públicos verificáveis.
- * Outros clientes Drift, dados o mesmo conjunto de eventos, calculam
- * os mesmos números. Sem reputação subjetiva.
+ * **Manifesto §5.3**: 3 modos canônicos
+ *   - Anônimo (default): display_name vazio → "anônimo" italic
+ *   - Semi-anônimo: kind 0 com `name`/`display_name`
+ *   - Identificado: kind 0 com nome + avatar (`picture`)
+ *
+ * **§28 / §17**: nenhum campo de kind 0 participa de score/weight/feed
+ * ranking (LOCK_VIA_TEST). Identificação é opt-in, default vazio.
+ *
+ * Edit/reset de kind 0 ficam num sub-card separado (EditProfileCard)
+ * com banner inline citando §28 + §5.3 antes do publish.
  */
 
 import { useEffect, useState } from 'react'
 import { db } from '../../lib/db'
-import { SlideUpOverlay } from '../UI/SlideUpOverlay'
-import { ModalHeader } from '../UI/ModalHeader'
+import { FullPageCard } from '../UI/FullPageCard'
+import { Collapse } from '../UI/Collapse'
+import { ChevronDownIcon } from '../UI/Icons'
+import { DriftButton } from '../UI/DriftButton'
 import { useUserWeight } from '../../hooks/useUserWeight'
 import { getWeightTier, type WeightTier } from '../../lib/weight'
 import { useFollowsStore } from '../../lib/follows'
-import { useIdentitiesStore } from '../../lib/identities'
+import { useIdentitiesStore, setActiveIdentity } from '../../lib/identities'
 import { useModLocalStore } from '../../lib/moderation-local'
+import { useUserMetadata } from '../../lib/profiles'
+import { dialog } from '../../lib/dialog'
+import { pushLayer } from '../../lib/layer-stack'
+import { EditProfileCard } from './EditProfileCard'
 import type { DriftIdentity } from '../../types/drift'
 
 export interface ProfileModalProps {
@@ -36,6 +44,9 @@ interface AggregateRow {
   spreads_given: number
   buries_given: number
   pinned_count: number
+  comments_authored: number
+  spreads_received: number
+  reports_received: number
 }
 
 export function ProfileModal({ identity, onClose }: ProfileModalProps) {
@@ -45,20 +56,26 @@ export function ProfileModal({ identity, onClose }: ProfileModalProps) {
   const mutedCount = useModLocalStore((s) => s.muted.size)
   const activeNpub = useIdentitiesStore((s) => s.activeNpub)
   const identitiesList = useIdentitiesStore((s) => s.list)
+  const metadata = useUserMetadata(identity.npub)
 
   const [aggregate, setAggregate] = useState<AggregateRow | null>(null)
+  const [open, setOpen] = useState<number | null>(null)
+  const toggle = (i: number) => setOpen((prev) => (prev === i ? null : i))
 
   useEffect(() => {
     let cancelled = false
     void (async () => {
-      // Query consolidada — 1 round-trip pegando todos os contadores.
+      const npub = identity.npub
       const row = await db.get<AggregateRow>(
         `SELECT
-           (SELECT COUNT(*) FROM posts WHERE author_pub = ?) AS posts_count,
-           (SELECT COUNT(*) FROM spreads WHERE spreader_pub = ?) AS spreads_given,
-           (SELECT COUNT(*) FROM buries WHERE burier_pub = ?) AS buries_given,
-           (SELECT COUNT(*) FROM pinned) AS pinned_count`,
-        [identity.npub, identity.npub, identity.npub],
+           (SELECT COUNT(*) FROM posts    WHERE author_pub = ?) AS posts_count,
+           (SELECT COUNT(*) FROM spreads  WHERE spreader_pub = ?) AS spreads_given,
+           (SELECT COUNT(*) FROM buries   WHERE burier_pub = ?) AS buries_given,
+           (SELECT COUNT(*) FROM pinned)  AS pinned_count,
+           (SELECT COUNT(*) FROM comments WHERE author_pub = ?) AS comments_authored,
+           (SELECT COUNT(*) FROM spreads s JOIN posts p ON p.id = s.post_id WHERE p.author_pub = ?) AS spreads_received,
+           (SELECT COUNT(*) FROM reports  WHERE post_id IN (SELECT id FROM posts WHERE author_pub = ?)) AS reports_received`,
+        [npub, npub, npub, npub, npub, npub],
       )
       if (!cancelled && row) setAggregate(row)
     })()
@@ -69,63 +86,249 @@ export function ProfileModal({ identity, onClose }: ProfileModalProps) {
 
   const activeRecord = identitiesList.find((id) => id.npub === activeNpub)
   const label = activeRecord?.label ?? null
+  const tier = getWeightTier(userWeight.weight)
+  const ageWeeks = Math.max(1, Math.floor((Date.now() - identity.createdAt) / (1000 * 60 * 60 * 24 * 7)))
+
+  function openEdit() {
+    pushLayer({
+      id: 'profile-edit',
+      component: EditProfileCard,
+      parent: 'profile',
+      props: { npub: identity.npub, currentMetadata: metadata },
+    })
+  }
+
+  async function handleSwitchIdentity(npub: string) {
+    if (npub === activeNpub) return
+    const target = identitiesList.find((id) => id.npub === npub)
+    const targetLabel = target?.label ?? `${npub.slice(0, 8)}…`
+    const ok = await dialog.confirm(
+      `Trocar para ${targetLabel}? Reload necessário pra reset do sync e feed.`,
+      { title: 'trocar identidade', okLabel: 'trocar' },
+    )
+    if (!ok) return
+    await setActiveIdentity(npub)
+    window.location.reload()
+  }
 
   return (
-    <SlideUpOverlay onClose={onClose} ariaLabel="perfil">
-      <ModalHeader title="perfil" onClose={onClose} />
-
-      <section className="mb-4 rounded border border-drift-border bg-drift-bg/30 p-3">
-          {label && (
-            <div className="mb-1 text-[12px] text-drift-text">{label}</div>
+    <FullPageCard onClose={onClose} title="perfil" ariaLabel="perfil">
+      <div className="space-y-3 px-4 py-5">
+        {/* Hero — sempre visível */}
+        <div className="rounded-2xl border border-drift-border/40 bg-drift-surface/50 px-5 py-5">
+          <div className="flex items-start gap-4">
+            <Avatar metadata={metadata} npub={identity.npub} />
+            <div className="min-w-0 flex-1">
+              <div className="font-display text-[18px] font-bold text-drift-text">
+                {metadata?.displayName || metadata?.name || (
+                  <span className="italic text-drift-muted/50">anônimo</span>
+                )}
+              </div>
+              {label && (
+                <div className="mt-0.5 font-mono text-[10px] uppercase tracking-meta text-drift-muted/40">
+                  {label}
+                </div>
+              )}
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <TierBadge tier={tier} />
+                <span className="font-mono text-[10px] text-drift-muted/50">
+                  há {ageWeeks} {ageWeeks === 1 ? 'semana' : 'semanas'}
+                </span>
+              </div>
+            </div>
+          </div>
+          {metadata?.about && (
+            <p className="mt-3 font-mono text-[11px] leading-relaxed text-drift-text/70">
+              {metadata.about}
+            </p>
           )}
-          <div className="break-all font-mono text-[12px] text-drift-muted">
-            {identity.npubBech32}
+          <div className="mt-3 flex gap-2">
+            <DriftButton variant="primary" size="md" onClick={openEdit} className="flex-1">
+              ✎ editar
+            </DriftButton>
           </div>
-          <div className="mt-2 flex items-center justify-between">
-            <span className="text-[12px] text-drift-muted">
-              criada: {new Date(identity.createdAt).toLocaleString()}
-            </span>
-            <TierBadge tier={getWeightTier(userWeight.weight)} />
-          </div>
-        </section>
+        </div>
 
-        <section className="mb-4 grid grid-cols-2 gap-2 text-center">
-          <Stat
-            label="max subposts"
-            value={String(userWeight.maxSubposts)}
-            tooltip="máximo permitido por post; cresce com peso (manifesto §33)"
-          />
-          <Stat
-            label="seguindo"
-            value={String(followingCount)}
-            tooltip="manifesto §24 — filtragem local, não muda ranking"
-          />
-        </section>
-
-        {aggregate && (
-          <section className="mb-4 grid grid-cols-3 gap-2 text-center">
-            <Stat label="posts" value={String(aggregate.posts_count)} tooltip="que você publicou" />
-            <Stat label="↑ dados" value={String(aggregate.spreads_given)} tone="spread" />
-            <Stat label="↓ dados" value={String(aggregate.buries_given)} tone="bury" />
-          </section>
-        )}
-
-        {(aggregate?.pinned_count || blockedCount || mutedCount) ? (
-          <section className="mb-2 flex flex-wrap gap-2 border-t border-drift-border pt-3 text-[12px] text-drift-muted">
-            {aggregate && aggregate.pinned_count > 0 && (
-              <span>📌 {aggregate.pinned_count} fixados</span>
+        {/* Section: Identidade */}
+        <SectionHeader title="identidade" expanded={open === 0} onToggle={() => toggle(0)} />
+        <Collapse open={open === 0}>
+          <div className="space-y-2 pl-3">
+            <div className="rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3">
+              <div className="mb-1 font-mono text-[10px] uppercase tracking-meta text-drift-muted/50">
+                npub
+              </div>
+              <div className="break-all font-mono text-[11px] text-drift-text/80">
+                {identity.npubBech32}
+              </div>
+              {metadata?.nip05 && (
+                <div className="mt-2">
+                  <span className="font-mono text-[10px] uppercase tracking-meta text-drift-muted/50">
+                    nip-05
+                  </span>
+                  <div className="font-mono text-[12px] text-drift-accent2">
+                    {metadata.nip05}
+                  </div>
+                  <p className="mt-0.5 font-mono text-[10px] text-drift-muted/30">
+                    claim não verificado pelo Drift — outros clientes podem checar
+                  </p>
+                </div>
+              )}
+            </div>
+            {identitiesList.length > 1 && (
+              <div className="rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3">
+                <div className="mb-2 font-mono text-[10px] uppercase tracking-meta text-drift-muted/50">
+                  trocar identidade ativa
+                </div>
+                <div className="space-y-1.5">
+                  {identitiesList.map((id) => {
+                    const isActive = id.npub === activeNpub
+                    return (
+                      <button
+                        key={id.npub}
+                        onClick={() => void handleSwitchIdentity(id.npub)}
+                        disabled={isActive}
+                        className={`flex w-full items-center justify-between rounded-lg border px-3 py-2 text-left font-mono text-[11px] transition-colors ${
+                          isActive
+                            ? 'border-drift-accent2/40 bg-drift-accent2/10 text-drift-accent2'
+                            : 'border-drift-border/30 bg-drift-surface/20 text-drift-muted/70 hover:text-drift-text'
+                        }`}
+                      >
+                        <span className="truncate">
+                          {id.label || `${id.npub.slice(0, 8)}…`}
+                        </span>
+                        {isActive && <span className="text-[10px] uppercase tracking-meta">ativa</span>}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
             )}
-            {blockedCount > 0 && <span>⊘ {blockedCount} bloqueados</span>}
-            {mutedCount > 0 && <span>🔇 {mutedCount} silenciados</span>}
-          </section>
-        ) : null}
+          </div>
+        </Collapse>
 
-      <p className="mt-3 text-[12px] leading-relaxed text-drift-muted">
-        Manifesto §22 — score determinístico. Esses números vêm de eventos
-        Nostr públicos; qualquer cliente Drift calcula os mesmos a partir
-        do mesmo conjunto.
-      </p>
-    </SlideUpOverlay>
+        {/* Section: Atividade */}
+        <SectionHeader title="atividade" expanded={open === 1} onToggle={() => toggle(1)} />
+        <Collapse open={open === 1}>
+          <div className="grid grid-cols-2 gap-2 pl-3">
+            <Stat label="posts" value={aggregate?.posts_count ?? 0} />
+            <Stat label="comments" value={aggregate?.comments_authored ?? 0} />
+            <Stat label="↑ dados" value={aggregate?.spreads_given ?? 0} tone="spread" />
+            <Stat label="↓ dados" value={aggregate?.buries_given ?? 0} tone="bury" />
+            <Stat label="↑ recebidos" value={aggregate?.spreads_received ?? 0} tone="spread" />
+            {(aggregate?.reports_received ?? 0) > 0 && (
+              <Stat
+                label="reports recebidos"
+                value={aggregate!.reports_received}
+                tone="warning"
+                tooltip="reports não excluem — score só baixa após threshold dinâmico (§26)"
+              />
+            )}
+          </div>
+        </Collapse>
+
+        {/* Section: Peso & alcance */}
+        <SectionHeader title="peso & alcance" expanded={open === 2} onToggle={() => toggle(2)} />
+        <Collapse open={open === 2}>
+          <div className="space-y-2 pl-3">
+            <div className="rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3.5">
+              <div className="flex items-baseline justify-between">
+                <span className="font-mono text-[10px] uppercase tracking-meta text-drift-muted/50">
+                  peso composto
+                </span>
+                <span className="font-display text-[20px] font-bold text-drift-text tabular-nums">
+                  {userWeight.weight.toFixed(1)}
+                </span>
+              </div>
+              <div className="mt-3 space-y-1.5 font-mono text-[11px]">
+                <Row label="antiquidade" value={userWeight.antiquity.toFixed(1)} />
+                <Row label="engajamento" value={userWeight.engagement.toFixed(1)} />
+                <Row label="max subposts" value={String(userWeight.maxSubposts)} />
+              </div>
+            </div>
+            <p className="px-1 font-mono text-[10px] leading-relaxed text-drift-muted/30">
+              peso é função pura de antiquidade + spreads recebidos (§22).
+              qualquer cliente drift calcula o mesmo.
+            </p>
+          </div>
+        </Collapse>
+
+        {/* Section: Minhas listas */}
+        <SectionHeader title="minhas listas" expanded={open === 3} onToggle={() => toggle(3)} />
+        <Collapse open={open === 3}>
+          <div className="grid grid-cols-2 gap-2 pl-3">
+            <Stat label="seguindo" value={followingCount} />
+            <Stat label="fixados" value={aggregate?.pinned_count ?? 0} />
+            <Stat label="bloqueados" value={blockedCount} />
+            <Stat label="silenciados" value={mutedCount} />
+          </div>
+        </Collapse>
+
+        <p className="px-2 pt-2 font-mono text-[10px] leading-relaxed text-drift-muted/30">
+          §22 — score determinístico. esses números vêm de eventos públicos;
+          qualquer cliente drift calcula os mesmos.
+        </p>
+      </div>
+    </FullPageCard>
+  )
+}
+
+function SectionHeader({
+  title,
+  expanded,
+  onToggle,
+}: {
+  title: string
+  expanded: boolean
+  onToggle: () => void
+}) {
+  return (
+    <button
+      onClick={onToggle}
+      aria-expanded={expanded}
+      className="flex w-full items-center gap-3 rounded-2xl border border-drift-border/40 bg-drift-surface/50 px-5 py-3.5 text-left transition-colors"
+    >
+      <span className="flex-1 font-display text-[14px] font-bold uppercase tracking-tag text-drift-accent">
+        {title}
+      </span>
+      <span
+        className={`shrink-0 text-drift-muted/40 transition-transform duration-motion-emphasis ease-drift-inout ${expanded ? 'rotate-180' : ''}`}
+      >
+        <ChevronDownIcon size={16} />
+      </span>
+    </button>
+  )
+}
+
+function Avatar({
+  metadata,
+  npub,
+}: {
+  metadata: ReturnType<typeof useUserMetadata>
+  npub: string
+}) {
+  if (metadata?.picture) {
+    return (
+      <img
+        src={metadata.picture}
+        alt="avatar"
+        className="h-14 w-14 shrink-0 rounded-full border border-drift-border/40 object-cover"
+        onError={(e) => {
+          // Fallback se URL quebrar: esconde img, identicon assume.
+          ;(e.target as HTMLImageElement).style.display = 'none'
+        }}
+      />
+    )
+  }
+  // Identicon simples — derivado do npub.
+  const hue = parseInt(npub.slice(0, 8), 16) % 360
+  return (
+    <div
+      className="grid h-14 w-14 shrink-0 place-items-center rounded-full border border-drift-border/40 font-display text-[18px] font-bold text-drift-bg"
+      style={{ background: `hsl(${hue}, 50%, 60%)` }}
+      aria-hidden="true"
+    >
+      {npub.slice(0, 2).toUpperCase()}
+    </div>
   )
 }
 
@@ -139,8 +342,8 @@ function TierBadge({ tier }: { tier: WeightTier | null }) {
       : { emoji: '🌱', label: 'novo', color: 'text-drift-spread border-drift-spread/40' }
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded border px-2 py-0.5 text-[12px] ${config.color}`}
-      title="weight é determinístico — função pura de antiquity (semanas) + spreads recebidos. Manifesto §22."
+      className={`inline-flex items-center gap-1 rounded-lg border px-2 py-0.5 font-mono text-[11px] ${config.color}`}
+      title="weight é determinístico — função pura de antiquity (semanas) + spreads recebidos. §22."
     >
       <span aria-hidden>{config.emoji}</span>
       <span>{config.label}</span>
@@ -155,22 +358,40 @@ function Stat({
   tooltip,
 }: {
   label: string
-  value: string
-  tone?: 'accent' | 'spread' | 'bury'
+  value: number
+  tone?: 'spread' | 'bury' | 'warning'
   tooltip?: string
 }) {
   const color =
-    tone === 'accent'
-      ? 'text-drift-accent'
-      : tone === 'spread'
+    tone === 'spread'
       ? 'text-drift-spread'
       : tone === 'bury'
       ? 'text-drift-bury'
+      : tone === 'warning'
+      ? 'text-drift-warning'
       : 'text-drift-text'
   return (
-    <div className="rounded border border-drift-border/60 bg-drift-bg/30 p-2" title={tooltip}>
-      <div className={`text-lg font-semibold tabular-nums ${color}`}>{value}</div>
-      <div className="text-[12px] uppercase tracking-widest text-drift-muted">{label}</div>
+    <div
+      className="rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3.5 text-center"
+      title={tooltip}
+    >
+      <div className={`font-display text-[18px] font-bold tabular-nums ${color}`}>
+        {value}
+      </div>
+      <div className="mt-0.5 font-mono text-[10px] uppercase tracking-meta text-drift-muted/50">
+        {label}
+      </div>
+    </div>
+  )
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-[11px] uppercase tracking-meta text-drift-muted/50">
+        {label}
+      </span>
+      <span className="text-[12px] text-drift-text tabular-nums">{value}</span>
     </div>
   )
 }
