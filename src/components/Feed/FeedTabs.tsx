@@ -15,6 +15,7 @@ import { useState, type ReactNode } from 'react'
 // `m` é o primitive leve do framer-motion (LazyMotion). Features via main.tsx.
 import { m } from 'framer-motion'
 import { markFeedSeen, refreshFeed, setFeedTab, useFeedStore } from '../../lib/feed'
+import { RefreshIcon } from '../UI/Icons'
 
 type FeedTab = 'global' | 'following' | 'trending'
 
@@ -128,15 +129,13 @@ export function FeedTabs({ onActiveTabTap }: FeedTabsProps = {}) {
         className="relative flex shrink-0 items-center justify-center px-3 text-drift-muted transition-colors hover:text-drift-text disabled:opacity-40 focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2 focus-visible:ring-offset-1 focus-visible:ring-offset-drift-bg"
       >
         <span
-          className={`text-[14px] ${refreshing ? 'animate-spin' : ''} ${
+          aria-hidden="true"
+          className={`inline-flex ${refreshing ? 'animate-spin' : ''} ${
             unseenCount > 0 ? 'text-drift-accent2' : ''
           }`}
-          style={{
-            display: 'inline-block',
-            transformOrigin: 'center',
-          }}
+          style={{ transformOrigin: 'center' }}
         >
-          ↻
+          <RefreshIcon size={16} />
         </span>
         {unseenCount > 0 && (
           <span

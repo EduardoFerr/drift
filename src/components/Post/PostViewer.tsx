@@ -23,6 +23,7 @@
 import { lazy, useEffect, useRef, useState } from 'react'
 import { LazyBoundary } from '../UI/LazyBoundary'
 import { DriftSkeleton } from '../UI/DriftSkeleton'
+import { MapIcon, PinIcon, PinOffIcon, WarningIcon } from '../UI/Icons'
 // `m` é o primitive leve do framer-motion (LazyMotion). Features via main.tsx.
 import { m, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { MOTION } from '../../lib/motion'
@@ -475,7 +476,7 @@ export function PostViewer({
             }
             aria-label={pinned ? 'Desfixar' : 'Fixar'}
           >
-            {pinned ? '📌' : '📍'}
+            {pinned ? <PinIcon size={16} /> : <PinOffIcon size={16} />}
           </button>
           <button
             onClick={() => setShowMap((v) => !v)}
@@ -487,7 +488,7 @@ export function PostViewer({
             title="mapa de deriva"
             aria-label="Abrir mapa"
           >
-            🗺️
+            <MapIcon size={18} />
           </button>
           {!isMine && (
             <>
@@ -529,7 +530,7 @@ export function PostViewer({
                 title="denunciar — manifesto §26"
                 aria-label="Denunciar"
               >
-                ⚠
+                <WarningIcon size={16} />
               </button>
             </>
           )}

@@ -24,6 +24,7 @@
  */
 
 import { Component, Suspense, type ErrorInfo, type ReactNode } from 'react'
+import { RefreshIcon } from './Icons'
 
 interface LazyBoundaryProps {
   /** Suspense fallback enquanto chunk baixa. Default: null (overlay
@@ -38,10 +39,12 @@ interface LazyBoundaryState {
 }
 
 /**
- * Tenta limpar caches do service worker antes de reload — útil quando
- * o SW está servindo um precache list stale após deploy. Falha silente:
- * se a API não existe ou rejeita, o reload sozinho ainda resolve a
- * maioria dos casos.
+ * Tenta limpar caches do service worker E artefatos OPFS órfãos antes
+ * de reload — útil quando o SW está servindo um precache list stale
+ * após deploy, ou quando o worker SQLite anterior deixou um handle
+ * preso no `drift.db-journal` (NoModificationAllowedError ao boot
+ * pós-update). Falha silente: se a API não existe ou rejeita, o reload
+ * sozinho ainda resolve a maioria dos casos.
  *
  * Exportado pra reuso em UI de "atualizar app" (Settings > Sobre, R33).
  */
@@ -54,6 +57,30 @@ export async function clearServiceWorkerAndReload(): Promise<void> {
     if ('serviceWorker' in navigator) {
       const regs = await navigator.serviceWorker.getRegistrations()
       await Promise.all(regs.map((r) => r.unregister()))
+    }
+    // OPFS nuke — remove drift.db + drift.db-journal + drift.db-wal.
+    // User feedback 2026-05-17: "limpar local + recarregar" não
+    // resolvia NoModificationAllowedError em /drift.db-journal porque
+    // só limpava Cache Storage; OPFS persiste em camada separada e
+    // segura locks de sync access handle através de reloads se o
+    // worker anterior não liberou. Remoção do arquivo força liberação
+    // do handle órfão. Manifesto §3 (dispositivo descartável,
+    // identidade não) torna isso aceitável — identidade vive em
+    // IndexedDB separado, posts re-sincronizam dos relays.
+    if ('storage' in navigator && navigator.storage.getDirectory) {
+      try {
+        const root = await navigator.storage.getDirectory()
+        for (const name of ['drift.db', 'drift.db-journal', 'drift.db-wal']) {
+          try {
+            await root.removeEntry(name)
+          } catch {
+            /* arquivo pode não existir — não é erro */
+          }
+        }
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.warn('[LazyBoundary] OPFS nuke falhou (continuando)', err)
+      }
     }
   } catch (err) {
     // eslint-disable-next-line no-console
@@ -102,9 +129,15 @@ class LazyErrorBoundary extends Component<
           <button
             onClick={this.handleRetry}
             disabled={this.state.clearing}
-            className="w-full max-w-sm rounded-xl bg-drift-accent2 px-4 py-3 font-mono text-[12px] uppercase tracking-meta font-medium text-drift-bg transition-colors hover:bg-drift-accent2/85 disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
+            className="inline-flex w-full max-w-sm items-center justify-center gap-2 rounded-xl bg-drift-accent2 px-4 py-3 font-mono text-[12px] uppercase tracking-meta font-medium text-drift-bg transition-colors hover:bg-drift-accent2/85 disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
           >
-            {this.state.clearing ? 'recarregando…' : '↻ recarregar'}
+            {this.state.clearing ? (
+              'recarregando…'
+            ) : (
+              <>
+                <RefreshIcon size={14} /> recarregar
+              </>
+            )}
           </button>
         </div>
       )

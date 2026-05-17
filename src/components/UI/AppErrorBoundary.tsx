@@ -25,6 +25,7 @@
  */
 
 import { Component, type ErrorInfo, type ReactNode } from 'react'
+import { RefreshIcon } from './Icons'
 
 interface Props {
   children: ReactNode
@@ -138,15 +139,15 @@ export class AppErrorBoundary extends Component<Props, State> {
           <div className="flex flex-col gap-2">
             <button
               onClick={this.handleReload}
-              className="w-full rounded border border-drift-accent px-4 py-2 font-mono text-[12px] uppercase tracking-meta text-drift-accent hover:bg-drift-accent/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2"
+              className="flex w-full items-center justify-center gap-2 rounded border border-drift-accent px-4 py-2 font-mono text-[12px] uppercase tracking-meta text-drift-accent hover:bg-drift-accent/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2"
             >
-              ↻ Recarregar
+              <RefreshIcon size={14} /> Recarregar
             </button>
             <button
               onClick={() => void this.handleClearAndReload()}
-              className="w-full rounded border border-drift-danger/60 bg-drift-danger/5 px-4 py-2 font-mono text-[12px] uppercase tracking-meta text-drift-danger hover:bg-drift-danger/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2"
+              className="flex w-full items-center justify-center gap-2 rounded border border-drift-danger/60 bg-drift-danger/5 px-4 py-2 font-mono text-[12px] uppercase tracking-meta text-drift-danger hover:bg-drift-danger/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2"
             >
-              ↻ Limpar cache e recarregar
+              <RefreshIcon size={14} /> Limpar cache e recarregar
             </button>
           </div>
         </div>
