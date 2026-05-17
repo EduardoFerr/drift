@@ -273,6 +273,28 @@ export function ProfileModal({ identity, onClose }: ProfileModalProps) {
 }
 
 
+/**
+ * Whitelist de schemes seguros pra avatar URL.
+ *
+ * Barney HIMYM audit 2026-05-17 (HIGH severity):
+ * Autor malicioso pode setar `metadata.picture` pra rastrear viewer:
+ *   - Tracker pixel: `https://attacker.com/pixel?npub=…` colhe IP+Referer
+ *   - `javascript:` URL: React 18 sanitiza, mas defensa em profundidade
+ *   - `data:image/...` gigante: DoS render
+ *   - schemes desconhecidos (file://, vbscript:, etc.): bloquear
+ *
+ * Decisão: aceitar `https://` (90% dos casos) + `data:image/` (avatar
+ * pequeno embedded). Recusar todo o resto silenciosamente (fallback
+ * pro identicon).
+ */
+function isSafeAvatarUrl(url: string): boolean {
+  if (!url) return false
+  // wcag-audit: ok reason=length-cap-prevents-DoS-from-massive-data-urls
+  if (url.length > 4096) return false
+  const lower = url.trim().toLowerCase()
+  return lower.startsWith('https://') || lower.startsWith('data:image/')
+}
+
 function Avatar({
   metadata,
   npub,
@@ -280,11 +302,16 @@ function Avatar({
   metadata: ReturnType<typeof useUserMetadata>
   npub: string
 }) {
-  if (metadata?.picture) {
+  if (metadata?.picture && isSafeAvatarUrl(metadata.picture)) {
     return (
       <img
         src={metadata.picture}
         alt="avatar"
+        // Barney §28 — `referrerPolicy="no-referrer"` evita que origem
+        // do avatar (potencialmente hostil) colha viewer's Referer + IP.
+        // `loading="lazy"` reduz DoS de avatares enormes em listas.
+        referrerPolicy="no-referrer"
+        loading="lazy"
         className="h-14 w-14 shrink-0 rounded-full border border-drift-border/40 object-cover"
         onError={(e) => {
           // Fallback se URL quebrar: esconde img, identicon assume.
