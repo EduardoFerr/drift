@@ -102,30 +102,78 @@ o "porquê" via `git show <hash>`.
 
 ## BUGS — prioridade alta (correção sem polish)
 
-- [ ] **BUG-LONGPRESS-FAN: long-press em ícone do ActionsFan ativa
-  moderação 5s** — gesture conflict: PostViewer.tsx tem long-press 5s
-  na card area pra abrir ModerationModal; quando user segura ícone do
-  fan (block/mute/follow/etc), o ícone NÃO faz preventPointerDown ou
-  similar, então o gesture do parent dispara junto. Resultado: user
-  pretende ver tooltip/feedback do fan, mas barra de moderação inicia.
-  Contexto: user feedback 2026-05-17 sessão noite V.
-  Fix proposto: `data-no-longpress="true"` nos botões do ActionsFan
-  (pattern já usado no ⋮ trigger em PostViewer.tsx:670) OU stopPropagation
-  no onPointerDown dos botões do fan. Verificar primeiro qual é o
-  vector exato.
-  Bloqueio: nenhum — bugfix direto. ~15min.
+- [x] **BUG-LONGPRESS-FAN** — fechado 2026-05-17 em [aff356d].
+  `data-no-longpress="true"` no wrapper `<m.div>` de cada FanItem.
+  Pattern já estabelecido pra ⋮ trigger (linha 671 PostViewer).
+
+- [x] **BUG-UPDATE-BUTTON: "atualizar" não faz nada sem feedback** —
+  fechado 2026-05-17 em [52e7175]. User reportou que botão "atualizar"
+  no Settings > Sobre frequentemente "não fazia nada" e precisava F5
+  manual sem indicativo visual. Causa: confiávamos que
+  `updateServiceWorker(true)` faz reload sozinho; em Chromium PWA
+  installed mode + SW state estranho, falhava silenciosamente.
+  Fix: estados visuais granulares (checking/applying/reloading/latest),
+  `window.location.reload()` explícito como fallback após 800ms,
+  bg color diferenciado por fase, aria-live="polite".
+
+## RFC reviews — adicionados 2026-05-17 (sessão noite VI)
+
+- [ ] **RFC DAOP-001 (Drift Adaptive Onboarding Protocol)** — Ted HIMYM
+  review concluído. Veredict: aceita como **inspiração**, rejeita branding
+  "Protocol" (não é protocolo, é arquitetura de cliente). Recomendação:
+  renomear pra "Drift Adaptive Onboarding — Client Architecture".
+
+  **Phase 1 minimal (~1 sprint, viável agora):**
+  - `lib/capabilities.ts`: capacidades derivadas de queries SQLite locais
+    (`hasFirstPost`, `hasFirstSpread`, `hasBackup`, `hasFollow`) — funções
+    puras testáveis (CLAUDE.md invariante #16)
+  - `user_prefs.capabilities_dismissed` bag substitui `onboarding_done`
+    boolean por granularidade
+  - `lib/guidance.ts`: store Zustand com regras declarativas hardcoded
+    versionadas no client (regras = código, auditáveis)
+  - Refactor `OnboardingOverlay` pra consumir mesmas regras (steps =
+    capability gaps no boot)
+  - 3 componentes UI: `HintChip` (passive), `HintToast` (reactive),
+    `HintModal` (interactive)
+
+  **Phase 2:** capability re-derivation no `setIdentityFromNsec`, hints
+  contextuais em Discovery/Settings/PeersCard, i18n das regras.
+
+  **Phase N (decisões políticas):** sugestões follows curadas (precisa
+  HIMYM antes — colide §24), behavioral signals locais.
+
+  **NUNCA fazer (manifesto irremediável):**
+    - Kind Nostr novo `capability_acquired` (viola #14 + §28)
+    - AI onboarding agent remoto/local-treinado-por-terceiro no cliente
+      oficial (§17, §25, invariante #7)
+    - Reputation-aware onboarding / trust-based guidance (§22)
+    - Feed personalizado pra newcomer (§24)
+    - Behavioral signals exportadas (§28)
+    - Guidance Engine remoto servindo regras
+
+  Próximos dispatches HIMYM se for adiante: Lily (copy hints PT, hierarquia
+  HintChip/Toast/Modal, degradação progressiva), Marshall (LOCK_VIA_TEST
+  pra non-export de signals, capabilities.ts pure function), Barney
+  (threat: timing correlation pra deanonymizar newcomer; AI poisoning
+  Phase N), Satoshi (capability portability sem servidor — re-derivação
+  por replay é suficiente; gaming neutro porque caps não rankeiam),
+  Robin (research onboarding decentralizado Damus/Coracle/Snort/Bluesky).
+
+  **Recomendação imediata:** primeiro PR extrai 5 telas atuais do
+  `OnboardingOverlay.tsx` pra regras declarativas em `lib/guidance.ts`
+  mantendo paridade visual — refactor puro, abre caminho pra capabilities
+  derivadas no PR seguinte.
+
+  Bloqueio: aguardando user decision se adota Phase 1 minimal.
 
 ## UX / Design — adicionados 2026-05-17 (sessão noite V)
 
 ### ActionsFan (vertical icon menu sobre post)
 
-- [ ] **ActionsFan icons — alguns ainda emoji, não SVG** — Sprint 2/3
-  SVG migration cobriu PostViewer header + IdentityPanel + IdentitySwitcher,
-  mas ActionsFan (visível em embedded mode) ainda tem ícones Unicode
-  em alguns slots. Audit: cross-ref `src/lib/actions-fan.ts` `buildFanItems`
-  com SVG icons disponíveis em `UI/Icons.tsx`. Substituir restantes
-  (provavelmente compartilhar/share-image/silenciar).
-  Bloqueio: nenhum — quick win ~20min.
+- [x] **ActionsFan icons emoji → SVG** — fechado 2026-05-17 em [aff356d].
+  ShareIcon (📤) + ImageIcon (🖼) adicionados a `UI/Icons.tsx`; mapping
+  no FanIcon helper completo. Sprint 2/3 SVG migration agora cobre 100%
+  do ActionsFan.
 
 - [ ] **ActionsFan visibilidade sobre foto/background dinâmico** — icons
   do fan ficam invisíveis quando post tem foto clara por trás (screenshot
@@ -162,26 +210,21 @@ o "porquê" via `git show <hash>`.
 
 ### Profile
 
-- [ ] **Avatar cadastrado não exibido no perfil** — user salvou imagem
-  de avatar em EditProfileCard mas não aparece renderizada em lugar
-  nenhum visível do perfil. Possíveis causas:
-    1. Avatar URL salva em metadata kind 0 mas Profile view não lê
-    2. ProfileModal não tem `<img src={metadata.picture}>` (só nome)
-    3. Cache de profile metadata stale após edit
-    4. URL salva mal-formada (validation gap)
-  Audit: `src/components/Profile/ProfileModal.tsx` + `EditProfileCard.tsx`
-  cross-ref com `metadata.picture` field NIP-01.
-  Bloqueio: nenhum — bugfix funcional ~30min.
+- [~] **Avatar cadastrado não exibido no perfil** — investigado
+  2026-05-17. ProfileModal:120 JÁ renderiza Avatar component que tem
+  `<img src={metadata.picture}>`. Causa raiz provável: cache stale
+  pós-edit (kind 0 publicado mas não round-trippou via relay ainda).
+  Refinado em [ba8b054] com defesa adversarial Barney (scheme whitelist
+  https/data:image + referrerPolicy="no-referrer" + loading="lazy"
+  contra DoS). Cache stale fica pra investigação futura — não-trivial
+  (envolve fluxo onNostrEvent).
 
 ### MapViewCard
 
-- [ ] **MapViewCard — toggle FECHADO/ABERTO visual pobre** — single text
-  color change indica estado ativo, mas user não percebe imediatamente
-  qual está selecionado. Pattern: visual radiogroup com bg destacado +
-  border accent (similar tabs do FeedTabs com indicator slide), ou
-  segmented control iOS-style com pill animada.
-  Bloqueio: nenhum — refactor visual ~30min, padrão já existe em
-  outros toggles.
+- [x] **MapViewCard — toggle FECHADO/ABERTO visual pobre** — fechado
+  2026-05-17 em [6abf4cb]. Segmented control com pill chartreuse
+  animada (motion.span animate x + spring), mesmo padrão FeedTabs
+  indicator. Helper text movido pra fora do container.
 
 ### DiagnosticCard
 
@@ -301,13 +344,10 @@ o "porquê" via `git show <hash>`.
   arquivo. Este item passa a ser umbrella.
   Bloqueio: aguarda audit sistemático fechar.
 
-- [ ] **Onboarding com muito CLS entre steps** — Cumulative Layout Shift
-  alto durante transições de step no OnboardingOverlay. Provavelmente
-  height/width dos containers muda entre slides causando jank visual.
-  Contexto: feedback user 2026-05-17.
-  Bloqueio: precisa medir CLS real (DevTools) + identificar steps
-  culpados; possíveis fixes (min-h fixo, transition contained, skeleton
-  durante swap).
+- [x] **Onboarding com muito CLS entre steps** — fechado 2026-05-17 em
+  [6abf4cb]. Container do `<m.div key={step}>` ganhou `min-h-[320px]`
+  + CSS `contain: layout`. Steps variam 3-8+ linhas, sem min-h os
+  buttons saltavam. Cobre step médio sem desperdiçar viewport mobile.
 
 - [ ] **HIMYM flavor curado** — user forneceu links Pinterest (fotos da
   série) + scarymommy (quotes). Considerar: easter eggs nos templates de
