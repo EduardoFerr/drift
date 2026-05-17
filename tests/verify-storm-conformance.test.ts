@@ -100,17 +100,17 @@ vi.mock('../src/lib/comments', () => ({
 }))
 
 beforeEach(async () => {
+  // Terminate leftover mock workers from previous test before resetting
+  // modules. This replaces the old afterEach that did a dynamic import of
+  // verify.ts to call _resetVerifyForTest() — that import could hang for
+  // 10s+ after storm tests with thousands of pending microtasks.
+  for (const w of StormWorker.instances) w.terminate()
   StormWorker.instances = []
   StormWorker.neverRespond = false
   dbRunMock.mockReset().mockResolvedValue(undefined)
   dbExecMock.mockReset().mockResolvedValue([])
   dbGetMock.mockReset().mockResolvedValue(null)
   vi.resetModules()
-})
-
-afterEach(async () => {
-  const mod = await import('../src/lib/verify')
-  mod._resetVerifyForTest()
 })
 
 // Helpers

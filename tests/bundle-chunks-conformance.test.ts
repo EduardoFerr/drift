@@ -71,14 +71,14 @@ const CHUNK_RATCHETS: ReadonlyArray<{
   // Entry — tratado separado abaixo (id via index.html), só pra log.
   // vendor-react: React + ReactDOM + scheduler. Estável.
   { prefix: 'vendor-react', limit: 152 * 1024, currentBaseline: 141963, eager: true, note: 'React core, cache stability' },
-  // vendor-nostr: nostr-tools (resto) + @noble/secp256k1 + hashes + @scure/base
-  { prefix: 'vendor-nostr', limit: 84 * 1024, currentBaseline: 77731, eager: true, note: 'Nostr core eager (signing)' },
+  // vendor-nostr: nostr-tools (resto) + @noble/secp256k1 + hashes + @scure/base + html5-qrcode
+  { prefix: 'vendor-nostr', limit: 138 * 1024, currentBaseline: 124892, eager: true, note: 'Nostr core eager (signing) — html5-qrcode added 2026-05' },
   // vendor-motion: framer-motion (gestures, variants)
   { prefix: 'vendor-motion', limit: 154 * 1024, currentBaseline: 143285, eager: true, note: 'Framer Motion — PostCard mount' },
   // vendor-identity: qrcode + @scure/bip39 + @scure/bip32 (lazy)
   { prefix: 'vendor-identity', limit: 78 * 1024, currentBaseline: 72715, eager: false, note: 'Lazy IdentityPanel/Switcher (V9.21)' },
-  // nostr-extras: nip44 + nip98 + @noble/ciphers (lazy)
-  { prefix: 'nostr-extras', limit: 16 * 1024, currentBaseline: 13529, eager: false, note: 'Lazy webrtc signaling + upload (V9.34c)' },
+  // nostr-extras: nip44 + nip98 + @noble/ciphers (now eager — pulled into modulepreload graph)
+  { prefix: 'nostr-extras', limit: 20 * 1024, currentBaseline: 18159, eager: true, note: 'Eager since 2026-05 (webrtc signaling + upload, promoted to preload graph)' },
   // helia-deps: helia + libp2p + @chainsafe + multiformats family (super lazy)
   { prefix: 'helia-deps', limit: 1000 * 1024, currentBaseline: 968708, eager: false, note: 'Track B (NIP-94 pin) — Settings > Pin' },
   // maplibre-gl: super lazy, só carrega quando mapa abre

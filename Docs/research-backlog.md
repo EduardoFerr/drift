@@ -336,6 +336,104 @@ recorrente. Versão nova pode resolver.
 
 ---
 
+## Fase 7+ (descoberta de relays moderados — adicionado 2026-05-17)
+
+### R26 — Relays Nostr com moderação / "family friendly"
+**Pergunta**: quais relays públicos hoje aplicam moderação (hate speech,
+NSFW, illegal, harassment)? Quais são pagos vs gratuitos, whitelist
+vs blacklist, NIP-56 (kind 1984) consumers vs producers?
+**Por quê informa**: Drift hoje ships `SEED_RELAY_CONFIGS` neutro. Pra
+users que querem feed family-friendly por default (manifesto §24 — sem
+afinidade no ranking, MAS user pode escolher relay que filtra antes do
+cliente), precisa lista curada. Não é censura — é opt-in.
+**Workaround interim**: docs explicam como adicionar relay manualmente
+em Settings > Relays. Falta curated list + UX de descoberta.
+**Fonte ideal**: `relay.nos.social` (Tagr Bot), `nostr.how/relays`,
+relay directory wikis (`nostr.directory`?), discussão de NIP-56 no
+GitHub `nostr-protocol/nips`.
+
+### R27 — Relays sem moderação (extremo oposto)
+**Pergunta**: quais relays são absolute-free-speech / sem-moderação?
+Privacidade vs censura — onde users dissidentes / leakers buscam?
+**Por quê informa**: Drift §15 anti-censura por país. Cliente precisa
+oferecer ambos os polos pro user — moderado pro casual, sem-moderação
+pro ativista. Curated list por categoria.
+**Workaround interim**: SEED_RELAY_CONFIGS atual é mainstream — não
+expõe paranoia tier. Adicionar comentário no config sobre quais são
+neutros vs moderados.
+
+### R28 — Como criar relay próprio com filtro de IA
+**Pergunta**: stack atual pra rodar relay Nostr + classificador
+NSFW/hate/spam? `strfry` é o backend dominante? Hooks pra plugar
+classifier (OpenAI API, local LLM via llama.cpp, ML5)? Performance
+overhead aceitável (eventos/seg)?
+**Por quê informa**: Fase 7 contempla "run-your-own-relay" como
+distribuição. Comunidades Drift podem rodar relay próprio com
+moderação adaptada. Cliente Drift NÃO escaneia (§7/§25), mas relay
+operator é livre — manifesto §17 não estende a operator de relay.
+**Fonte ideal**: `github.com/hoytech/strfry` + plugins, blogs de
+operadores (Damus, Nos), `nostr-protocol/nips` PR de moderação.
+
+### R29 — Implementação completa de NIP-56 (kind 1984)
+**Pergunta**: schema exato de kind 1984, tags obrigatórias, como
+clientes amplos (Damus, Snort, Iris, Coracle) consomem labels e
+renderizam? Drift hoje ships kind 9081 (REPORT) próprio — qual a
+ponte semântica com NIP-56?
+**Por quê informa**: kind 9081 é Drift-only — outros clientes não
+entendem. NIP-56 é padrão. Drift pode emitir AMBOS (9081 pro pipeline
+interno + 1984 pro ecossistema Nostr) ou só 1984 com tag drift-specific.
+Decidir antes de inflar adoption.
+**Fonte ideal**: `nostrbook.dev/kinds/1984`, NIP-56 spec no
+`nostr-protocol/nips`, source de Damus/Snort handlers.
+
+### R30 — Arquitetura de moderação Nos/Primal/Damus
+**Pergunta**: como cada cliente top-tier do Nostr lida com moderação?
+- Damus: client-side filters? NIP-56 consume? Bot pipeline próprio?
+- Primal: server-side aggregation + filtering?
+- Nos: integração Tagr Bot + NIP-56 labels (já documentado)
+- Snort/Iris: blocklists, mutelist?
+**Por quê informa**: ROI vs reinventar. Drift pode adotar pattern
+consolidado em vez de inventar pipeline próprio.
+**Workaround interim**: Drift ships `moderation-local.ts` (block/mute
+locais) + `kind 9081` (reports globais com threshold dinâmico §26).
+Funcional mas isolado do resto do ecossistema.
+
+### R31 — strfry + plugins pra Drift run-your-own-relay
+**Pergunta**: minimal viable stack pra comunidade Drift rodar relay
+próprio em VPS de $5/mes (DigitalOcean, Hetzner)? `strfry` + nginx
+reverse proxy + Let's Encrypt + opcional Tor onion? Backup strategy?
+**Por quê informa**: Fase 7 "run-your-own-relay" precisa receita
+copy-paste. Sem isso, manifesto §16 (disponibilidade distribuída)
+fica retórica.
+**Fonte ideal**: `github.com/hoytech/strfry/blob/master/docs/`, blogs
+de relay operators amadores.
+
+### R32 — Filtros automáticos via OpenAI API vs LLM local
+**Pergunta**: trade-off financeiro + privacidade entre OpenAI Moderation
+API (free pra dev, log-no-policy) vs local LLM (llama.cpp + small model,
+self-hosted)? Latência (relay precisa decidir aceitar/recusar em <500ms),
+acurácia (false positive rate de NSFW classifier).
+**Por quê informa**: complementa R28. Operator de relay Drift precisa
+decisão informada. Cliente NÃO usa esses (manifesto §25), mas relay-
+side é jogo aberto.
+
+---
+
+## Fase 5/6 (UX pequeno — adicionado 2026-05-17)
+
+### R33 — Botão "atualizar" em Settings > Sobre
+**Pergunta**: trivial — apenas implementação. Trigger de service worker
+update (`skipWaiting` + `clients.claim`), hard reload, cache nuke.
+**Por quê informa**: user reporta que app fica em versão stale após
+deploy. PWA service worker pode demorar até 24h pra detectar nova
+versão. Botão manual em Sobre dá agência ao user.
+**Workaround interim**: cache nuke já existe no LazyBoundary retry
+button (auto on chunk fail). Falta entrada manual.
+**Fonte ideal**: própria — implementar reusando `clearServiceWorkerAndReload`
+de `LazyBoundary.tsx`. Botão em `AboutCardLayer` (App.tsx).
+
+---
+
 *Documento mantido (atribuição original: papel de research/curadoria).
-Última atualização: 2026-05-02.*
-*Itens originais: 25. Resolvidos até 2026-05-01: 4 (R3, R5, R11, R21 parcial).*
+Última atualização: 2026-05-17.*
+*Itens originais: 25 → 33 (8 novos R26-R33). Resolvidos até 2026-05-01: 4 (R3, R5, R11, R21 parcial).*

@@ -50,6 +50,7 @@ const EAGER_PRELOAD_EXPECTED: ReadonlyArray<string> = [
   'vendor-react',
   'vendor-nostr',
   'vendor-motion',
+  'nostr-extras',
 ]
 
 /**
@@ -66,7 +67,6 @@ const LAZY_NOT_PRELOADED: ReadonlyArray<string> = [
   'vendor-identity',
   'helia-deps',
   'maplibre-gl',
-  'nostr-extras',
   'rebroadcast',
   'spreadMapLayers',
   'SpreadMap',
@@ -180,7 +180,7 @@ describe('Bundle chunks structure — composition guard', () => {
      * vira serie em vez de parallel.
      */
     it.skipIf(!inspection.hasDist)(
-      'entry chunk has expected eager preload partners (vendor-react, vendor-nostr, vendor-motion)',
+      'entry chunk has expected eager preload partners (vendor-react, vendor-nostr, vendor-motion, nostr-extras)',
       () => {
         for (const prefix of EAGER_PRELOAD_EXPECTED) {
           const preloaded = isPrefixPreloaded(inspection.preloadedAssets, prefix)
@@ -208,7 +208,7 @@ describe('Bundle chunks structure — composition guard', () => {
      * acidental que os promova ao preload graph.
      */
     it.skipIf(!inspection.hasDist)(
-      'lazy chunks are NOT in modulepreload (vendor-identity, helia-deps, maplibre-gl, spreadMapLayers, nostr-extras, rebroadcast, ThreadView, IdentityPanel, SpreadMap, tesselator)',
+      'lazy chunks are NOT in modulepreload (vendor-identity, helia-deps, maplibre-gl, spreadMapLayers, rebroadcast, ThreadView, IdentityPanel, SpreadMap, tesselator)',
       () => {
         for (const prefix of LAZY_NOT_PRELOADED) {
           const preloaded = isPrefixPreloaded(inspection.preloadedAssets, prefix)
