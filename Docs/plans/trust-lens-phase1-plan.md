@@ -84,13 +84,13 @@ influence(source → target) = sigmoid(
 )
 ```
 
-**Personalized PageRank Monte Carlo** (com bump L=8 — distance-decay contínuo per user feedback):
+**Personalized PageRank Monte Carlo** (Ted v2 deliberation 2026-05-17 — `Docs/sessions/trust-lens-L-parameter-ted-2026-05-17.md`):
 ```
-parameters:
+parameters (HARD-CODED em src/lib/trust/constants.ts — não user_prefs):
   K = 1000 walks
-  L = 8           // bumped de 4: captura ~90% da distribuição natural com α=0.15
+  L = 6           // ⌊1/α⌋ par; captura ~62% da massa natural; ~75ms compute
   α = 0.15        // damping; expected walk length = 1/α = 6.67
-  seed = hash(source_npub || floor(now / 24h))  // determinism cross-device
+  seed = hash(source_npub || floor(now / 24h))  // determinism cross-device §7
 
 algorithm:
   for k in 1..K:
@@ -340,6 +340,37 @@ Copy do header:
 
 ---
 
+## 2.9 Phase 2/3 expansion — multi-list curation (user vision 2026-05-17)
+
+User propôs: multi-list curation com per-list strength sliders + parental control via password lock.
+
+**Arquitetura emergente**: Trust Lens vira UMA lista entre várias. Cada lista tem slider 0-100%. Mix de listas = personalização local.
+
+### Status do componente (deliberação HIMYM em curso)
+
+| Componente | Status | Veredict |
+|---|---|---|
+| **Multi-list mixer 0-100%** | ✅ Barney aprovou com constraints | Phase 2 — pipeline order: Trust Lens base + filter_rules locais + listas externas additive + conflict resolver (exclude-wins default) + reports §26 |
+| **Source diversity** (NIP-32 / NIP-85 / Vertex / NIP-78 import / local) | ✅ Barney aprovou com mitigations | Source npub visible obrigatório; nunca default-ON; cap N=10 listas ativas; cap 50k rows/lista LRU |
+| **Conflict resolution UX** | ✅ Barney: exclude-wins default + explicit surface no Inspector | Aguarda Lily UX (rodando) |
+| **Cumulative censorship indicator** | ✅ Barney: "X% escondido" persistente >15%, não-desligável | Aguarda Lily |
+| **Password lock parental** | ❌ Barney REJECT no cliente oficial | §17 derivado + §25 slippery slope. Fork separado / plugin opt-in / não existe. **Aguarda decisão política Arquiteto**: filho menor é user §17? |
+
+### 6 bandeiras vermelhas Phase 2/3 (Barney + Ted survey)
+
+1. Password lock parental no cliente oficial
+2. Trust score público (mesmo NIP-85 opt-in)
+3. Default-ON em qualquer lista externa
+4. Sync de filter_rules entre devices via Nostr
+5. Lista pre-fab "anti-CSAM/extremismo" hardcoded com escopo amplo
+6. "Stealth mode" parental (lista ativa sem indicator visible)
+
+Detalhes Barney: `Docs/sessions/trust-lens-multilist-barney-2026-05-17.md`
+
+Lily UX + Robin research rodando — quando completarem, integra aqui + decide se shipa em Phase 2 ou Phase 3.
+
+---
+
 ## 3. Phase 2 — Vertex DVM / NIP-85 (Robin reframe)
 
 **Reframing crítico**: NIP-32 labeler market **não está emergindo**. NIP-85 Trusted Assertions + Vertex DVM (NIP-90) ocuparam o nicho. Coracle já integra Vertex hoje.
@@ -370,7 +401,7 @@ Phase 1 e 1.5 podem ser commits intercalados num único PR ou PRs separados — 
 
 ## 5. Open questions / handoffs pós-plano
 
-- **Ted refinement L= tensão**: User pediu L=8 (distance-decay contínuo, "não é só vizinhos"). Ted survey zero-trust recomenda L=2 como "conservative Phase 1" pra evitar SybilGuard-style attacks via long paths. Robin honest sobre falta de data Nostr real. **Decisão**: ship L=4 como meio-termo (cobre FoF naturalmente via damping α=0.15; user pode ajustar pra L=6/8 depois de telemetria) OU ship L=8 conforme user pediu, com instrumentação extra de ring-attack detection. Marcar como aberto.
+- ~~**Ted refinement L= tensão**~~ ✅ **RESOLVIDO 2026-05-17** — Ted v2 deliberation locked L=6 (math: ⌊1/α⌋ par, captura ~62% massa natural, ~75ms compute). Hard-coded em `src/lib/trust/constants.ts`. Detalhes: `Docs/sessions/trust-lens-L-parameter-ted-2026-05-17.md`
 - **Marshall predicate DSL**: refinar operators conforme casos de uso reais aparecerem (Phase 2 pode precisar `time_decay`, `relay_subset`).
 - **Lily**: copy final pra empty states e Rede view ("@alice deu drift" testar com 3-5 users PT-BR, sugerido Robin).
 - **Barney followup**: Alvisi 2013 SoK + Mohaisen 2010 mixing time worth deep read antes de Phase 1 freeze.
