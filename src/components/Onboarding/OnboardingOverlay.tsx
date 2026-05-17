@@ -202,22 +202,29 @@ export function OnboardingOverlay({ onClose, onOpenIdentity }: OnboardingOverlay
           ))}
         </div>
 
-        <AnimatePresence mode="wait">
-          <m.div
-            key={step}
-            initial={{ opacity: 0, x: 12 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -12 }}
-            transition={{ duration: 0.18 }}
-          >
-            <h2 className="mb-3 font-display text-[14px] font-bold uppercase tracking-tag text-drift-accent">
-              {currentStep?.title}
-            </h2>
-            <div className="space-y-3 text-sm text-drift-text [&_code]:text-[12px] [&_p]:leading-relaxed">
-              {currentStep?.body}
-            </div>
-          </m.div>
-        </AnimatePresence>
+        {/* CLS fix 2026-05-17 (Lily audit): min-h fixo no container do
+            slide impede layout shift entre steps. Steps variam de 3
+            linhas a 8+ itens; sem min-h, header/buttons saltavam a
+            cada step swap. min-h-[320px] cobre step médio (~6 linhas)
+            sem desperdiçar viewport em telas pequenas. */}
+        <div className="min-h-[320px]" style={{ contain: 'layout' }}>
+          <AnimatePresence mode="wait">
+            <m.div
+              key={step}
+              initial={{ opacity: 0, x: 12 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -12 }}
+              transition={{ duration: 0.18 }}
+            >
+              <h2 className="mb-3 font-display text-[14px] font-bold uppercase tracking-tag text-drift-accent">
+                {currentStep?.title}
+              </h2>
+              <div className="space-y-3 text-sm text-drift-text [&_code]:text-[12px] [&_p]:leading-relaxed">
+                {currentStep?.body}
+              </div>
+            </m.div>
+          </AnimatePresence>
+        </div>
 
         <div className="mt-6 flex items-center justify-between">
           <DriftButton variant="cancel" size="md" onClick={skip}>

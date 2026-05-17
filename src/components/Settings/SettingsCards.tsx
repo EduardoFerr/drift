@@ -25,6 +25,8 @@
  */
 
 import { useCallback, useEffect, useState } from 'react'
+// `m` é o primitive leve do framer-motion (LazyMotion). Features via main.tsx.
+import { m } from 'framer-motion'
 import { setPref, usePrefsStore } from '../../lib/prefs'
 import { dialog } from '../../lib/dialog'
 import { db } from '../../lib/db'
@@ -231,39 +233,50 @@ export function LocationCard({ onClose }: CardProps) {
 
 export function MapViewCard({ onClose }: CardProps) {
   const prefs = usePrefsStore()
+  // Segmented control com pill animada (motion.div layoutId) — pattern
+  // Lily recomendou em 2026-05-17 audit. Antes: text-color-only change
+  // não comunicava estado ativo. Agora: pill chartreuse desliza entre
+  // opções, mesmo padrão FeedTabs indicator.
+  const activeIndex = MAP_VIEW_OPTIONS.findIndex((o) => o.value === prefs.map_view)
   return (
     <FullPageCard onClose={onClose} title="mapa de spread" ariaLabel="enquadramento do mapa">
       <div className="space-y-3 px-4 py-5">
         <SectionHeader title="enquadramento" />
-        <div className="pl-3">
-          <p className="mb-2 font-mono text-[10px] text-drift-muted/30">
-            fechado foca na região com atividade. aberto mostra o globo.
-          </p>
-          <div
-            className="grid grid-cols-2 gap-2"
-            role="radiogroup"
-            aria-label="enquadramento"
-          >
-            {MAP_VIEW_OPTIONS.map((opt) => {
-              const active = prefs.map_view === opt.value
-              return (
-                <button
-                  key={opt.value}
-                  role="radio"
-                  aria-checked={active}
-                  onClick={() => void setPref('map_view', opt.value)}
-                  className={`rounded-xl border px-3 py-3 font-mono text-[12px] uppercase tracking-meta transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40 ${
-                    active
-                      ? 'border-drift-accent/50 bg-drift-accent/10 text-drift-accent'
-                      : 'border-drift-border/30 bg-drift-surface/30 text-drift-muted hover:border-drift-accent2/25 hover:text-drift-text'
-                  }`}
-                  title={opt.hint}
-                >
-                  {opt.label}
-                </button>
-              )
-            })}
-          </div>
+        <p className="px-1 font-mono text-[11px] leading-relaxed text-drift-muted/60">
+          fechado foca na região com atividade. aberto mostra o globo.
+        </p>
+        <div
+          className="relative inline-flex w-full rounded-2xl border border-drift-border/40 bg-drift-surface/50 p-1"
+          role="radiogroup"
+          aria-label="enquadramento"
+        >
+          {/* Pill animada — desliza entre opções */}
+          <m.span
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-y-1 left-1 rounded-xl bg-drift-accent2/20 border border-drift-accent2/40"
+            style={{ width: `calc(${100 / MAP_VIEW_OPTIONS.length}% - 4px)` }}
+            animate={{ x: `${activeIndex * 100}%` }}
+            transition={{ type: 'spring', stiffness: 380, damping: 28, mass: 0.6 }}
+          />
+          {MAP_VIEW_OPTIONS.map((opt) => {
+            const active = prefs.map_view === opt.value
+            return (
+              <button
+                key={opt.value}
+                role="radio"
+                aria-checked={active}
+                onClick={() => void setPref('map_view', opt.value)}
+                className={`relative z-10 flex-1 rounded-xl px-3 py-3 font-mono text-[12px] uppercase tracking-meta transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40 ${
+                  active
+                    ? 'text-drift-accent2'
+                    : 'text-drift-muted hover:text-drift-text'
+                }`}
+                title={opt.hint}
+              >
+                {opt.label}
+              </button>
+            )
+          })}
         </div>
       </div>
     </FullPageCard>
