@@ -26,6 +26,7 @@ import { useBootStore } from '../../lib/bootstrap'
 import { setPref, usePrefsStore } from '../../lib/prefs'
 import { pushLayer } from '../../lib/layer-stack'
 import { DriftButton } from '../UI/DriftButton'
+import { DriftAlert } from '../UI/DriftAlert'
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000
 
@@ -59,43 +60,38 @@ export function DiscoverNudgeBanner() {
     <AnimatePresence>
       {show && (
         <m.div
-          role="status"
-          aria-live="polite"
           initial={{ y: 80, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: 80, opacity: 0 }}
           transition={{ duration: 0.25, ease: 'easeOut' }}
-          className="fixed bottom-[88px] left-4 right-4 z-40 mx-auto max-w-md rounded-2xl border border-drift-border/40 border-l-[3px] border-l-drift-accent2 bg-drift-surface/95 px-4 py-3.5 shadow-drift-lg backdrop-blur"
+          className="fixed bottom-[88px] left-4 right-4 z-40 mx-auto max-w-md shadow-drift-lg"
         >
-          <div className="flex items-start gap-3">
-            <div className="flex-1 font-mono">
-              <p className="text-[12px] font-medium text-drift-text">
-                Descubra outros relays
-              </p>
-              <p className="mt-1 text-[11px] leading-relaxed text-drift-muted/50">
-                Drift conecta a múltiplos servidores. Você pode escolher relays
-                neutros, moderados, livres ou .onion — cada um com política
-                visível.
-              </p>
-            </div>
-          </div>
-          <div className="mt-3 flex gap-2">
-            <DriftButton
-              variant="primary"
-              size="lg"
-              onClick={() => void handleOpen()}
-              className="flex-1"
-            >
-              descobrir
-            </DriftButton>
-            <DriftButton
-              variant="cancel"
-              size="lg"
-              onClick={() => void handleDismiss()}
-            >
-              depois
-            </DriftButton>
-          </div>
+          <DriftAlert
+            variant="info"
+            title="Descubra outros relays"
+            actions={
+              <>
+                <DriftButton
+                  variant="primary"
+                  size="lg"
+                  onClick={() => void handleOpen()}
+                  className="flex-1"
+                >
+                  descobrir
+                </DriftButton>
+                <DriftButton
+                  variant="cancel"
+                  size="lg"
+                  onClick={() => void handleDismiss()}
+                >
+                  depois
+                </DriftButton>
+              </>
+            }
+          >
+            Drift conecta a múltiplos servidores. Você pode escolher relays
+            neutros, moderados, livres ou .onion — cada um com política visível.
+          </DriftAlert>
         </m.div>
       )}
     </AnimatePresence>

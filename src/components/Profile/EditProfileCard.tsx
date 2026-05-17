@@ -23,6 +23,7 @@
 
 import { useState } from 'react'
 import { FullPageCard } from '../UI/FullPageCard'
+import { DriftAlert } from '../UI/DriftAlert'
 import { DriftButton } from '../UI/DriftButton'
 import { dialog } from '../../lib/dialog'
 import {
@@ -259,18 +260,17 @@ function Field({
 
 function ManifestoNotice() {
   return (
-    <div className="rounded-xl border border-drift-warning/20 bg-drift-warning/5 px-4 py-3">
-      <div className="mb-1 font-display text-[12px] font-bold uppercase tracking-tag text-drift-warning">
-        antes de publicar
-      </div>
-      <p className="font-mono text-[10px] leading-relaxed text-drift-warning/60">
+    <DriftAlert variant="warning" title="antes de publicar">
+      <p>
         <strong className="text-drift-warning">§28 privacidade pelo mínimo:</strong>{' '}
-        anonimato é o default. tudo que voce preencher aqui vira público em todos os relays e visível em qualquer cliente nostr (damus, snort, iris).
+        anonimato é o default. tudo que voce preencher aqui vira público em
+        todos os relays e visível em qualquer cliente nostr (damus, snort, iris).
       </p>
-      <p className="mt-2 font-mono text-[10px] leading-relaxed text-drift-warning/60">
+      <p className="mt-2">
         <strong className="text-drift-warning">§5.3 modos de identidade:</strong>{' '}
-        "o cliente nunca obriga o usuário a se identificar. se o usuário publica seu nome real voluntariamente, é decisão dele e direito dele."
+        "o cliente nunca obriga o usuário a se identificar. se o usuário
+        publica seu nome real voluntariamente, é decisão dele e direito dele."
       </p>
-    </div>
+    </DriftAlert>
   )
 }

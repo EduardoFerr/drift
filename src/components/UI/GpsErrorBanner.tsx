@@ -46,6 +46,7 @@ export function GpsErrorBanner({ reason, onDismiss }: GpsErrorBannerProps) {
        * padrão "atenção, não bloqueio" continua válido (manifesto §28
        * privacy: post publicou sem location, não é falha catastrófica).
        */}
+      {/* design-system: ok reason=layout-horizontal-icon-leading-aguarda-DriftAlert-extension */}
       <div
         role="status"
         className="mb-4 flex items-center gap-3 rounded-xl border border-drift-warning/20 border-l-[3px] border-l-drift-warning bg-drift-warning/5 px-4 py-3"
