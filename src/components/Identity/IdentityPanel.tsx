@@ -21,6 +21,7 @@ import {
   isPasskeySupported,
 } from '../../lib/passkey'
 import type { DriftIdentity } from '../../types/drift'
+import { CopyIcon, CheckIcon, DownloadIcon } from '../UI/Icons'
 
 /**
  * Modal de identidade.
@@ -56,7 +57,7 @@ export function IdentityPanel({ identity, onClose }: Props) {
           </IdTabBtn>
         </div>
 
-        <div className="pl-3">
+        <div className="min-w-0">
           {tab === 'backup' && <BackupTab identity={identity} />}
           {tab === 'import' && <ImportTab onClose={onClose} />}
           {tab === 'passkey' && <PasskeyTab npub={identity.npub} />}
@@ -95,6 +96,7 @@ function BackupTab({ identity }: { identity: DriftIdentity }) {
   const [reveal, setReveal] = useState(false)
   const [qrUrl, setQrUrl] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [npubCopied, setNpubCopied] = useState(false)
   const [downloaded, setDownloaded] = useState(false)
   // Track C.3 — checkbox de confirmação. UX guia: user precisa
   // explicitamente declarar que guardou. Não bloqueia (não é gate),
@@ -126,6 +128,16 @@ function BackupTab({ identity }: { identity: DriftIdentity }) {
     }
   }
 
+  async function handleCopyNpub() {
+    try {
+      await navigator.clipboard.writeText(identity.npubBech32)
+      setNpubCopied(true)
+      setTimeout(() => setNpubCopied(false), 2000)
+    } catch (err) {
+      console.error('[copy npub]', err)
+    }
+  }
+
   // Track C.3 — download backup como JSON file. Browser file picker
   // via blob URL + a.download. Sem upload remoto, sem servidor —
   // arquivo gerado e salvo 100% client-side (manifesto §28).
@@ -152,10 +164,21 @@ function BackupTab({ identity }: { identity: DriftIdentity }) {
   return (
     <div className="space-y-3">
       <div>
-        <div className="mb-1.5 px-1 font-mono text-[10px] uppercase tracking-meta text-drift-muted/50">
-          npub público
+        <div className="mb-1.5 flex items-center justify-between px-1">
+          <span className="font-mono text-[10px] uppercase tracking-meta text-drift-muted/50">
+            npub público
+          </span>
+          <button
+            onClick={() => void handleCopyNpub()}
+            aria-label="copiar npub"
+            title={npubCopied ? 'copiado' : 'copiar npub'}
+            className="inline-flex h-11 min-w-[44px] items-center justify-center gap-1 rounded font-mono text-[10px] uppercase tracking-meta text-drift-muted transition-colors hover:text-drift-accent2 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
+          >
+            {npubCopied ? <CheckIcon size={14} /> : <CopyIcon size={14} />}
+            <span aria-live="polite">{npubCopied ? 'copiado' : 'copiar'}</span>
+          </button>
         </div>
-        <div className="break-all rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3 font-mono text-[12px] text-drift-text">
+        <div className="min-w-0 break-all rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3 font-mono text-[12px] text-drift-text">
           {identity.npubBech32}
         </div>
       </div>
@@ -175,7 +198,7 @@ function BackupTab({ identity }: { identity: DriftIdentity }) {
 
         {reveal ? (
           <div className="space-y-3">
-            <div className="break-all rounded-xl border border-drift-danger/20 bg-drift-danger/5 px-4 py-3 font-mono text-[12px] text-drift-danger">
+            <div className="min-w-0 break-all rounded-xl border border-drift-danger/20 bg-drift-danger/5 px-4 py-3 font-mono text-[12px] text-drift-danger">
               {identity.nsecBech32}
             </div>
 
@@ -200,16 +223,20 @@ function BackupTab({ identity }: { identity: DriftIdentity }) {
             <div className="flex gap-2">
               <button
                 onClick={handleCopy}
-                className="flex-1 rounded-xl border border-drift-border/30 bg-drift-surface/30 px-3 py-3 font-mono text-[12px] uppercase tracking-meta text-drift-muted transition-colors hover:border-drift-accent2/30 hover:text-drift-accent2 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
+                aria-label="copiar nsec"
+                className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-drift-border/30 bg-drift-surface/30 px-3 py-3 font-mono text-[12px] uppercase tracking-meta text-drift-muted transition-colors hover:border-drift-accent2/30 hover:text-drift-accent2 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
               >
-                {copied ? '✓ copiado' : '⎘ copiar nsec'}
+                {copied ? <CheckIcon size={14} /> : <CopyIcon size={14} />}
+                <span aria-live="polite">{copied ? 'copiado' : 'copiar nsec'}</span>
               </button>
               <button
                 onClick={handleDownload}
-                className="flex-1 rounded-xl border border-drift-accent2/25 bg-drift-surface/30 px-3 py-3 font-mono text-[12px] uppercase tracking-meta text-drift-accent2 transition-colors hover:bg-drift-accent2/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
+                aria-label="baixar arquivo de backup"
                 title="Baixa um arquivo .json com nsec + npub + metadados. Guarde em local seguro."
+                className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-drift-accent2/25 bg-drift-surface/30 px-3 py-3 font-mono text-[12px] uppercase tracking-meta text-drift-accent2 transition-colors hover:bg-drift-accent2/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
               >
-                {downloaded ? '✓ baixado' : '↓ baixar arquivo'}
+                {downloaded ? <CheckIcon size={14} /> : <DownloadIcon size={14} />}
+                <span aria-live="polite">{downloaded ? 'baixado' : 'baixar arquivo'}</span>
               </button>
             </div>
           </div>
