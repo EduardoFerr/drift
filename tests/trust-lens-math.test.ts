@@ -561,3 +561,54 @@ describe('Trust Lens — filter predicate DSL (Robin §27 loop)', () => {
     expect(evaluatePredicate(notRule, { pprScore: 0.5, tags: [] })).toBe(false)
   })
 })
+
+// ─── PR-4b smoke tests (orchestrator API) ─────────────────────────
+// trust-lens.ts has DB I/O which can't run in Vitest Node env without
+// SQLite WASM setup. Smoke test ONLY pure store + applyLensToPost.
+
+describe('Trust Lens orchestrator — pure store ops (PR-4b smoke)', () => {
+  it('useLensStore: setLensStrength clamps [0, 1] and updates enabled', async () => {
+    const { useLensStore, setLensStrength, __testing } = await import('../src/lib/trust-lens')
+    __testing.resetStore()
+    expect(useLensStore.getState().strength).toBe(0)
+    expect(useLensStore.getState().enabled).toBe(false)
+
+    setLensStrength(0.5)
+    expect(useLensStore.getState().strength).toBe(0.5)
+    expect(useLensStore.getState().enabled).toBe(true)
+
+    setLensStrength(0) // off
+    expect(useLensStore.getState().strength).toBe(0)
+    expect(useLensStore.getState().enabled).toBe(false)
+
+    // Clamps
+    setLensStrength(1.5)
+    expect(useLensStore.getState().strength).toBe(1)
+    setLensStrength(-0.5)
+    expect(useLensStore.getState().strength).toBe(0)
+
+    __testing.resetStore()
+  })
+
+  it('applyLensToPost: strength=0 returns globalScore bit-exact (#19 invariant)', async () => {
+    const { applyLensToPost, setLensStrength, __testing } = await import('../src/lib/trust-lens')
+    __testing.resetStore()
+    setLensStrength(0)
+    expect(
+      applyLensToPost({
+        globalScore: 42,
+        authorNpub: 'npub_anyone',
+        mutualSpreadPost: 99,
+      }),
+    ).toBe(42) // bit-exact, off-state
+    __testing.resetStore()
+  })
+
+  it('getPprForAuthor: cold-start retorna 0 (sem cache, sem throw)', async () => {
+    const { getPprForAuthor, __testing } = await import('../src/lib/trust-lens')
+    __testing.resetStore()
+    expect(getPprForAuthor('npub_unknown')).toBe(0)
+    expect(getPprForAuthor('')).toBe(0)
+    __testing.resetStore()
+  })
+})
