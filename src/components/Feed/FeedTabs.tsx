@@ -1,21 +1,23 @@
 /**
- * FeedTabs — seletor de aba do feed (Global / Seguindo / Trending).
+ * FeedTabs — seletor de aba do feed (Global / Seguindo / Em alta).
  *
- * V_pre0 extraiu de App.tsx; V3.2 (este reskin) adiciona indicator
- * slide elastic + paleta v0.7:
- * - Active: text-drift-text font-medium em font-mono uppercase tracking-widest
- * - Inativos: text-drift-muted hover→text-drift-text
- * - Indicator: m.span único hoisted no container row, position absolute,
- *   anima `x` (translate em %) via `animate` prop — feature `animation`
- *   já está em `domAnimation`. Antes usava `layoutId` (precisa `domMax`
- *   ~25 KB extra). Spring tem mesma sensação tactile.
+ * V_pre0 extraiu de App.tsx; V3.2 (reskin) adicionou indicator slide
+ * elastic + paleta v0.7. V_2026-05-17 (HIMYM consenso 4/4) remove o
+ * botão refresh manual do header — substituído por:
+ *   1. tap-on-active-tab → refresh + scroll-to-top + markFeedSeen
+ *      (pattern dominante 2026 — Twitter/Bluesky/Threads/Instagram)
+ *   2. invalidateFeed() automático debounced 150ms via onNostrEvent
+ *   3. dot indicator chartreuse nas tabs como sinal de "tem novo"
+ *
+ * Rationale arquitetural (Ted): refreshFeed() faz a MESMA query SQLite
+ * que invalidateFeed() já dispara — único delta real é markFeedSeen(),
+ * agora wired no tap-active-tab.
  */
 
-import { useState, type ReactNode } from 'react'
+import { type ReactNode } from 'react'
 // `m` é o primitive leve do framer-motion (LazyMotion). Features via main.tsx.
 import { m } from 'framer-motion'
 import { markFeedSeen, refreshFeed, setFeedTab, useFeedStore } from '../../lib/feed'
-import { RefreshIcon } from '../UI/Icons'
 
 type FeedTab = 'global' | 'following' | 'trending'
 
@@ -25,6 +27,9 @@ export interface FeedTabsProps {
    * ativa — gesto "voltar pro topo" (Twitter/Bluesky pattern).
    * App.tsx usa pra resetar `idxByTab[tab]` pra 0. Manifesto §24:
    * default é preservar posição por tab; este gesto é opt-in explícito.
+   *
+   * V_2026-05-17: tap-active-tab agora também faz refresh + markFeedSeen
+   * (substitui botão refresh manual removido).
    */
   onActiveTabTap?: () => void
 }
@@ -32,48 +37,26 @@ export interface FeedTabsProps {
 export function FeedTabs({ onActiveTabTap }: FeedTabsProps = {}) {
   const tab = useFeedStore((s) => s.tab)
   const unseenByTab = useFeedStore((s) => s.unseenByTab)
-  const [refreshing, setRefreshing] = useState(false)
-  const unseenCount = unseenByTab[tab]
-
-  // User feedback 2026-05-08: ter botão pra refresh manual além do
-  // automático via invalidateFeed (debounced 150ms quando relay
-  // entrega evento). Útil pra confirmar visualmente que feed atualiza.
-  // Refresh manual também limpa contador "+N novos" da tab atual via
-  // markFeedSeen — auto-invalidate NÃO limpa (preserva acúmulo idle).
-  async function handleRefresh() {
-    if (refreshing) return
-    setRefreshing(true)
-    try {
-      await refreshFeed()
-      markFeedSeen()
-    } finally {
-      // Pequeno delay pra animação ser perceptível mesmo em refresh fast
-      setTimeout(() => setRefreshing(false), 400)
-    }
-  }
 
   /**
-   * Click handler pra cada tab. Se já é ativa, dispara `onActiveTabTap`
-   * (volta pro topo via App.tsx). Senão, troca pra essa tab.
+   * Click handler pra cada tab. Se já é ativa, dispara o combo
+   * "refresh + clear unseen + scroll-to-top". Senão, troca pra essa tab
+   * (setFeedTab já faz refresh internamente).
    */
   function handleTabClick(targetTab: FeedTab) {
     if (targetTab === tab) {
+      void refreshFeed()
+      markFeedSeen()
       onActiveTabTap?.()
     } else {
       void setFeedTab(targetTab)
     }
   }
 
-  // V9.3c — flex-1 + text-center (mockup .tab pattern). Cada tab ocupa
-  // 1/3 da largura da row, texto centralizado. Antes: gap-1 + px-2
-  // (inline width baseado no texto, alinhamento à esquerda).
-  // User feedback 2026-05-08: "para cada aba" — indicador de unseen
-  // visível em CADA tab (não só na ativa via botão ↻). Permite user
-  // saber que Following/Trending tem novo sem switchar pra confirmar.
   const tabs: { id: FeedTab; label: string }[] = [
     { id: 'global', label: 'global' },
     { id: 'following', label: 'seguindo' },
-    { id: 'trending', label: 'trending' },
+    { id: 'trending', label: 'em alta' },
   ]
   const activeIndex = Math.max(
     0,
@@ -91,7 +74,7 @@ export function FeedTabs({ onActiveTabTap }: FeedTabsProps = {}) {
             onClick={() => handleTabClick(t.id)}
             title={
               tab === t.id
-                ? 'voltar ao topo'
+                ? 'tocar de novo: atualizar + voltar ao topo'
                 : unseenByTab[t.id] > 0
                 ? `${unseenByTab[t.id]} ${unseenByTab[t.id] === 1 ? 'novo' : 'novos'}`
                 : undefined
@@ -102,9 +85,7 @@ export function FeedTabs({ onActiveTabTap }: FeedTabsProps = {}) {
         ))}
         {/* Indicator único hoisted no container — anima `x` em % via
             `animate` prop (feature `animation` está em `domAnimation`).
-            Largura = 1/3 do container das tabs (flex-1 × 3). Antes
-            usava layoutId compartilhado que requer feature `layout`
-            (só em `domMax`, +25 KB). Spring values são equivalentes. */}
+            Largura = 1/3 do container das tabs (flex-1 × 3). */}
         <m.span
           aria-hidden="true"
           className="pointer-events-none absolute -bottom-px left-0 h-[2px] w-1/3 bg-drift-accent2"
@@ -117,35 +98,6 @@ export function FeedTabs({ onActiveTabTap }: FeedTabsProps = {}) {
           }}
         />
       </div>
-      <button
-        onClick={() => void handleRefresh()}
-        disabled={refreshing}
-        title={
-          unseenCount > 0
-            ? `${unseenCount} ${unseenCount === 1 ? 'post novo' : 'posts novos'} — atualizar`
-            : 'atualizar feed'
-        }
-        aria-label="atualizar feed"
-        className="relative flex shrink-0 items-center justify-center px-3 text-drift-muted transition-colors hover:text-drift-text disabled:opacity-40 focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2 focus-visible:ring-offset-1 focus-visible:ring-offset-drift-bg"
-      >
-        <span
-          aria-hidden="true"
-          className={`inline-flex ${refreshing ? 'animate-spin' : ''} ${
-            unseenCount > 0 ? 'text-drift-accent2' : ''
-          }`}
-          style={{ transformOrigin: 'center' }}
-        >
-          <RefreshIcon size={16} />
-        </span>
-        {unseenCount > 0 && (
-          <span
-            aria-hidden="true"
-            className="absolute -right-0.5 -top-0.5 min-w-[16px] rounded-full bg-drift-accent2 px-1 text-center text-[12px] font-bold leading-[16px] text-drift-bg"
-          >
-            {unseenCount > 99 ? '99+' : unseenCount}
-          </span>
-        )}
-      </button>
     </div>
   )
 }
