@@ -84,13 +84,13 @@ influence(source → target) = sigmoid(
 )
 ```
 
-**Personalized PageRank Monte Carlo** (Ted v2 deliberation 2026-05-17 — `Docs/sessions/trust-lens-L-parameter-ted-2026-05-17.md`):
+**Personalized PageRank Monte Carlo** (Ted v2 + Stage 3 HIMYM 2026-05-17 corrigido — `Docs/sessions/trust-lens-math-stage3-himym-2026-05-17.md`):
 ```
 parameters (HARD-CODED em src/lib/trust/constants.ts — não user_prefs):
   K = 1000 walks
-  L = 6           // ⌊1/α⌋ par; captura ~62% da massa natural; ~75ms compute
-  α = 0.15        // damping; expected walk length = 1/α = 6.67
-  seed = hash(source_npub || floor(now / 24h))  // determinism cross-device §7
+  L = 6           // cap edges traversed; massa retida = 1 − 0.85^7 = 0.679
+  α = 0.15        // damping; E[K_realized] = (1−α)/α = 5.67
+  seed = hash(source_npub || floor(now / 24h))  // §7 determinism
 
 algorithm:
   for k in 1..K:
@@ -101,7 +101,15 @@ algorithm:
       walk.append(next)
     for node in walk[1:]:              // exclui source
       visits[node] += 1
-  ppr_score(target) = visits[target] / total_visits
+  totalVisits = sum(visits)
+  if (totalVisits === 0) return empty  // cold-start guard (ISSUE-6)
+  ppr_score(target) = visits[target] / totalVisits
+
+variance bounds:
+  ε_marginal ≤ √(ln(40)/2K) = 0.043   // Hoeffding 95% conf per-target
+  ε_uniform ≤ √(log(n_efetivo)/K)      // Bahmani 2010 simultâneo
+    n_efetivo Nostr realista ~50 → ε ≤ 0.077
+    n_teorico 50k cap → ε ≤ 0.104
 ```
 
 **Path diversity bonus** (Barney/Alvisi/Viswanath — central, não polish):
@@ -109,13 +117,17 @@ algorithm:
 disjoint_paths(source → target, depth ≤ 3) = count distinct intermediate npubs
 diversity_bonus = min(disjoint_paths, 3) / 3   // [0, 1]
 final_score = ppr_score × (0.7 + 0.3 × diversity_bonus)
+
+cache: BFS depth-3 cached entre recomputes; invalidação on follow change
+       OR após 24h. Reduz custo amortizado vs full recompute.
 ```
 
 **Local rendering score** (view-boundary apenas, NUNCA persisted):
 ```
-β = 0.8 × lens_strength
-γ = 0.4 × lens_strength²              // não-linear pra Forte não explodir (Lily)
-s_local = s_global × clip(α₀ + β·ppr_score(author) + γ·mutual_spread_post, 0.1, 3.0)
+ppr_normalized = log(1 + 100·ppr_score) / log(101)   // [0,1] log-transform
+β = 1.5 × lens_strength               // BETA_MAX subido de 0.8 (BUG-5 fix)
+γ = 0.4 × lens_strength               // linear (BUG-6 fix Norman heurística)
+s_local = s_global × clip(1.0 + β·ppr_normalized(author) + γ·mutual_spread_post, 0.1, 3.0)
 ```
 
 Cap intermediary contribution: `M = 0.3` máx por single path (Barney P1.1 mitigation).
@@ -188,12 +200,22 @@ src/lib/trust-lens.ts integrates with:
 | **P0.4 Edge weight gaming** | Mutual restrito a vizinhança-de-1; cap mutual em 20 antes do log | `edges.ts` |
 | **P0.5 Inspector path leak** | Path nunca persisted; sem logging de npubs; aria-label genérico; conformance test grep `console.log` sem npub | `Inspector.tsx` + LOCK_VIA_TEST |
 
-### 1.6.5 Princípio capability-based (Ted survey 2026-05-17)
+### 1.6.5 Princípio capability-based + §24 carve-out (Ted survey + Stage 3 HIMYM 2026-05-17)
 
 `Docs/sessions/zero-trust-survey-ted-2026-05-17.md` reforça que Trust Lens segue
 modelo **capability-based** estilo Tahoe-LAFS: o `npub` ativo é a capability
 que define o ponto-de-vista do walk. Nenhuma view escapa dessa restrição —
 PPR não tem "view privilegiada" do operador; só viewer + grafo.
+
+**Carve-out explícito de §24 (registrado Stage 3)**:
+Manifesto §24 ("sem afinidade no feed canônico") tem carve-out implícito desde
+v2.2 — "bloqueios/silenciamentos são camada de visualização local, não de
+ranking". Trust Lens segue mesmo carve-out: `s_local` é calculado no
+view-boundary do render, NUNCA persisted em `posts.score`, NUNCA shared via
+event. Robin Stage 2 levantou tensão filosófica (PPR personalização **é**
+afinidade local) — resolução: o §24 protege canônico (compartilhado entre
+clientes Drift), não view local. CLAUDE.md invariante #11 atualizado com nota
+explícita.
 
 **Bandeiras vermelhas confirmadas** (Phase 2/3 não cruzar):
 - **NÃO compartilhar PPR scores entre users** (vira EigenTrust, gaming, catedral — viola §22)
@@ -220,7 +242,7 @@ PPR não tem "view privilegiada" do operador; só viewer + grafo.
 ### 1.8 Cost
 
 - Bundle: ~8 KB gz (incluindo predicate DSL + path diversity)
-- Compute: ~100ms recompute debounced (L=8 vs L=4 era 50ms) em mid-range phone
+- Compute: ~125ms recompute debounced em mid-range phone (PPR L=6 ~75ms + path diversity BFS depth-3 ~50ms, Stage 3 atualização do 100ms anterior). Path diversity cache amortiza custo entre recomputes.
 - Render: ~0.2ms/post (table lookup + multiplier)
 - Storage: ~80 KB / 500 follows com FoF-d1 caps
 

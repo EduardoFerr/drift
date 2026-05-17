@@ -197,6 +197,14 @@ Ranking é função pura de score. **Não personalizar feed por usuário.**
 Bloqueios/silenciamentos são camada de visualização local, não de
 ranking. Manifesto §24.
 
+**Adendo Trust Lens (2026-05-17, Stage 3 HIMYM):** quando `lens_strength > 0`,
+o cliente aplica multiplier local `s_local = s_global × f(PPR(autor), ...)`
+no view-boundary do render. **Crítico**: `s_local` NUNCA é persisted em
+`posts.score`, NUNCA é shared via Nostr event, NUNCA escapa do device.
+§24 protege o canônico (compartilhado entre clientes Drift); Trust Lens
+é layer de visualização local explícito (mesma família que mute/block).
+LOCK_VIA_TEST `tests/trust-lens-conformance.test.ts` #2 + #9.
+
 ### 12. Sem chave mestra, jamais
 
 Não escrever função `deletePost()`, `banUser()`, `flagAsSpam()`
