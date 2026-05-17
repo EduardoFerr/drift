@@ -188,7 +188,24 @@ src/lib/trust-lens.ts integrates with:
 | **P0.4 Edge weight gaming** | Mutual restrito a vizinhança-de-1; cap mutual em 20 antes do log | `edges.ts` |
 | **P0.5 Inspector path leak** | Path nunca persisted; sem logging de npubs; aria-label genérico; conformance test grep `console.log` sem npub | `Inspector.tsx` + LOCK_VIA_TEST |
 
-### 1.7 Conformance tests (Marshall — 7 + 1)
+### 1.6.5 Princípio capability-based (Ted survey 2026-05-17)
+
+`Docs/sessions/zero-trust-survey-ted-2026-05-17.md` reforça que Trust Lens segue
+modelo **capability-based** estilo Tahoe-LAFS: o `npub` ativo é a capability
+que define o ponto-de-vista do walk. Nenhuma view escapa dessa restrição —
+PPR não tem "view privilegiada" do operador; só viewer + grafo.
+
+**Bandeiras vermelhas confirmadas** (Phase 2/3 não cruzar):
+- **NÃO compartilhar PPR scores entre users** (vira EigenTrust, gaming, catedral — viola §22)
+- **NÃO usar PPR pra moderation destrutiva** (`score = -999` é prerrogativa §26 reports, não Trust Lens)
+- **NÃO importar "trust default list" de servidor central** no cold start (viola §17)
+
+**Phase 3 candidatos** (não Phase 2):
+- "View as @other_npub" — debug switch + valor pedagógico
+- TOFU-style change alarm (grafo muda 40% em 24h → possível account compromise?)
+- Sharing trust hints offline via BLE/sneakernet — careful, flerta com catedral
+
+### 1.7 Conformance tests (Marshall 8 + Ted 9th)
 
 1. **`posts.score` write-side fechado**: grep `UPDATE posts SET score` fora de `scoring.ts:scheduleScoreRecalc` + `moderation.ts:maybeModerate`
 2. **`s_local` nunca persisted**: grep `s_local` fora de `trust-lens/*` e `feed.ts`
@@ -198,6 +215,7 @@ src/lib/trust-lens.ts integrates with:
 6. **`lens_edges` nunca em raw_event nem em kind published**: grep em `protocol.ts` + `nostr.ts`
 7. **Vocabulary lock**: JSX strings não usam "Trust"/"score numérico" — só "Sua Lente"/"influência"
 8. **Subscribe filter independence** (Barney P0.2): grep `sync.ts` não importa `lens_edges` nem `ppr_score`
+9. **PPR locality** (Ted survey): novo `tests/trust-lens-locality.test.ts` falha se função PPR escapa do client — import em `sync.ts`/`protocol.ts`/`nostr.ts`, publish em event tag, etc. LOCK_VIA_TEST §17/§22/§25
 
 ### 1.8 Cost
 
@@ -289,14 +307,16 @@ Mitigações:
 
 **Naming**: tab simplemente **"Rede"** (não "Network", não "Grafo de Confiança"). Curto, em português.
 
-**Mental model**:
-- Verde = "gente que sua rede valida pra você"
-- Cinza = "gente fora do alcance da sua rede"
-- **Evitar** copy "saudável/não saudável" — judgmental. Reframe: "**próxima**" vs "**distante**".
+**Mental model — agência positiva (user feedback 2026-05-17)**:
+- Verde = "pessoas próximas da sua rede" (alta PPR via mutuais/follows/spreads)
+- Cinza = "pessoas distantes da sua rede" (baixa PPR, fora do alcance)
+- **Framing como curadoria, não julgamento**: user pode encontrar nós cinzas que NÃO quer manter na sua lente e remover via long-press → cria `filter_rule`. É **agência sobre a própria lente**, não estigma.
+- Gameficação leve sem ser explícita: ver o grafo torna PPR tangível em vez de "algoritmo invisível"; user é incentivado a curar sua rede limpando nós irrelevantes.
+- **Evitar copy "saudável/não saudável"** — Lily flagou como judgmental. Mas a INTENÇÃO é agência (poder limpar), não estigma (rotular outros). Resolver via verbo: **"limpar da minha lente"** em vez de "marcar como ruim".
 
 Copy do header:
 > Sua Rede
-> Os pontos mais verdes são pessoas que sua lente prioriza. Os mais cinzas têm pouca conexão com você.
+> Os pontos mais verdes são pessoas mais próximas da sua rede. Os mais cinzas estão mais distantes — toque pra ver, segure pra remover da sua lente.
 
 **Empty state**: se PPR cache vazio (lens nunca rodou), botão "Calcular Sua Rede" + spinner durante recompute.
 
@@ -350,7 +370,7 @@ Phase 1 e 1.5 podem ser commits intercalados num único PR ou PRs separados — 
 
 ## 5. Open questions / handoffs pós-plano
 
-- **Ted refinement**: confirmar L=8 (ou L=6 baseado em mixing time de Mohaisen) — Robin honest sobre falta de data Nostr real; instrumentar graph-cobertura metric no Phase 1.
+- **Ted refinement L= tensão**: User pediu L=8 (distance-decay contínuo, "não é só vizinhos"). Ted survey zero-trust recomenda L=2 como "conservative Phase 1" pra evitar SybilGuard-style attacks via long paths. Robin honest sobre falta de data Nostr real. **Decisão**: ship L=4 como meio-termo (cobre FoF naturalmente via damping α=0.15; user pode ajustar pra L=6/8 depois de telemetria) OU ship L=8 conforme user pediu, com instrumentação extra de ring-attack detection. Marcar como aberto.
 - **Marshall predicate DSL**: refinar operators conforme casos de uso reais aparecerem (Phase 2 pode precisar `time_decay`, `relay_subset`).
 - **Lily**: copy final pra empty states e Rede view ("@alice deu drift" testar com 3-5 users PT-BR, sugerido Robin).
 - **Barney followup**: Alvisi 2013 SoK + Mohaisen 2010 mixing time worth deep read antes de Phase 1 freeze.
