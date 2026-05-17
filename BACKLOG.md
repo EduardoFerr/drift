@@ -4,8 +4,13 @@ Registro durável de decisões abertas que precisam de input do user.
 Não é todo-list de implementação — é rastro de **rumos** que ficaram
 abertos entre tarefas.
 
-Formato: `- [ ] <decisão> — contexto: <origem> — bloqueio: <quem/quê>`
-Quando user fecha, marcar `[x]` com data + 1 linha de resolução.
+Formato:
+- Item aberto: `- [ ] <decisão> — contexto: <origem> — bloqueio: <quem/quê>`
+- Item fechado: `- [x] <decisão> — fechado YYYY-MM-DD em <commit-hash> — <1 linha resolução>`
+
+**Regra 2026-05-17**: cada fechamento DEVE ter commit hash anexo, mesmo
+que seja `(no-commit, decisão registrada apenas)`. Permite reconstruir
+o "porquê" via `git show <hash>`.
 
 Última atualização: 2026-05-17
 
@@ -86,15 +91,36 @@ Quando user fecha, marcar `[x]` com data + 1 linha de resolução.
   Bloqueio: aguardando decisão de scope (refactor grande vs grandfather
   existente + aplicar só em novos components).
 
+## UX / Design — adicionados 2026-05-17 (sessão noite II)
+
+- [ ] **ComposeOverlay textarea — baixo contraste em alguns temas** —
+  campo "escreva o que vai derivar…" fica ilegível em pelo menos um dos
+  temas (cinder/rosenholz/velatura). Placeholder + text color provavelmente
+  têm alpha demais sobre bg-drift-surface. Precisa medir contrast ratio
+  por tema (similar Marshall WCAG audit fechado em [6e4f1ce]).
+  Contexto: screenshot user 2026-05-17 sessão noite II.
+  Bloqueio: precisa identificar tema afetado + ratio atual. HIMYM Marshall
+  pode auditar.
+
+- [ ] **ComposeOverlay — "Publicar" → "Prévia do post"** — UX flow:
+    1. Botão atual "Publicar ↑" no rodapé do compose vira "Prévia do post"
+    2. Tap → mostra preview full-screen do post + subposts renderizado
+       como se estivesse postado (mesmo PostViewer real, mas read-only)
+    3. Na tela de preview aparece botão "Publicar" final
+    4. "Prévia" existente do card (botão pequeno no rodapé do card único)
+       fica preservada — é prévia de UM card; "Prévia do post" é do
+       post completo com subposts navegáveis
+  Contexto: user feedback 2026-05-17 — diferenciar "prévia do card"
+  (1 subpost) de "prévia do post" (post completo com swipes).
+  Bloqueio: precisa decidir se PostViewer aceita modo "preview" novo
+  ou se cria PostPreview component separado. HIMYM pode deliberar.
+
 ## UX / Design — adicionados 2026-05-17 (sessão tarde)
 
-- [ ] **Refresh icon location no header** — o ícone de atualizar próximo ao
-  badge "DERIVA X.XXX" / "trending" parece deslocado. HIMYM deve deliberar:
-  ainda é necessário neste local? Qual UI/UX já tem o mesmo efeito
-  (pull-to-refresh? auto-refresh?)? Ou um gestual basta (reduzir fricção
-  cognitiva)?
-  Contexto: screenshot 2026-05-17 sessão PR-5.
-  Bloqueio: HIMYM deliberação pendente.
+- [x] **Refresh icon location no header** — fechado 2026-05-17 em [253fe48]
+  — HIMYM consenso 4/4: removido. Substituído por tap-on-active-tab
+  (Twitter/Bluesky pattern) + auto-refresh invalidateFeed já existente.
+  Conformance test `tests/feed-tabs-gesture-conformance.test.ts` trava.
 
 - [ ] **Dialogs com design antigo** — alguns dialogs (confirmações, prompts)
   não seguiram o novo design system (FullPageCard + section-header +
@@ -136,25 +162,27 @@ Quando user fecha, marcar `[x]` com data + 1 linha de resolução.
 
 (Origem: user feedback em screenshot do drift-wheat-one.vercel.app.)
 
-- [ ] **IdentityPanel — nsec input overflow** — campo "NSEC PRIVADO" estoura
-  largura da tela em mobile. Sem botão de copy visível.
-  Contexto: screenshot 2026-05-17 sessão PR-5.
-  Bloqueio: HIMYM deliberando (Ted/Marshall/Barney/Lily/Robin).
+- [x] **IdentityPanel — nsec input overflow + copy button** — fechado
+  2026-05-17 em [5bf7daa] (overflow + copy npub) + [a8d3d51] (Barney §8
+  guards: auto-clear clipboard 30s, auto-hide reveal 60s, warning
+  Win+V/iCloud, QR/download promovidos). 8 conformance tests em
+  `tests/identity-nsec-guards-conformance.test.ts`.
 
-- [ ] **IdentityPanel — design legado** — UI desse card destoa do resto do
-  app (header velho, padding diferente). Migrar pra FullPageCard pattern?
-  Contexto: mesma screenshot.
-  Bloqueio: HIMYM deliberando.
+- [x] **IdentityPanel — design legado** — fechado 2026-05-17 em [5bf7daa]
+  (Ted veredict: refactor in-place, já usa FullPageCard, só conteúdo
+  desalinhado — pl-3→min-w-0 corrige causa raiz) + [680a7c6] (SectionHeader
+  extract atomic-lite, 6 call-sites DRY).
 
-- [ ] **Baixo contraste em backgrounds com blur** — cards com bg/85
-  + backdrop-blur ficam bonitos mas comprometem leitura.
-  Contexto: feedback user 2026-05-17.
-  Bloqueio: HIMYM deliberando (precisa medir contrast ratios WCAG AA/AAA).
+- [x] **Baixo contraste em backgrounds com blur** — fechado 2026-05-17
+  em [6e4f1ce] — 3 hits AA críticos corrigidos (SpreadMap atribuição+badge,
+  ThreadHeader sticky). Marshall regra de 2 camadas + conformance test
+  `tests/wcag-contrast-conformance.test.ts`. Hits MÉDIA em GlassIconButton
+  + PostViewer botão flutuante ainda pendentes (depend de backdrop dinâmico).
 
-- [ ] **Vocabulário PT-BR — auditoria geral** — user citou "textos devem
-  estar em português". Verificar se há strings EN sobraram no app.
-  Contexto: feedback geral.
-  Bloqueio: precisa varredura sistemática (grep + revisão).
+- [x] **Vocabulário PT-BR — auditoria geral** — fechado 2026-05-17 em
+  [9a99076] — 6 strings P0/P1 migradas (Settings→Ajustes, trending→em alta,
+  granularidade country/city/precise→país/cidade/GPS). Robin audit registrou
+  glossário canônico EN-intocado (DRIFT/SPREAD/BURY/nsec/npub/NIP).
 
 ---
 
