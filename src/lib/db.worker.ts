@@ -239,6 +239,11 @@ const DOMAIN_TABLES = [
   // NIP-65 dos contacts repõe). identities/blocked/muted NÃO entram
   // aqui — são estado local do user (identidade não é descartável).
   'relays_user',
+  // Trust Lens Phase 1 (schema_v=11): cache do PPR é derivável de
+  // follows + spreads observados. lens_filter_rules NÃO entra aqui —
+  // é user-state (escolha explícita do user, igual blocked/muted/identities).
+  'lens_edges',
+  'lens_walks_cache',
 ] as const
 
 function rebuildDomainSchema(schema: string) {
@@ -524,13 +529,20 @@ function applyMigrations(schema: string) {
     // por `prefs.ts:applyRow` (chave ausente → DEFAULT_USER_PREFS).
     // Marker semântico só pra facilitar telemetria de migração futura.
 
+    // schema_v=11 (Trust Lens Phase 1 scaffolding 2026-05-17):
+    // Cria lens_edges, lens_walks_cache, lens_filter_rules. Schema.sql
+    // tem CREATE TABLE IF NOT EXISTS no apply loop acima — aqui só
+    // bumpa marker. Plano: Docs/plans/trust-lens-phase1-plan.md.
+    // lens_edges e lens_walks_cache são DOMAIN (deriváveis); lens_filter_rules
+    // é user-state (preserva no rebuild).
+
     db.exec({
-      sql: `INSERT INTO user_prefs (key, value) VALUES ('schema_v', '10')
+      sql: `INSERT INTO user_prefs (key, value) VALUES ('schema_v', '11')
             ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
     })
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    log(`migração schema_v=10 FALHOU (continuando): ${msg}`)
+    log(`migração schema_v=11 FALHOU (continuando): ${msg}`)
   }
 
   // Auto-recuperação: se alguma migração falhou, rebuild do schema de

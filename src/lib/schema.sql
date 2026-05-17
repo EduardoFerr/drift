@@ -311,3 +311,70 @@ CREATE TABLE IF NOT EXISTS users_metadata (
   fetched_at       INTEGER NOT NULL      -- quando o cliente cacheou
 );
 CREATE INDEX IF NOT EXISTS idx_users_metadata_nip05 ON users_metadata(nip05);
+
+-- ── Trust Lens (Phase 1 — manifesto §24 view-layer carve-out) ─────
+-- "Sua Lente" / "Lente Pessoal" — PPR (Personalized PageRank) local
+-- pessoal sobre grafo Nostr. Reordena feed só pra leitor; score canônico
+-- de `posts.score` permanece intocado (LOCK_VIA_TEST §22).
+--
+-- Naming Lily 2026-05-17: `lens_*` (não `trust_*`) pra evitar colisão
+-- com "Peso de Perfil" em ProfileModal. Coluna `influence` (não `weight`)
+-- pela mesma razão.
+--
+-- Manifesto check:
+--   §17 sem chave mestra — lens é local, sem poder pra terceiros
+--   §22 sem reputação subjetiva no protocolo — canônico intocado
+--   §24 sem afinidade no feed canônico — carve-out explícito local view
+--   §25 sem chave mestra disfarçada — sem oracle único, toggle 1-click
+--   §27 auto-classificação — predicate DSL fecha loop classifier-tag
+--   §28-30 compat ecossistema — zero novos kinds Nostr
+--
+-- Plano completo: Docs/plans/trust-lens-phase1-plan.md
+-- HIMYM deliberation: Docs/sessions/trust-lens-{ted-rfc,himym-reviews,
+--   L-parameter-ted,multilist-barney,multilist-lily}-2026-05-17.md
+
+-- Edges do grafo de lente. source_npub SEMPRE = active identity
+-- (multi-id invariante #15 — mantemos na PK pra coexistir entre identities).
+-- components JSON versionado pra forward-compat Phase 2/3.
+CREATE TABLE IF NOT EXISTS lens_edges (
+  source_npub TEXT NOT NULL,
+  target_npub TEXT NOT NULL,
+  influence   REAL NOT NULL CHECK (influence >= 0.0 AND influence <= 1.0),
+  components  TEXT NOT NULL,         -- JSON {v:1, follow, mutual_spread, my_spread, my_bury, fof_paths}
+  updated_at  INTEGER NOT NULL,      -- ms epoch
+  PRIMARY KEY (source_npub, target_npub)
+);
+CREATE INDEX IF NOT EXISTS idx_lens_edges_source_influence
+  ON lens_edges(source_npub, influence DESC);
+CREATE INDEX IF NOT EXISTS idx_lens_edges_target
+  ON lens_edges(target_npub);
+
+-- PPR Monte Carlo cache. Cap 5000 rows/source via LRU eviction
+-- (trust-lens/edges.ts:writeWalks aplica cap; conformance test valida).
+-- Recompute trigger: follow change, 50 SPREAD/BURYs, 24h TTL.
+CREATE TABLE IF NOT EXISTS lens_walks_cache (
+  source_npub TEXT NOT NULL,
+  target_npub TEXT NOT NULL,
+  ppr_score   REAL NOT NULL CHECK (ppr_score >= 0.0 AND ppr_score <= 1.0),
+  computed_at INTEGER NOT NULL,      -- ms epoch
+  PRIMARY KEY (source_npub, target_npub)
+);
+CREATE INDEX IF NOT EXISTS idx_lens_walks_source_computed
+  ON lens_walks_cache(source_npub, computed_at);
+
+-- Filter rules predicate DSL (Robin §27 loop fix — combina tags
+-- content-warning + trust threshold). User-state, NÃO domain.
+-- Predicate JSON shape (discriminated union por kind):
+--   { v:1, kind:'trust_threshold', op:'lt'|'gte', value:0..1, action }
+--   { v:1, kind:'tag_present', tag, tag_value?, action }
+--   { v:1, kind:'and'|'or', predicates:[...], action }
+--   { v:1, kind:'not', predicate, action }
+-- Reader rejeita v != 1 gracefully (retorna null, não throw).
+CREATE TABLE IF NOT EXISTS lens_filter_rules (
+  rule_id    TEXT PRIMARY KEY,        -- UUIDv4 gerado por trust-lens.ts
+  predicate  TEXT NOT NULL,           -- JSON FilterPredicate
+  active     INTEGER NOT NULL DEFAULT 1,
+  created_at INTEGER NOT NULL         -- ms epoch
+);
+CREATE INDEX IF NOT EXISTS idx_lens_filter_rules_active
+  ON lens_filter_rules(active);

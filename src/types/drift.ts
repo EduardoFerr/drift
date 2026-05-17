@@ -447,3 +447,112 @@ export const DEFAULT_USER_PREFS: UserPrefs = {
   theme_id: 'cinder',
   discover_nudge_dismissed: false,
 }
+
+// ─── Trust Lens (Phase 1 — manifesto §24 view-layer carve-out) ────
+//
+// Naming Lily 2026-05-17: `Lens*` (não `Trust*`) pra evitar colisão
+// com "Peso de Perfil" em ProfileModal. Vocabulário Drift mantém
+// "Sua Lente" (PT-BR user-facing), "lens" (código/spec).
+//
+// Plano completo: Docs/plans/trust-lens-phase1-plan.md
+// HIMYM deliberation: Docs/sessions/trust-lens-*-2026-05-17.md
+
+/**
+ * Components do edge weight — schema versionado pra forward-compat.
+ * v=1 fixo em Phase 1. Phase 2/3 adiciona labeler components em v=2.
+ * Reader em `lib/trust/predicate.ts` faz schema check; v desconhecido
+ * → trata como edge vazio (degradação graciosa).
+ */
+export interface LensEdgeComponentsV1 {
+  v: 1
+  /** 1 se source segue target (NIP-02), 0 caso contrário. */
+  follow: 0 | 1
+  /** Contagem de mutuais entre source e target em vizinhança-de-1
+   *  (intersection com follows do source; Barney P0.4). */
+  mutual_spread: number
+  /** Quantos posts do target foram SPREADed por source. */
+  my_spread: number
+  /** Quantos posts do target foram BURYed/muted por source. */
+  my_bury: number
+  /** Contagem de paths disjuntos source→target (depth ≤3). */
+  fof_paths: number
+}
+
+export type LensEdgeComponents = LensEdgeComponentsV1
+// Phase 2: | LensEdgeComponentsV2 quando labeler influence entra
+
+/** Edge no grafo de confiança local. Source = active identity. */
+export interface LensEdge {
+  source_npub: string
+  target_npub: string
+  /** [0, 1]. Output do sigmoid de `EDGE_WEIGHT` coefficients. */
+  influence: number
+  components: LensEdgeComponents
+  /** ms epoch (consistent com Date.now()). */
+  updated_at: number
+}
+
+/** PPR Monte Carlo cache entry — pre-computed per recompute window. */
+export interface LensWalkCacheEntry {
+  source_npub: string
+  target_npub: string
+  /** [0, 1]. Stationary distribution mass attributed a target. */
+  ppr_score: number
+  /** ms epoch. TTL + LRU eviction key. */
+  computed_at: number
+}
+
+/** Ação aplicada quando um predicate matches. */
+export type FilterAction = 'hide' | 'dim' | 'collapse' | 'blur'
+
+/**
+ * Predicate DSL pra filter rules — Robin §27 loop fix.
+ * Combina trust score local + tags content-warning + composição
+ * via `and`/`or`/`not`. Discriminated union por `kind`; reader
+ * rejeita `v !== 1` gracefully (return null, não throw).
+ */
+export type LensFilterPredicate =
+  | {
+      v: 1
+      kind: 'trust_threshold'
+      op: 'lt' | 'gte'
+      /** [0, 1]. Compara contra `ppr_score(author)`. */
+      value: number
+      action: FilterAction
+    }
+  | {
+      v: 1
+      kind: 'tag_present'
+      /** Tag Nostr name (e.g. 'content-warning'). */
+      tag: string
+      /** Opcional — match exato em tag value. Ausente = tag presente. */
+      tag_value?: string
+      action: FilterAction
+    }
+  | {
+      v: 1
+      kind: 'and'
+      predicates: LensFilterPredicate[]
+      action: FilterAction
+    }
+  | {
+      v: 1
+      kind: 'or'
+      predicates: LensFilterPredicate[]
+      action: FilterAction
+    }
+  | {
+      v: 1
+      kind: 'not'
+      predicate: LensFilterPredicate
+      action: FilterAction
+    }
+
+/** Filter rule persistida em `lens_filter_rules`. User-state. */
+export interface LensFilterRule {
+  /** UUIDv4 gerado em `lib/trust-lens.ts:createRule`. */
+  rule_id: string
+  predicate: LensFilterPredicate
+  active: boolean
+  created_at: number
+}
