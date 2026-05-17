@@ -22,18 +22,6 @@ mover pra "Resolvido" no fim do doc.
 
 ## Fase 6.1a (em andamento — `transport/webrtc.ts` + signaling mock)
 
-### R2 — RTCPeerConnection mockability em ambiente de teste
-**Pergunta**: existe lib mantida em 2025-2026 que mock
-`RTCPeerConnection` + `RTCDataChannel` pra Vitest, ou todo teste de
-`webrtcTransport` real precisa ser e2e manual?
-**Por quê bloqueia**: plano atual aceita "tests unit cobrem só
-matchFilter + signaling mock". Se aparecer mock decente, ganhamos
-coverage automatizada do pipeline §5 (kind→verify→entrega).
-**Workaround interim**: e2e manual em 2 abas (já documentado em
-`webrtc-6.1a-plan.md §9`). Aceitável pra 6.1a.
-**Fonte ideal**: npm `wrtc`, `@koush/wrtc` (forks pós-deprecation),
-`werift` (TypeScript WebRTC). Verificar manutenção 2026.
-
 ---
 
 ## Fase 6.1b (próxima — signaling real via Nostr DM NIP-44)
@@ -96,33 +84,9 @@ puro".
 **Fonte ideal**: Cloudflare Calls pricing; `coturn` GitHub;
 `numb.viagenie.ca` (já morreu? confirmar).
 
-### R9 — WebRTC + mDNS IP leak mitigations 2026
-**Pergunta**: o quanto os browsers de 2026 ainda obfuscam ICE
-candidates locais com mDNS (`xxx.local`) por default? Safari/Firefox
-mantêm o comportamento? Existe novo vetor de leak via
-`navigator.connection`?
-**Por quê bloqueia**: privacidade IP é compromisso de §28. Modo
-`always-on` declara "vaza IP" — precisamos validar exatamente o que
-vaza pra ser honesto na UI.
-**Workaround interim**: assumir worst-case (IP público sempre vaza
-sem TURN); UI conservadora.
-**Fonte ideal**: `webrtc-security.github.io`, `caniuse.com mdns ice`,
-draft IETF `mmusic-mdns-ice-candidates`, Mozilla bug tracker.
-
 ---
 
 ## Fase 6 (Tauri shell — após 6.3)
-
-### R10 — Tauri Mobile (Android/iOS) status estável 2026
-**Pergunta**: Tauri 2.x Mobile saiu de beta? Build pra Android via
-Tauri vs TWA via Bubblewrap — qual decidir como caminho oficial?
-**Por quê bloqueia**: Fase 6 prevê "cliente nativo Tauri". Se Tauri
-Mobile é estável, pula F-Droid TWA → F-Droid Tauri. Se ainda beta,
-TWA continua sendo o caminho Android.
-**Workaround interim**: Tauri pro **desktop** (comprovado v2.x), TWA
-pro Android. Reavaliar quando Tauri Mobile bater 1.0 GA.
-**Fonte ideal**: `tauri.app/blog`, `github.com/tauri-apps/tauri`
-releases, Reddit r/tauri.
 
 ### R11 — `arti` (Tor em Rust) bindings JS/Tauri 2026
 **Pergunta**: `arti` (Tor em Rust pelo TPO) tem binding pra Tauri /
@@ -295,6 +259,23 @@ versions tab; `sqlite.org/wasm`.
   9081 (interno) + kind 1984 (NIP-56 cross-client); `src/lib/events.ts`
   ingere kind 1984 de outros clientes. Ponte semântica entre Drift e
   ecossistema Nostr fechada.
+- **R2** (RTCPeerConnection mockability 2025-2026) — ✅ resolvido como
+  "decisão aceita" 2026-05-17 (Robin audit pós-cleanup). Fase 6.4 shipped
+  `src/lib/transport/webrtc/` com 4 discovery mechanisms + bundle
+  (commits `73c1687`). Sem mock lib externa adotada — e2e manual em 2
+  abas continua workaround padrão. Reabrir se aparecer lib madura em
+  2026-2027.
+- **R9** (WebRTC + mDNS IP leak mitigations 2026) — ✅ resolvido como
+  "monitor passivo" 2026-05-17 (Robin audit). `tests/webrtc-tor-mode-isolation.test.ts`
+  ativo + `audit(security)` `a0e1bc4` cobrem threat model atual. Modo
+  `always-on` documenta "vaza IP sem TURN" honesto. Reabrir se literatura
+  nova mostrar vetor novo concreto.
+- **R10** (Tauri Mobile estável 2026) — ✅ resolvido como "decisão
+  arquitetural fechada" 2026-05-17 (Robin audit). Decisão de fato: Fase
+  6.4 shipped **Tauri desktop** + Fase 7.1 antecipou **TWA Bubblewrap**
+  (`v0.5.4` estável) pra Android. Tauri Mobile fica como follow-up
+  oportunista — só migrar se TWA degradar. Reabrir quando Tauri Mobile
+  bater 1.0 GA + tooling F-Droid maduro.
 
 ---
 
@@ -414,6 +395,50 @@ pagerank monte carlo", "sybil resistance random walk", "trust graph
 gaming"); papers Viswanath et al. SybilLimit/SybilGuard;
 `github.com/PaperWithCode/awesome-trust`.
 
+### R37 — DriftAlert primitive variants 2026 (Sonner / Radix Toast / custom)
+**Pergunta**: stack 2026 pra toast transient (não-persistent) — Sonner
+(~6 KB gz), Radix Toast (~12 KB gz), react-hot-toast, ou custom Zustand
+(~1 KB)? Drift hoje shipped `DriftAlert.tsx` (commit `7cf4ec0`) pra
+banners persistentes (info/warning/danger). Próximo step natural é
+toast transient (operação completada, erro recuperável, network status).
+**Por quê informa**: bundle ratchet ≤250 KB exige escolha consciente.
+Mesma família de decisão que R34 (i18n) e R36 (icons). Custom dá
+controle total mas requer manutenção.
+**Workaround interim**: usar DriftAlert atual com setTimeout dismiss
+quando toast for necessário. Aceita pra 1-2 uses. Se virar pattern
+recorrente, fetch decisivo.
+**Fonte ideal**: `sonner.emilkowal.ski`, `radix-ui.com/primitives/docs/components/toast`,
+`react-hot-toast.com`, `bundlephobia.com` pra deltas.
+
+### R38 — Compose preview / draft persistence patterns 2026
+**Pergunta**: como apps social tier-1 (Twitter, Bluesky, Mastodon)
+implementam: (a) preview pré-publish; (b) draft persistence (RAM vs
+local encrypted vs server)? Drift compose hoje é fire-and-forget.
+Manifesto §4 (device descartável) + §28 (privacidade mínima) — draft
+deve viver em OPFS encrypted ou só RAM?
+**Por quê informa**: BACKLOG item "Publicar → Prévia do post" + risco
+de UX perdida se app crash mid-compose. Decisão arquitetural antes
+de implementar.
+**Workaround interim**: ship "Prévia do post" sem persistence (RAM-only).
+Adiciona draft layer depois se user pedir.
+**Fonte ideal**: blog Bluesky engineering, Mastodon source (clients
+Tusky/Ivory/Elk), Twitter compose teardown.
+
+### R39 — Onboarding patterns p/ features novel (Trust Lens / Sua Lente)
+**Pergunta**: Drift PR-5 (`c89774b`) shipped SuaLenteCard UI mas
+onboarding (primeiro encontro do user com o conceito de Lente) é
+hardcoded em prose. Conceito é novel — sem prior art exato. Como
+Mastodon onboard "advanced settings"? Como Bluesky onboard
+"algorithmic feeds" (feeds são CONCEITO novo do Bluesky AT proto)?
+**Por quê informa**: user feedback "SuaLenteCard interface confusa".
+Polish UX precisa research em onboarding de features opt-in advanced
+antes de redesign aleatório.
+**Workaround interim**: rodar HIMYM Lily quick polish (labels +
+helper text + CTA "ver feed agora") em sessão dedicada.
+**Fonte ideal**: Bluesky design notes, Mastodon UX research,
+"onboarding for power features" pattern libraries (UX Collective,
+Nielsen Norman).
+
 ### R36 — SVG icon libraries 2026 — Lucide vs Heroicons vs Phosphor vs Tabler
 **Pergunta**: comparativo 2026 das libs de icon SVG React. Drift hoje
 tem icons custom em `src/components/UI/Icons.tsx` (Feather-style MIT
@@ -435,7 +460,7 @@ Bundle impact via `bundlephobia.com`.
 ---
 
 *Documento mantido (atribuição original: papel de research/curadoria).
-Última atualização: 2026-05-17 (Robin audit cleanup).*
-*Itens originais: 25 → 36 (11 novos R26-R36). Resolvidos: 12 (R1, R3, R4,
-R5, R7, R11, R12, R16, R23, R24, R25, R29, R33) + 2 STALE arquivados
-(R20, R22). Ativos: ~22 ainda em aberto.*
+Última atualização: 2026-05-17 (Robin re-audit pós-cleanup).*
+*Itens originais: 25 → 39 (14 novos R26-R39). Resolvidos: 15 (R1, R2,
+R3, R4, R5, R7, R9, R10, R11, R12, R16, R23, R24, R25, R29, R33) + 2
+STALE arquivados (R20, R22). Ativos: ~19 ainda em aberto.*
