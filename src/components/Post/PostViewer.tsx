@@ -23,7 +23,50 @@
 import { lazy, useEffect, useRef, useState } from 'react'
 import { LazyBoundary } from '../UI/LazyBoundary'
 import { DriftSkeleton } from '../UI/DriftSkeleton'
-import { MapIcon, PinIcon, PinOffIcon, WarningIcon } from '../UI/Icons'
+import {
+  MapIcon,
+  PinIcon,
+  PinOffIcon,
+  WarningIcon,
+  BanIcon,
+  MicOffIcon,
+  PlusIcon,
+  CheckIcon,
+  XIcon,
+} from '../UI/Icons'
+
+/**
+ * Renderer compartilhado: converte emoji strings (vindas de actions-fan
+ * e ModerationModal item arrays) em SVG icons. actions-fan permanece
+ * pure (string), tests não quebram, e UI fica consistente.
+ *
+ * Emojis não mapeados (📤 share, 🖼 image) renderizam como fallback —
+ * actions-fan ainda funciona com Unicode.
+ */
+function FanIcon({ icon, size = 18 }: { icon: string; size?: number }) {
+  switch (icon) {
+    case '📌':
+      return <PinIcon size={size} />
+    case '📍':
+      return <PinOffIcon size={size} />
+    case '🗺':
+    case '🗺️':
+      return <MapIcon size={size} />
+    case '⊘':
+      return <BanIcon size={size} />
+    case '🔇':
+      return <MicOffIcon size={size} />
+    case '➕':
+      return <PlusIcon size={size} />
+    case '✓':
+      return <CheckIcon size={size} />
+    case '⚠':
+      return <WarningIcon size={size} />
+    default:
+      // Fallback pra emojis não mapeados (📤 share-post, 🖼 share-image)
+      return <span aria-hidden="true">{icon}</span>
+  }
+}
 // `m` é o primitive leve do framer-motion (LazyMotion). Features via main.tsx.
 import { m, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { MOTION } from '../../lib/motion'
@@ -506,7 +549,7 @@ export function PostViewer({
                 }
                 aria-label={isFollowing ? 'Deixar de seguir' : 'Seguir'}
               >
-                {isFollowing ? '✓' : '➕'}
+                {isFollowing ? <CheckIcon size={16} /> : <PlusIcon size={16} />}
               </button>
               <button
                 onClick={handleMute}
@@ -514,7 +557,7 @@ export function PostViewer({
                 title="silenciar autor — só esconde posts dele do meu feed (manifesto §24)"
                 aria-label="Silenciar"
               >
-                🔇
+                <MicOffIcon size={16} />
               </button>
               <button
                 onClick={handleBlock}
@@ -522,7 +565,7 @@ export function PostViewer({
                 title="bloquear autor — esconde posts e interações dele (manifesto §24)"
                 aria-label="Bloquear"
               >
-                ⊘
+                <BanIcon size={16} />
               </button>
               <button
                 onClick={() => setShowReport(true)}
@@ -539,7 +582,7 @@ export function PostViewer({
             className="inline-flex h-11 min-w-[44px] items-center justify-center rounded border border-drift-border px-2 hover:border-drift-accent hover:text-drift-accent"
             aria-label="Fechar"
           >
-            ✕
+            <XIcon size={16} />
           </button>
         </div>
       </div>
@@ -953,7 +996,7 @@ function ModerationModal({
               style={{ touchAction: 'manipulation' }}
             >
               <span aria-hidden="true" className="text-[16px] leading-none">
-                {item.icon}
+                <FanIcon icon={item.icon} size={16} />
               </span>
               <span className="flex flex-1 flex-col gap-[2px]">
                 <span className="font-mono text-[12px] uppercase tracking-[2px]">
@@ -1123,7 +1166,9 @@ function ActionsFan({
               aria-label={item.label}
               title={item.label}
             >
-              <span aria-hidden="true">{item.icon}</span>
+              <span aria-hidden="true">
+                <FanIcon icon={item.icon} size={20} />
+              </span>
             </GlassIconButton>
           </m.div>
         ))}

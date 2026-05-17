@@ -264,3 +264,64 @@ export function PaletteIcon({ size = 18, className = '' }: IconProps) {
     </svg>
   )
 }
+
+/** ⊘ Ban / block author. Círculo + diagonal cortando. */
+export function BanIcon({ size = 18, className = '' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" className={className} {...base}>
+      <circle cx="12" cy="12" r="10" />
+      <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+    </svg>
+  )
+}
+
+/** 🔇 Mute / silenciar autor. Speaker com slash. */
+export function MicOffIcon({ size = 18, className = '' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" className={className} {...base}>
+      {/* Speaker shape */}
+      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+      {/* Slash diagonal */}
+      <line x1="22" y1="2" x2="2" y2="22" />
+    </svg>
+  )
+}
+
+/** ➕ Plus / follow / criar. */
+export function PlusIcon({ size = 18, className = '' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" className={className} {...base}>
+      <line x1="12" y1="5" x2="12" y2="19" />
+      <line x1="5" y1="12" x2="19" y2="12" />
+    </svg>
+  )
+}
+
+/** ✓ Check / done / following. */
+export function CheckIcon({ size = 18, className = '' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" className={className} {...base}>
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+  )
+}
+
+/** ✕ X / close / cancel. */
+export function XIcon({ size = 18, className = '' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" className={className} {...base}>
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  )
+}
+
+/** ⎘ Copy / copiar. */
+export function CopyIcon({ size = 18, className = '' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" className={className} {...base}>
+      <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </svg>
+  )
+}
