@@ -353,8 +353,18 @@ function AboutSectionHeader({
  * versão mais recente".
  */
 function UpdateVersionButton() {
+  // BUG FIX 2026-05-17 (user report): botão "atualizar" frequentemente
+  // "não fazia nada" visualmente — user precisava F5 manual sem feedback.
+  // Causa: confiávamos que `updateServiceWorker(true)` faz reload sozinho,
+  // mas em vários cenários (SW state estranho, Chromium buffer, PWA
+  // installed mode) o reload falha silenciosamente. Agora:
+  //   1. Feedback visual em CADA fase (checking/applying/reloading/latest)
+  //   2. Reload explícito como fallback se SW não disparar em 1.5s
+  //   3. Status persistido até reload (busy=true bloqueia segunda ação)
   const [busy, setBusy] = useState(false)
-  const [status, setStatus] = useState<'idle' | 'checking' | 'latest'>('idle')
+  const [status, setStatus] = useState<
+    'idle' | 'checking' | 'applying' | 'reloading' | 'latest'
+  >('idle')
   const {
     needRefresh: [needRefresh],
     updateServiceWorker,
@@ -367,43 +377,63 @@ function UpdateVersionButton() {
   async function handleClick() {
     if (busy) return
     setBusy(true)
-    setStatus('checking')
     try {
       if (needRefresh) {
         // SW novo já está waiting → aplicar imediatamente
-        await updateServiceWorker(true)
-        // Reload acontece dentro de updateServiceWorker; este código não executa
-      } else {
-        // Força check no servidor; se houver SW novo, registra como waiting
-        // e o hook atualiza needRefresh assincronamente. Damos 2s pra resposta.
-        const reg = await navigator.serviceWorker?.getRegistration()
-        if (reg) await reg.update()
-        // Pequena espera pro hook detectar mudança
-        await new Promise((r) => setTimeout(r, 2000))
-        // Se needRefresh continua false, está na última versão
-        setStatus('latest')
-        setTimeout(() => setStatus('idle'), 3000)
+        setStatus('applying')
+        // Fire-and-forget — não espera (pode pendurar se SW não responder)
+        void updateServiceWorker(true)
+        // Curto delay pra SW processar SKIP_WAITING + activate
+        await new Promise((r) => setTimeout(r, 800))
+        // Fallback explícito: força reload mesmo se updateServiceWorker
+        // não tiver disparado (Chromium PWA installed mode bug recorrente).
+        // Status visível antes do reload em si.
+        setStatus('reloading')
+        await new Promise((r) => setTimeout(r, 200))
+        window.location.reload()
+        // Código abaixo não executa (reload em curso)
+        return
       }
+      // Força check no servidor
+      setStatus('checking')
+      const reg = await navigator.serviceWorker?.getRegistration()
+      if (reg) await reg.update()
+      // Espera 2s pro hook detectar mudança (registra waiting SW)
+      await new Promise((r) => setTimeout(r, 2000))
+      // Se needRefresh continua false após update(), está na última versão
+      setStatus('latest')
+      setTimeout(() => setStatus('idle'), 3000)
     } finally {
       setBusy(false)
     }
   }
 
-  const label = busy
-    ? 'aplicando…'
-    : needRefresh
-    ? '↻ aplicar nova versão'
-    : status === 'latest'
-    ? '✓ versão mais recente'
-    : '↻ verificar atualizações'
+  const label =
+    status === 'applying'
+      ? 'aplicando…'
+      : status === 'reloading'
+      ? '⟳ recarregando…'
+      : status === 'checking'
+      ? 'verificando…'
+      : busy
+      ? 'aplicando…'
+      : needRefresh
+      ? '↻ aplicar nova versão'
+      : status === 'latest'
+      ? '✓ versão mais recente'
+      : '↻ verificar atualizações'
 
   return (
     <button
       onClick={() => void handleClick()}
       disabled={busy}
+      // aria-live anuncia mudanças de status pra screen readers
+      aria-live="polite"
       className={`w-full rounded-xl px-4 py-3 font-mono text-[12px] uppercase tracking-meta font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40 ${
-        needRefresh
+        needRefresh || status === 'reloading'
           ? 'bg-drift-accent2 text-drift-bg hover:bg-drift-accent2/85'
+          : status === 'checking' || status === 'applying'
+          ? 'bg-drift-accent2/30 text-drift-text'
           : 'border border-drift-border/30 bg-drift-surface/30 text-drift-muted/70 hover:text-drift-text'
       }`}
     >
