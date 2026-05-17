@@ -214,38 +214,25 @@ o "porquê" via `git show <hash>`.
 ## UX / Design — adicionados 2026-05-17 (sessão noite IV)
 
 - [ ] **Banners "ANTES DE PUBLICAR" / avisos longos inline — tooltip ou
-  dialog?** — EditProfileCard tem banner inline com texto longo (§28
-  privacidade pelo mínimo, §5.3 modos de identidade — "o cliente nunca
-  obriga o usuário a se identificar..."). Padrão atual: banner amber
-  no topo do form sempre visível, ocupa ~25% da viewport.
-  Decisão UX: vale converter pra ícone (i) com tooltip on-hover/tap?
-  Ou dialog informativo opt-in (botão "saiba mais")? Trade-offs:
-    - **Banner inline**: privacidade visível ao max (§28 alignment); MAS
-      polui form, user fast-path lê toda vez.
-    - **Tooltip (i)**: form limpo, info disponível on-demand; MAS user
-      pode pular sem ver — falha em "consentimento informado".
-    - **Dialog one-time first-edit**: aparece 1x na primeira edição,
-      depois (i) tooltip; balanço entre os dois acima.
-  Bloqueio: HIMYM Lily/Barney deliberar — §28 privacy-visible vs UX clean.
-  Aplicar pattern escolhido em EditProfileCard + outros forms com banner
-  similar (ComposeOverlay tem warning de content-warning? IdentityPanel
-  passkey warnings? audit).
+  dialog?** — banner ainda inline em EditProfileCard (~25% viewport).
+  Em [7cf4ec0] foi MIGRADO pra DriftAlert primitive (DRY com nudge
+  banners), mas a decisão de **CONVERTER pra tooltip/dialog** segue
+  pendente. HIMYM Lily/Barney deliberar §28 privacy-visible vs UX clean.
 
-- [ ] **Views ainda sem design novo (audit umbrella expansion)** — após
-  fechar InstallModal em [b2c5f6b], user identificou mais views legacy.
-  Screenshot 2026-05-17 sessão noite IV mostra EditProfileCard com:
-    - Header "editar perfil" + "FECHAR" ad-hoc (não usa ModalHeader
-      primitive — Marshall regra de DRY)
-    - Labels de campo inline (não usa SectionHeader extraído em [680a7c6])
-    - Botão "✓ PUBLICAR" rodapé não usa DriftButton primitive
-    - Banner amber inline sem usar primitive de alerta/warning
-  Audit sistemático Lily/Marshall: varrer `grep -lE "role=\"dialog\""`
-  + `grep -lE "<FullPageCard"` cross-reference; listar gaps de cada
-  view legacy + estimar custo de migração.
-  Contexto: User pediu explicitamente "ainda existem visões sem o
-  design novo" — refina o item umbrella "Audit sistemático de dialogs
-  antigos" da sessão noite III.
-  Bloqueio: audit sistemático ainda pendente (esperando dispatch).
+- [x] **Views ainda sem design novo (audit umbrella expansion)** —
+  audit fechado 2026-05-17 (HIMYM Lily + Marshall). Resultados:
+    - EditProfileCard JÁ era compliant (FullPageCard + DriftButton);
+      gap real era apenas banner inline — fechado em [7cf4ec0] via
+      DriftAlert primitive.
+    - 5 views legacy identificadas: ComposeOverlay sub-overlay,
+      OnboardingOverlay shell, ReplySheet bottom-sheet, PostViewer
+      ModalWrapper, ThreadView overlay. Conformance tests it.todo
+      criados em [7cf4ec0] pra liberar ENFORCE por PR de migração.
+    - GpsErrorBanner whitelist (icon-leading layout — TODO: estender
+      DriftAlert com prop leadingIcon).
+  Próximos PRs (Lily ROI ordering): ReplySheet → SlideUpOverlay
+  (~1h, alta freq), OnboardingOverlay → SlideUpOverlay (~45min,
+  first impression).
 
 ## UX / Design — adicionados 2026-05-17 (sessão noite III)
 
