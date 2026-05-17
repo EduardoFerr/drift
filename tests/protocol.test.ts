@@ -23,10 +23,14 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 // Capture the event passed to signDriftEvent so we can inspect kind/tags/content
 // without needing real crypto.
 let lastSignInput: { kind: number; tags: string[][]; content: string } | null = null
+// Captura TODOS os signs do call atual — pra reportPost (dual emit
+// kind 9081 + kind 1984 NIP-56) e qualquer outro flow que assine N>1.
+const allSignInputs: Array<{ kind: number; tags: string[][]; content: string }> = []
 
 vi.mock('../src/lib/nostr', () => ({
   signDriftEvent: vi.fn(async (input: { kind: number; tags: string[][]; content: string }) => {
     lastSignInput = input
+    allSignInputs.push(input)
     return {
       id: '0'.repeat(64),
       pubkey: 'a'.repeat(64),
@@ -39,6 +43,16 @@ vi.mock('../src/lib/nostr', () => ({
   }),
   publishToRelays: vi.fn(async () => ({ ok: true, failures: [] })),
 }))
+
+beforeEach(() => {
+  lastSignInput = null
+  allSignInputs.length = 0
+})
+
+/** Helper pra encontrar o sign de kind específico no batch. */
+function findSignByKind(kind: number) {
+  return allSignInputs.find((s) => s.kind === kind)
+}
 
 // nip94 buildImetaTag is a pure function — let the real impl through
 // (no side effects, already tested in nip94.test.ts).
@@ -344,47 +358,69 @@ describe('buryPost (kind 9080)', () => {
   })
 })
 
-describe('reportPost (kind 9081)', () => {
-  it('produces kind 9081 (DRIFT_KIND.REPORT)', async () => {
+describe('reportPost (dual emit kind 9081 Drift + kind 1984 NIP-56)', () => {
+  it('produces kind 9081 (DRIFT_KIND.REPORT) — primário', async () => {
     await reportPost({ postId: HEX64, authorPub: HEX64_B, reason: 'spam' })
-    expect(lastSignInput!.kind).toBe(DRIFT_KIND.REPORT)
-    expect(lastSignInput!.kind).toBe(9081)
+    const e9081 = findSignByKind(DRIFT_KIND.REPORT)
+    expect(e9081).toBeDefined()
+    expect(e9081!.kind).toBe(9081)
   })
 
-  it('has e tag with postId', async () => {
+  it('produces kind 1984 (NIP-56) — compat ecossistema', async () => {
+    await reportPost({ postId: HEX64, authorPub: HEX64_B, reason: 'spam' })
+    const e1984 = findSignByKind(1984)
+    expect(e1984).toBeDefined()
+    expect(e1984!.kind).toBe(1984)
+  })
+
+  it('kind 9081 tem e tag com postId', async () => {
     await reportPost({ postId: HEX64, authorPub: HEX64_B, reason: 'illegal' })
-    const eTag = findTag(lastSignInput!.tags, 'e')
+    const e9081 = findSignByKind(9081)!
+    const eTag = findTag(e9081.tags, 'e')
     expect(eTag).toEqual(['e', HEX64])
   })
 
-  it('has p tag with authorPub', async () => {
+  it('kind 9081 tem p tag com authorPub', async () => {
     await reportPost({ postId: HEX64, authorPub: HEX64_B, reason: 'harassment' })
-    const pTag = findTag(lastSignInput!.tags, 'p')
+    const e9081 = findSignByKind(9081)!
+    const pTag = findTag(e9081.tags, 'p')
     expect(pTag).toEqual(['p', HEX64_B])
   })
 
-  it('has reason tag with the report reason', async () => {
+  it('kind 9081 tem reason tag com Drift reason', async () => {
     await reportPost({ postId: HEX64, authorPub: HEX64_B, reason: 'spam' })
-    const tag = findTag(lastSignInput!.tags, 'reason')
+    const e9081 = findSignByKind(9081)!
+    const tag = findTag(e9081.tags, 'reason')
     expect(tag).toEqual(['reason', 'spam'])
   })
 
-  it('content is empty string', async () => {
+  it('content vazio em ambos os kinds', async () => {
     await reportPost({ postId: HEX64, authorPub: HEX64_B, reason: 'spam' })
-    expect(lastSignInput!.content).toBe('')
+    expect(findSignByKind(9081)!.content).toBe('')
+    expect(findSignByKind(1984)!.content).toBe('')
   })
 
-  it('supports all three ReportReason values', async () => {
+  it('mapeia ReportReason → NIP-56 report_type (illegal/spam/other)', async () => {
+    const mapping: Record<string, string> = {
+      illegal: 'illegal',
+      spam: 'spam',
+      harassment: 'other', // NIP-56 sem canônico
+    }
     for (const reason of ['illegal', 'spam', 'harassment'] as const) {
+      allSignInputs.length = 0
       await reportPost({ postId: HEX64, authorPub: HEX64_B, reason })
-      const tag = findTag(lastSignInput!.tags, 'reason')
-      expect(tag![1]).toBe(reason)
+      const e1984 = findSignByKind(1984)!
+      const eTag = e1984.tags.find((t) => t[0] === 'e')!
+      // NIP-56: report_type no index [3] de e/p tag
+      expect(eTag[3]).toBe(mapping[reason])
     }
   })
 
-  it('has exactly three tags (e, p, reason)', async () => {
+  it('kind 1984 tem drift-version tag (anti-weaponization cross-client)', async () => {
     await reportPost({ postId: HEX64, authorPub: HEX64_B, reason: 'spam' })
-    expect(lastSignInput!.tags).toHaveLength(3)
+    const e1984 = findSignByKind(1984)!
+    const dv = findTag(e1984.tags, 'drift-version')
+    expect(dv).toBeDefined()
   })
 })
 

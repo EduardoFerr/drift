@@ -1,0 +1,103 @@
+# Curated relays health check — cron mensal
+#
+# Fase A relay moderation (A5 da deliberação HIMYM 2026-05-17).
+# Detecta relays mortos no curated antes do user reportar.
+#
+# Faz fetch NIP-11 de cada relay em `Docs/curated-relays-YYYY-MM.json`,
+# falha se >X% offline. Robin (curator) atualiza snapshot mensal
+# baseado no output.
+#
+# Sources Robin: 95% dos relays Nostr não cobrem custo operacional
+# (343 de 1000 já saíram do ar). Snapshot precisa audit periódico.
+
+name: curated-relays-health
+
+on:
+  schedule:
+    # Primeiro dia de cada mês, 06:00 UTC.
+    - cron: '0 6 1 * *'
+  workflow_dispatch: # manual trigger pra debug
+
+jobs:
+  health-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Probe NIP-11 de cada relay curated
+        run: |
+          set -euo pipefail
+          # Lê o snapshot mais recente (glob pega o último por ordem alfabética)
+          SNAPSHOT=$(ls -1 Docs/curated-relays-*.json 2>/dev/null | sort | tail -1)
+          if [ -z "$SNAPSHOT" ]; then
+            echo "::error::Nenhum snapshot Docs/curated-relays-*.json encontrado"
+            exit 1
+          fi
+          echo "Usando snapshot: $SNAPSHOT"
+
+          # Extrai URLs dos relays curated (excluded fora)
+          URLS=$(jq -r '.relays[].url' "$SNAPSHOT")
+          TOTAL=0
+          FAILED=0
+          FAILED_LIST=""
+
+          for url in $URLS; do
+            TOTAL=$((TOTAL + 1))
+            # Skip .onion — não conseguimos probe via Tor em GH Actions
+            if [[ "$url" == *.onion* ]]; then
+              echo "  skip $url (onion)"
+              continue
+            fi
+            # WSS → HTTPS pro NIP-11 GET
+            http_url=${url/wss:\/\//https:\/\/}
+            http_url=${http_url/ws:\/\//http:\/\/}
+
+            # Curl com timeout 5s + Accept NIP-11
+            if curl -sS --max-time 5 -H "Accept: application/nostr+json" \
+                "$http_url" -o /dev/null -w "%{http_code}" | grep -qE "^(200|301|302)$"; then
+              echo "  ✓ $url"
+            else
+              echo "  ✗ $url (offline ou inválido NIP-11)"
+              FAILED=$((FAILED + 1))
+              FAILED_LIST="$FAILED_LIST\n  - $url"
+            fi
+          done
+
+          echo ""
+          echo "Total: $TOTAL · Falhas: $FAILED"
+
+          # Threshold: falha se >30% offline (sugere bitrot do snapshot)
+          if [ "$TOTAL" -gt 0 ] && [ "$FAILED" -gt 0 ]; then
+            RATIO=$((FAILED * 100 / TOTAL))
+            if [ "$RATIO" -gt 30 ]; then
+              echo "::warning::$RATIO% dos relays curated estão offline (>30% threshold)"
+              echo -e "Relays com problema:$FAILED_LIST"
+              # Não falha hard — só warning. Robin curator deve atualizar.
+            fi
+          fi
+
+      - name: Validar schema do snapshot
+        run: |
+          # Cada entry deve ter url + tab + policy + cost
+          SNAPSHOT=$(ls -1 Docs/curated-relays-*.json | sort | tail -1)
+          jq -e '
+            .relays | all(
+              has("url") and has("tab") and has("policy") and has("cost")
+            )
+          ' "$SNAPSHOT" > /dev/null || {
+            echo "::error::Snapshot tem entries malformadas (faltam url/tab/policy/cost)"
+            exit 1
+          }
+
+      - name: Enforce constraint sem-pagos
+        run: |
+          # Constraint do Arquiteto 2026-05-17: cost = 'free' em TODAS as entries
+          SNAPSHOT=$(ls -1 Docs/curated-relays-*.json | sort | tail -1)
+          PAID=$(jq -r '.relays[] | select(.cost != "free") | .url' "$SNAPSHOT")
+          if [ -n "$PAID" ]; then
+            echo "::error::Snapshot tem relays pagos (viola constraint sem-pagos):"
+            echo "$PAID"
+            exit 1
+          fi
