@@ -100,6 +100,117 @@ o "porquê" via `git show <hash>`.
   Bloqueio: aguardando decisão de scope (refactor grande vs grandfather
   existente + aplicar só em novos components).
 
+## BUGS — prioridade alta (correção sem polish)
+
+- [ ] **BUG-LONGPRESS-FAN: long-press em ícone do ActionsFan ativa
+  moderação 5s** — gesture conflict: PostViewer.tsx tem long-press 5s
+  na card area pra abrir ModerationModal; quando user segura ícone do
+  fan (block/mute/follow/etc), o ícone NÃO faz preventPointerDown ou
+  similar, então o gesture do parent dispara junto. Resultado: user
+  pretende ver tooltip/feedback do fan, mas barra de moderação inicia.
+  Contexto: user feedback 2026-05-17 sessão noite V.
+  Fix proposto: `data-no-longpress="true"` nos botões do ActionsFan
+  (pattern já usado no ⋮ trigger em PostViewer.tsx:670) OU stopPropagation
+  no onPointerDown dos botões do fan. Verificar primeiro qual é o
+  vector exato.
+  Bloqueio: nenhum — bugfix direto. ~15min.
+
+## UX / Design — adicionados 2026-05-17 (sessão noite V)
+
+### ActionsFan (vertical icon menu sobre post)
+
+- [ ] **ActionsFan icons — alguns ainda emoji, não SVG** — Sprint 2/3
+  SVG migration cobriu PostViewer header + IdentityPanel + IdentitySwitcher,
+  mas ActionsFan (visível em embedded mode) ainda tem ícones Unicode
+  em alguns slots. Audit: cross-ref `src/lib/actions-fan.ts` `buildFanItems`
+  com SVG icons disponíveis em `UI/Icons.tsx`. Substituir restantes
+  (provavelmente compartilhar/share-image/silenciar).
+  Bloqueio: nenhum — quick win ~20min.
+
+- [ ] **ActionsFan visibilidade sobre foto/background dinâmico** — icons
+  do fan ficam invisíveis quando post tem foto clara por trás (screenshot
+  user 2026-05-17). Causas combinadas:
+    1. bg do botão é `glass` (transparente) sem opacidade suficiente
+    2. icon stroke fino (1.5px Feather padrão) some sobre noise visual
+    3. sem sombra/halo no icon
+  Fix proposto (Marshall pattern):
+    - Aumentar alpha do bg pra `/85` mínimo (regra de 2 camadas)
+    - Adicionar `drop-shadow` no SVG (CSS filter) OU stroke duplicado
+      (white background stroke + colored fill stroke — pattern de map
+      icons)
+    - OU substituir Feather-style por filled icons (Phosphor regular
+      ou Heroicons solid) — R36 SVG icon libs research pode ajudar
+  Bloqueio: precisa decidir entre quick-fix (drop-shadow CSS) e
+  research-then-fix (lib filled icons). HIMYM Lily/Marshall.
+
+- [ ] **ActionsFan — labels PT-BR ao lado dos icons** — usabilidade
+  de descoberta. Icons sozinhos são ambíguos (fixar O QUÊ? seguir O
+  QUÊ? silenciar O QUÊ?). User sugeriu labels curtos (1-2 palavras)
+  à esquerda do icon:
+    - Compartilhar Post
+    - Compartilhar Imagem
+    - Mapa de Spread
+    - Fixar post
+    - Seguir autor
+    - Silenciar autor
+    - Bloquear autor
+    - Reportar post
+  Trade-off: aumenta largura do fan vs fan-stacked vertical com label
+  inline. Em mobile max-w-md, label largo pode estourar.
+  Bloqueio: HIMYM Lily — decidir layout (label sempre visível? só
+  no hover/long-press? expandido on first-show + dismissable?).
+
+### Profile
+
+- [ ] **Avatar cadastrado não exibido no perfil** — user salvou imagem
+  de avatar em EditProfileCard mas não aparece renderizada em lugar
+  nenhum visível do perfil. Possíveis causas:
+    1. Avatar URL salva em metadata kind 0 mas Profile view não lê
+    2. ProfileModal não tem `<img src={metadata.picture}>` (só nome)
+    3. Cache de profile metadata stale após edit
+    4. URL salva mal-formada (validation gap)
+  Audit: `src/components/Profile/ProfileModal.tsx` + `EditProfileCard.tsx`
+  cross-ref com `metadata.picture` field NIP-01.
+  Bloqueio: nenhum — bugfix funcional ~30min.
+
+### MapViewCard
+
+- [ ] **MapViewCard — toggle FECHADO/ABERTO visual pobre** — single text
+  color change indica estado ativo, mas user não percebe imediatamente
+  qual está selecionado. Pattern: visual radiogroup com bg destacado +
+  border accent (similar tabs do FeedTabs com indicator slide), ou
+  segmented control iOS-style com pill animada.
+  Bloqueio: nenhum — refactor visual ~30min, padrão já existe em
+  outros toggles.
+
+### DiagnosticCard
+
+- [ ] **Reconstruir histórico só busca relays — incluir P2P/WebRTC/LAN?**
+  `rebuildIdentityHistory(npub)` em `src/lib/sync.ts` hoje só re-pede
+  pros relays. User sugere: incluir descoberta P2P (peer link, WebRTC
+  signaling Nostr DM), mesma rede LAN (mDNS quando habilitar),
+  bundle import. Manifesto §15 anti-censura por país: se relays estão
+  bloqueados, fallback P2P é exatamente o caminho.
+  Decisão: separar em (a) bugfix simples adicionar P2P fontes existentes,
+  ou (b) feature maior orchestrando multi-transport com UI de progresso?
+  Bloqueio: HIMYM Ted/Marshall — decidir arquitetura. Possivelmente
+  cabe num plano Fase 6.x ou 7.
+
+### SuaLenteCard
+
+- [ ] **SuaLenteCard — UI/UX confusa, vale rodada deliberação** — user
+  feedback 2026-05-17 sessão noite V. Após ship em [c89774b], user
+  testou e achou interface confusa. Possíveis pontos:
+    1. Slider sem feedback claro do efeito real no feed
+    2. Labels "Nenhuma/Moderada/Forte" abstratos — user não sabe o que muda
+    3. "Como funciona" muito textual, sem visualização
+    4. Falta CTA "ver feed com lente ativa" pra testar antes
+    5. Inspector chip do PostViewer talvez não ligado mentalmente ao card
+  HIMYM rodada completa: Lily (UX), Robin (research patterns onboarding
+  de features novas), Marshall (vocabulary lock conferir). Eventualmente
+  Phase 1.5 pode trazer visualização no mapa (já no plan §2).
+  Bloqueio: HIMYM dispatch + decisão de scope (quick polish vs redesign).
+
 ## UX / Design — adicionados 2026-05-17 (sessão noite IV)
 
 - [ ] **Banners "ANTES DE PUBLICAR" / avisos longos inline — tooltip ou
