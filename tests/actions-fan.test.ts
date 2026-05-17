@@ -21,6 +21,7 @@ function makeHandlers(): FanHandlers {
     onMute: vi.fn(),
     onSharePost: vi.fn(),
     onShareImage: vi.fn(),
+    onOpenModeration: vi.fn(),
   }
 }
 
@@ -54,7 +55,7 @@ describe('buildFanItems', () => {
     expect(items.map((i) => i.key)).toEqual(['share-post', 'map', 'pin'])
   })
 
-  it('isMine=false + currentHasImage=true → 6 itens incluindo follow + mute', () => {
+  it('isMine=false + currentHasImage=true → 7 itens (com follow/mute/moderar)', () => {
     const items = buildFanItems(base({ isMine: false, currentHasImage: true }))
     expect(items.map((i) => i.key)).toEqual([
       'share-post',
@@ -63,10 +64,11 @@ describe('buildFanItems', () => {
       'pin',
       'follow',
       'mute',
+      'moderar',
     ])
   })
 
-  it('isMine=false + currentHasImage=false → 5 itens (sem share-image)', () => {
+  it('isMine=false + currentHasImage=false → 6 itens (sem share-image)', () => {
     const items = buildFanItems(base({ isMine: false, currentHasImage: false }))
     expect(items.map((i) => i.key)).toEqual([
       'share-post',
@@ -74,6 +76,7 @@ describe('buildFanItems', () => {
       'pin',
       'follow',
       'mute',
+      'moderar',
     ])
   })
 

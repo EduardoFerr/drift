@@ -86,6 +86,7 @@ import type { Post, RenderHint, ReportReason } from '../../types/drift'
 import { dialog } from '../../lib/dialog'
 import { applyContentFilters } from '../../lib/feed'
 import { usePrefsStore } from '../../lib/prefs'
+import { toggleSlim, useViewModeStore } from '../../lib/view-mode'
 import { reportPost } from '../../lib/protocol'
 import { pinPost, unpinPost } from '../../lib/cache'
 import { block, mute } from '../../lib/moderation-local'
@@ -207,15 +208,22 @@ export function PostViewer({
   const [subpostIdx, setSubpostIdx] = useState(0)
   const [showMap, setShowMap] = useState(false)
   const [showReport, setShowReport] = useState(false)
-  // V9.16 (user pedido 2026-05-14): long-press 5s → moderação.
-  // Estado local: pressing controla render do progress bar; pressTimer
-  // dispara a abertura do modal. moderationOpen é o modal em si.
+  // V_2026-05-17 (user pedido): long-press 5s mudou semantics.
+  //   - Antes: abria ModerationModal (block/mute/report)
+  //   - Agora: alterna modo padrão ⇄ modo slim (chrome hidden, card
+  //     ocupa toda a tela)
+  // Moderação foi movida pro ActionsFan como item `moderar` (mesmo
+  // modal real, só trigger mudou pra menu explícito).
+  // Estado local: `pressing` controla render do progress bar feedback.
   const [pressing, setPressing] = useState(false)
   const [moderationOpen, setModerationOpen] = useState(false)
   const pressTimerRef = useRef<number | null>(null)
   const pressStartRef = useRef<{ x: number; y: number } | null>(null)
   const LONG_PRESS_MS = 5000
   const LONG_PRESS_SLOP_PX = 20
+  // Acompanha slim mode pra label do progress bar feedback (mostra
+  // "modo slim" quando entrando ou "modo padrão" quando saindo).
+  const isSlim = useViewModeStore((s) => s.slim)
   function cancelLongPress() {
     if (pressTimerRef.current !== null) {
       window.clearTimeout(pressTimerRef.current)
@@ -225,16 +233,14 @@ export function PostViewer({
     setPressing(false)
   }
   function handleCardPointerDown(e: React.PointerEvent) {
-    if (isMine) return // long-press só faz sentido em posts de outros
-    // V10.6 (user report 2026-05-15: "Pressionar 5s só funciona quando a
-    // camada é só imagem ou só texto, em Portrait/Landscape com imagem
-    // não funciona"). Causa: Image lightbox é <button> cobrindo inset-0;
-    // qualquer toque no card cai nele → closest('button') matchava →
-    // bail. Trocamos pra opt-out EXPLÍCITO via `data-no-longpress` —
-    // image button perde o atributo (long-press inicia sobre ela), mas
-    // dots/ver mais/⋮ ganham (ações explícitas de tap não devem virar
-    // long-press). Links genéricos (`a`) seguem bailing — nunca fazem
-    // sentido como gesto de moderação.
+    // V10.6 (2026-05-15): opt-out explícito via `data-no-longpress` —
+    // dots/⋮/buttons explícitos não devem virar long-press. Imagem
+    // lightbox passa pelo gesto (vira slim toggle no novo modelo).
+    // Links genéricos (`a`) seguem bailing.
+    //
+    // V_2026-05-17: removido `if (isMine) return` — slim toggle se
+    // aplica também em posts próprios (não há razão semântica pra
+    // restringir; era restrição de moderação antiga).
     const target = e.target as Element | null
     if (
       target &&
@@ -249,7 +255,7 @@ export function PostViewer({
       setPressing(false)
       pressStartRef.current = null
       navigator.vibrate?.(50)
-      setModerationOpen(true)
+      toggleSlim()
     }, LONG_PRESS_MS)
   }
   function handleCardPointerMove(e: React.PointerEvent) {
@@ -637,8 +643,11 @@ export function PostViewer({
         <AnimatePresence>
           {pressing && (
             <>
+              {/* Progress bar 5s — drift-accent2 (neutro, era drift-bury
+                  na semântica antiga de moderar). Label aparece em 600ms
+                  pós-pressing pra contexto. */}
               <m.div
-                className="pointer-events-none absolute inset-x-0 top-0 z-[15] h-1 origin-left bg-drift-bury"
+                className="pointer-events-none absolute inset-x-0 top-0 z-[15] h-1 origin-left bg-drift-accent2"
                 initial={{ scaleX: 0, opacity: 0.9 }}
                 animate={{ scaleX: 1 }}
                 exit={{ opacity: 0, scaleX: 1, transition: { duration: 0.18 } }}
@@ -651,8 +660,8 @@ export function PostViewer({
                 exit={{ opacity: 0, y: -4 }}
                 transition={{ duration: 0.18, delay: 0.6 }}
               >
-                <span className="rounded-full border border-drift-bury/60 bg-drift-bg/85 px-3 py-1 font-mono text-[12px] uppercase tracking-meta text-drift-bury backdrop-blur-sm">
-                  segure pra moderar
+                <span className="rounded-full border border-drift-accent2/60 bg-drift-bg/85 px-3 py-1 font-mono text-[12px] uppercase tracking-meta text-drift-accent2 backdrop-blur-sm">
+                  {isSlim ? 'segure pra sair do slim' : 'segure pra modo slim'}
                 </span>
               </m.div>
             </>
@@ -681,10 +690,9 @@ export function PostViewer({
               <span aria-hidden="true">{showActionsMenu ? '×' : '⋮'}</span>
             </GlassIconButton>
             {/* V9.15 (user pedido 2026-05-14): tap em ⋮ expande em fan
-                de 4 quick actions (mapa/fixar/seguir/silenciar). Ações
-                sensíveis (block/report) saem do menu pra long-press 5s.
-                Cada ícone slide-in vertical 48px abaixo do anterior,
-                stagger 40ms. */}
+                de quick actions. V_2026-05-17: item `moderar` adicionado
+                ao fan (era ativado por long-press 5s antes; 5s agora
+                alterna modo slim). */}
             <ActionsFan
               visible={showActionsMenu}
               isMine={isMine}
@@ -714,6 +722,10 @@ export function PostViewer({
               }}
               onShareImage={() => {
                 void handleShareImage()
+                setShowActionsMenu(false)
+              }}
+              onOpenModeration={() => {
+                setModerationOpen(true)
                 setShowActionsMenu(false)
               }}
             />
@@ -1054,6 +1066,7 @@ function ActionsFan({
   onMute,
   onSharePost,
   onShareImage,
+  onOpenModeration,
 }: {
   visible: boolean
   isMine: boolean
@@ -1068,6 +1081,7 @@ function ActionsFan({
   onMute: () => void
   onSharePost: () => void
   onShareImage: () => void
+  onOpenModeration: () => void
 }) {
   const items: FanItem[] = buildFanItems({
     isMine,
@@ -1082,6 +1096,7 @@ function ActionsFan({
       onMute,
       onSharePost,
       onShareImage,
+      onOpenModeration,
     },
   })
 

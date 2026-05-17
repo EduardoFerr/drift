@@ -4,12 +4,16 @@
  *
  * Extraído pra função pura (manifesto §7) pra permitir testes
  * exaustivos das combinações de visibilidade: share-image só aparece
- * quando o subpost atual tem imagem; follow/mute só aparecem em posts
- * de terceiros; pin fica disabled enquanto o estado de pin ainda
- * carrega do SQLite (pinned === null).
+ * quando o subpost atual tem imagem; follow/mute/moderar só aparecem
+ * em posts de terceiros; pin fica disabled enquanto o estado de pin
+ * ainda carrega do SQLite (pinned === null).
  *
- * Block/Report saíram do fan — long-press 5s ativa modal de moderação
- * (Phase 2). Decisão: ações destrutivas precisam fricção intencional.
+ * **2026-05-17 — semântica do long-press 5s mudou** (user pedido):
+ * - Antes: long-press 5s abria ModerationModal direto
+ * - Agora: long-press 5s alterna modo padrão/slim (ver lib/view-mode.ts)
+ * - Moderação foi movida PRO FAN como item `moderar` (item destrutivo
+ *   ainda exige fricção mas via menu explícito, não gesto). Mantém o
+ *   modal real (block/mute/report) — só o trigger mudou.
  */
 
 export interface FanItem {
@@ -28,6 +32,8 @@ export interface FanHandlers {
   onMute: () => void
   onSharePost: () => void
   onShareImage: () => void
+  /** Abre ModerationModal (block / mute / report). Só em posts de terceiros. */
+  onOpenModeration: () => void
 }
 
 export interface BuildFanItemsInput {
@@ -105,6 +111,13 @@ export function buildFanItems(input: BuildFanItemsInput): FanItem[] {
         label: 'silenciar',
         hint: 'esconde posts dele do meu feed (filtro local §24)',
         onClick: handlers.onMute,
+      },
+      {
+        key: 'moderar',
+        icon: '⚠',
+        label: 'moderar',
+        hint: 'abre opções: bloquear, silenciar ou denunciar (kind 1984)',
+        onClick: handlers.onOpenModeration,
       },
     )
   }

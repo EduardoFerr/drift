@@ -55,6 +55,13 @@ export interface NavBarProps {
   onCompose: () => void
   /** aria-label do plus button. Default 'criar post'. */
   composeAriaLabel?: string
+  /**
+   * Slim mode (2026-05-17): quando true, NavBar desliza off-screen
+   * (translateY 110%) com spring suave, liberando viewport pro card.
+   * Toggled via long-press 5s no PostViewer (`useViewModeStore`).
+   * `inert` attribute desabilita focus + interaction quando hidden.
+   */
+  slim?: boolean
 }
 
 export function NavBar({
@@ -62,15 +69,23 @@ export function NavBar({
   right,
   onCompose,
   composeAriaLabel = 'criar post',
+  slim = false,
 }: NavBarProps) {
   return (
-    <nav
+    <m.nav
       role="navigation"
       aria-label="navegação principal"
       // mx-auto + max-w-md alinha com o app centrado (App.tsx root).
       // Em mobile, max-w-md > viewport → ocupa toda largura
       // (comportamento original preservado). User feedback 2026-05-08.
       className="fixed inset-x-0 bottom-0 z-30 mx-auto max-w-md border-t border-drift-border bg-drift-bg/95 px-3 py-3 backdrop-blur-sm sm:border-x"
+      // Slim: slide off-screen com spring. Mantém aria-hidden+inert quando
+      // off-screen pra screen readers + keyboard nav não acharem botões.
+      animate={{ y: slim ? '110%' : '0%' }}
+      transition={{ type: 'spring', stiffness: 260, damping: 30, mass: 0.8 }}
+      aria-hidden={slim || undefined}
+      // @ts-expect-error -- inert é HTML attribute valid mas tipos React 18 não cobrem
+      inert={slim ? '' : undefined}
     >
       <div className="flex items-center justify-between gap-2">
         <div className="flex flex-1 items-center justify-around gap-2">
@@ -117,7 +132,7 @@ export function NavBar({
           ))}
         </div>
       </div>
-    </nav>
+    </m.nav>
   )
 }
 

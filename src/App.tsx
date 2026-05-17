@@ -1,6 +1,6 @@
 ﻿import { lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
-import { AnimatePresence } from 'framer-motion'
+import { AnimatePresence, m } from 'framer-motion'
 import { OPTIMISTIC_TIMEOUT_MS, CLIENT_VERSION } from './config/constants'
 import { db } from './lib/db'
 import {
@@ -30,6 +30,7 @@ import {
 import { getPrefs, usePrefsStore } from './lib/prefs'
 import { useUserWeight } from './hooks/useUserWeight'
 import { useInstallPrompt } from './hooks/useInstallPrompt'
+import { exitSlim, useViewModeStore } from './lib/view-mode'
 import { PostViewer } from './components/Post/PostViewer'
 // V10.10 — GpsErrorBanner lazy (Lighthouse unused-js audit). Banner só
 // renderiza quando getCurrentLocation falha durante spread/bury. Boot
@@ -477,12 +478,65 @@ function ManifestoLine({ n, text }: { n: string; text: string }) {
   )
 }
 
+/**
+ * Slim mode hint — chip discreto que aparece ao entrar em slim mode.
+ * Explica gesto pra sair (segure 5s) + oferece X explícito.
+ * Auto-dismiss 4s OU dismiss manual via X. Em re-entradas no slim
+ * (toggle off/on), aparece de novo (state efêmero, sem persist).
+ */
+function SlimModeHint() {
+  const slim = useViewModeStore((s) => s.slim)
+  const [visible, setVisible] = useState(false)
+  useEffect(() => {
+    if (!slim) {
+      setVisible(false)
+      return
+    }
+    setVisible(true)
+    const t = window.setTimeout(() => setVisible(false), 4000)
+    return () => window.clearTimeout(t)
+  }, [slim])
+
+  return (
+    <AnimatePresence>
+      {slim && visible && (
+        <m.div
+          role="status"
+          aria-live="polite"
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -10 }}
+          transition={{ duration: 0.25, ease: 'easeOut' }}
+          className="fixed left-1/2 top-4 z-40 -translate-x-1/2 flex items-center gap-2 rounded-full border border-drift-accent2/40 bg-drift-bg/90 px-4 py-2 backdrop-blur-sm shadow-lg"
+        >
+          <span className="font-mono text-[11px] uppercase tracking-meta text-drift-accent2">
+            modo slim · segure 5s pra sair
+          </span>
+          <button
+            onClick={() => exitSlim()}
+            aria-label="sair do modo slim"
+            className="ml-1 inline-flex h-6 w-6 items-center justify-center rounded-full text-drift-muted transition-colors hover:bg-drift-surface/60 hover:text-drift-text focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </m.div>
+      )}
+    </AnimatePresence>
+  )
+}
+
 function App() {
   const boot = useBootStore()
   const posts = useFeedStore((s) => s.posts)
   const feedLoaded = useFeedStore((s) => s.loaded)
   const userWeight = useUserWeight(boot.identity?.npub ?? null)
   const installPrompt = useInstallPrompt()
+  // Slim mode (2026-05-17): toggled via long-press 5s no PostViewer.
+  // Esconde NavBar bottom + HomeHeader top, card ocupa toda viewport.
+  const slimMode = useViewModeStore((s) => s.slim)
 
   // V10b — install vira modal. Auto-abre 1x quando disponível (ainda
   // não dismissed nem instalado). User dispensa via X ou via botão
@@ -1196,6 +1250,12 @@ function App() {
         <LensNudgeBanner />
       </LazyBoundary>
 
+      {/* Slim mode hint — chip discreto top-center quando slim ativo,
+          explica gesto pra sair. fade in 300ms, auto-dismiss 4s.
+          Mostra exit button (X) caso user não queira esperar 5s. */}
+      <SlimModeHint />
+
+
       <LayerRenderer />
 
       {/* Stack — área central que contém o card atual. flex:1 expande
@@ -1205,8 +1265,14 @@ function App() {
           até a navbar bottom. NavBar é fixed (z-30, h-68px no primitive
           + padding); aplicamos pb-[88px] aqui (68 navbar + 20 folga)
           pra evitar cards renderizarem POR TRÁS da navbar fixed.
-          Hidden navbar não importa — pb-[88px] preserva consistência. */}
-      <main className="relative min-h-0 flex-1 overflow-hidden px-4 pt-3 pb-[88px]">
+          Slim mode (2026-05-17): zera padding bottom + top + horizontal
+          pra card ocupar TODA viewport. Transição animada via Tailwind
+          `transition-[padding]` + duration matching spring (≈300ms). */}
+      <main
+        className={`relative min-h-0 flex-1 overflow-hidden transition-[padding] duration-300 ease-out ${
+          slimMode ? 'p-0' : 'px-4 pt-3 pb-[88px]'
+        }`}
+      >
         {posts.length === 0 ? (
           <HomeEmpty tab={useFeedStore.getState().tab} />
         ) : atEnd ? (
@@ -1317,6 +1383,7 @@ function App() {
           ]}
           onCompose={() => setShowCreate(true)}
           composeAriaLabel="criar post"
+          slim={slimMode}
         />
       )}
 
@@ -1523,8 +1590,24 @@ function HomeHeader({
   void onOpenIdentity
   void locationGranularity
 
+  // Slim mode: header inteiro (logo + status + FeedTabs) some via slide-up.
+  // Mesma animação coordenada com NavBar (slim no view-mode store).
+  const slim = useViewModeStore((s) => s.slim)
   return (
-    <header className="shrink-0 px-5 pt-4">
+    <m.header
+      className="shrink-0 px-5 pt-4"
+      animate={{ y: slim ? '-110%' : '0%', opacity: slim ? 0 : 1 }}
+      transition={{ type: 'spring', stiffness: 260, damping: 30, mass: 0.8 }}
+      aria-hidden={slim || undefined}
+      // @ts-expect-error -- inert é HTML attribute valid mas React 18 não tipa
+      inert={slim ? '' : undefined}
+      style={{
+        // Slim: header sai do layout flow (position: fixed-like) pra card
+        // expandir realmente. Sem isso, header `shrink-0` mantém o slot
+        // mesmo quando off-screen — card não cresce.
+        ...(slim ? { position: 'absolute', top: 0, left: 0, right: 0, pointerEvents: 'none' } : {}),
+      }}
+    >
       <div className="mb-[14px] flex items-center justify-between gap-3">
         <h1 className="font-display text-[25px] font-extrabold leading-none tracking-[-0.5px] text-drift-text">
           dri<em className="not-italic text-drift-accent">ft</em>
@@ -1547,7 +1630,7 @@ function HomeHeader({
       <div className="border-b border-drift-border">
         <FeedTabs {...(onActiveTabTap ? { onActiveTabTap } : {})} />
       </div>
-    </header>
+    </m.header>
   )
 }
 
