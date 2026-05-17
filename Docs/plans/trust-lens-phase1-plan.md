@@ -340,34 +340,50 @@ Copy do header:
 
 ---
 
-## 2.9 Phase 2/3 expansion — multi-list curation (user vision 2026-05-17)
+## 2.9 Phase 3 — multi-list curation (user vision 2026-05-17, decisão consolidada)
 
-User propôs: multi-list curation com per-list strength sliders + parental control via password lock.
+User propôs Phase 2/3 expansão: multi-list curation com per-list strength sliders + ~~parental control via password lock~~.
 
-**Arquitetura emergente**: Trust Lens vira UMA lista entre várias. Cada lista tem slider 0-100%. Mix de listas = personalização local.
+### Decisão política registrada (manifesto §17 adendo II 2026-05-17)
 
-### Status do componente (deliberação HIMYM em curso)
+**Cliente oficial Drift NÃO embute controle parental nem password lock** (mesmo como "self-binding"). Filho menor é user §17 — Drift NUNCA é usado contra um user.
 
-| Componente | Status | Veredict |
-|---|---|---|
-| **Multi-list mixer 0-100%** | ✅ Barney aprovou com constraints | Phase 2 — pipeline order: Trust Lens base + filter_rules locais + listas externas additive + conflict resolver (exclude-wins default) + reports §26 |
-| **Source diversity** (NIP-32 / NIP-85 / Vertex / NIP-78 import / local) | ✅ Barney aprovou com mitigations | Source npub visible obrigatório; nunca default-ON; cap N=10 listas ativas; cap 50k rows/lista LRU |
-| **Conflict resolution UX** | ✅ Barney: exclude-wins default + explicit surface no Inspector | Aguarda Lily UX (rodando) |
-| **Cumulative censorship indicator** | ✅ Barney: "X% escondido" persistente >15%, não-desligável | Aguarda Lily |
-| **Password lock parental** | ❌ Barney REJECT no cliente oficial | §17 derivado + §25 slippery slope. Fork separado / plugin opt-in / não existe. **Aguarda decisão política Arquiteto**: filho menor é user §17? |
+Casos legítimos de "configuração delegada" são endereçados por primitives existentes:
+- **Multi-identity** (§15) + **nsec portável** (§3) — pai importa nsec do filho no client dele, configura lentes/follows/filters, filho usa device dele com mesma nsec
+- **Shared device** com identidade única — config aplica pra essa identity no device
+- "Se filho descumprir ordem do pai, isso é problema familiar" — fora do escopo técnico
 
-### 6 bandeiras vermelhas Phase 2/3 (Barney + Ted survey)
+Quem quiser fork "Drift Family" pode — manifesto próprio. Cliente oficial não.
 
-1. Password lock parental no cliente oficial
+### Phase 3 scope (multi-list mixer, sem lock)
+
+**Naming Lily**: "Lentes" (plural). Phase 1 "Sua Lente" vira "Lente Pessoal" (item da coleção).
+
+| Componente | Veredict |
+|---|---|
+| **Multi-list mixer 0-100%** | ✅ Phase 3 ship. Pipeline: Trust Lens base + filter_rules locais (hard) + lentes externas additive + conflict resolver (**exclude vence** default) + reports §26 |
+| **Source diversity** (NIP-32 / NIP-85 / Vertex / NIP-78 / local) | ✅ Com mitigations: source npub visible; nunca default-ON; cap N=10 ativas; cap 50k rows/lente LRU |
+| **Discovery** | Peer-to-peer ONLY — colar npub, escanear QR, sugestões orgânicas via PPR ("lentes ativas entre seus top-PPR"). **Sem marketplace oficial**, sem editorial Drift |
+| **Schema** | NIP-51 kind 30000 (Generic List) reusar pra publicação — zero novos kinds (§28-30). Tabelas `lenses` + `lens_subscriptions` (user-state, NÃO em DOMAIN_TABLES). Coluna `lens_id` opcional em `lens_filter_rules` |
+| **Conflict resolution UX** | Exclude vence + explicit surface no Inspector ("Lista A queria incluir @x, Lista B excluiu") |
+| **Cumulative censorship indicator** | "X% escondido" persistente >10%, warning sutil >30%. Mitigação Barney crítica |
+| **Slider snap** | 0/50/100 com labels Nenhuma/Moderada/Forte (consistência Phase 1) |
+| **Update lente sem consent** | Não — pull manual ou opt-in auto-pull com diff review notification |
+| **Filter rules locais (block/mute)** | Compõem, não substituem — block sempre vence (hard veto) |
+| ~~Password lock~~ | ❌ Removido permanentemente do escopo (manifesto §17 adendo II) |
+
+### 6 bandeiras vermelhas Phase 2/3 — NÃO cruzar
+
+1. ~~Password lock parental~~ → **decidido: nem self-binding. Fora.**
 2. Trust score público (mesmo NIP-85 opt-in)
-3. Default-ON em qualquer lista externa
-4. Sync de filter_rules entre devices via Nostr
-5. Lista pre-fab "anti-CSAM/extremismo" hardcoded com escopo amplo
-6. "Stealth mode" parental (lista ativa sem indicator visible)
+3. Default-ON em qualquer lente externa
+4. Sync de filter_rules entre devices via Nostr (publica o que esconde = vetor vigilância)
+5. Lente pre-fab "anti-CSAM/extremismo" hardcoded com escopo amplo no client default
+6. "Stealth mode" lente (ativa sem indicator visible)
 
-Detalhes Barney: `Docs/sessions/trust-lens-multilist-barney-2026-05-17.md`
+Detalhes: `Docs/sessions/trust-lens-multilist-barney-2026-05-17.md` + `trust-lens-multilist-lily-2026-05-17.md`
 
-Lily UX + Robin research rodando — quando completarem, integra aqui + decide se shipa em Phase 2 ou Phase 3.
+Robin research ainda rodando — quando completar, integra NIP-51 adoção + Argon2id WASM size (nota: relevância reduzida sem password lock) + anti-centralização patterns Phase 3.
 
 ---
 

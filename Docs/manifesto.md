@@ -392,6 +392,43 @@ Resumo: §17 protege a REDE da chave-mestra do fundador. Não impede
 que user **escolha** participar de subset moderado da rede — desde
 que escolha consciente.
 
+**Adendo de escopo II (2026-05-17) — §17 derivado: Drift NUNCA contra o user.**
+
+Decisão política registrada após deliberação HIMYM Phase 2/3 Trust Lens
+(`Docs/sessions/trust-lens-multilist-barney-2026-05-17.md` +
+`trust-lens-multilist-lily-2026-05-17.md`).
+
+§17 protege todo user de Drift sendo Drift usado **contra ele** —
+independente de idade, contexto familiar, ou relação hierárquica IRL.
+Implicações duras:
+
+- **Cliente oficial NÃO embute "controle parental"** nem qualquer
+  feature de "user A controla affordances de user B no mesmo client".
+  Filho menor é user §17 também.
+- **Cliente oficial NÃO embute password lock sobre lentes/listas/
+  filtros**, nem como "self-binding", porque a affordance é a mesma —
+  e Apple Screen Time é caso documentado de abuse em violência
+  doméstica.
+- **Casos legítimos de "configuração delegada"** são endereçados pelos
+  primitives já existentes:
+  - **§3 + §15 multi-identity**: cada user tem sua nsec. Pai em device
+    próprio + filho em device próprio, com nsecs distintas.
+  - **§3 dispositivo descartável**: pai e filho compartilhando UM
+    device usam a mesma nsec. Curadoria (lentes/follows/filters)
+    aplica pra essa identidade no device. Não é "pai controla filho"
+    — é "configuração da identidade ativa no device compartilhado".
+  - Pai querendo curar pra filho: pai importa nsec do filho no client
+    dele, configura lentes/follows, filho usa device dele com a
+    mesma nsec. Multi-identity normal serve, sem Drift inventar
+    affordance nova.
+- **"Se filho descumprir ordem do pai, isso é problema familiar"** —
+  fora do escopo técnico do Drift. Cliente oficial não tem autoridade
+  pra mediar relação doméstica nem ferramentas pra um user enforçar
+  comportamento de outro.
+
+Quem QUISER um "Drift Family" com controles fortes pode forkar com
+manifesto próprio explicitando o trade-off. Cliente oficial não.
+
 ### 18. Cliente Oficial sem Privilégios sobre a Rede
 
 O cliente oficial é uma implementação de referência, não uma
