@@ -148,7 +148,62 @@ async function init(schema: string): Promise<{ hasOpfs: boolean; storage: Storag
   // Aplicado APÓS open + ANTES de schema.exec pra cobrir migrações.
   db.exec('PRAGMA busy_timeout = 5000')
 
-  db.exec(schema)
+  try {
+    db.exec(schema)
+  } catch (err) {
+    // User feedback 2026-05-17: pós-update do app, db.exec(schema) falha
+    // com NoModificationAllowedError em /drift.db-journal porque o worker
+    // anterior deixou handle órfão no journal. OpfsDb constructor já
+    // pegou /drift.db (main file) com sucesso, mas qualquer WRITE precisa
+    // acquire handle no journal — e essa é a colisão.
+    //
+    // Self-heal: fecha db, remove journal + wal do OPFS (main db
+    // preservado), reabre. Schema é idempotente (CREATE IF NOT EXISTS) —
+    // retry seguro. Sem isso, user fica em loop de "limpar local" sem
+    // resolver até fechar TODAS as abas do Drift manualmente.
+    if (
+      storageMode === 'opfs' &&
+      err instanceof Error &&
+      (err.name === 'NoModificationAllowedError' ||
+        err.message?.includes('NoModificationAllowedError') ||
+        err.message?.includes('drift.db-journal'))
+    ) {
+      log('journal preso — tentando self-heal (remover journal + wal e reabrir)')
+      try {
+        ;(db as unknown as { close?: () => void }).close?.()
+      } catch {
+        /* close pode falhar se já corrompido — ignora */
+      }
+      db = null
+      try {
+        const root = await navigator.storage.getDirectory()
+        for (const name of ['drift.db-journal', 'drift.db-wal']) {
+          try {
+            await root.removeEntry(name)
+            log(`removed OPFS file ${name}`)
+          } catch {
+            /* arquivo pode não existir */
+          }
+        }
+      } catch (e) {
+        log(`falha ao limpar journal/wal OPFS: ${e instanceof Error ? e.message : e}`)
+      }
+      try {
+        db = new sqlite3.oo1.OpfsDb('/drift.db')
+        db.exec('PRAGMA busy_timeout = 5000')
+        db.exec(schema)
+        log('self-heal funcionou — schema aplicado após cleanup')
+      } catch (retryErr) {
+        if (retryErr instanceof Error && retryErr.name === 'NoModificationAllowedError') {
+          log('self-heal falhou — lock persiste, provável outra aba aberta')
+          throw new Error('MULTI_TAB_CONFLICT')
+        }
+        throw retryErr
+      }
+    } else {
+      throw err
+    }
+  }
   log('schema aplicado com sucesso')
 
   // Migrações idempotentes — pra usuários com banco de fases anteriores.
