@@ -127,7 +127,23 @@ export async function loadLens(): Promise<void> {
   const pprScores = new Map<string, number>()
   for (const row of pprRows) pprScores.set(row.target_npub, row.ppr_score)
 
-  useLensStore.setState({ filterRules: rules, pprScores, loaded: true })
+  // Strength persistido em user_prefs.lens_strength (REAL 0..1). Default 0
+  // — feed canônico bit-exact até o user mover o slider. Manifesto §24.
+  const strengthRow = await db.get<{ value: string }>(
+    `SELECT value FROM user_prefs WHERE key = 'lens_strength'`,
+  )
+  const strengthRaw = strengthRow ? Number(strengthRow.value) : 0
+  const strength = Number.isFinite(strengthRaw)
+    ? Math.max(0, Math.min(1, strengthRaw))
+    : 0
+
+  useLensStore.setState({
+    filterRules: rules,
+    pprScores,
+    strength,
+    enabled: strength > 0,
+    loaded: true,
+  })
 }
 
 // ─── PPR lookups ──────────────────────────────────────────────────

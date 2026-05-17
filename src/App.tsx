@@ -56,6 +56,11 @@ const DialogHost = lazy(() =>
     default: m.DialogHost,
   })),
 )
+const LensNudgeBanner = lazy(() =>
+  import('./components/Settings/LensNudgeBanner').then((m) => ({
+    default: m.LensNudgeBanner,
+  })),
+)
 const DiscoverNudgeBanner = lazy(() =>
   import('./components/Settings/DiscoverNudgeBanner').then((m) => ({
     default: m.DiscoverNudgeBanner,
@@ -104,6 +109,9 @@ const PermissionsCard = lazy(() =>
 )
 const AppearanceCard = lazy(() =>
   import('./components/Settings/AppearanceCard').then((m) => ({ default: m.AppearanceCard })),
+)
+const SuaLenteCard = lazy(() =>
+  import('./components/Settings/SuaLenteCard').then((m) => ({ default: m.SuaLenteCard })),
 )
 const RelaySettings = lazy(() =>
   import('./components/Settings/RelaySettings').then((m) => ({ default: m.RelaySettings })),
@@ -155,6 +163,7 @@ import {
   LinkIcon,
   ChevronDownIcon,
   PaletteIcon,
+  EyeIcon,
 } from './components/UI/Icons'
 // SpreadMap pull MapLibre GL (1.1 MB) + Deck.gl ArcLayer (467 KB) —
 // só carrega quando user abre overlay de mapa. Ver MapOverlay abaixo.
@@ -1150,6 +1159,9 @@ function App() {
       <LazyBoundary fallback={null}>
         <DiscoverNudgeBanner />
       </LazyBoundary>
+      <LazyBoundary fallback={null}>
+        <LensNudgeBanner />
+      </LazyBoundary>
 
       <LayerRenderer />
 
@@ -1750,6 +1762,7 @@ type SettingsTarget =
   | 'sobre'
   | 'permissoes'
   | 'aparencia'
+  | 'sua-lente'
   | 'instalar'
   | 'limpar'
 
@@ -1819,6 +1832,9 @@ function SettingsRoot({ onClose }: { onClose: () => void }) {
         break
       case 'aparencia':
         pushLayer({ id: 'appearance', component: AppearanceCard, parent: p })
+        break
+      case 'sua-lente':
+        pushLayer({ id: 'sua-lente', component: SuaLenteCard, parent: p })
         break
       case 'diagnostico':
         pushLayer({ id: 'diagnostic', component: DiagnosticCard, parent: p })
@@ -1907,6 +1923,12 @@ function SettingsRoot({ onClose }: { onClose: () => void }) {
       title: 'conteúdo',
       groupIcon: SlidersIcon,
       items: [
+        {
+          target: 'sua-lente',
+          label: 'sua lente',
+          hint: 'reordenamento local — feed na sua perspectiva',
+          icon: EyeIcon,
+        },
         {
           target: 'filtros',
           label: 'filtros',

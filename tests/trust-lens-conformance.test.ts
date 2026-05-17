@@ -12,7 +12,26 @@
  * conforme implementação avança (edges.ts → ppr.ts → predicate.ts → UI).
  */
 
-import { describe, it } from 'vitest'
+import { describe, it, expect } from 'vitest'
+import { readFileSync, readdirSync, statSync } from 'node:fs'
+import { join } from 'node:path'
+
+function walk(dir: string, acc: string[] = []): string[] {
+  for (const name of readdirSync(dir)) {
+    const full = join(dir, name)
+    const st = statSync(full)
+    if (st.isDirectory()) walk(full, acc)
+    else acc.push(full)
+  }
+  return acc
+}
+
+function readJsxStrings(): { file: string; content: string }[] {
+  const root = 'src/components'
+  return walk(root)
+    .filter((f) => f.endsWith('.tsx'))
+    .map((f) => ({ file: f, content: readFileSync(f, 'utf8') }))
+}
 
 describe('Trust Lens — conformance (LOCK_VIA_TEST §17 §22 §24 §25 §27)', () => {
   // ─── #1 — posts.score write-side fechado (Marshall) ──────────────
@@ -54,23 +73,77 @@ describe('Trust Lens — conformance (LOCK_VIA_TEST §17 §22 §24 §25 §27)', 
   // Manifesto §22: trust scores não saem do device. Grep em
   // protocol.ts + nostr.ts proibindo refs a lens_edges/lens_walks_cache
   // em qualquer code path que emit kinds.
-  it.todo(
-    '6. lens_edges/lens_walks_cache nunca referenciados em protocol/nostr',
-  )
+  it('6. lens_edges/lens_walks_cache nunca referenciados em protocol/nostr', () => {
+    // Manifesto §22 + §17 — trust scores nunca saem do device. Code paths
+    // que assinam ou publicam eventos NÃO podem referenciar lens state.
+    const targets = ['src/lib/protocol.ts', 'src/lib/nostr.ts']
+    const violations: string[] = []
+    for (const file of targets) {
+      const src = readFileSync(file, 'utf8')
+      if (/\blens_edges\b|\blens_walks_cache\b|\bppr_score\b/.test(src)) {
+        violations.push(file)
+      }
+    }
+    expect(violations).toEqual([])
+  })
 
   // ─── #7 — Vocabulary lock (Lily) ─────────────────────────────────
   // JSX strings NÃO usam "Trust" nem score numérico exposto. Só "Sua
   // Lente"/"influência" PT-BR. Evita colisão semântica com Peso de
   // Perfil (ProfileModal) + evita gaming (Stack Overflow karma).
-  it.todo('7. JSX strings não contêm "Trust"/"trust score" expostos')
+  it('7. JSX strings não contêm "Trust"/"trust score" expostos', () => {
+    // Vocabulary lock PT-BR (Lily): UI user-facing usa "Sua Lente" /
+    // "influência" / "lente". Strings em inglês "Trust" ou "trust score"
+    // ou expor o número PPR são proibidas em JSX.
+    //
+    // Source-of-truth: arquivos de comentário/doc (`Docs/`) podem
+    // mencionar "Trust Lens" — protocol/spec lexicon. JSX user-facing
+    // (.tsx em src/components) NÃO.
+    //
+    // Aceitável apenas:
+    //   - comentários `//` ou `/* */` (não chegam ao DOM)
+    //   - imports/identifiers (não viram texto user-facing)
+    //
+    // Bloqueado: texto entre `>...<` ou em prop string que aparente ser
+    // user-facing copy ("Trust", "trust score", numérico de PPR exposto).
+    const violations: string[] = []
+    const userFacingForbidden = /(?:>|"|')(?:[^<>"']*?\b)(Trust\s+(?:Lens|score)|trust\s+score)\b/gi
+    for (const { file, content } of readJsxStrings()) {
+      // Remove block + line comments antes do match — sem dependência
+      // de AST. Regex simples cobre os casos do repo.
+      const stripped = content
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .replace(/^\s*\/\/.*$/gm, '')
+      let m: RegExpExecArray | null
+      while ((m = userFacingForbidden.exec(stripped)) !== null) {
+        violations.push(`${file}: "${m[0]}"`)
+      }
+    }
+    expect(violations, violations.join('\n')).toEqual([])
+  })
 
   // ─── #8 — Subscribe filter independence (Barney P0.2) ────────────
   // sync.ts subscribe filters NÃO dependem de PPR. Relay observer
   // não pode inferir trust graph parcial via timing de subscribe shape.
   // Grep sync.ts: sem import de lens_edges/lens_walks_cache/ppr_score.
-  it.todo(
-    '8. sync.ts não importa lens_edges nem lens_walks_cache (PPR post-fetch only)',
-  )
+  it('8. sync.ts não importa lens_edges nem lens_walks_cache (PPR post-fetch only)', () => {
+    // Barney P0.2 (filter shape leak): subscribe filters NÃO podem
+    // depender de PPR. Se o relay vê filtros enviesados pela rede social
+    // do user, infere o grafo parcial via timing — vetor de eclipse.
+    //
+    // Lock: sync.ts não importa de lens-*; não lê lens_edges /
+    // lens_walks_cache do SQL; não chama getPprForAuthor.
+    const sync = readFileSync('src/lib/sync.ts', 'utf8')
+    const forbidden = [
+      /from\s+['"]\.\/trust-lens['"]/,
+      /from\s+['"]\.\/trust\//,
+      /\blens_edges\b/,
+      /\blens_walks_cache\b/,
+      /\bgetPprForAuthor\b/,
+    ]
+    const hits = forbidden.filter((re) => re.test(sync))
+    expect(hits, `sync.ts viola P0.2: ${hits.map((r) => r.source).join(', ')}`).toEqual([])
+  })
 
   // ─── #9 — PPR locality (Ted zero-trust survey) ───────────────────
   // PPR scores nunca escapam do client: import em sync.ts (#8 já cobre),

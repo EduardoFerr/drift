@@ -107,6 +107,7 @@ import { GlassIconButton } from '../UI/GlassIconButton'
 import { SlideUpOverlay } from '../UI/SlideUpOverlay'
 import { ModalHeader } from '../UI/ModalHeader'
 import { DriftChip } from '../UI/DriftChip'
+import { LensInspector } from './LensInspector'
 // V10.7 — `computeInitialFromExit` removido daqui (lógica inline em
 // EmbeddedWrapper.variants.initial). Função pura preservada em
 // `lib/post-viewer-motion.ts` por compatibilidade dos testes.
@@ -729,6 +730,9 @@ export function PostViewer({
                 </span>
               )}
             </button>
+            {/* Trust Lens inspector chip — bottom-right do card.
+                Aparece só quando lens strength > 0 E post foi tocado. */}
+            <LensInspector postId={post.id} authorPub={post.authorPub} />
           </>
         )}
         {queue && queue.next && (

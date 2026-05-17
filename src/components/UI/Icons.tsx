@@ -265,6 +265,20 @@ export function PaletteIcon({ size = 18, className = '' }: IconProps) {
   )
 }
 
+/**
+ * Lens / olho — Trust Lens user-facing. Forma de olho (Feather-style)
+ * com íris central. Usado em Settings → "sua lente" e no inspector chip
+ * do PostViewer.
+ */
+export function EyeIcon({ size = 18, className = '' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" className={className} {...base}>
+      <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  )
+}
+
 /** ⊘ Ban / block author. Círculo + diagonal cortando. */
 export function BanIcon({ size = 18, className = '' }: IconProps) {
   return (

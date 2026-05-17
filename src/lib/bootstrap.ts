@@ -25,6 +25,7 @@ import { applyTheme, DEFAULT_THEME_ID, isThemeId } from './theme'
 import { loadRelays } from './relays'
 import { loadIdentities } from './identities'
 import { loadFollows } from './follows'
+import { loadLens } from './trust-lens'
 import { loadModLocal } from './moderation-local'
 // V10.11 — passkey movido pra dynamic import. ~3.58 KB raw / 1.4 KB gz
 // fica fora do entry chunk; só carrega se user efetivamente habilitou
@@ -233,6 +234,11 @@ async function doBootstrap(): Promise<void> {
     // primeiro pra UI ficar reativa imediatamente; sync com relays
     // acontece em background (não bloqueia boot).
     await loadFollows()
+
+    // Trust Lens — carrega strength persistido + filter rules + cache PPR.
+    // Cold-start (cache vazio) é safe: getPprForAuthor retorna 0 e
+    // viewMultiplier degrada graciosamente. Manifesto §24 (view-layer).
+    await loadLens()
 
     setBoot((p) => ({ ...p, step: 'sync' }))
 

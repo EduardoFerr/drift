@@ -406,6 +406,15 @@ export interface UserPrefs {
    * diferentes do default — sem ser empurrado durante onboarding.
    */
   discover_nudge_dismissed: boolean
+  /**
+   * Banner one-time "Sua Lente" — dismissido permanente. Trust Lens
+   * Phase 1 (plan §1.5). Aparece quando user tem ≥10 follows E identidade
+   * ≥7 dias E lens strength = 0 E não foi dismissido.
+   *
+   * Manifesto §17 (sem chave mestra): UX honesta — user só recebe nudge
+   * depois que tem grafo suficiente pra lens fazer sentido.
+   */
+  lens_nudge_dismissed: boolean
 }
 
 /**
@@ -446,6 +455,7 @@ export const DEFAULT_USER_PREFS: UserPrefs = {
   thread_view_mode: 'list',
   theme_id: 'cinder',
   discover_nudge_dismissed: false,
+  lens_nudge_dismissed: false,
 }
 
 // ─── Trust Lens (Phase 1 — manifesto §24 view-layer carve-out) ────

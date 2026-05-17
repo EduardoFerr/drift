@@ -53,6 +53,7 @@ const {
   loadModLocalMock,
   loadIdentitiesMock,
   loadFollowsMock,
+  loadLensMock,
   loadCommentCountsMock,
   isPasskeyEnabledMock,
   getOrCreateIdentityMock,
@@ -80,6 +81,7 @@ const {
     loadModLocalMock: vi.fn(),
     loadIdentitiesMock: vi.fn(),
     loadFollowsMock: vi.fn(),
+    loadLensMock: vi.fn(),
     loadCommentCountsMock: vi.fn(),
     isPasskeyEnabledMock: vi.fn(),
     getOrCreateIdentityMock: vi.fn(),
@@ -131,6 +133,10 @@ vi.mock('../src/lib/identities', () => ({
 
 vi.mock('../src/lib/follows', () => ({
   loadFollows: loadFollowsMock,
+}))
+
+vi.mock('../src/lib/trust-lens', () => ({
+  loadLens: loadLensMock,
 }))
 
 vi.mock('../src/lib/moderation-local', () => ({
@@ -222,6 +228,7 @@ beforeEach(() => {
   loadModLocalMock.mockResolvedValue(undefined)
   loadIdentitiesMock.mockResolvedValue(undefined)
   loadFollowsMock.mockResolvedValue(undefined)
+  loadLensMock.mockResolvedValue(undefined)
   loadCommentCountsMock.mockResolvedValue(undefined)
   isPasskeyEnabledMock.mockResolvedValue(false)
   getOrCreateIdentityMock.mockResolvedValue({

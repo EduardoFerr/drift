@@ -108,6 +108,9 @@ function applyRow(target: UserPrefs, key: string, value: string): void {
     case 'discover_nudge_dismissed':
       target.discover_nudge_dismissed = value === '1'
       return
+    case 'lens_nudge_dismissed':
+      target.lens_nudge_dismissed = value === '1'
+      return
     default:
       // chave desconhecida — pode ser de fase futura, ignora silenciosamente
       return
