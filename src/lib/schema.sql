@@ -241,6 +241,29 @@ CREATE TABLE IF NOT EXISTS peers_known (
 CREATE INDEX IF NOT EXISTS idx_peers_last_seen    ON peers_known(last_seen DESC);
 CREATE INDEX IF NOT EXISTS idx_peers_score_inputs ON peers_known(latency_ms, fail_count);
 
+-- ── Relay directory cache (NIP-11) — discovery UX ────────────────
+-- Cache de fetch NIP-11 (`Accept: application/nostr+json`) dos relays
+-- curados. Fonte estática vem de `Docs/curated-relays-YYYY-MM.json`
+-- (importada em `src/config/relays-directory.ts`); ESTE cache armazena
+-- metadata viva (latency, supported_nips, software, version, etc.)
+-- com TTL de 24h.
+--
+-- Manifesto §17 adendo + invariante #18: directory é OPT-IN pro user
+-- adicionar relay; SEED_RELAY_CONFIGS continua mínimo (anti-spam-only).
+--
+-- Tabela operacional/cache (não-domínio) — pode dropar sem perder dados
+-- de eventos. Reconstrói via re-fetch.
+CREATE TABLE IF NOT EXISTS relay_directory_cache (
+  url            TEXT PRIMARY KEY,        -- WSS URL canônica
+  json           TEXT NOT NULL,           -- NIP-11 raw response body
+  latency_ms     INTEGER,                 -- TCP+TLS+resp roundtrip; null se timeout
+  software       TEXT,                    -- extraído de json.software pra query rápida
+  supported_nips TEXT,                    -- JSON array dos NIPs suportados
+  fetched_at     INTEGER NOT NULL,        -- unix sec — TTL check
+  ok             INTEGER DEFAULT 1        -- 0 = fetch falhou; mantém TTL pra evitar retry storm
+);
+CREATE INDEX IF NOT EXISTS idx_relay_directory_fetched ON relay_directory_cache(fetched_at);
+
 -- ── User metadata kind 0 (NIP-01) — opt-in identity ───────────────
 -- Cache de eventos kind 0 (perfil público Nostr canônico). Replaceable
 -- event: LWW por `event_created_at` na ingestão. Tabela SEPARADA de

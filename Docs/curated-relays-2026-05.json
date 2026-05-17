@@ -1,0 +1,133 @@
+{
+  "$schema": "./curated-relays.schema.json",
+  "version": "2026-05",
+  "lastAuditedAt": "2026-05-17",
+  "curator": "Drift HIMYM research (Robin)",
+  "rationale": "Snapshot mensal versionado em git. Lista de sugestão NÃO whitelist — user sempre pode adicionar relay manualmente em Settings > Relays. Constraint do Arquiteto 2026-05-17: SEM pagos. Constraint manifesto §17 adendo + CLAUDE invariante #18: relays AI-moderated entram no Discovery, NUNCA no SEED.",
+  "tabs": {
+    "curated": "Recomendados Drift — relays neutros gratuitos, mix de jurisdições, alto volume",
+    "moderated": "Moderados opt-in com AI filter — user escolhe conscientemente (manifesto §17 adendo)",
+    "free": "Sem moderação ativa — paranoid tier, ativistas, jornalistas em país sob censura",
+    "community": "Community relays NIP-29 (admins/membership grupos privados)",
+    "onion": "Tor hidden service (.onion) — exige network_mode=tor no Drift"
+  },
+  "relays": [
+    {
+      "url": "wss://relay.damus.io",
+      "tab": "curated",
+      "policy": "manual-spam-only",
+      "policyDetail": "Sem AI scan; spam rate-limit técnico. Read sempre free; write pode exigir Damus Purple em períodos.",
+      "cost": "free",
+      "trustNote": "Operado por jb55 (Damus iOS). OpenSats funded.",
+      "source": "https://damus.io/support/"
+    },
+    {
+      "url": "wss://nos.lol",
+      "tab": "curated",
+      "policy": "manual-spam-only",
+      "policyDetail": "Public relay, sem moderação de conteúdo. Alto volume, alta diversidade de kinds.",
+      "cost": "free",
+      "source": "https://nostr.watch/"
+    },
+    {
+      "url": "wss://relay.nostr.band",
+      "tab": "curated",
+      "policy": "manual-spam-only",
+      "policyDetail": "Public aggregator com indexing. Sem AI scan.",
+      "cost": "free",
+      "source": "https://nostr.band/"
+    },
+    {
+      "url": "wss://relay.snort.social",
+      "tab": "free",
+      "policy": "unmoderated",
+      "policyDetail": "Sem rejeição de conteúdo declarada. Operado por equipe Snort.",
+      "cost": "free",
+      "source": "https://docs.snort.social/"
+    },
+    {
+      "url": "wss://relay.primal.net",
+      "tab": "free",
+      "policy": "unmoderated",
+      "policyDetail": "Infra própria Primal, filtros mínimos só anti-spam técnico.",
+      "cost": "free",
+      "source": "https://primal.net"
+    },
+    {
+      "url": "wss://nostr.sethforprivacy.com",
+      "tab": "free",
+      "policy": "unmoderated",
+      "policyDetail": "Cloud diverso (não Cloudflare/AWS). Sem moderação política.",
+      "cost": "free",
+      "source": "https://simplifiedprivacy.com/nostr-relay-guide/"
+    },
+    {
+      "url": "wss://nostr.thank.eu",
+      "tab": "free",
+      "policy": "unmoderated",
+      "policyDetail": "Swiss host. Sem moderação política. Jurisdição protetiva.",
+      "cost": "free",
+      "source": "https://simplifiedprivacy.com/nostr-relay-guide/"
+    },
+    {
+      "url": "wss://relay.nos.social",
+      "tab": "moderated",
+      "policy": "ai-assisted-opt-in",
+      "policyDetail": "Tagr Bot rotula NSFW/hate/illegal via NIP-56 (kind 1984). Opt-in: user segue o bot pra receber labels. Sem filtro server-side automático — labels são metadata, não rejection.",
+      "cost": "free",
+      "trustNote": "Único relay moderado com AI que respeita §25 (user escolhe seguir o bot, scan não é forçado).",
+      "source": "https://www.nos.social/tagr-bot"
+    },
+    {
+      "url": "wss://nostr.oxtr.dev",
+      "onion": "ws://oxtrdevav64z64yb7x6rjg4ntzqjhedm5b5zjqulugknhzr46ny2qbad.onion",
+      "tab": "onion",
+      "policy": "unmoderated",
+      "policyDetail": "Self-hosted, censorship-resistant. Disponível também como hidden service Tor.",
+      "cost": "free",
+      "source": "https://github.com/0xtrr/onion-service-nostr-relays"
+    },
+    {
+      "url": "wss://relay.snort.social",
+      "onion": "ws://skzzn6cimfdv5e2phjc4yr5v7ikbxtn5f7dkwn5c7v47tduzlbosqmqd.onion",
+      "tab": "onion",
+      "policy": "unmoderated",
+      "policyDetail": "Mirror onion do relay.snort.social. Mesma política, acessível via Tor.",
+      "cost": "free",
+      "source": "https://github.com/0xtrr/onion-service-nostr-relays"
+    }
+  ],
+  "excluded": {
+    "rationale": "Estes relays foram considerados e DEIXADOS DE FORA. Documentado pra transparência.",
+    "list": [
+      {
+        "url": "wss://nostr.wine",
+        "reason": "Paid (~10k sats/mês). Constraint do Arquiteto 2026-05-17: sem pagos no curated."
+      },
+      {
+        "url": "wss://filter.nostr.wine",
+        "reason": "Paid filter (~10k sats/mês). Mesma constraint."
+      },
+      {
+        "url": "wss://nostr.land",
+        "reason": "Paid (Lightning paywall). Mesma constraint."
+      },
+      {
+        "url": "ws://nostrland2gdw7g3y77ctftovvil76vquipymo7tsctlxpiwknevzfid.onion",
+        "reason": "Mirror onion de nostr.land (paid)."
+      }
+    ]
+  },
+  "maintenance": {
+    "next_audit": "2026-06-17",
+    "audit_protocol": [
+      "1. Probe WSS handshake de cada URL (timeout 5s)",
+      "2. Fetch NIP-11 (Accept: application/nostr+json) e validar JSON",
+      "3. Cross-check com nostr.watch online list",
+      "4. Atualizar policy/policyDetail se operator mudou",
+      "5. Remover relays mortos >30d sem resposta",
+      "6. Adicionar PRs comunitários com nova entrada (consenso curador)"
+    ],
+    "ci_hook": "Fase MVP+1 — .github/workflows/curated-health.yml (cron mensal)"
+  }
+}
