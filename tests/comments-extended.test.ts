@@ -345,14 +345,20 @@ describe('schema migration v9 (C.6.2)', () => {
     expect(src).toMatch(/ALTER TABLE comments ADD COLUMN content_warning TEXT/)
   })
 
-  it('db.worker.ts marker bumpado em schema_v=10 (Round Comments Nav Phase A)', () => {
+  it('db.worker.ts marker bumpado em schema_v ≥ 10 (Round Comments Nav Phase A)', () => {
     // schema_v=9: content_warning em comments (Track C.6.2) — coluna ainda
     // alterada idempotente no apply loop.
     // schema_v=10: thread_view_mode em user_prefs (key/value, sem DDL).
+    // schema_v=11: Trust Lens Phase 1 (lens_edges/lens_walks_cache/
+    // lens_filter_rules) — marker bumpado.
+    // Forward-only migrations: validar que marker é >=10 (latest).
     const src = readFileSync(
       resolve(__dirname, '../src/lib/db.worker.ts'),
       'utf-8',
     )
-    expect(src).toMatch(/'schema_v',\s*'10'/)
+    const match = src.match(/'schema_v',\s*'(\d+)'/)
+    expect(match).not.toBeNull()
+    const version = parseInt(match![1] ?? '0', 10)
+    expect(version).toBeGreaterThanOrEqual(10)
   })
 })
