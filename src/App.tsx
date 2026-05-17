@@ -239,8 +239,47 @@ function AboutCardLayer({ onClose }: { onClose: () => void }) {
         <p className="px-1 font-mono text-[10px] leading-relaxed text-drift-muted/30">
           eventos imutáveis assinados (kinds 9078–9081). score determinístico. identidade portável via nsec1. PWA + tauri opcional.
         </p>
+
+        <div className="rounded-2xl border border-drift-border/40 bg-drift-surface/50 px-5 py-3.5">
+          <span className="font-display text-[14px] font-bold uppercase tracking-tag text-drift-accent">
+            atualizar
+          </span>
+        </div>
+        <p className="px-1 font-mono text-[10px] leading-relaxed text-drift-muted/30">
+          drift é PWA; cache do service worker pode segurar versão antiga por até 24h após deploy. forçar atualização limpa o cache e recarrega.
+        </p>
+        <div className="pl-3">
+          <RefreshAppButton />
+        </div>
       </div>
     </FullPageCard>
+  )
+}
+
+/**
+ * R33 — botão "atualizar app" pra forçar refresh do PWA cache.
+ * Reusa `clearServiceWorkerAndReload` do LazyBoundary (mesma lógica
+ * do retry de chunk fail). User-reportado: cliente fica em versão
+ * stale após deploy; SW pode demorar até 24h pra detectar nova
+ * versão. Botão manual dá agência ao user (manifesto §1 existência
+ * autônoma — não depende de timing de SW).
+ */
+function RefreshAppButton() {
+  const [refreshing, setRefreshing] = useState(false)
+  async function handleRefresh() {
+    if (refreshing) return
+    setRefreshing(true)
+    const { clearServiceWorkerAndReload } = await import('./components/UI/LazyBoundary')
+    await clearServiceWorkerAndReload()
+  }
+  return (
+    <button
+      onClick={() => void handleRefresh()}
+      disabled={refreshing}
+      className="w-full rounded-xl bg-drift-accent2 px-4 py-3 font-mono text-[12px] uppercase tracking-meta font-medium text-drift-bg transition-colors hover:bg-drift-accent2/85 disabled:cursor-not-allowed disabled:opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
+    >
+      {refreshing ? 'recarregando…' : '↻ atualizar app'}
+    </button>
   )
 }
 

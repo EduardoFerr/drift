@@ -42,8 +42,10 @@ interface LazyBoundaryState {
  * o SW está servindo um precache list stale após deploy. Falha silente:
  * se a API não existe ou rejeita, o reload sozinho ainda resolve a
  * maioria dos casos.
+ *
+ * Exportado pra reuso em UI de "atualizar app" (Settings > Sobre, R33).
  */
-async function clearServiceWorkerAndReload(): Promise<void> {
+export async function clearServiceWorkerAndReload(): Promise<void> {
   try {
     if ('caches' in window) {
       const names = await caches.keys()
