@@ -102,16 +102,10 @@ o "porquê" via `git show <hash>`.
 
 ## UX / Design — adicionados 2026-05-17 (sessão noite III)
 
-- [ ] **InstallModal — design antigo confirmado** (src/App.tsx:2131-2218)
-  Audit dialog 2026-05-17 confirma: NÃO usa primitives do design system:
-    - ❌ Não usa `FullPageCard` nem `SlideUpOverlay`
-    - ❌ Não usa `SectionHeader` (extraído em [680a7c6])
-    - ❌ Botões inline em vez de `DriftButton`
-    - ❌ Emoji 📥 + ✕ em vez de SVG icons (Sprint 2/3 não cobriu)
-    - ❌ Backdrop ad-hoc `bg-black/70` em vez de SlideUpOverlay backdrop
-  Decisão: migrar pra `SlideUpOverlay` + `ModalHeader` + `DriftButton`
-  + SVG icons (Download/X). Mantém tom específico do passo-a-passo iOS.
-  Bloqueio: nenhum — quick win (~30min), padrão estabelecido.
+- [x] **InstallModal — design antigo confirmado** — fechado 2026-05-17
+  em [b2c5f6b]. Migrado pra SlideUpOverlay + ModalHeader + DriftButton
+  + DownloadIcon SVG. Emoji 📥 ✕ removidos, backdrop ad-hoc removido,
+  botões inline substituídos por variants primary/ghost/cancel.
 
 - [ ] **Audit sistemático de dialogs antigos** — gerador da pergunta
   user 2026-05-17 ("alguns dialogs parecem não ter seguido o novo
@@ -138,14 +132,13 @@ o "porquê" via `git show <hash>`.
 
 ## UX / Design — adicionados 2026-05-17 (sessão noite II)
 
-- [ ] **ComposeOverlay textarea — baixo contraste em alguns temas** —
-  campo "escreva o que vai derivar…" fica ilegível em pelo menos um dos
-  temas (cinder/rosenholz/velatura). Placeholder + text color provavelmente
-  têm alpha demais sobre bg-drift-surface. Precisa medir contrast ratio
-  por tema (similar Marshall WCAG audit fechado em [6e4f1ce]).
-  Contexto: screenshot user 2026-05-17 sessão noite II.
-  Bloqueio: precisa identificar tema afetado + ratio atual. HIMYM Marshall
-  pode auditar.
+- [x] **ComposeOverlay textarea — baixo contraste em alguns temas** —
+  fechado 2026-05-17 em [4b673ad]. Causa raiz: double-alpha
+  `bg-drift-bg/60` + `placeholder:text-drift-muted/40` = ratio 1.68:1
+  em velatura (FALHA AA). Fix systemático: 13 form fields em 8 arquivos
+  migrados de `placeholder:text-muted/25-40` → `/70`; ComposeOverlay
+  bg também trocado pra opaco. Conformance test estendido cobre vetor 2
+  (placeholder form fields) além do vetor 1 (backdrop-blur).
 
 - [ ] **ComposeOverlay — "Publicar" → "Prévia do post"** — UX flow:
     1. Botão atual "Publicar ↑" no rodapé do compose vira "Prévia do post"
