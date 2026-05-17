@@ -339,3 +339,27 @@ export function CopyIcon({ size = 18, className = '' }: IconProps) {
     </svg>
   )
 }
+
+/** 📤 Share / compartilhar (Feather-style — node central + 2 nodes ligados). */
+export function ShareIcon({ size = 18, className = '' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" className={className} {...base}>
+      <circle cx="18" cy="5" r="3" />
+      <circle cx="6" cy="12" r="3" />
+      <circle cx="18" cy="19" r="3" />
+      <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+      <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+    </svg>
+  )
+}
+
+/** 🖼 Image / share-image (Feather-style — moldura + sol + montanha). */
+export function ImageIcon({ size = 18, className = '' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" className={className} {...base}>
+      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+      <circle cx="8.5" cy="8.5" r="1.5" />
+      <polyline points="21 15 16 10 5 21" />
+    </svg>
+  )
+}

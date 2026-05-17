@@ -33,6 +33,8 @@ import {
   PlusIcon,
   CheckIcon,
   XIcon,
+  ShareIcon,
+  ImageIcon,
 } from '../UI/Icons'
 
 /**
@@ -62,8 +64,14 @@ function FanIcon({ icon, size = 18 }: { icon: string; size?: number }) {
       return <CheckIcon size={size} />
     case '⚠':
       return <WarningIcon size={size} />
+    case '📤':
+      return <ShareIcon size={size} />
+    case '🖼':
+    case '🖼️':
+      return <ImageIcon size={size} />
     default:
-      // Fallback pra emojis não mapeados (📤 share-post, 🖼 share-image)
+      // Fallback genérico — Sprint 4+ pode adicionar mais SVG conforme
+      // novos items de ActionsFan apareçam.
       return <span aria-hidden="true">{icon}</span>
   }
 }
@@ -1128,6 +1136,11 @@ function ActionsFan({
             transition={{ duration: 0.18, delay: i * 0.04, ease: [0.22, 1, 0.36, 1] }}
             className="absolute right-4 z-30"
             style={{ top: `${60 + i * 48}px` }}
+            // BUG-LONGPRESS-FAN fix 2026-05-17 — opt-out do long-press 5s
+            // do card parent. Hold no fan já tem semantics próprio (tooltip
+            // 500ms via startHold/holdEnd); sem este attr, parent
+            // handleCardPointerDown também dispararia ModerationModal em 5s.
+            data-no-longpress="true"
           >
             {/* Tooltip à esquerda do ícone — visível enquanto hold ativo
                 pra este item. Glass styled, max-w prevent overflow. */}
