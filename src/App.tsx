@@ -56,6 +56,11 @@ const DialogHost = lazy(() =>
     default: m.DialogHost,
   })),
 )
+const DiscoverNudgeBanner = lazy(() =>
+  import('./components/Settings/DiscoverNudgeBanner').then((m) => ({
+    default: m.DiscoverNudgeBanner,
+  })),
+)
 import { dialog } from './lib/dialog'
 import { pushLayer, popLayer, hasLayer } from './lib/layer-stack'
 import { NavBar } from './components/UI/NavBar'
@@ -1087,6 +1092,9 @@ function App() {
       </LazyBoundary>
       <LazyBoundary fallback={null}>
         <DialogHost />
+      </LazyBoundary>
+      <LazyBoundary fallback={null}>
+        <DiscoverNudgeBanner />
       </LazyBoundary>
 
       <LayerRenderer />

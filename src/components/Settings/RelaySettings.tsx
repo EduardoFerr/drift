@@ -121,6 +121,32 @@ export function RelaySettings({ onClose }: RelaySettingsProps) {
   return (
     <FullPageCard onClose={onClose} title="relays" ariaLabel="settings · relays">
       <div className="space-y-3 px-4 py-5">
+        {/* Discovery entry (E1 do plano relay moderation) — sub-card
+            complementar à UI "adicionar manualmente". Lança DiscoverRelaysCard
+            via pushLayer com tabs por política. */}
+        <button
+          onClick={() => {
+            void import('../../lib/layer-stack').then(({ pushLayer }) => {
+              void import('./DiscoverRelaysCard').then(({ DiscoverRelaysCard }) => {
+                pushLayer({ id: 'discover-relays', component: DiscoverRelaysCard, parent: 'relays' })
+              })
+            })
+          }}
+          className="flex w-full items-center justify-between rounded-2xl border border-drift-accent2/30 bg-drift-surface/50 px-5 py-4 text-left transition-colors hover:bg-drift-accent2/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
+        >
+          <div className="min-w-0">
+            <div className="font-display text-[14px] font-bold uppercase tracking-tag text-drift-accent2">
+              ↗ descobrir relays
+            </div>
+            <p className="mt-0.5 font-mono text-[10px] text-drift-muted/60">
+              relays curados por política — neutros, livres, moderados, onion
+            </p>
+          </div>
+          <span aria-hidden="true" className="shrink-0 font-mono text-[16px] text-drift-accent2/60">
+            ›
+          </span>
+        </button>
+
         <SectionHeader title="conectados" />
         <p className="px-1 font-mono text-[10px] text-drift-muted/30">
           relays intercambiáveis. remover um não tira você da rede.

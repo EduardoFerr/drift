@@ -105,6 +105,9 @@ function applyRow(target: UserPrefs, key: string, value: string): void {
         target.theme_id = value
       }
       return
+    case 'discover_nudge_dismissed':
+      target.discover_nudge_dismissed = value === '1'
+      return
     default:
       // chave desconhecida — pode ser de fase futura, ignora silenciosamente
       return

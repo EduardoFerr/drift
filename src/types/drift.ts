@@ -397,6 +397,15 @@ export interface UserPrefs {
    * scoring/weight/ranking.
    */
   theme_id: ThemeIdPref
+  /**
+   * Banner one-time "descobrir relays" — dismissido permanente pelo
+   * user. Fase A relay moderation (E6 da deliberação 2026-05-17).
+   *
+   * Aparece na home quando identidade tem >7 dias E não foi dismissido.
+   * Manifesto §17 adendo: user comum sabe que pode escolher relays
+   * diferentes do default — sem ser empurrado durante onboarding.
+   */
+  discover_nudge_dismissed: boolean
 }
 
 /**
@@ -436,4 +445,5 @@ export const DEFAULT_USER_PREFS: UserPrefs = {
   p2p_auto_follows: false,
   thread_view_mode: 'list',
   theme_id: 'cinder',
+  discover_nudge_dismissed: false,
 }
