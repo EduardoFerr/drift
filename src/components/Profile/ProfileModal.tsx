@@ -115,6 +115,7 @@ export function ProfileModal({ identity, onClose }: ProfileModalProps) {
     <FullPageCard onClose={onClose} title="perfil" ariaLabel="perfil">
       <div className="space-y-3 px-4 py-5">
         {/* Hero — sempre visível */}
+        {/* section-header-audit: ok reason=content-card-com-Avatar-nao-header */}
         <div className="rounded-2xl border border-drift-border/40 bg-drift-surface/50 px-5 py-5">
           <div className="flex items-start gap-4">
             <Avatar metadata={metadata} npub={identity.npub} />

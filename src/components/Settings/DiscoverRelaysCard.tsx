@@ -22,6 +22,7 @@
 
 import { useEffect, useState } from 'react'
 import { FullPageCard } from '../UI/FullPageCard'
+import { SectionHeader } from '../UI/SectionHeader'
 import { RelayTierBadge, type RelayTier } from '../UI/RelayTierBadge'
 import {
   getRelaysByTab,
@@ -60,6 +61,7 @@ export function DiscoverRelaysCard({ onClose }: CardProps) {
     <FullPageCard onClose={onClose} title="descobrir relays" ariaLabel="descobrir relays">
       <div className="space-y-3 px-4 py-5">
         {/* Hero — 2 frases (Lily proposta) */}
+        {/* section-header-audit: ok reason=content-card-hero-com-paragrafo-nao-header */}
         <div className="rounded-2xl border border-drift-border/40 bg-drift-surface/50 px-5 py-4">
           <p className="font-mono text-[11px] leading-relaxed text-drift-muted/70">
             drift conecta a múltiplos servidores (relays). cada relay decide
@@ -264,6 +266,7 @@ function RelayDetailModal({
   return (
     <FullPageCard onClose={onClose} title="detalhes do relay" ariaLabel={`detalhes ${entry.url}`}>
       <div className="space-y-3 px-4 py-5">
+        {/* section-header-audit: ok reason=content-card-com-RelayTierBadge-nao-header */}
         <div className="rounded-2xl border border-drift-border/40 bg-drift-surface/50 px-5 py-4">
           <div className="break-all font-mono text-[12px] text-drift-text">
             {entry.url}
@@ -299,11 +302,7 @@ function RelayDetailModal({
           )}
         </div>
 
-        <div className="rounded-2xl border border-drift-border/40 bg-drift-surface/50 px-5 py-3.5">
-          <span className="font-display text-[14px] font-bold uppercase tracking-tag text-drift-accent">
-            NIP-11
-          </span>
-        </div>
+        <SectionHeader title="NIP-11" />
         <p className="px-1 font-mono text-[10px] text-drift-muted/30">
           metadata declarada pelo relay (atualizada a cada 24h).
         </p>
@@ -323,11 +322,7 @@ function RelayDetailModal({
 
         {entry.onion && (
           <>
-            <div className="rounded-2xl border border-drift-border/40 bg-drift-surface/50 px-5 py-3.5">
-              <span className="font-display text-[14px] font-bold uppercase tracking-tag text-drift-accent">
-                onion mirror
-              </span>
-            </div>
+            <SectionHeader title="onion mirror" />
             <p className="px-1 font-mono text-[10px] text-drift-muted/30">
               acessível via Tor (precisa `network_mode=tor` no Drift).
             </p>

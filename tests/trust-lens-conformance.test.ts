@@ -114,14 +114,9 @@ describe('Trust Lens — conformance (LOCK_VIA_TEST §17 §22 §24 §25 §27)', 
   })
 
   // ─── #3 — PPR Monte Carlo determinism (Marshall + Ted §7) ────────
-  // Mesmo seed + mesma adjacency list → mesmo Map<target, score> bit-
-  // exact. Cross-device convergence exige determinism. Quebra = §7
-  // violado.
-  // DEFER: coberto por tests/trust-lens-math.test.ts (PPR Monte Carlo
-  // section); este conformance fica it.todo até refatorar suite.
-  it.todo(
-    '3. PPR Monte Carlo é determinístico dado mesma seed + adjacency',
-  )
+  // Coberto em `tests/trust-lens-math.test.ts > "PPR Monte Carlo
+  // determinism"`. Não duplicar aqui (Marshall conformance audit
+  // 2026-05-17 — DELETE todo redundante).
 
   // ─── #4 — Edge influence bounds (Marshall) ───────────────────────
   // Property test: 1000 inputs aleatórios em domínios válidos de
@@ -267,7 +262,53 @@ describe('Trust Lens — conformance (LOCK_VIA_TEST §17 §22 §24 §25 §27)', 
   // publish em event tag (kinds 9078/9079/9080/9081/1984 sem ref a
   // lens_*), export em bundle (transport/webrtc/* sem ref).
   // LOCK_VIA_TEST §17/§22/§25 — "no trust catedral compartilhada".
-  it.todo(
-    '9. PPR scores nunca aparecem em event tags published ou bundle exports',
-  )
+  it('9. PPR scores nunca aparecem em event tags published ou bundle exports', () => {
+    // Expande scope do #6 (que já cobre protocol.ts + nostr.ts) pra incluir
+    // todo transport/webrtc/* + qualquer arquivo que toque event.tags ou
+    // bundle payload. Tokens proibidos = nomes load-bearing de Trust Lens.
+    const forbiddenTokens = [
+      /\blens_edges\b/,
+      /\blens_walks_cache\b/,
+      /\bppr_score\b/,
+      /\bcomputeInfluence\b/,
+      /\bcomputePpr\b/,
+      /\bgetPprForAuthor\b/,
+    ]
+    // Arquivos que tocam eventos publicados ou bundle exports
+    const targets: string[] = []
+    // src/lib/protocol.ts + nostr.ts (já em #6, re-cover)
+    targets.push('src/lib/protocol.ts', 'src/lib/nostr.ts')
+    // Todo src/lib/transport/webrtc/* (bundle, peer link, signaling)
+    function walk(dir: string): void {
+      try {
+        for (const name of readdirSync(dir)) {
+          const full = join(dir, name)
+          const st = statSync(full)
+          if (st.isDirectory()) walk(full)
+          else if (full.endsWith('.ts')) targets.push(full.replace(/\\/g, '/'))
+        }
+      } catch {
+        // Diretório pode não existir em fase intermediária — skip
+      }
+    }
+    walk('src/lib/transport/webrtc')
+
+    const violations: string[] = []
+    for (const file of targets) {
+      const content = readFileSync(file, 'utf8')
+      // Strip comments — pattern em doc não conta
+      const stripped = content
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .replace(/^\s*\/\/.*$/gm, '')
+      for (const re of forbiddenTokens) {
+        if (re.test(stripped)) {
+          violations.push(`${file} — token proibido: ${re.source}`)
+        }
+      }
+    }
+    expect(
+      violations,
+      `\n${violations.join('\n')}\nManifesto §17/§22/§25: PPR scores nunca saem do device. Code path que publica/exporta NÃO pode referenciar lens state.`,
+    ).toEqual([])
+  })
 })
