@@ -100,6 +100,42 @@ o "porquê" via `git show <hash>`.
   Bloqueio: aguardando decisão de scope (refactor grande vs grandfather
   existente + aplicar só em novos components).
 
+## UX / Design — adicionados 2026-05-17 (sessão noite IV)
+
+- [ ] **Banners "ANTES DE PUBLICAR" / avisos longos inline — tooltip ou
+  dialog?** — EditProfileCard tem banner inline com texto longo (§28
+  privacidade pelo mínimo, §5.3 modos de identidade — "o cliente nunca
+  obriga o usuário a se identificar..."). Padrão atual: banner amber
+  no topo do form sempre visível, ocupa ~25% da viewport.
+  Decisão UX: vale converter pra ícone (i) com tooltip on-hover/tap?
+  Ou dialog informativo opt-in (botão "saiba mais")? Trade-offs:
+    - **Banner inline**: privacidade visível ao max (§28 alignment); MAS
+      polui form, user fast-path lê toda vez.
+    - **Tooltip (i)**: form limpo, info disponível on-demand; MAS user
+      pode pular sem ver — falha em "consentimento informado".
+    - **Dialog one-time first-edit**: aparece 1x na primeira edição,
+      depois (i) tooltip; balanço entre os dois acima.
+  Bloqueio: HIMYM Lily/Barney deliberar — §28 privacy-visible vs UX clean.
+  Aplicar pattern escolhido em EditProfileCard + outros forms com banner
+  similar (ComposeOverlay tem warning de content-warning? IdentityPanel
+  passkey warnings? audit).
+
+- [ ] **Views ainda sem design novo (audit umbrella expansion)** — após
+  fechar InstallModal em [b2c5f6b], user identificou mais views legacy.
+  Screenshot 2026-05-17 sessão noite IV mostra EditProfileCard com:
+    - Header "editar perfil" + "FECHAR" ad-hoc (não usa ModalHeader
+      primitive — Marshall regra de DRY)
+    - Labels de campo inline (não usa SectionHeader extraído em [680a7c6])
+    - Botão "✓ PUBLICAR" rodapé não usa DriftButton primitive
+    - Banner amber inline sem usar primitive de alerta/warning
+  Audit sistemático Lily/Marshall: varrer `grep -lE "role=\"dialog\""`
+  + `grep -lE "<FullPageCard"` cross-reference; listar gaps de cada
+  view legacy + estimar custo de migração.
+  Contexto: User pediu explicitamente "ainda existem visões sem o
+  design novo" — refina o item umbrella "Audit sistemático de dialogs
+  antigos" da sessão noite III.
+  Bloqueio: audit sistemático ainda pendente (esperando dispatch).
+
 ## UX / Design — adicionados 2026-05-17 (sessão noite III)
 
 - [x] **InstallModal — design antigo confirmado** — fechado 2026-05-17
