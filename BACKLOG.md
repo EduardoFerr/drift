@@ -4,6 +4,15 @@ Registro durável de decisões abertas que precisam de input do user.
 Não é todo-list de implementação — é rastro de **rumos** que ficaram
 abertos entre tarefas.
 
+> **Escopo deste arquivo (raiz)**: decisões de sessão de chat — UX,
+> refactors, rumos arquiteturais, pendências reportadas pelo user.
+> Atualizado a cada commit; itens fechados ganham hash anexo.
+>
+> **NÃO confundir** com `Docs/research-backlog.md` — esse outro
+> arquivo guarda pesquisas externas pendentes (libs, RFCs, padrões
+> que dependem de WebFetch/WebSearch), Phase-scoped, mantido pela
+> persona Robin. Sem overlap.
+
 Formato:
 - Item aberto: `- [ ] <decisão> — contexto: <origem> — bloqueio: <quem/quê>`
 - Item fechado: `- [x] <decisão> — fechado YYYY-MM-DD em <commit-hash> — <1 linha resolução>`
@@ -91,6 +100,42 @@ o "porquê" via `git show <hash>`.
   Bloqueio: aguardando decisão de scope (refactor grande vs grandfather
   existente + aplicar só em novos components).
 
+## UX / Design — adicionados 2026-05-17 (sessão noite III)
+
+- [ ] **InstallModal — design antigo confirmado** (src/App.tsx:2131-2218)
+  Audit dialog 2026-05-17 confirma: NÃO usa primitives do design system:
+    - ❌ Não usa `FullPageCard` nem `SlideUpOverlay`
+    - ❌ Não usa `SectionHeader` (extraído em [680a7c6])
+    - ❌ Botões inline em vez de `DriftButton`
+    - ❌ Emoji 📥 + ✕ em vez de SVG icons (Sprint 2/3 não cobriu)
+    - ❌ Backdrop ad-hoc `bg-black/70` em vez de SlideUpOverlay backdrop
+  Decisão: migrar pra `SlideUpOverlay` + `ModalHeader` + `DriftButton`
+  + SVG icons (Download/X). Mantém tom específico do passo-a-passo iOS.
+  Bloqueio: nenhum — quick win (~30min), padrão estabelecido.
+
+- [ ] **Audit sistemático de dialogs antigos** — gerador da pergunta
+  user 2026-05-17 ("alguns dialogs parecem não ter seguido o novo
+  design"). InstallModal já identificado; precisa varrer outros
+  candidatos: BootView dialogs, dialog.confirm/prompt instances,
+  qualquer modal inline em App.tsx que ainda não migrou.
+  Contexto: Lily UX audit pendente.
+  Bloqueio: HIMYM Lily/Marshall podem fazer audit sistemático com grep
+  `role="dialog"` + cross-reference com FullPageCard/SlideUpOverlay.
+
+- [ ] **Contraste de texto em dialogs sobre backdrop dinâmico** —
+  user pergunta se precisa técnica para contraste. Auditoria:
+    - InstallModal usa `bg-drift-surface` SEM alpha (opaco) — contraste
+      OK em cinder/rosenholz; risco em velatura (light theme).
+    - Bg-black/70 no backdrop tem blur — texto do modal não atravessa.
+    - Surface opaco já é a "técnica" — não precisa text-shadow nem stroke.
+    - MAS: outros dialogs (DialogHost custom?) podem usar surface/N alpha
+      que tira o opaco. Precisa varredura junto com #1.
+  Decisão técnica registrada: text-shadow é fallback **só** quando bg é
+  inevitavelmente dinâmico (mapa/foto). Em dialog padrão, manter surface
+  opaco + medir contrast ratio por tema é a fix correta.
+  Bloqueio: depende do audit #1 — uma vez listados todos os dialogs,
+  Marshall WCAG audit confirma quais precisam fix.
+
 ## UX / Design — adicionados 2026-05-17 (sessão noite II)
 
 - [ ] **ComposeOverlay textarea — baixo contraste em alguns temas** —
@@ -122,11 +167,12 @@ o "porquê" via `git show <hash>`.
   (Twitter/Bluesky pattern) + auto-refresh invalidateFeed já existente.
   Conformance test `tests/feed-tabs-gesture-conformance.test.ts` trava.
 
-- [ ] **Dialogs com design antigo** — alguns dialogs (confirmações, prompts)
-  não seguiram o novo design system (FullPageCard + section-header +
-  drift-accent2). Revisar todos os `dialog.confirm` / `dialog.prompt` e
-  componentes em `src/lib/dialog.ts` + DialogHost.
-  Bloqueio: precisa varredura sistemática + decisão sobre quais migrar.
+- [ ] **Dialogs com design antigo** — alguns dialogs (confirmações,
+  prompts) não seguiram o novo design system. Item refinado em
+  2026-05-17 sessão noite III: ver items "InstallModal — design antigo
+  confirmado" + "Audit sistemático de dialogs antigos" no topo do
+  arquivo. Este item passa a ser umbrella.
+  Bloqueio: aguarda audit sistemático fechar.
 
 - [ ] **Onboarding com muito CLS entre steps** — Cumulative Layout Shift
   alto durante transições de step no OnboardingOverlay. Provavelmente

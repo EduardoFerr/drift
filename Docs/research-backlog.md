@@ -10,6 +10,14 @@ ideal** (onde olhar primeiro).
 Mantida pela Robin (research). Atualizar quando item for resolvido —
 mover pra "Resolvido" no fim do doc.
 
+> **Escopo deste arquivo**: research externo Phase-scoped — libs,
+> RFCs, NIPs, padrões de mercado que exigem WebFetch/WebSearch pra
+> resolver. Itens longos com **pergunta/bloqueia/workaround/fonte**.
+>
+> **NÃO confundir** com `BACKLOG.md` (raiz) — esse guarda decisões
+> de sessão de chat (UX, refactors, rumos arquiteturais reportados
+> pelo user). Sem overlap.
+
 ---
 
 ## Fase 6.1a (em andamento — `transport/webrtc.ts` + signaling mock)
