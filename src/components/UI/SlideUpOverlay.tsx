@@ -58,6 +58,13 @@ export interface SlideUpOverlayProps {
    * children deve ter heading semantically discoverable).
    */
   ariaLabel?: string
+  /**
+   * Boost z-index pra z-[60] (default z-40). Usado em overlays que
+   * precisam dominar UpdatePrompt (z-50) — onboarding, dialogs
+   * críticos. Adicionado 2026-05-17 (OnboardingOverlay migration —
+   * antes era z-[60] inline ad-hoc).
+   */
+  boost?: boolean
 }
 
 const MAX_WIDTH_CLASS: Record<NonNullable<SlideUpOverlayProps['maxWidth']>, string> = {
@@ -73,6 +80,7 @@ export function SlideUpOverlay({
   padded = true,
   backdropDismissible = true,
   ariaLabel,
+  boost = false,
 }: SlideUpOverlayProps) {
   return (
     <m.div
@@ -80,7 +88,9 @@ export function SlideUpOverlay({
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.2 }}
-      className="fixed inset-0 z-40 flex items-center justify-center bg-drift-bg/90 p-4 backdrop-blur-sm"
+      className={`fixed inset-0 flex items-center justify-center bg-drift-bg/90 p-4 backdrop-blur-sm ${
+        boost ? 'z-[60]' : 'z-40'
+      }`}
       onClick={backdropDismissible ? onClose : undefined}
       role="dialog"
       aria-modal="true"

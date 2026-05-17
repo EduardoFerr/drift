@@ -19,6 +19,7 @@ import { useState } from 'react'
 import { m, AnimatePresence } from 'framer-motion'
 import { setPref, usePrefsStore } from '../../lib/prefs'
 import { DriftButton } from '../UI/DriftButton'
+import { SlideUpOverlay } from '../UI/SlideUpOverlay'
 
 export interface OnboardingOverlayProps {
   onClose: () => void
@@ -170,22 +171,19 @@ export function OnboardingOverlay({ onClose, onOpenIdentity }: OnboardingOverlay
   }
 
   return (
-    <m.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.15 }}
-      // z-[60] pra dominar TODAS as outras overlays (UpdatePrompt
-      // z-50, SlideUp z-40, NavBar z-30). User report 2026-05-09:
-      // "Pular/Começar não avança" — o UpdatePrompt fixed bottom z-50
-      // cobria a região dos botões do onboarding, absorvendo todos
-      // os clicks. First-run + SW prompt simultâneo = bloqueio.
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-drift-bg/95 p-4 backdrop-blur-sm"
-      role="dialog"
-      aria-modal="true"
-      aria-label="onboarding do drift"
+    <SlideUpOverlay
+      onClose={skip}
+      ariaLabel="onboarding do drift"
+      maxWidth="md"
+      // boost=true → z-[60] pra dominar UpdatePrompt z-50. User report
+      // 2026-05-09: "Pular/Começar não avança" — antes era z-[60] inline.
+      boost
+      // backdropDismissible=false: user precisa ação explícita (pular
+      // ou completar). Tap acidental no backdrop não deve pular intro.
+      backdropDismissible={false}
+      padded={false}
     >
-      <div className="flex max-h-[85dvh] w-full max-w-md flex-col overflow-y-auto overscroll-contain rounded-2xl border border-drift-border/40 bg-drift-surface/95 px-4 py-5">
+      <div className="flex flex-col px-4 py-5">
         {/* Progress bar estilo Stories */}
         <div className="mb-4 flex gap-1">
           {steps.map((_, i) => (
@@ -247,6 +245,6 @@ export function OnboardingOverlay({ onClose, onOpenIdentity }: OnboardingOverlay
           </div>
         </div>
       </div>
-    </m.div>
+    </SlideUpOverlay>
   )
 }

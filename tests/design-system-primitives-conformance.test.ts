@@ -54,21 +54,63 @@ function fileImportsPrimitive(content: string, primitives: string[]): boolean {
   )
 }
 
+/**
+ * Allowlist explícita de views legacy que ainda usam overlay manual
+ * (`fixed inset-0 z-*`) ao invés de SlideUpOverlay/FullPageCard primitive.
+ *
+ * Cada migration futura REMOVE 1 entry — ratchet força progresso. Adicionar
+ * NOVA entry exige justificativa no PR review (não é trivial).
+ *
+ * Migrações concluídas (removidas):
+ *   - OnboardingOverlay [f8db7XX] → SlideUpOverlay com boost prop
+ *
+ * Migrações pendentes:
+ */
+const OVERLAY_LEGACY_ALLOWLIST = new Set([
+  // Lily ROI #2 — bottom-sheet manual com drag-to-dismiss próprio
+  'src/components/Post/ReplySheet.tsx',
+  // ComposeOverlay sub-overlay interno (preview/abort) — refactor maior
+  'src/components/Create/ComposeOverlay.tsx',
+  // PostViewer ModalWrapper interno — refactor maior
+  'src/components/Post/PostViewer.tsx',
+  // ThreadView role="tree" + bg semi-transparent — exceção documentada
+  'src/components/Post/ThreadView.tsx',
+])
+
 describe('Design system primitives — modal/overlay usage', () => {
-  // FASE OBSERVE — violations atuais (Lily audit 2026-05-17):
+  // FASE OBSERVE — violations restantes (post OnboardingOverlay migration):
   //   - src/components/Create/ComposeOverlay.tsx (sub-overlay interno)
-  //   - src/components/Onboarding/OnboardingOverlay.tsx (overlay shell)
   //   - src/components/Post/ReplySheet.tsx (bottom-sheet manual)
   //   - src/components/Post/PostViewer.tsx (ModalWrapper interno)
-  //   - src/components/Post/ThreadView.tsx (overlay manual)
+  //   - src/components/Post/ThreadView.tsx (overlay manual exceção docs)
   it.todo(
     '1. role="dialog" deve importar de SlideUpOverlay/FullPageCard/DialogHost',
   )
 
-  // FASE OBSERVE — violations atuais: mesmas 5 views acima
-  it.todo(
-    '2. fixed inset-0 z-* fora de UI/ é overlay manual — usar primitive',
-  )
+  // ENFORCE (Marshall Tier 1 #5 post-OnboardingOverlay migration 2026-05-17):
+  // Detecta NOVAS violations. Allowlist contém 4 legacy aguardando migração
+  // — cada migration remove 1 entry da allowlist (ratchet).
+  it('2. fixed inset-0 z-* fora de UI/ é overlay manual — usar primitive (allowlist 4 legacy)', () => {
+    const violations: string[] = []
+    for (const file of walk('src/components')) {
+      if (file.startsWith('src/components/UI/')) continue
+      if (OVERLAY_LEGACY_ALLOWLIST.has(file)) continue
+      const content = readFileSync(file, 'utf8')
+      // Whitelist por comentário
+      if (/(?:\/\/|\/\*)\s*design-system:\s*ok/.test(content)) continue
+      // Strip comments antes do match
+      const stripped = content
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .replace(/^\s*\/\/.*$/gm, '')
+      if (/className=["'][^"']*fixed\s+inset-0\s+z-/.test(stripped)) {
+        violations.push(file)
+      }
+    }
+    expect(
+      violations,
+      `\n${violations.join('\n')}\nFix: usar SlideUpOverlay/FullPageCard primitive em vez de overlay manual. Ou adicionar à OVERLAY_LEGACY_ALLOWLIST com justificativa no PR.`,
+    ).toEqual([])
+  })
 })
 
 describe('Design system primitives — DriftAlert (banners/notices)', () => {
