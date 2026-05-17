@@ -22,19 +22,6 @@ mover pra "Resolvido" no fim do doc.
 
 ## Fase 6.1a (em andamento — `transport/webrtc.ts` + signaling mock)
 
-### R1 — BroadcastChannel em jsdom / Vitest 4.x
-**Pergunta**: o jsdom default que vem com Vitest 4.1.5 expõe
-`BroadcastChannel` nativamente, ou os tests de `signaling-mock.test.ts`
-vão precisar polyfill?
-**Por quê bloqueia**: `webrtc-6.1a-plan.md §8.1` lista isso como
-armadilha. Sem clareza, os tests de signaling mock podem falhar em CI.
-**Workaround interim**: começar implementação. Se jsdom não tem,
-fallback é `happy-dom` env (que tem) ou polyfill manual de ~30 linhas
-com `EventTarget` + Map global por canal.
-**Fonte ideal**: `github.com/jsdom/jsdom` CHANGELOG (procurar
-"BroadcastChannel"); `vitest.dev` docs sobre environments; comparativo
-com `happy-dom`.
-
 ### R2 — RTCPeerConnection mockability em ambiente de teste
 **Pergunta**: existe lib mantida em 2025-2026 que mock
 `RTCPeerConnection` + `RTCDataChannel` pra Vitest, ou todo teste de
@@ -95,21 +82,6 @@ RFC sobre eclipse attacks (Heilman et al. 2015).
 ---
 
 ## Fase 6.3 (STUN/TURN policy)
-
-### R7 — STUN públicos confiáveis em 2026
-**Pergunta**: Google STUN (`stun.l.google.com:19302`) ainda é gratuito
-sem rate limit em 2026? Cloudflare Calls oferece STUN público
-incondicional? Existem listas curadas tipo `pradt2/always-online-stun`
-ainda mantidas?
-**Por quê bloqueia**: vai hard-coded em `transport/webrtc.ts`.
-Mudança = bump versão + push ao cliente. Errar = NAT traversal
-silenciosamente quebra pra usuários atrás de NAT simétrico.
-**Workaround interim**: lista híbrida (Google + Cloudflare + 2-3
-alternativas). Observar via UI métrica de health pra detectar STUN
-caindo.
-**Fonte ideal**: `developers.cloudflare.com/calls/turn`,
-`webrtc.github.io/samples`, GitHub `pradt2/always-online-stun`,
-`stun-protocol.org`.
 
 ### R8 — TURN gratuito ou auto-hospedado em 2026
 **Pergunta**: Cloudflare Calls ainda tem free tier de TURN (10GB/mês)?
@@ -211,19 +183,6 @@ documentar diffoscope output como "best effort".
 
 ## Fase 7.3+ (IPFS pin, run-your-own-relay, sneakernet)
 
-### R16 — Helia (IPFS modular JS) — release stable 2026
-**Pergunta**: `helia` (sucessor de `js-ipfs`) atingiu 1.0 GA?
-Compatível com browser via WebRTC transport? Bundle size atual
-(árvore minimizada)?
-**Por quê bloqueia**: Fase 7 §16 promete IPFS pin de posts virais.
-Decisão entre helia (moderno, modular) vs js-ipfs legacy
-(arquivado mas funcional). Bundle size impacta PWA cold start.
-**Workaround interim**: pinar via service externo (Pinata API) sem
-helia local. Não cumpre §17 (sem chave mestra) plenamente — Pinata
-pode censurar.
-**Fonte ideal**: `github.com/ipfs/helia` releases;
-`bundlephobia.com/package/helia`; benchmarks comunitários.
-
 ### R17 — Pinning services com free tier persistente 2026
 **Pergunta**: Web3.Storage / NFT.Storage / Pinata / Filebase /
 4everland — quais ainda tem free tier permanente em 2026? Quais
@@ -262,18 +221,6 @@ GitHub stars/issues de cada.
 
 ## Cross-cutting
 
-### R20 — Browser support matrix 2026 — Battery API, Network Info
-**Pergunta**: `navigator.getBattery()` ainda funcional em
-Chrome/Firefox/Safari 2026, ou foi deprecated por privacy?
-`navigator.connection.type` cobre quais browsers?
-**Por quê bloqueia**: gating de seeding (Fase 7.1) depende disso
-(`archive/webrtc-seeding.md §"Modos operacionais"`). Se Battery API foi
-removida, modo `lan-wifi-only` precisa heurística diferente.
-**Workaround interim**: feature-detect com fallback `'always-on'`
-explícito (user opt-in mais forte).
-**Fonte ideal**: `caniuse.com/battery-status`, `caniuse.com/netinfo`,
-MDN deprecation notices.
-
 ### R21 — `@sqlite.org/sqlite-wasm` — saiu de pre-release?
 **Pergunta**: pacote ainda só publica como pre-release (motivo do pin
 exato em `package.json`), ou já tem versão estável `^3.x`?
@@ -282,28 +229,6 @@ estabilizou, podemos relaxar pra `~3.51` ou `^3`.
 **Workaround interim**: continuar pin exato. Funciona, só é tedioso.
 **Fonte ideal**: `npmjs.com/package/@sqlite.org/sqlite-wasm`
 versions tab; `sqlite.org/wasm`.
-
-### R22 — Análise de risco WebRTC — IP leak via mDNS 2026
-**Pergunta**: papers ou advisories recentes (2024-2026) sobre
-des-anonymização de WebRTC mesmo com mDNS hostnames? Novos vetores
-descobertos?
-**Por quê bloqueia**: threat model do `archive/webrtc-seeding.md §Riscos` é
-de Abril 2026. Se literatura nova mostra que mDNS já é furável,
-default `lan-wifi-only` perde valor de privacidade.
-**Workaround interim**: doc atual já marca limitação ("não somos
-mixnet"). Honesto.
-**Fonte ideal**: USENIX Security, IEEE S&P proceedings 2024-2026;
-`webrtc-security.github.io` issues recentes.
-
-### R24 — `vite-plugin-pwa` + Workbox v8 status
-**Pergunta**: Workbox v8 saiu? `vite-plugin-pwa@^0.20` em
-`package.json` está em latest, ou existe upgrade significativo
-(performance, precache shrink) disponível?
-**Por quê bloqueia**: Fase 5 fechou PWA polish, mas precache size é
-recorrente. Versão nova pode resolver.
-**Workaround interim**: aceitar tamanho atual; medir com Lighthouse.
-**Fonte ideal**: `github.com/vite-pwa/vite-plugin-pwa` releases;
-`developer.chrome.com/docs/workbox` blog.
 
 ---
 
@@ -341,6 +266,35 @@ recorrente. Versão nova pode resolver.
 - **R25** (MapLibre vs Mapbox bundle size) — ✅ resolvido como "monitor
   passivo". Estado atual aceitável; reabrir só se UX queixar de load
   de mapa. Sem trabalho ativo.
+- **R1** (BroadcastChannel jsdom/Vitest 4.x) — ✅ resolvido 2026-05-17
+  (Robin audit). jsdom 29 + Vitest 4.1.5 expõem `BroadcastChannel`
+  nativamente; `tests/webrtcSignalingMock.test.ts` rodam clean com guards
+  defensivos. Zero polyfill necessário.
+- **R7** (STUN público confiável 2026) — ✅ resolvido por decisão
+  2026-05-17 (Robin audit). Google STUN único (`stun.l.google.com:19302`)
+  hard-coded em `src/lib/transport/webrtc/ice.ts`; Fase 6.4 shipped sem
+  incidente. Multi-STUN só se telemetria mostrar falha.
+- **R16** (Helia IPFS modular JS — release stable 2026) — ✅ resolvido
+  2026-05-17 (Robin audit). `helia@^6.1.4` + `@helia/unixfs@^7.2.1`
+  integrados em `src/lib/blobs.ts` + `helia.ts` + Settings UI (Track B
+  IPFS opt-in). Lazy-loaded — sem custo no cold start.
+- **R20** (Browser support matrix — Battery API) — 🗑 arquivado
+  2026-05-17 (Robin audit, STALE). Modo `lan-wifi-only` do
+  `archive/webrtc-seeding.md` virou archive sem implementar; referente
+  da pergunta sumiu.
+- **R22** (Análise de risco WebRTC mDNS papers 2024-2026) — 🗑 arquivado
+  2026-05-17 (Robin audit, STALE). Threat model atual em
+  `tests/webrtc-tor-mode-isolation.test.ts` + `audit(security)` commit
+  `a0e1bc4`. Doc archive referenciado perdeu o referente.
+- **R24** (`vite-plugin-pwa` + Workbox v8) — ✅ resolvido como "monitor
+  passivo" 2026-05-17 (Robin audit). `vite-plugin-pwa@^0.20.0` +
+  `workbox-window@^7.0.0` estáveis; Fase 5 fechada limpa. Reabrir se
+  precache size virar gargalo Lighthouse.
+- **R29** (Implementação NIP-56 kind 1984) — ✅ resolvido (data ≤
+  2026-05-17). Drift dual-emit: `ReportModal.tsx` publica AMBOS kind
+  9081 (interno) + kind 1984 (NIP-56 cross-client); `src/lib/events.ts`
+  ingere kind 1984 de outros clientes. Ponte semântica entre Drift e
+  ecossistema Nostr fechada.
 
 ---
 
@@ -381,18 +335,6 @@ moderação adaptada. Cliente Drift NÃO escaneia (§7/§25), mas relay
 operator é livre — manifesto §17 não estende a operator de relay.
 **Fonte ideal**: `github.com/hoytech/strfry` + plugins, blogs de
 operadores (Damus, Nos), `nostr-protocol/nips` PR de moderação.
-
-### R29 — Implementação completa de NIP-56 (kind 1984)
-**Pergunta**: schema exato de kind 1984, tags obrigatórias, como
-clientes amplos (Damus, Snort, Iris, Coracle) consomem labels e
-renderizam? Drift hoje ships kind 9081 (REPORT) próprio — qual a
-ponte semântica com NIP-56?
-**Por quê informa**: kind 9081 é Drift-only — outros clientes não
-entendem. NIP-56 é padrão. Drift pode emitir AMBOS (9081 pro pipeline
-interno + 1984 pro ecossistema Nostr) ou só 1984 com tag drift-specific.
-Decidir antes de inflar adoption.
-**Fonte ideal**: `nostrbook.dev/kinds/1984`, NIP-56 spec no
-`nostr-protocol/nips`, source de Damus/Snort handlers.
 
 ### R30 — Arquitetura de moderação Nos/Primal/Damus
 **Pergunta**: como cada cliente top-tier do Nostr lida com moderação?
@@ -437,6 +379,63 @@ chunk.
 
 ---
 
+## Cross-cutting — gaps identificados em audit 2026-05-17 (Robin)
+
+### R34 — i18n libs 2026 — react-i18next vs FormatJS vs LinguiJS
+**Pergunta**: estado 2026 das libs de internacionalização React. Drift
+hoje é hardcoded PT-BR (com vocabulary lock — glossário canônico
+SPREAD/BURY/DRIFT/SINK/DERIVA). Fase 7 distribuição global precisa
+escolher antes de espalhar strings em 1 idioma.
+**Por quê bloqueia**: bundle ratchet ≤250 KB entry — react-i18next +
+ICU runtime parser podem somar +40 KB facil. Lingui (~5-7 KB compile-time)
+ou Custom Zustand (~1-2 KB) cabem confortável. Decidir antes de
+proliferar `t('foo.bar')` em ~80 arquivos.
+**Workaround interim**: HIMYM Robin já fez recommendation curada em
+sessão noite II (deliberation salva em log) — Lingui é favorito. Falta
+spike de 1 dia + POC de 3 dias antes de produção.
+**Fonte ideal**: bundle deltas medidos em `tests/bundle-chunks-conformance.test.ts`,
+`bundlephobia.com` pra cada lib, `lingui.dev`, `react.i18next.com`,
+`formatjs.io`.
+
+### R35 — Trust Lens PPR — citation track Monte Carlo PageRank 2024-2026
+**Pergunta**: papers acadêmicos recentes (2024-2026) sobre Personalized
+PageRank Monte Carlo, log-transform de scores, e path diversity bonus
+(Alvisi/Viswanath family). Phase 1 está implementado mas Phase 2 plan
+referencia "literatura sólida" sem citation track.
+**Por quê informa**: Phase 2 do Trust Lens (FORA integration, Vertex DVM,
+NIP-85) será debatida em algumas semanas. Sem citation track, Robin
+não consegue defender decisões arquiteturais contra reviewers externos
+ou contributors novos.
+**Workaround interim**: Phase 1 shipped sem precisar citation (math
+limpa + conformance tests cobrem corretude). Phase 2 pode esperar
+research adequada.
+**Fonte ideal**: ACM Digital Library + arXiv (queries: "personalized
+pagerank monte carlo", "sybil resistance random walk", "trust graph
+gaming"); papers Viswanath et al. SybilLimit/SybilGuard;
+`github.com/PaperWithCode/awesome-trust`.
+
+### R36 — SVG icon libraries 2026 — Lucide vs Heroicons vs Phosphor vs Tabler
+**Pergunta**: comparativo 2026 das libs de icon SVG React. Drift hoje
+tem icons custom em `src/components/UI/Icons.tsx` (Feather-style MIT
+lineage). Sprint 2-3 SVG migration recém-fechada (`bff07ad`, `f9a529f`)
+adicionou ~10 icons custom. Worth migrar pra lib externa pra cobrir
+mais use cases (50+ icons potenciais ao longo do app)?
+**Por quê informa**: cada icon custom = ~50 linhas SVG + risco de
+inconsistência stroke/size. Lib externa = manutenção zero + bundle
+crescimento controlado por tree-shaking. Mas dep externa = risco
+abandonware (Feather original parou em 2018).
+**Workaround interim**: continuar adding icons custom à medida que
+precisar (~3-5 por sprint). Decidir migration quando inventory passar
+~25 icons custom (ponto onde manutenção começa a pesar).
+**Fonte ideal**: `lucide.dev` (fork ativo do Feather, MIT, ~1450 icons),
+`heroicons.com` (Tailwind team, MIT, ~300 icons), `phosphoricons.com`
+(MIT, ~9000 icons, multi-weight), `tabler-icons.io` (MIT, ~5400 icons).
+Bundle impact via `bundlephobia.com`.
+
+---
+
 *Documento mantido (atribuição original: papel de research/curadoria).
-Última atualização: 2026-05-17.*
-*Itens originais: 25 → 33 (8 novos R26-R33). Resolvidos até 2026-05-01: 4 (R3, R5, R11, R21 parcial).*
+Última atualização: 2026-05-17 (Robin audit cleanup).*
+*Itens originais: 25 → 36 (11 novos R26-R36). Resolvidos: 12 (R1, R3, R4,
+R5, R7, R11, R12, R16, R23, R24, R25, R29, R33) + 2 STALE arquivados
+(R20, R22). Ativos: ~22 ainda em aberto.*
