@@ -70,6 +70,9 @@ import { dialog } from './lib/dialog'
 import { pushLayer, popLayer, hasLayer } from './lib/layer-stack'
 import { NavBar } from './components/UI/NavBar'
 import { FullPageCard } from './components/UI/FullPageCard'
+import { SlideUpOverlay } from './components/UI/SlideUpOverlay'
+import { ModalHeader } from './components/UI/ModalHeader'
+import { DriftButton } from './components/UI/DriftButton'
 import { LayerRenderer } from './components/UI/LayerRenderer'
 import { LazyBoundary } from './components/UI/LazyBoundary'
 import { Collapse } from './components/UI/Collapse'
@@ -2134,86 +2137,74 @@ function InstallModal({ onClose }: { onClose: () => void }) {
   const [showIosHelp, setShowIosHelp] = useState(kind === 'ios-safari')
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="instalar Drift"
-      className="fixed inset-0 z-50 flex items-center justify-center px-4"
-    >
-      {/* Backdrop — clique fecha sem persistir. */}
-      <div
-        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
-        onClick={onClose}
-        aria-hidden="true"
+    <SlideUpOverlay onClose={onClose} maxWidth="sm" ariaLabel="instalar Drift">
+      <ModalHeader
+        title="instalar Drift"
+        subtitle={
+          kind === 'ios-safari'
+            ? 'Safari iOS não tem botão de instalar — segue o passo a passo abaixo.'
+            : 'PWA — instala sem app store. Manifesto §1 (existência autônoma).'
+        }
+        onClose={onClose}
       />
-      <div className="relative w-full max-w-sm rounded border border-drift-accent/40 bg-drift-surface p-5 shadow-xl">
-        <div className="mb-3 flex items-start gap-3">
-          <span className="text-xl" aria-hidden="true">📥</span>
-          <div className="flex-1">
-            <h2 className="font-mono text-[12px] uppercase tracking-[2px] text-drift-accent">
-              instalar Drift
-            </h2>
-            <p className="mt-1 font-mono text-[10px] text-drift-muted">
-              {kind === 'ios-safari'
-                ? 'Safari iOS não tem botão de instalar — segue o passo a passo abaixo.'
-                : 'PWA — instala sem app store. Manifesto §1 (existência autônoma).'}
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-drift-muted hover:text-drift-text"
-            aria-label="fechar"
-            title="fechar"
-          >
-            ✕
-          </button>
-        </div>
 
-        {kind === 'ios-safari' ? (
-          <>
-            {showIosHelp && (
-              <ol className="mb-4 list-decimal space-y-2 pl-5 text-[12px] text-drift-text">
-                <li>
-                  Toque no botão <strong>Compartilhar</strong> (quadrado com
-                  seta) na barra do Safari
-                </li>
-                <li>
-                  Role e toque em{' '}
-                  <strong>&ldquo;Adicionar à Tela de Início&rdquo;</strong>
-                </li>
-                <li>Confirme em &ldquo;Adicionar&rdquo;</li>
-                <li>
-                  Drift aparece na tela inicial — abre fullscreen, sem barra
-                  do Safari
-                </li>
-              </ol>
-            )}
-            {!showIosHelp && (
-              <button
-                onClick={() => setShowIosHelp(true)}
-                className="mb-3 w-full rounded border border-drift-accent px-3 py-2 text-[12px] uppercase tracking-widest text-drift-accent hover:bg-drift-accent/10"
-              >
-                como instalar
-              </button>
-            )}
-          </>
-        ) : (
-          <button
-            onClick={async () => { await ip.install(); onClose() }}
-            className="mb-3 w-full rounded border border-drift-accent bg-drift-accent/10 px-3 py-2 text-[12px] uppercase tracking-widest text-drift-accent hover:bg-drift-accent/20"
-          >
-            instalar agora
-          </button>
-        )}
-
-        <button
-          onClick={() => { ip.setDismissed(true); onClose() }}
-          className="w-full font-mono text-[10px] uppercase tracking-widest text-drift-muted hover:text-drift-text"
+      {kind === 'ios-safari' ? (
+        <>
+          {showIosHelp && (
+            <ol className="mb-4 list-decimal space-y-2 pl-5 text-[12px] text-drift-text">
+              <li>
+                Toque no botão <strong>Compartilhar</strong> (quadrado com
+                seta) na barra do Safari
+              </li>
+              <li>
+                Role e toque em{' '}
+                <strong>&ldquo;Adicionar à Tela de Início&rdquo;</strong>
+              </li>
+              <li>Confirme em &ldquo;Adicionar&rdquo;</li>
+              <li>
+                Drift aparece na tela inicial — abre fullscreen, sem barra
+                do Safari
+              </li>
+            </ol>
+          )}
+          {!showIosHelp && (
+            <DriftButton
+              variant="ghost"
+              size="lg"
+              onClick={() => setShowIosHelp(true)}
+              className="mb-3 w-full"
+            >
+              como instalar
+            </DriftButton>
+          )}
+        </>
+      ) : (
+        <DriftButton
+          variant="primary"
+          size="lg"
+          onClick={async () => {
+            await ip.install()
+            onClose()
+          }}
+          className="mb-3 inline-flex w-full items-center justify-center gap-2"
         >
-          não mostrar de novo
-        </button>
-      </div>
-    </div>
+          <DownloadIcon size={16} />
+          instalar agora
+        </DriftButton>
+      )}
+
+      <DriftButton
+        variant="cancel"
+        size="md"
+        onClick={() => {
+          ip.setDismissed(true)
+          onClose()
+        }}
+        className="w-full"
+      >
+        não mostrar de novo
+      </DriftButton>
+    </SlideUpOverlay>
   )
 }
 
