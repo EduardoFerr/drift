@@ -222,14 +222,41 @@ describe('CLAUDE.md invariante #8: "nsec NUNCA sai do dispositivo"', () => {
   it.todo('smoke-test dinâmico: nsec não aparece em nenhum WebSocket.send/fetch payload')
 })
 
-describe('Marshall finding: nostr.build hardcoded é vetor LGPD curador-único', () => {
-  // Test atualmente falha-on-purpose se você descomentar — serve como
-  // TDD pro refactor `UPLOAD_ENDPOINT` → `UserPrefs.upload_endpoint`.
-  // Mantemos como `it.todo` pra não quebrar CI antes do refactor; quando
-  // o refactor entra, mover pra `it()` ativo.
-  it.todo('upload.ts não contém endpoint hardcoded — endpoint vem de UserPrefs')
+describe('Marshall finding: sovereignty endpoints customizáveis via UserPrefs', () => {
+  // Shipped 2026-05-17 (Marshall NEEDS-FIX A+B+C): upload.ts e SpreadMap
+  // agora leem UserPrefs.upload_endpoint / map_tile_url_template como
+  // override. Default constante preserva comportamento histórico.
+  it('upload.ts lê de UserPrefs.upload_endpoint via getUploadEndpoint()', () => {
+    const src = readFileSync('src/lib/upload.ts', 'utf8')
+    // Endpoint default preservado como constante
+    expect(src).toMatch(/NOSTR_BUILD_ENDPOINT_DEFAULT/)
+    // Função reader que combina pref + default
+    expect(src).toMatch(/getUploadEndpoint/)
+    expect(src).toMatch(/getPrefs\(\)\.upload_endpoint/)
+    // fetchWithProgress usa getUploadEndpoint(), NÃO a constante direta
+    expect(src).toMatch(/fetchWithProgress\(getUploadEndpoint\(\)/)
+  })
 
-  it.todo('SpreadMap.tsx não contém URL CARTO hardcoded — vem de UserPrefs.map_tile_url_template')
+  it('SpreadMap.tsx lê de UserPrefs.map_tile_url_template via buildMapStyle()', () => {
+    const src = readFileSync('src/components/Feed/SpreadMap.tsx', 'utf8')
+    // Default CARTO preservado como array
+    expect(src).toMatch(/CARTO_TILE_URLS_DEFAULT/)
+    // Builder function que aceita override
+    expect(src).toMatch(/function\s+buildMapStyle/)
+    // Componentes leem da pref
+    expect(src).toMatch(/usePrefsStore\(\(s\)\s*=>\s*s\.map_tile_url_template\)/)
+    // maplibregl.Map style usa buildMapStyle(tileTemplate), não MAP_STYLE constante
+    expect(src).toMatch(/style:\s*buildMapStyle\(tileTemplate\)/)
+  })
+
+  it('moderation.ts getReportThreshold aceita override (UserPrefs.report_threshold_override)', () => {
+    const src = readFileSync('src/lib/moderation.ts', 'utf8')
+    // Signature aceita override opcional
+    expect(src).toMatch(/getReportThreshold\([^)]*override\?\s*:\s*number/)
+    // maybeModerate lê pref + passa pra getReportThreshold
+    expect(src).toMatch(/getPrefs\(\)\.report_threshold_override/)
+    expect(src).toMatch(/getReportThreshold\(activeUsers,\s*reason,\s*override\)/)
+  })
 
   it.todo('Quando IPFS gateway entrar (Fase 6+), endpoint vem de UserPrefs (não hardcoded)')
 })

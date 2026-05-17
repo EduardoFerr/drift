@@ -108,6 +108,38 @@ function applyRow(target: UserPrefs, key: string, value: string): void {
     case 'lens_nudge_dismissed':
       target.lens_nudge_dismissed = value === '1'
       return
+    case 'upload_endpoint':
+      // Sovereignty (Marshall NEEDS-FIX A): URL https:// pra Blossom
+      // server. Empty = unset (cai no default constante). Validation
+      // mínima aqui — Settings UI futuro deve gatekeep antes de chegar
+      // ao SQLite.
+      if (value && value.startsWith('https://')) {
+        target.upload_endpoint = value
+      }
+      return
+    case 'map_tile_url_template':
+      // Sovereignty (Marshall NEEDS-FIX B): URL template XYZ pra map tiles.
+      // Requer https:// + tokens {x}{y}{z} (validation mínima).
+      if (
+        value &&
+        value.startsWith('https://') &&
+        value.includes('{x}') &&
+        value.includes('{y}') &&
+        value.includes('{z}')
+      ) {
+        target.map_tile_url_template = value
+      }
+      return
+    case 'report_threshold_override':
+      // Sovereignty (Marshall NEEDS-FIX C): integer ≥ 1. 0 ou inválido
+      // = cai no cálculo dinâmico (default behavior).
+      {
+        const n = Number(value)
+        if (Number.isInteger(n) && n >= 1) {
+          target.report_threshold_override = n
+        }
+      }
+      return
     default:
       // chave desconhecida — pode ser de fase futura, ignora silenciosamente
       return

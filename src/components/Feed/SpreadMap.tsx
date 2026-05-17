@@ -39,22 +39,45 @@ export interface SpreadMapProps {
 const MAP_ATTRIBUTION =
   '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · © <a href="https://carto.com/attributions">CARTO</a>'
 
-const MAP_STYLE: maplibregl.StyleSpecification = {
-  version: 8,
-  sources: {
-    carto: {
-      type: 'raster',
-      tiles: [
-        'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
-        'https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
-        'https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
-        'https://d.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
-      ],
-      tileSize: 256,
-      attribution: MAP_ATTRIBUTION,
+const CARTO_TILE_URLS_DEFAULT = [
+  'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
+  'https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
+  'https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
+  'https://d.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
+]
+
+/**
+ * Constrói style spec a partir de URL template (XYZ format).
+ *
+ * Sovereignty (Marshall NEEDS-FIX B 2026-05-17): aceita override via
+ * `UserPrefs.map_tile_url_template`. Default = CARTO Voyager dark
+ * (4 mirrors a/b/c/d). Override = 1 URL única (user usa seu próprio
+ * tile server / OSM / mirror anônimo pra evitar CARTO logar IP).
+ *
+ * Manifesto §28 — CARTO loga IP do user a cada tile fetch. Pref custom
+ * = user controla quem vê esse tráfego.
+ */
+function buildMapStyle(customTemplate?: string): maplibregl.StyleSpecification {
+  const tiles =
+    customTemplate &&
+    customTemplate.startsWith('https://') &&
+    customTemplate.includes('{x}') &&
+    customTemplate.includes('{y}') &&
+    customTemplate.includes('{z}')
+      ? [customTemplate]
+      : CARTO_TILE_URLS_DEFAULT
+  return {
+    version: 8,
+    sources: {
+      carto: {
+        type: 'raster',
+        tiles,
+        tileSize: 256,
+        attribution: MAP_ATTRIBUTION,
+      },
     },
-  },
-  layers: [{ id: 'carto', type: 'raster', source: 'carto' }],
+    layers: [{ id: 'carto', type: 'raster', source: 'carto' }],
+  }
 }
 
 // ─── Minimal type stubs (evita importar tipos pesados da lib) ─────────
@@ -181,6 +204,9 @@ interface AnimDotProps {
 
 function PostModeMap({ data, className, mode, onModeChange }: ModeMapProps) {
   const mapView = usePrefsStore((s) => s.map_view)
+  // Sovereignty: tile template override pra usar self-hosted/OSM/mirror
+  // anônimo em vez do default CARTO (que loga IP). Marshall NEEDS-FIX B.
+  const tileTemplate = usePrefsStore((s) => s.map_tile_url_template)
   const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -214,7 +240,7 @@ function PostModeMap({ data, className, mode, onModeChange }: ModeMapProps) {
 
         const map = new maplibregl.Map({
           container: containerRef.current!,
-          style: MAP_STYLE,
+          style: buildMapStyle(tileTemplate),
           center,
           zoom: 1.5,
           attributionControl: false,
@@ -308,6 +334,7 @@ function PostModeMap({ data, className, mode, onModeChange }: ModeMapProps) {
 
 function GlobalModeMap({ data, className, mode, onModeChange }: ModeMapProps) {
   const mapView = usePrefsStore((s) => s.map_view)
+  const tileTemplate = usePrefsStore((s) => s.map_tile_url_template)
   const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -354,7 +381,7 @@ function GlobalModeMap({ data, className, mode, onModeChange }: ModeMapProps) {
 
         const map = new maplibregl.Map({
           container: el,
-          style: MAP_STYLE,
+          style: buildMapStyle(tileTemplate),
           center,
           zoom: 1.5,
           attributionControl: false,

@@ -79,9 +79,23 @@ export function getReportWeight(reporterWeight: number): number {
  *
  * @param activeUsers - Número de identidades ativas (≤30 dias)
  * @param reason - Categoria do report; 'illegal' tem threshold 2x menor
+ * @param override - Sovereignty (Marshall NEEDS-FIX C 2026-05-17):
+ *   quando passado e ≥ 1, override do cálculo dinâmico. Power user
+ *   pode customizar via `UserPrefs.report_threshold_override`.
+ *   Mantida pure — leitura da pref fica no caller.
  * @returns Soma mínima de pesos de reports pra moderação automática
  */
-export function getReportThreshold(activeUsers: number, reason: ReportReason): number {
+export function getReportThreshold(
+  activeUsers: number,
+  reason: ReportReason,
+  override?: number,
+): number {
+  if (typeof override === 'number' && Number.isInteger(override) && override >= 1) {
+    // Override aplica o multiplicador 'illegal' também (semantics
+    // consistente — illegal sempre mais agressivo que o configurado).
+    if (reason === 'illegal') return Math.max(3, Math.floor(override / 2))
+    return override
+  }
   const base = Math.max(5, Math.floor(activeUsers * 0.001))
   if (reason === 'illegal') return Math.max(3, Math.floor(base / 2))
   return base
@@ -157,12 +171,18 @@ export async function maybeModerate(postId: string, now: number): Promise<void> 
   const { totalWeight, byReason } = await aggregateReports(postId)
 
   const activeUsers = await countActiveUsers(now)
+  // Sovereignty (Marshall NEEDS-FIX C 2026-05-17): user pode override
+  // o threshold dinâmico via UserPrefs. Útil pra comunidades fechadas
+  // que querem moderação mais/menos agressiva. Lazy require pra evitar
+  // dep cycle (prefs → db → events → moderation).
+  const { getPrefs } = await import('./prefs')
+  const override = getPrefs().report_threshold_override
 
   // Verifica cada categoria contra seu threshold próprio. Se qualquer
   // uma passar, modera. 'illegal' tem threshold mais agressivo.
   const reasons: ReportReason[] = ['illegal', 'spam', 'harassment']
   for (const reason of reasons) {
-    const t = getReportThreshold(activeUsers, reason)
+    const t = getReportThreshold(activeUsers, reason, override)
     if (byReason[reason] >= t) {
       await db.run(`UPDATE posts SET score = -999 WHERE id = ?`, [postId])
       // Invariante #1 (CLAUDE.md): UPDATE em domínio fora de
@@ -176,7 +196,7 @@ export async function maybeModerate(postId: string, now: number): Promise<void> 
   }
 
   // Threshold combinado (qualquer mistura de razões) — mais conservador.
-  const combinedThreshold = getReportThreshold(activeUsers, 'spam')
+  const combinedThreshold = getReportThreshold(activeUsers, 'spam', override)
   if (totalWeight >= combinedThreshold) {
     await db.run(`UPDATE posts SET score = -999 WHERE id = ?`, [postId])
     invalidateFeed()

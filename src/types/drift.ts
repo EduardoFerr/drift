@@ -395,6 +395,37 @@ export interface UserPrefs {
    * depois que tem grafo suficiente pra lens fazer sentido.
    */
   lens_nudge_dismissed: boolean
+  /**
+   * Sovereignty schema bump 2026-05-17 (Marshall conformance NEEDS-FIX A).
+   * Endpoint HTTP de upload de blobs (Blossom server). Quando undefined,
+   * usa default constante (nostr.build). User power pode trocar pra
+   * self-hosted blossom server. Manifesto §17 (sem chave mestra: user
+   * NÃO depende de nostr.build se quiser sair).
+   *
+   * Validation: URL https:// obrigatório (settings UI futuro deve gatekeep).
+   * Empty string = unset (cai no default).
+   */
+  upload_endpoint?: string
+  /**
+   * Sovereignty schema bump 2026-05-17 (Marshall conformance NEEDS-FIX B).
+   * Template URL pra tiles de mapa (XYZ format `{x}/{y}/{z}` ou similar).
+   * Quando undefined, usa CARTO Voyager default. CARTO loga IP do user —
+   * privacy concern §28. User power pode trocar pra OSM, self-hosted,
+   * ou mirror anônimo.
+   *
+   * Validation: URL https:// + tokens {x}{y}{z} obrigatórios.
+   * Empty string = unset.
+   */
+  map_tile_url_template?: string
+  /**
+   * Sovereignty schema bump 2026-05-17 (Marshall conformance NEEDS-FIX C).
+   * Override do threshold dinâmico de reports (manifesto §26). Quando
+   * undefined, usa cálculo dinâmico baseado em peso/idade do post.
+   * Power user pode forçar threshold custom (debug, comunidades fechadas).
+   *
+   * Validation: integer ≥ 1. undefined ou 0 = usar dinâmico.
+   */
+  report_threshold_override?: number
 }
 
 /**

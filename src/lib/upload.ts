@@ -37,8 +37,22 @@ import imageCompression from 'browser-image-compression'
 import { finalizeEvent } from 'nostr-tools/pure'
 import type { EventTemplate } from 'nostr-tools'
 import { getOrCreateIdentity, nsecHexToBytes } from './identity'
+import { getPrefs } from './prefs'
 
-const NOSTR_BUILD_ENDPOINT = 'https://nostr.build/api/v2/upload/files'
+const NOSTR_BUILD_ENDPOINT_DEFAULT = 'https://nostr.build/api/v2/upload/files'
+
+/**
+ * Endpoint efetivo pra upload — `UserPrefs.upload_endpoint` override
+ * quando setado (sovereignty: user troca pra self-hosted Blossom).
+ * Default = nostr.build histórico.
+ *
+ * Manifesto §17 (sem chave mestra): user NÃO depende de nostr.build
+ * forçadamente. Marshall NEEDS-FIX A 2026-05-17.
+ */
+function getUploadEndpoint(): string {
+  const custom = getPrefs().upload_endpoint
+  return custom && custom.startsWith('https://') ? custom : NOSTR_BUILD_ENDPOINT_DEFAULT
+}
 
 /**
  * Constrói header `Authorization: Nostr <base64>` exigido por nostr.build
@@ -212,7 +226,7 @@ async function uploadOnce(
   const form = new FormData()
   form.append('fileToUpload', file)
 
-  const res = await fetchWithProgress(NOSTR_BUILD_ENDPOINT, form, options)
+  const res = await fetchWithProgress(getUploadEndpoint(), form, options)
 
   if (!res.ok) {
     throw new UploadError(
