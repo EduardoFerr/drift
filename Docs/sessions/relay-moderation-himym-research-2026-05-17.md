@@ -3,7 +3,33 @@
 **Data:** 2026-05-17
 **Trigger:** Backlog R26-R32 (relay moderation landscape).
 **Personas:** Robin (curadoria), Ted (arquitetura), Marshall (schema/NIP-56), Barney (threat), Lily (UX).
-**Status:** Research consolidada. Implementação NÃO iniciada.
+**Status:** ✅ Fase A IMPLEMENTADA e shipped (11 commits 2026-05-17). Esse doc preserva a pesquisa original.
+
+## Mapeamento research → commits shipped
+
+| Item proposto na pesquisa | Status | Commit |
+|---|---|---|
+| Lista curada Robin → `Docs/curated-relays-YYYY-MM.json` | ✅ | `567870a` feat(relays): curated directory + NIP-11 fetch |
+| Manifesto §17 adendo (cliente vs operador de relay) | ✅ | `cef9e4b` docs(manifesto): §17 adendo + CLAUDE invariante #18 |
+| CLAUDE.md invariante #18 (relay moderado é opt-in) | ✅ | `cef9e4b` (mesmo commit acima) |
+| NIP-56 (kind 1984) dual emit + ingest + LOCK_VIA_TEST | ✅ | `b17e2ca` feat(reports): NIP-56 kind 1984 dual emit |
+| Salvaguarda D2 — silent-drop warning quando há relay moderado | ✅ | `f5bae5d` feat(relays): D2 + D3 guardrails Barney |
+| Salvaguarda D3 — RelayTierBadge per relay (none / manual / ai-assisted / ai-automated) | ✅ | `f5bae5d` (mesmo) |
+| Salvaguarda D4 — warning de privacidade do reporter pré-submit | ✅ | `5e38205` feat(ux): D4 warning reporter privacy |
+| DiscoverRelaysCard Lily (5 tabs por política) | ✅ | `df9e1b8` feat(relays): DiscoverRelaysCard + banner one-time |
+| DiscoverNudgeBanner one-time (E6 da deliberação) | ✅ | `df9e1b8` (mesmo) |
+| `Docs/run-your-own-relay-with-ai.md` (Ted) | ✅ | `5e38205` (mesmo de D4) |
+| CI mensal curated-relays-health (A5) | ✅ | `93ce889` feat(ci): A5 monthly curated relays health check |
+
+## Items conscientemente deferred (NÃO no scope original deste doc, surgiram durante implementação)
+
+- **A3** — reavaliar damus.io no SEED. Precisa telemetria runtime (1-2 semanas de health data) pra decidir.
+- **D6** — contador de relays OK por post ("publicado em N/M relays"). Substancial, mexe em `feed.ts`/`protocol.ts`. UX-polish, não guardrail crítico.
+- Adicionar `wss://relay.nos.social` (Tagr Bot opt-in) + `wss://nos.lol` (high-volume free) ao SEED — pendente decisão.
+
+Conteúdo original da pesquisa preservado abaixo.
+
+---
 
 ---
 
