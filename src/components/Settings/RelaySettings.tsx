@@ -100,29 +100,22 @@ export function RelaySettings({ onClose }: RelaySettingsProps) {
 
   return (
     <FullPageCard onClose={onClose} title="relays" ariaLabel="settings · relays">
-      <div className="p-5">
-        <p className="mb-4 text-[12px] leading-relaxed text-drift-muted">
-          Manifesto §14 — bootstrap distribuído. Relays são intercambiáveis;
-          remover um não tira você da rede. Cliente sempre mantém ao
-          menos um seed externo se sua lista ficar muito pequena (anti-eclipse §20).
+      <div className="space-y-3 px-4 py-5">
+        <SectionHeader title="conectados" />
+        <p className="px-1 font-mono text-[10px] text-drift-muted/30">
+          relays intercambiáveis. remover um não tira você da rede.
         </p>
-
-        {/* Lista atual */}
-        <section className="mb-4 max-h-64 space-y-1 overflow-y-auto">
-          {!loaded && <div className="text-[12px] text-drift-muted">carregando…</div>}
+        <div className="max-h-72 space-y-2 overflow-y-auto pl-3">
+          {!loaded && (
+            <div className="font-mono text-[11px] text-drift-muted/40">carregando…</div>
+          )}
           {loaded && list.length === 0 && (
-            <div className="text-[12px] text-drift-muted">nenhum relay configurado</div>
+            <div className="font-mono text-[11px] text-drift-muted/40">nenhum relay configurado</div>
           )}
           {list.map((r) => {
             const now = Date.now()
             const isDemoted = r.demotedUntil > now
-            const status = isDemoted
-              ? '⏸'
-              : r.lastErr
-              ? '✗'
-              : r.lastOkAt
-              ? '✓'
-              : '·'
+            const status = isDemoted ? '⏸' : r.lastErr ? '✗' : r.lastOkAt ? '✓' : '·'
             const tone = isDemoted
               ? 'text-drift-warning'
               : r.lastErr
@@ -139,106 +132,113 @@ export function RelaySettings({ onClose }: RelaySettingsProps) {
             return (
               <div
                 key={r.url}
-                className={`flex items-center gap-2 rounded border border-drift-border/60 bg-drift-bg/30 px-2 py-1 text-[12px] ${
+                className={`flex items-center gap-2 rounded-xl border border-drift-border/30 bg-drift-surface/30 px-3 py-2.5 font-mono text-[11px] ${
                   r.enabled ? '' : 'opacity-50'
                 }`}
               >
                 <span className={`${tone} text-base leading-none`}>{status}</span>
-                <span className="flex-1 truncate text-drift-text" title={titleAttr}>
+                <span className="flex-1 truncate text-drift-text/80" title={titleAttr}>
                   {r.url}
                 </span>
                 {isDemoted && (
-                  <span className="rounded bg-drift-warning/20 px-1 text-[12px] text-drift-warning">
-                    demoted {demotedMin}m
+                  <span className="rounded-md bg-drift-warning/10 px-1.5 py-0.5 text-[10px] text-drift-warning">
+                    {demotedMin}m
                   </span>
                 )}
-                <span className="rounded bg-drift-border/40 px-1 text-[12px] text-drift-muted">
+                <span className="rounded-md bg-drift-border/20 px-1.5 py-0.5 text-[10px] text-drift-muted/60">
                   {r.source}
                 </span>
                 <button
                   onClick={() => void setRelayEnabled(r.url, !r.enabled)}
-                  className="rounded border border-drift-border px-1 py-0.5 text-drift-muted hover:border-drift-accent hover:text-drift-accent"
+                  className="rounded-lg border border-drift-border/30 bg-drift-surface/30 px-2 py-0.5 text-[10px] uppercase tracking-meta text-drift-muted/70 transition-colors hover:border-drift-accent2/30 hover:text-drift-accent2"
                 >
                   {r.enabled ? 'pausar' : 'ativar'}
                 </button>
                 <button
                   onClick={() => void removeRelay(r.url)}
-                  className="rounded border border-drift-danger/60 px-1 py-0.5 text-drift-danger/80 hover:bg-drift-danger/10"
+                  className="rounded-lg border border-drift-danger/20 bg-drift-danger/5 px-2 py-0.5 text-[10px] uppercase tracking-meta text-drift-danger transition-colors hover:bg-drift-danger/10"
                 >
                   remover
                 </button>
               </div>
             )
           })}
-        </section>
+        </div>
 
-        {/* Adicionar */}
-        <section className="mb-4 border-t border-drift-border pt-3">
-          <div className="mb-2 text-[12px] uppercase tracking-widest text-drift-muted">
-            adicionar relay
-          </div>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={newUrl}
-              onChange={(e) => setNewUrl(e.target.value)}
-              placeholder="wss://relay.exemplo.com"
-              className="flex-1 rounded border border-drift-border bg-drift-bg px-2 py-1 text-[12px] text-drift-text placeholder:text-drift-muted/60 focus:border-drift-accent focus:outline-none"
-            />
-            <button
-              onClick={handleAdd}
-              disabled={adding || !newUrl.trim()}
-              className="rounded border border-drift-accent px-3 py-1 text-[12px] uppercase tracking-widest text-drift-accent hover:bg-drift-accent/10 disabled:opacity-30"
-            >
-              {adding ? '…' : '+'}
-            </button>
-          </div>
-          {error && (
-            <div className="mt-2 text-[12px] text-drift-danger">{error}</div>
-          )}
-        </section>
-
-        {/* NIP-65 */}
-        <section className="mb-4 border-t border-drift-border pt-3">
-          <div
-            className="mb-2 text-[12px] uppercase tracking-widest text-drift-muted"
-            title="NIP-65 — Relay List Metadata"
+        <SectionHeader title="adicionar" />
+        <div className="space-y-2 pl-3">
+          <input
+            type="text"
+            value={newUrl}
+            onChange={(e) => setNewUrl(e.target.value)}
+            placeholder="wss://relay.exemplo.com"
+            className="w-full rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3 font-mono text-[12px] text-drift-text placeholder:text-drift-muted/25 focus:border-drift-accent2/40 focus:outline-none focus:ring-1 focus:ring-drift-accent2/20"
+          />
+          <button
+            onClick={handleAdd}
+            disabled={adding || !newUrl.trim()}
+            className="w-full rounded-xl bg-drift-accent2 px-4 py-3 font-mono text-[12px] uppercase tracking-meta font-medium text-drift-bg transition-colors hover:bg-drift-accent2/85 disabled:cursor-not-allowed disabled:opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
           >
-            descobrir relays via NIP-65
-          </div>
-          <div className="mb-2 flex gap-2">
-            <input
-              type="text"
-              value={importNpub}
-              onChange={(e) => setImportNpub(e.target.value)}
-              placeholder="npub1... — buscar lista de relays desse user"
-              className="flex-1 rounded border border-drift-border bg-drift-bg px-2 py-1 text-[12px] text-drift-text placeholder:text-drift-muted/60 focus:border-drift-accent focus:outline-none"
-            />
+            {adding ? 'adicionando…' : '⊕ adicionar relay'}
+          </button>
+          {error && (
+            <div className="rounded-xl border border-drift-danger/20 bg-drift-danger/5 px-4 py-2.5 font-mono text-[11px] text-drift-danger">
+              {error}
+            </div>
+          )}
+        </div>
+
+        <SectionHeader title="NIP-65" />
+        <p className="px-1 font-mono text-[10px] text-drift-muted/30">
+          descobrir relays de outro user ou publicar a sua lista.
+        </p>
+        <div className="space-y-2 pl-3">
+          <input
+            type="text"
+            value={importNpub}
+            onChange={(e) => setImportNpub(e.target.value)}
+            placeholder="npub1… — buscar lista desse user"
+            className="w-full rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3 font-mono text-[12px] text-drift-text placeholder:text-drift-muted/25 focus:border-drift-accent2/40 focus:outline-none focus:ring-1 focus:ring-drift-accent2/20"
+          />
+          <div className="flex gap-2">
             <button
               onClick={handleImport}
               disabled={importing || !importNpub.trim()}
-              className="rounded border border-drift-accent px-3 py-1 text-[12px] text-drift-accent hover:bg-drift-accent/10 disabled:opacity-30"
+              className="flex-1 rounded-xl border border-drift-accent2/25 bg-drift-surface/30 px-3 py-3 font-mono text-[12px] uppercase tracking-meta text-drift-accent2 transition-colors hover:bg-drift-accent2/10 disabled:cursor-not-allowed disabled:opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
             >
-              {importing ? '…' : 'buscar'}
+              {importing ? 'buscando…' : '↓ buscar lista'}
+            </button>
+            <button
+              onClick={handlePublish}
+              disabled={publishing || list.filter((r) => r.enabled).length === 0}
+              className="flex-1 rounded-xl border border-drift-accent2/25 bg-drift-surface/30 px-3 py-3 font-mono text-[12px] uppercase tracking-meta text-drift-accent2 transition-colors hover:bg-drift-accent2/10 disabled:cursor-not-allowed disabled:opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
+            >
+              {publishing ? 'publicando…' : '↗ publicar'}
             </button>
           </div>
           {importMsg && (
-            <div className="text-[12px] text-drift-muted">{importMsg}</div>
+            <div className="rounded-xl border border-drift-border/20 bg-drift-surface/20 px-4 py-2.5 font-mono text-[11px] text-drift-muted/60">
+              {importMsg}
+            </div>
           )}
-
-          <button
-            onClick={handlePublish}
-            disabled={publishing || list.filter((r) => r.enabled).length === 0}
-            className="mt-2 w-full rounded border border-drift-border px-3 py-1 text-[12px] text-drift-muted hover:border-drift-accent hover:text-drift-accent disabled:opacity-30"
-          >
-            {publishing ? 'publicando…' : '↗ publicar minha lista (NIP-65)'}
-          </button>
           {publishMsg && (
-            <div className="mt-1 text-[12px] text-drift-muted">{publishMsg}</div>
+            <div className="rounded-xl border border-drift-border/20 bg-drift-surface/20 px-4 py-2.5 font-mono text-[11px] text-drift-muted/60">
+              {publishMsg}
+            </div>
           )}
-        </section>
+        </div>
       </div>
     </FullPageCard>
+  )
+}
+
+function SectionHeader({ title }: { title: string }) {
+  return (
+    <div className="rounded-2xl border border-drift-border/40 bg-drift-surface/50 px-5 py-3.5">
+      <span className="font-display text-[14px] font-bold uppercase tracking-tag text-drift-accent">
+        {title}
+      </span>
+    </div>
   )
 }
 

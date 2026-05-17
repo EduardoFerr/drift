@@ -50,24 +50,24 @@ export function PeerInterstitial({
         </div>
       }
     >
-      <div className="flex flex-col gap-5 px-5 py-6">
+      <div className="flex flex-col gap-5 px-4 py-5">
         <p className="text-[14px] leading-relaxed text-drift-text">
           Alguem compartilhou um link pra conectar diretamente com voce via P2P (WebRTC).
         </p>
 
-        <div className="rounded-lg border border-drift-border bg-black/20 px-4 py-3">
+        <div className="rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3.5">
           <span className="block font-mono text-[12px] text-drift-accent break-all">
             {short}
           </span>
           {relayHints.length > 0 && (
-            <span className="mt-1 block text-[11px] text-drift-muted">
+            <span className="mt-1 block font-mono text-[11px] text-drift-muted/50">
               {relayHints.length} relay hint{relayHints.length > 1 ? 's' : ''}
             </span>
           )}
         </div>
 
-        <div className="rounded-lg border border-yellow-700/40 bg-yellow-900/10 px-4 py-3">
-          <p className="text-[12px] leading-relaxed text-yellow-300/90">
+        <div className="rounded-xl border border-drift-warning/20 bg-drift-warning/5 px-4 py-3">
+          <p className="font-mono text-[11px] leading-relaxed text-drift-warning">
             Conexao direta — seu IP sera visivel para este peer.
             So conecte com alguem que voce confia.
           </p>

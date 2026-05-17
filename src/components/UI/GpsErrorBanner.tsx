@@ -3,9 +3,9 @@
  * tentativa de getCurrentLocation retornou null (Lily 29-04 — user comum
  * não abre DevTools, console.warn não é suficiente).
  *
- * Por que amber e não vermelho:
+ * Por que warning e não danger:
  *   - Não é falha catastrófica — post foi publicado SEM location, mas foi.
- *   - Vermelho dispara ansiedade desnecessária; amber comunica "atenção,
+ *   - Danger dispara ansiedade desnecessária; warning comunica "atenção,
  *     não bloqueio".
  *
  * Manifesto §28 (privacidade pelo mínimo): banner só aparece se user
@@ -18,6 +18,8 @@
 
 import { useState } from 'react'
 import type { GeolocationFailureReason } from '../../lib/geolocation'
+import { FullPageCard } from './FullPageCard'
+import { DriftButton } from './DriftButton'
 
 interface GpsErrorBannerProps {
   reason: Exclude<GeolocationFailureReason, null>
@@ -39,33 +41,34 @@ export function GpsErrorBanner({ reason, onDismiss }: GpsErrorBannerProps) {
   return (
     <>
       {/*
-       * V5 polish: border-left 3px drift-bury (mockup v0.7) — visual de
-       * alerta sem o vermelho saturado. Mantém amber pra texto pq o
+       * V5 polish: border-left 3px drift-warning (mockup v0.7) — visual de
+       * alerta sem o vermelho saturado. Mantém warning pra texto pq o
        * padrão "atenção, não bloqueio" continua válido (manifesto §28
        * privacy: post publicou sem location, não é falha catastrófica).
        */}
       <div
         role="status"
-        className="mb-4 flex items-center gap-3 rounded border border-amber-500/30 border-l-[3px] border-l-drift-bury bg-amber-500/5 p-3"
+        className="mb-4 flex items-center gap-3 rounded-xl border border-drift-warning/20 border-l-[3px] border-l-drift-warning bg-drift-warning/5 px-4 py-3"
       >
         <span className="text-base" aria-hidden="true">
           📍
         </span>
         <div className="flex-1 font-mono text-[12px]">
-          <div className="text-amber-200">{message}</div>
-          <div className="text-[12px] text-amber-200/60">
+          <div className="text-drift-warning">{message}</div>
+          <div className="text-[11px] text-drift-muted/50">
             Post foi publicado sem location.
           </div>
         </div>
-        <button
+        <DriftButton
+          variant="ghost"
+          size="sm"
           onClick={() => setShowHelp(true)}
-          className="rounded border border-amber-500/60 px-3 py-1 font-mono text-[12px] uppercase tracking-widest text-amber-300 hover:bg-amber-500/10"
         >
           como ajustar
-        </button>
+        </DriftButton>
         <button
           onClick={onDismiss}
-          className="text-amber-500/60 hover:text-amber-300"
+          className="text-drift-muted/50 hover:text-drift-warning transition-colors"
           aria-label="dispensar aviso"
           title="dispensar"
         >
@@ -81,37 +84,23 @@ export function GpsErrorBanner({ reason, onDismiss }: GpsErrorBannerProps) {
 
 function GpsHelpModal({ onClose }: { onClose: () => void }) {
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
-      onClick={onClose}
+    <FullPageCard
+      onClose={onClose}
+      title="como ajustar GPS"
+      ariaLabel="como ajustar permissão de GPS"
+      clickOutToClose
     >
-      <div
-        className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded border border-drift-border bg-drift-surface p-5 text-[12px]"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm uppercase tracking-widest text-drift-accent">
-            Como ajustar GPS
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-slate-500 hover:text-slate-200"
-            aria-label="fechar"
-          >
-            ✕
-          </button>
-        </div>
-
-        <p className="mb-4 text-[12px] text-slate-400">
+      <div className="space-y-4 px-4 py-5 text-[12px]">
+        <p className="font-mono text-[12px] text-drift-muted/50">
           Drift não pode forçar permissão de GPS — só o navegador permite.
           Siga os passos do seu navegador:
         </p>
 
-        <section className="mb-4">
-          <h3 className="mb-1 text-[12px] uppercase tracking-widest text-slate-300">
+        <section className="rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3.5">
+          <h3 className="mb-2 font-display text-[12px] font-bold uppercase tracking-tag text-drift-accent">
             Chrome / Edge (desktop e Android)
           </h3>
-          <ol className="ml-5 list-decimal space-y-1 text-[12px] text-slate-400">
+          <ol className="ml-5 list-decimal space-y-1 font-mono text-[12px] text-drift-muted/50">
             <li>
               Toque no ícone de <strong>cadeado</strong> (ou ⓘ) à esquerda da
               URL
@@ -127,11 +116,11 @@ function GpsHelpModal({ onClose }: { onClose: () => void }) {
           </ol>
         </section>
 
-        <section className="mb-4">
-          <h3 className="mb-1 text-[12px] uppercase tracking-widest text-slate-300">
+        <section className="rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3.5">
+          <h3 className="mb-2 font-display text-[12px] font-bold uppercase tracking-tag text-drift-accent">
             Firefox
           </h3>
-          <ol className="ml-5 list-decimal space-y-1 text-[12px] text-slate-400">
+          <ol className="ml-5 list-decimal space-y-1 font-mono text-[12px] text-drift-muted/50">
             <li>Clique no ícone de cadeado à esquerda da URL</li>
             <li>
               Em <strong>Permissões</strong>, encontre{' '}
@@ -144,11 +133,11 @@ function GpsHelpModal({ onClose }: { onClose: () => void }) {
           </ol>
         </section>
 
-        <section className="mb-4">
-          <h3 className="mb-1 text-[12px] uppercase tracking-widest text-slate-300">
+        <section className="rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3.5">
+          <h3 className="mb-2 font-display text-[12px] font-bold uppercase tracking-tag text-drift-accent">
             Safari (macOS)
           </h3>
-          <ol className="ml-5 list-decimal space-y-1 text-[12px] text-slate-400">
+          <ol className="ml-5 list-decimal space-y-1 font-mono text-[12px] text-drift-muted/50">
             <li>
               Menu <strong>Safari → Preferências → Sites</strong>
             </li>
@@ -161,11 +150,11 @@ function GpsHelpModal({ onClose }: { onClose: () => void }) {
           </ol>
         </section>
 
-        <section className="mb-4">
-          <h3 className="mb-1 text-[12px] uppercase tracking-widest text-slate-300">
+        <section className="rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3.5">
+          <h3 className="mb-2 font-display text-[12px] font-bold uppercase tracking-tag text-drift-accent">
             Safari (iOS / iPadOS)
           </h3>
-          <ol className="ml-5 list-decimal space-y-1 text-[12px] text-slate-400">
+          <ol className="ml-5 list-decimal space-y-1 font-mono text-[12px] text-drift-muted/50">
             <li>
               <strong>Ajustes → Safari → Localização</strong> (precisa estar em{' '}
               <em>Perguntar</em> ou <em>Permitir</em>)
@@ -176,25 +165,18 @@ function GpsHelpModal({ onClose }: { onClose: () => void }) {
             </li>
             <li>Feche e reabra a aba do Drift</li>
           </ol>
-          <p className="mt-2 text-[12px] text-slate-500">
+          <p className="mt-2 font-mono text-[11px] text-drift-muted/40">
             Nota: iOS Safari não tem permissions API — não dá pra detectar
             estado de antemão. Se permissão foi negada, a única forma de
             reabilitar é via Ajustes do sistema.
           </p>
         </section>
 
-        <div className="mt-4 border-t border-drift-border pt-3 text-[12px] text-slate-500">
+        <div className="rounded-xl border border-drift-border/20 bg-drift-surface/20 px-4 py-3 font-mono text-[11px] text-drift-muted/40">
           Drift NUNCA envia coordenada precisa por padrão — você escolheu
           a granularidade em Settings (manifesto §28).
         </div>
-
-        <button
-          onClick={onClose}
-          className="mt-4 w-full rounded border border-drift-border px-3 py-2 text-[12px] uppercase tracking-widest text-slate-300 hover:border-drift-accent hover:text-drift-accent"
-        >
-          fechar
-        </button>
       </div>
-    </div>
+    </FullPageCard>
   )
 }

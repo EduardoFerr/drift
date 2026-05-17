@@ -28,6 +28,7 @@
 import { m, AnimatePresence } from 'framer-motion'
 import { useEffect, useRef } from 'react'
 import { useRegisterSW } from 'virtual:pwa-register/react'
+import { DriftButton } from './DriftButton'
 
 // Lily memory-leak audit 2026-05-15: timer global, idempotente. Guarda
 // fora do componente porque `onRegisteredSW` pode ser chamado mais de uma
@@ -102,36 +103,37 @@ export function UpdatePrompt() {
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: 80, opacity: 0 }}
           transition={{ duration: 0.25, ease: 'easeOut' }}
-          className="fixed bottom-4 left-4 right-4 z-50 mx-auto max-w-md rounded border border-drift-border border-l-[3px] border-l-drift-accent bg-drift-surface p-4 shadow-lg backdrop-blur"
+          className="fixed bottom-4 left-4 right-4 z-50 mx-auto max-w-md rounded-2xl border border-drift-border/40 border-l-[3px] border-l-drift-accent bg-drift-surface/95 px-4 py-3.5 shadow-lg backdrop-blur"
         >
           <div className="flex items-start gap-3">
             <div className="flex-1 font-mono">
               <p className="text-[12px] font-medium text-drift-text">
                 Nova versão do Drift disponível
               </p>
-              <p className="mt-1 text-[12px] leading-relaxed text-drift-muted">
+              <p className="mt-1 text-[11px] leading-relaxed text-drift-muted/50">
                 Atualização propaga fixes de segurança e features. Você decide
                 quando aplicar — manifesto §17 (sem update silencioso).
               </p>
             </div>
           </div>
           <div className="mt-3 flex gap-2">
-            <button
-              type="button"
+            <DriftButton
+              variant="primary"
+              size="lg"
               onClick={() => {
                 void updateServiceWorker(true)
               }}
-              className="flex-1 rounded border border-drift-accent bg-drift-accent px-3 py-2 font-mono text-[12px] uppercase tracking-widest text-drift-bg transition hover:bg-drift-accent/90 focus:outline-none focus:ring-2 focus:ring-drift-accent2 focus:ring-offset-2 focus:ring-offset-drift-surface"
+              className="flex-1"
             >
               Atualizar agora
-            </button>
-            <button
-              type="button"
+            </DriftButton>
+            <DriftButton
+              variant="cancel"
+              size="lg"
               onClick={() => setNeedRefresh(false)}
-              className="rounded border border-drift-border px-3 py-2 font-mono text-[12px] uppercase tracking-widest text-drift-muted transition hover:border-drift-text hover:text-drift-text focus:outline-none focus:ring-1 focus:ring-drift-accent2"
             >
               Mais tarde
-            </button>
+            </DriftButton>
           </div>
         </m.div>
       )}

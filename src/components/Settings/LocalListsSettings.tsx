@@ -52,50 +52,51 @@ export function LocalListsSettings({ onClose }: LocalListsSettingsProps) {
 
   return (
     <FullPageCard onClose={onClose} title="listas locais" ariaLabel="settings · listas locais">
-      <div className="p-5">
+      <div className="space-y-3 px-4 py-5">
 
-        {/* Tabs */}
-        <div className="mb-4 flex gap-1 border-b border-drift-border">
-          <TabBtn active={tab === 'pinned'} onClick={() => setTab('pinned')}>
-            📌 fixados ({pinned.length})
+        <div className="flex gap-2 rounded-2xl border border-drift-border/40 bg-drift-surface/50 p-1.5">
+          <TabBtn active={tab === 'pinned'} onClick={() => setTab('pinned')} count={pinned.length}>
+            fixados
           </TabBtn>
-          <TabBtn active={tab === 'blocked'} onClick={() => setTab('blocked')}>
-            ⊘ bloqueados ({blocked.length})
+          <TabBtn active={tab === 'blocked'} onClick={() => setTab('blocked')} count={blocked.length}>
+            bloqueados
           </TabBtn>
-          <TabBtn active={tab === 'muted'} onClick={() => setTab('muted')}>
-            🔇 silenciados ({muted.length})
+          <TabBtn active={tab === 'muted'} onClick={() => setTab('muted')} count={muted.length}>
+            silenciados
           </TabBtn>
         </div>
 
-        {tab === 'pinned' && (
-          <PinnedList
-            list={pinned}
-            onUnpin={async (postId) => {
-              await unpinPost(postId)
-              await reload()
-            }}
-          />
-        )}
-        {tab === 'blocked' && (
-          <ModList
-            list={blocked}
-            kind="blocked"
-            onAction={async (npub) => {
-              await unblock(npub)
-              await reload()
-            }}
-          />
-        )}
-        {tab === 'muted' && (
-          <ModList
-            list={muted}
-            kind="muted"
-            onAction={async (npub) => {
-              await unmute(npub)
-              await reload()
-            }}
-          />
-        )}
+        <div className="pl-3">
+          {tab === 'pinned' && (
+            <PinnedList
+              list={pinned}
+              onUnpin={async (postId) => {
+                await unpinPost(postId)
+                await reload()
+              }}
+            />
+          )}
+          {tab === 'blocked' && (
+            <ModList
+              list={blocked}
+              kind="blocked"
+              onAction={async (npub) => {
+                await unblock(npub)
+                await reload()
+              }}
+            />
+          )}
+          {tab === 'muted' && (
+            <ModList
+              list={muted}
+              kind="muted"
+              onAction={async (npub) => {
+                await unmute(npub)
+                await reload()
+              }}
+            />
+          )}
+        </div>
       </div>
     </FullPageCard>
   )
@@ -104,22 +105,27 @@ export function LocalListsSettings({ onClose }: LocalListsSettingsProps) {
 function TabBtn({
   active,
   onClick,
+  count,
   children,
 }: {
   active: boolean
   onClick: () => void
+  count: number
   children: React.ReactNode
 }) {
   return (
     <button
       onClick={onClick}
-      className={`flex-1 px-2 py-1 text-[12px] uppercase tracking-widest transition-colors ${
+      className={`flex-1 rounded-xl px-3 py-2 font-mono text-[11px] uppercase tracking-meta transition-colors ${
         active
-          ? 'border-b-2 border-drift-accent text-drift-accent'
-          : 'border-b-2 border-transparent text-drift-muted hover:text-drift-text'
+          ? 'bg-drift-accent2 text-drift-bg'
+          : 'text-drift-muted/70 hover:text-drift-text'
       }`}
     >
       {children}
+      <span className={`ml-1.5 ${active ? 'opacity-60' : 'opacity-40'}`}>
+        {count}
+      </span>
     </button>
   )
 }
@@ -133,37 +139,36 @@ function PinnedList({
 }) {
   if (list.length === 0) {
     return (
-      <p className="py-6 text-center text-[12px] text-drift-muted">
+      <p className="py-8 text-center font-mono text-[11px] leading-relaxed text-drift-muted/40">
         nenhum post fixado.
         <br />
-        no PostViewer, clique em 📍 pra fixar — protege de eviction local
-        e marca pra re-broadcast (manifesto §16).
+        no post, toque em ◈ pra fixar — protege de eviction e re-broadcast.
       </p>
     )
   }
   return (
-    <div className="max-h-80 space-y-1 overflow-y-auto">
+    <div className="max-h-96 space-y-2 overflow-y-auto">
       {list.map((p) => (
         <div
           key={p.postId}
-          className="flex items-center gap-2 rounded border border-drift-border/60 bg-drift-bg/30 px-2 py-1 text-[12px]"
+          className="flex items-center gap-2 rounded-xl border border-drift-border/30 bg-drift-surface/30 px-3 py-2.5 font-mono text-[11px]"
         >
-          <span className="text-drift-warning">📌</span>
-          <span className="flex-1 truncate font-mono text-drift-muted">
+          <span className="text-drift-accent">◈</span>
+          <span className="flex-1 truncate text-drift-text/80">
             {p.postId.slice(0, 16)}…
           </span>
-          <span className="text-drift-muted">{timeAgo(p.pinnedAt)}</span>
+          <span className="text-drift-muted/40">{timeAgo(p.pinnedAt)}</span>
           {p.cid && (
             <span
-              className="rounded bg-drift-spread/15 px-1 text-drift-spread"
+              className="rounded-md bg-drift-spread/10 px-1.5 py-0.5 text-[10px] text-drift-spread"
               title={`IPFS CID: ${p.cid}`}
             >
-              IPFS
+              ipfs
             </span>
           )}
           <button
             onClick={() => void onUnpin(p.postId)}
-            className="rounded border border-drift-danger/60 px-1 py-0.5 text-drift-danger/80 hover:bg-drift-danger/10"
+            className="rounded-lg border border-drift-danger/20 bg-drift-danger/5 px-2 py-0.5 text-[10px] uppercase tracking-meta text-drift-danger transition-colors hover:bg-drift-danger/10"
           >
             unpin
           </button>
@@ -184,14 +189,15 @@ function ModList({
 }) {
   if (list.length === 0) {
     return (
-      <p className="py-6 text-center text-[12px] text-drift-muted">
-        nenhum {kind === 'blocked' ? 'bloqueado' : 'silenciado'}. Filtros
-        locais (manifesto §24) — não mudam o score, só sua visualização.
+      <p className="py-8 text-center font-mono text-[11px] leading-relaxed text-drift-muted/40">
+        nenhum {kind === 'blocked' ? 'bloqueado' : 'silenciado'}.
+        <br />
+        filtros locais não mudam o score, só sua visualização.
       </p>
     )
   }
   return (
-    <div className="max-h-80 space-y-1 overflow-y-auto">
+    <div className="max-h-96 space-y-2 overflow-y-auto">
       {list.map((e) => {
         let bech32 = ''
         try {
@@ -202,17 +208,17 @@ function ModList({
         return (
           <div
             key={e.npub}
-            className="flex items-center gap-2 rounded border border-drift-border/60 bg-drift-bg/30 px-2 py-1 text-[12px]"
+            className="flex items-center gap-2 rounded-xl border border-drift-border/30 bg-drift-surface/30 px-3 py-2.5 font-mono text-[11px]"
           >
-            <span className="flex-1 truncate font-mono text-drift-muted" title={e.reason ?? ''}>
+            <span className="flex-1 truncate text-drift-text/80" title={e.reason ?? ''}>
               {bech32.slice(0, 18)}…
             </span>
-            <span className="text-drift-muted">{timeAgo(e.at)}</span>
+            <span className="text-drift-muted/40">{timeAgo(e.at)}</span>
             <button
               onClick={() => void onAction(e.npub)}
-              className="rounded border border-drift-border px-1 py-0.5 text-drift-muted hover:border-drift-accent hover:text-drift-accent"
+              className="rounded-lg border border-drift-border/30 bg-drift-surface/30 px-2 py-0.5 text-[10px] uppercase tracking-meta text-drift-muted/70 transition-colors hover:border-drift-accent2/30 hover:text-drift-accent2"
             >
-              {kind === 'blocked' ? 'desbloquear' : 'dessilenciar'}
+              {kind === 'blocked' ? 'desbloq' : 'dessil'}
             </button>
           </div>
         )

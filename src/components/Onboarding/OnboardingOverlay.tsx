@@ -18,6 +18,7 @@ import { useState } from 'react'
 // `m` é o primitive leve do framer-motion (LazyMotion). Features via main.tsx.
 import { m, AnimatePresence } from 'framer-motion'
 import { setPref, usePrefsStore } from '../../lib/prefs'
+import { DriftButton } from '../UI/DriftButton'
 
 export interface OnboardingOverlayProps {
   onClose: () => void
@@ -88,12 +89,14 @@ export function OnboardingOverlay({ onClose, onOpenIdentity }: OnboardingOverlay
             <span className="text-drift-warning">⚠</span> Faz backup. Se perder o nsec, perdeu a identidade. Se trocar de
             celular, é só importar o nsec — todo o histórico volta dos relays.
           </p>
-          <button
+          <DriftButton
+            variant="ghost"
+            size="md"
             onClick={onOpenIdentity}
-            className="mt-1 rounded border border-drift-accent px-3 py-1 text-xs text-drift-accent hover:bg-drift-accent/10"
+            className="mt-1"
           >
             abrir backup agora →
-          </button>
+          </DriftButton>
         </>
       ),
     },
@@ -182,7 +185,7 @@ export function OnboardingOverlay({ onClose, onOpenIdentity }: OnboardingOverlay
       aria-modal="true"
       aria-label="onboarding do drift"
     >
-      <div className="flex max-h-[85dvh] w-full max-w-md flex-col overflow-y-auto overscroll-contain rounded border border-drift-border bg-drift-surface p-5">
+      <div className="flex max-h-[85dvh] w-full max-w-md flex-col overflow-y-auto overscroll-contain rounded-2xl border border-drift-border/40 bg-drift-surface/95 px-4 py-5">
         {/* Progress bar estilo Stories */}
         <div className="mb-4 flex gap-1">
           {steps.map((_, i) => (
@@ -193,7 +196,7 @@ export function OnboardingOverlay({ onClose, onOpenIdentity }: OnboardingOverlay
                   ? 'bg-drift-accent/60'
                   : i === step
                   ? 'bg-drift-accent'
-                  : 'bg-drift-border'
+                  : 'bg-drift-border/60'
               }`}
             />
           ))}
@@ -207,7 +210,7 @@ export function OnboardingOverlay({ onClose, onOpenIdentity }: OnboardingOverlay
             exit={{ opacity: 0, x: -12 }}
             transition={{ duration: 0.18 }}
           >
-            <h2 className="mb-3 text-xs uppercase tracking-[0.2em] text-drift-accent">
+            <h2 className="mb-3 font-display text-[14px] font-bold uppercase tracking-tag text-drift-accent">
               {currentStep?.title}
             </h2>
             <div className="space-y-3 text-sm text-drift-text [&_code]:text-[12px] [&_p]:leading-relaxed">
@@ -217,27 +220,23 @@ export function OnboardingOverlay({ onClose, onOpenIdentity }: OnboardingOverlay
         </AnimatePresence>
 
         <div className="mt-6 flex items-center justify-between">
-          <button
-            onClick={skip}
-            className="rounded px-3 py-2 text-[12px] uppercase tracking-widest text-drift-muted hover:text-drift-text"
-          >
+          <DriftButton variant="cancel" size="md" onClick={skip}>
             pular
-          </button>
+          </DriftButton>
           <div className="flex gap-2">
             {step > 0 && (
-              <button
+              <DriftButton
+                variant="ghost"
+                size="md"
                 onClick={() => setStep((s) => s - 1)}
-                className="rounded border border-drift-border px-3 py-1 text-xs uppercase tracking-widest text-drift-muted hover:border-drift-accent hover:text-drift-accent"
+                aria-label="voltar"
               >
                 ←
-              </button>
+              </DriftButton>
             )}
-            <button
-              onClick={next}
-              className="rounded border border-drift-accent px-3 py-1 text-xs uppercase tracking-widest text-drift-accent hover:bg-drift-accent/10"
-            >
+            <DriftButton variant="primary" size="md" onClick={next}>
               {isLast ? 'começar' : 'próximo →'}
-            </button>
+            </DriftButton>
           </div>
         </div>
       </div>

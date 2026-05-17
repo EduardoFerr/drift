@@ -195,24 +195,24 @@ export function IdentitySwitcher({ onRequestExport, onClose }: IdentitySwitcherP
 
   return (
     <FullPageCard onClose={onClose} title="identidades" ariaLabel="identidades">
-      <div className="p-5">
-        <p className="mb-4 text-[12px] leading-relaxed text-drift-muted">
+      <div className="space-y-3 px-4 py-5">
+        <p className="px-1 font-mono text-[11px] leading-relaxed text-drift-muted/50">
           Manifesto §4 — anonimato por design. Múltiplas identidades
           ajudam a compartimentalizar contextos: uma pública, outra pra
           tópicos sensíveis. Cada uma é um nsec independente.
         </p>
 
         {error && (
-          <div className="mb-3 rounded border border-drift-danger/60 bg-drift-danger/10 p-2 text-[12px] text-drift-danger">
+          <div className="rounded-xl border border-drift-danger/20 bg-drift-danger/5 px-4 py-2.5 font-mono text-[11px] text-drift-danger">
             {error}
           </div>
         )}
 
         {mode === 'list' && (
           <>
-            <section className="mb-4 max-h-64 space-y-1 overflow-y-auto">
+            <section className="max-h-72 space-y-2 overflow-y-auto pl-3">
               {list.length === 0 && (
-                <div className="text-[12px] text-drift-muted">
+                <div className="font-mono text-[11px] text-drift-muted/40">
                   nenhuma identidade ainda — crie uma abaixo
                 </div>
               )}
@@ -221,21 +221,21 @@ export function IdentitySwitcher({ onRequestExport, onClose }: IdentitySwitcherP
                 return (
                   <div
                     key={id.npub}
-                    className={`rounded border bg-drift-bg/30 p-2 ${
-                      isActive ? 'border-drift-accent' : 'border-drift-border/60'
+                    className={`rounded-xl border bg-drift-surface/30 px-4 py-3 ${
+                      isActive ? 'border-drift-accent2/40' : 'border-drift-border/30'
                     }`}
                   >
-                    <div className="mb-1 flex items-center justify-between text-[12px]">
-                      <div className="flex items-center gap-2">
-                        <span className={isActive ? 'text-drift-accent' : 'text-drift-muted'}>
+                    <div className="mb-1.5 flex items-center justify-between">
+                      <div className="flex items-center gap-2 font-mono text-[12px]">
+                        <span className={isActive ? 'text-drift-accent2' : 'text-drift-muted/50'}>
                           {isActive ? '● ativa' : '○'}
                         </span>
                         <span className="text-drift-text">
-                          {id.label || <em className="text-drift-muted">sem label</em>}
+                          {id.label || <em className="text-drift-muted/50">sem label</em>}
                         </span>
                         {id.imported && (
                           <span
-                            className="rounded bg-drift-border/60 px-1 text-[12px] text-drift-muted"
+                            className="rounded-lg bg-drift-border/20 px-1.5 py-0.5 font-mono text-[10px] text-drift-muted/60"
                             title="importada via nsec1"
                           >
                             importada
@@ -243,15 +243,15 @@ export function IdentitySwitcher({ onRequestExport, onClose }: IdentitySwitcherP
                         )}
                       </div>
                     </div>
-                    <div className="mb-1 break-all text-[12px] text-drift-muted">
+                    <div className="mb-2 break-all font-mono text-[11px] text-drift-muted/50">
                       {id.npubBech32}
                     </div>
-                    <div className="flex flex-wrap gap-1 text-[12px]">
+                    <div className="flex flex-wrap gap-1.5">
                       {!isActive && (
                         <button
                           onClick={() => void handleSwitch(id)}
                           disabled={working}
-                          className="rounded border border-drift-accent px-2 py-0.5 text-drift-accent hover:bg-drift-accent/10 disabled:opacity-30"
+                          className="rounded-lg border border-drift-accent2/25 bg-drift-surface/30 px-2.5 py-1 font-mono text-[10px] uppercase tracking-meta text-drift-accent2 transition-colors hover:bg-drift-accent2/10 disabled:cursor-not-allowed disabled:opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
                         >
                           ativar
                         </button>
@@ -259,14 +259,14 @@ export function IdentitySwitcher({ onRequestExport, onClose }: IdentitySwitcherP
                       <button
                         onClick={() => void handleRename(id)}
                         disabled={working}
-                        className="rounded border border-drift-border px-2 py-0.5 text-drift-muted hover:border-drift-accent hover:text-drift-accent disabled:opacity-30"
+                        className="rounded-lg border border-drift-border/30 bg-drift-surface/30 px-2.5 py-1 font-mono text-[10px] uppercase tracking-meta text-drift-muted transition-colors hover:border-drift-accent2/30 hover:text-drift-accent2 disabled:cursor-not-allowed disabled:opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
                       >
                         renomear
                       </button>
                       {isActive && (
                         <button
                           onClick={onRequestExport}
-                          className="rounded border border-drift-warning/60 px-2 py-0.5 text-drift-warning hover:bg-drift-warning/15"
+                          className="rounded-lg border border-drift-warning/20 bg-drift-warning/5 px-2.5 py-1 font-mono text-[10px] uppercase tracking-meta text-drift-warning transition-colors hover:bg-drift-warning/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-warning/30"
                         >
                           backup nsec
                         </button>
@@ -275,7 +275,7 @@ export function IdentitySwitcher({ onRequestExport, onClose }: IdentitySwitcherP
                         <button
                           onClick={() => void handleRemove(id)}
                           disabled={working}
-                          className="rounded border border-drift-danger/60 px-2 py-0.5 text-drift-danger/80 hover:bg-drift-danger/15 disabled:opacity-30"
+                          className="rounded-lg border border-drift-danger/20 bg-drift-danger/5 px-2.5 py-1 font-mono text-[10px] uppercase tracking-meta text-drift-danger transition-colors hover:bg-drift-danger/10 disabled:cursor-not-allowed disabled:opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-danger/30"
                         >
                           remover
                         </button>
@@ -286,29 +286,29 @@ export function IdentitySwitcher({ onRequestExport, onClose }: IdentitySwitcherP
               })}
             </section>
 
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-2 pl-3">
               <button
                 onClick={() => setMode('create')}
-                className="rounded border border-drift-accent px-3 py-1 text-[12px] uppercase tracking-widest text-drift-accent hover:bg-drift-accent/10"
+                className="rounded-xl border border-drift-accent2/25 bg-drift-surface/30 px-3 py-3 font-mono text-[12px] uppercase tracking-meta text-drift-accent2 transition-colors hover:bg-drift-accent2/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
               >
                 + nsec local
               </button>
               <button
                 onClick={() => setMode('bip39-create')}
-                className="rounded border border-drift-accent px-3 py-1 text-[12px] uppercase tracking-widest text-drift-accent hover:bg-drift-accent/10"
+                className="rounded-xl border border-drift-accent2/25 bg-drift-surface/30 px-3 py-3 font-mono text-[12px] uppercase tracking-meta text-drift-accent2 transition-colors hover:bg-drift-accent2/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
                 title="NIP-06 — gera 12 palavras BIP39 derivadas em nsec"
               >
                 + 12 palavras
               </button>
               <button
                 onClick={() => setMode('import')}
-                className="rounded border border-drift-border px-3 py-1 text-[12px] uppercase tracking-widest text-drift-muted hover:border-drift-accent hover:text-drift-accent"
+                className="rounded-xl border border-drift-border/30 bg-drift-surface/30 px-3 py-3 font-mono text-[12px] uppercase tracking-meta text-drift-muted transition-colors hover:border-drift-accent2/30 hover:text-drift-accent2 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
               >
                 ↓ importar nsec1
               </button>
               <button
                 onClick={() => setMode('bip39-import')}
-                className="rounded border border-drift-border px-3 py-1 text-[12px] uppercase tracking-widest text-drift-muted hover:border-drift-accent hover:text-drift-accent"
+                className="rounded-xl border border-drift-border/30 bg-drift-surface/30 px-3 py-3 font-mono text-[12px] uppercase tracking-meta text-drift-muted transition-colors hover:border-drift-accent2/30 hover:text-drift-accent2 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
                 title="recupera identidade a partir de 12-24 palavras BIP39"
               >
                 ↓ importar palavras
@@ -318,8 +318,8 @@ export function IdentitySwitcher({ onRequestExport, onClose }: IdentitySwitcherP
         )}
 
         {mode === 'create' && (
-          <>
-            <p className="mb-2 text-[12px] text-drift-muted">
+          <div className="space-y-3 pl-3">
+            <p className="px-1 font-mono text-[11px] leading-relaxed text-drift-muted/50">
               Vai gerar uma nova chave criptográfica local. Não substitui a
               ativa atual — só adiciona à lista.
             </p>
@@ -328,29 +328,29 @@ export function IdentitySwitcher({ onRequestExport, onClose }: IdentitySwitcherP
               value={newLabel}
               onChange={(e) => setNewLabel(e.target.value)}
               placeholder="label (opcional, ex: ativismo)"
-              className="mb-3 w-full rounded border border-drift-border bg-drift-bg px-2 py-1 text-[12px] text-drift-text placeholder:text-drift-muted/60 focus:border-drift-accent focus:outline-none"
+              className="w-full rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3 font-mono text-[12px] text-drift-text placeholder:text-drift-muted/25 focus:border-drift-accent2/40 focus:outline-none focus:ring-1 focus:ring-drift-accent2/20"
             />
             <div className="flex gap-2">
               <button
                 onClick={() => setMode('list')}
-                className="rounded border border-drift-border px-3 py-1 text-[12px] text-drift-muted hover:border-drift-border"
+                className="flex-1 rounded-xl border border-drift-border/30 bg-drift-surface/30 px-3 py-3 font-mono text-[12px] uppercase tracking-meta text-drift-muted transition-colors hover:text-drift-text focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
               >
                 cancelar
               </button>
               <button
                 onClick={handleCreate}
                 disabled={working}
-                className="flex-1 rounded border border-drift-accent px-3 py-1 text-[12px] uppercase tracking-widest text-drift-accent hover:bg-drift-accent/10 disabled:opacity-30"
+                className="flex-1 rounded-xl bg-drift-accent2 px-3 py-3 font-mono text-[12px] uppercase tracking-meta font-medium text-drift-bg transition-colors hover:bg-drift-accent2/85 disabled:cursor-not-allowed disabled:opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
               >
-                {working ? 'criando…' : 'criar'}
+                {working ? 'criando…' : '⊕ criar'}
               </button>
             </div>
-          </>
+          </div>
         )}
 
         {mode === 'import' && (
-          <>
-            <p className="mb-2 text-[12px] text-drift-muted">
+          <div className="space-y-3 pl-3">
+            <p className="px-1 font-mono text-[11px] leading-relaxed text-drift-muted/50">
               Cole um nsec1... existente. Adiciona à lista mas não troca
               a identidade ativa — você ativa explicitamente depois.
             </p>
@@ -359,41 +359,41 @@ export function IdentitySwitcher({ onRequestExport, onClose }: IdentitySwitcherP
               value={newLabel}
               onChange={(e) => setNewLabel(e.target.value)}
               placeholder="label (opcional)"
-              className="mb-2 w-full rounded border border-drift-border bg-drift-bg px-2 py-1 text-[12px] text-drift-text placeholder:text-drift-muted/60 focus:border-drift-accent focus:outline-none"
+              className="w-full rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3 font-mono text-[12px] text-drift-text placeholder:text-drift-muted/25 focus:border-drift-accent2/40 focus:outline-none focus:ring-1 focus:ring-drift-accent2/20"
             />
             <textarea
               value={importNsec}
               onChange={(e) => setImportNsec(e.target.value)}
               placeholder="nsec1..."
               rows={2}
-              className="mb-3 w-full resize-none rounded border border-drift-border bg-drift-bg px-2 py-1 font-mono text-[12px] text-drift-text placeholder:text-drift-muted/60 focus:border-drift-accent focus:outline-none"
+              className="w-full resize-none break-all rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3 font-mono text-[12px] text-drift-text placeholder:text-drift-muted/25 focus:border-drift-accent2/40 focus:outline-none focus:ring-1 focus:ring-drift-accent2/20"
             />
             <div className="flex gap-2">
               <button
                 onClick={() => setMode('list')}
-                className="rounded border border-drift-border px-3 py-1 text-[12px] text-drift-muted hover:border-drift-border"
+                className="flex-1 rounded-xl border border-drift-border/30 bg-drift-surface/30 px-3 py-3 font-mono text-[12px] uppercase tracking-meta text-drift-muted transition-colors hover:text-drift-text focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
               >
                 cancelar
               </button>
               <button
                 onClick={handleImport}
                 disabled={working || !importNsec.trim()}
-                className="flex-1 rounded border border-drift-accent px-3 py-1 text-[12px] uppercase tracking-widest text-drift-accent hover:bg-drift-accent/10 disabled:opacity-30"
+                className="flex-1 rounded-xl bg-drift-accent2 px-3 py-3 font-mono text-[12px] uppercase tracking-meta font-medium text-drift-bg transition-colors hover:bg-drift-accent2/85 disabled:cursor-not-allowed disabled:opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
               >
-                {working ? 'importando…' : 'importar'}
+                {working ? 'importando…' : '⊕ importar'}
               </button>
             </div>
-          </>
+          </div>
         )}
 
         {mode === 'bip39-create' && !bip39ShowResult && (
-          <>
-            <p className="mb-2 text-[12px] text-drift-muted">
+          <div className="space-y-3 pl-3">
+            <p className="px-1 font-mono text-[11px] leading-relaxed text-drift-muted/50">
               Vai gerar uma nova identidade a partir de 12 palavras BIP39
               (NIP-06). Mais fácil de anotar que <code>nsec1</code>;
               compatível com Damus/Snort/Coracle/Iris/Amethyst.
             </p>
-            <p className="mb-3 text-[12px] text-drift-warning">
+            <p className="px-1 font-mono text-[11px] leading-relaxed text-drift-warning">
               ⚠ Anote ou guarde as palavras em local seguro. Quem tem as
               12 palavras tem a identidade.
             </p>
@@ -402,43 +402,43 @@ export function IdentitySwitcher({ onRequestExport, onClose }: IdentitySwitcherP
               value={newLabel}
               onChange={(e) => setNewLabel(e.target.value)}
               placeholder="label (opcional)"
-              className="mb-3 w-full rounded border border-drift-border bg-drift-bg px-2 py-1 text-[12px] text-drift-text placeholder:text-drift-muted/60 focus:border-drift-accent focus:outline-none"
+              className="w-full rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3 font-mono text-[12px] text-drift-text placeholder:text-drift-muted/25 focus:border-drift-accent2/40 focus:outline-none focus:ring-1 focus:ring-drift-accent2/20"
             />
             <div className="flex gap-2">
               <button
                 onClick={() => setMode('list')}
-                className="rounded border border-drift-border px-3 py-1 text-[12px] text-drift-muted hover:border-drift-border"
+                className="flex-1 rounded-xl border border-drift-border/30 bg-drift-surface/30 px-3 py-3 font-mono text-[12px] uppercase tracking-meta text-drift-muted transition-colors hover:text-drift-text focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
               >
                 cancelar
               </button>
               <button
                 onClick={handleBip39Create}
                 disabled={working}
-                className="flex-1 rounded border border-drift-accent px-3 py-1 text-[12px] uppercase tracking-widest text-drift-accent hover:bg-drift-accent/10 disabled:opacity-30"
+                className="flex-1 rounded-xl bg-drift-accent2 px-3 py-3 font-mono text-[12px] uppercase tracking-meta font-medium text-drift-bg transition-colors hover:bg-drift-accent2/85 disabled:cursor-not-allowed disabled:opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
               >
-                {working ? 'gerando…' : 'gerar 12 palavras'}
+                {working ? 'gerando…' : '⊕ gerar 12 palavras'}
               </button>
             </div>
-          </>
+          </div>
         )}
 
         {bip39ShowResult && (
-          <>
-            <p className="mb-2 text-[12px] text-drift-warning">
+          <div className="space-y-3 pl-3">
+            <p className="px-1 font-mono text-[11px] leading-relaxed text-drift-warning">
               ⚠ Anote estas 12 palavras AGORA. Não terão como serem
               recuperadas depois. Quem tem as palavras tem a identidade.
             </p>
-            <div className="mb-3 rounded border border-drift-warning/60 bg-drift-warning/10 p-3">
-              <div className="grid grid-cols-3 gap-1 font-mono text-[12px] text-drift-warning">
+            <div className="rounded-xl border border-drift-warning/20 bg-drift-warning/5 p-4">
+              <div className="grid grid-cols-3 gap-2 font-mono text-[12px] text-drift-warning">
                 {bip39ShowResult.mnemonic.split(' ').map((word, i) => (
-                  <div key={i} className="flex gap-1">
+                  <div key={i} className="flex gap-1.5">
                     <span className="w-4 text-right text-drift-warning/60">{i + 1}.</span>
                     <span>{word}</span>
                   </div>
                 ))}
               </div>
             </div>
-            <div className="mb-2 break-all text-[12px] text-drift-muted">
+            <div className="break-all px-1 font-mono text-[11px] text-drift-muted/50">
               npub: <span className="text-drift-text">{bip39ShowResult.npub}</span>
             </div>
             <div className="flex gap-2">
@@ -446,9 +446,9 @@ export function IdentitySwitcher({ onRequestExport, onClose }: IdentitySwitcherP
                 onClick={() => {
                   void navigator.clipboard.writeText(bip39ShowResult.mnemonic)
                 }}
-                className="rounded border border-drift-border px-3 py-1 text-[12px] text-drift-muted hover:border-drift-accent hover:text-drift-accent"
+                className="flex-1 rounded-xl border border-drift-border/30 bg-drift-surface/30 px-3 py-3 font-mono text-[12px] uppercase tracking-meta text-drift-muted transition-colors hover:border-drift-accent2/30 hover:text-drift-accent2 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
               >
-                copiar
+                ⎘ copiar
               </button>
               <button
                 onClick={() => {
@@ -456,17 +456,17 @@ export function IdentitySwitcher({ onRequestExport, onClose }: IdentitySwitcherP
                   setNewLabel('')
                   setMode('list')
                 }}
-                className="flex-1 rounded border border-drift-accent px-3 py-1 text-[12px] uppercase tracking-widest text-drift-accent hover:bg-drift-accent/10"
+                className="flex-1 rounded-xl bg-drift-accent2 px-3 py-3 font-mono text-[12px] uppercase tracking-meta font-medium text-drift-bg transition-colors hover:bg-drift-accent2/85 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
               >
-                anotei, fechar
+                ✓ anotei, fechar
               </button>
             </div>
-          </>
+          </div>
         )}
 
         {mode === 'bip39-import' && (
-          <>
-            <p className="mb-2 text-[12px] text-drift-muted">
+          <div className="space-y-3 pl-3">
+            <p className="px-1 font-mono text-[11px] leading-relaxed text-drift-muted/50">
               Cole 12 a 24 palavras BIP39. NIP-06 path padrão. Compatível
               com identidades criadas em outros clientes Nostr (Damus,
               Snort, Iris, Amethyst, etc.).
@@ -476,38 +476,38 @@ export function IdentitySwitcher({ onRequestExport, onClose }: IdentitySwitcherP
               value={newLabel}
               onChange={(e) => setNewLabel(e.target.value)}
               placeholder="label (opcional)"
-              className="mb-2 w-full rounded border border-drift-border bg-drift-bg px-2 py-1 text-[12px] text-drift-text placeholder:text-drift-muted/60 focus:border-drift-accent focus:outline-none"
+              className="w-full rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3 font-mono text-[12px] text-drift-text placeholder:text-drift-muted/25 focus:border-drift-accent2/40 focus:outline-none focus:ring-1 focus:ring-drift-accent2/20"
             />
             <textarea
               value={bip39Phrase}
               onChange={(e) => setBip39Phrase(e.target.value)}
               placeholder="palavra1 palavra2 ... palavra12"
               rows={3}
-              className="mb-2 w-full resize-none rounded border border-drift-border bg-drift-bg px-2 py-1 font-mono text-[12px] text-drift-text placeholder:text-drift-muted/60 focus:border-drift-accent focus:outline-none"
+              className="w-full resize-none rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3 font-mono text-[12px] text-drift-text placeholder:text-drift-muted/25 focus:border-drift-accent2/40 focus:outline-none focus:ring-1 focus:ring-drift-accent2/20"
             />
             <input
               type="password"
               value={bip39Passphrase}
               onChange={(e) => setBip39Passphrase(e.target.value)}
               placeholder="passphrase (opcional, padrão vazio)"
-              className="mb-3 w-full rounded border border-drift-border bg-drift-bg px-2 py-1 text-[12px] text-drift-text placeholder:text-drift-muted/60 focus:border-drift-accent focus:outline-none"
+              className="w-full rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3 font-mono text-[12px] text-drift-text placeholder:text-drift-muted/25 focus:border-drift-accent2/40 focus:outline-none focus:ring-1 focus:ring-drift-accent2/20"
             />
             <div className="flex gap-2">
               <button
                 onClick={() => setMode('list')}
-                className="rounded border border-drift-border px-3 py-1 text-[12px] text-drift-muted hover:border-drift-border"
+                className="flex-1 rounded-xl border border-drift-border/30 bg-drift-surface/30 px-3 py-3 font-mono text-[12px] uppercase tracking-meta text-drift-muted transition-colors hover:text-drift-text focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
               >
                 cancelar
               </button>
               <button
                 onClick={handleBip39Import}
                 disabled={working || !bip39Phrase.trim()}
-                className="flex-1 rounded border border-drift-accent px-3 py-1 text-[12px] uppercase tracking-widest text-drift-accent hover:bg-drift-accent/10 disabled:opacity-30"
+                className="flex-1 rounded-xl bg-drift-accent2 px-3 py-3 font-mono text-[12px] uppercase tracking-meta font-medium text-drift-bg transition-colors hover:bg-drift-accent2/85 disabled:cursor-not-allowed disabled:opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
               >
-                {working ? 'derivando…' : 'importar'}
+                {working ? 'derivando…' : '⊕ importar'}
               </button>
             </div>
-          </>
+          </div>
         )}
       </div>
     </FullPageCard>

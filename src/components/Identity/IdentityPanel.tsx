@@ -43,46 +43,49 @@ export function IdentityPanel({ identity, onClose }: Props) {
 
   return (
     <FullPageCard onClose={onClose} title="sua identidade" ariaLabel="sua identidade">
-      <div className="p-5">
-      <div className="mb-5 flex gap-1 text-[12px] uppercase tracking-widest">
-          <button
-            onClick={() => setTab('backup')}
-            className={`flex-1 rounded border px-3 py-1.5 ${
-              tab === 'backup'
-                ? 'border-drift-accent text-drift-accent'
-                : 'border-drift-border text-drift-muted hover:text-drift-text'
-            }`}
-          >
+      <div className="space-y-3 px-4 py-5">
+        <div className="flex gap-1.5 rounded-2xl border border-drift-border/40 bg-drift-surface/50 p-1.5">
+          <IdTabBtn active={tab === 'backup'} onClick={() => setTab('backup')}>
             backup
-          </button>
-          <button
-            onClick={() => setTab('import')}
-            className={`flex-1 rounded border px-3 py-1.5 ${
-              tab === 'import'
-                ? 'border-drift-accent text-drift-accent'
-                : 'border-drift-border text-drift-muted hover:text-drift-text'
-            }`}
-          >
+          </IdTabBtn>
+          <IdTabBtn active={tab === 'import'} onClick={() => setTab('import')}>
             importar
-          </button>
-          <button
-            onClick={() => setTab('passkey')}
-            className={`flex-1 rounded border px-3 py-1.5 ${
-              tab === 'passkey'
-                ? 'border-drift-accent text-drift-accent'
-                : 'border-drift-border text-drift-muted hover:text-drift-text'
-            }`}
-            title="WebAuthn opt-in"
-          >
+          </IdTabBtn>
+          <IdTabBtn active={tab === 'passkey'} onClick={() => setTab('passkey')}>
             passkey
-          </button>
+          </IdTabBtn>
         </div>
 
-      {tab === 'backup' && <BackupTab identity={identity} />}
-      {tab === 'import' && <ImportTab onClose={onClose} />}
-      {tab === 'passkey' && <PasskeyTab npub={identity.npub} />}
+        <div className="pl-3">
+          {tab === 'backup' && <BackupTab identity={identity} />}
+          {tab === 'import' && <ImportTab onClose={onClose} />}
+          {tab === 'passkey' && <PasskeyTab npub={identity.npub} />}
+        </div>
       </div>
     </FullPageCard>
+  )
+}
+
+function IdTabBtn({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean
+  onClick: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex-1 rounded-xl px-3 py-2 font-mono text-[11px] uppercase tracking-meta transition-colors ${
+        active
+          ? 'bg-drift-accent2 text-drift-bg'
+          : 'text-drift-muted/70 hover:text-drift-text'
+      }`}
+    >
+      {children}
+    </button>
   )
 }
 
@@ -147,24 +150,24 @@ function BackupTab({ identity }: { identity: DriftIdentity }) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div>
-        <div className="mb-1 text-[12px] uppercase tracking-widest text-drift-muted">
+        <div className="mb-1.5 px-1 font-mono text-[10px] uppercase tracking-meta text-drift-muted/50">
           npub público
         </div>
-        <div className="break-all rounded border border-drift-border bg-black/30 p-2 text-[12px] text-drift-text">
+        <div className="break-all rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3 font-mono text-[12px] text-drift-text">
           {identity.npubBech32}
         </div>
       </div>
 
       <div>
-        <div className="mb-1 flex items-center justify-between">
-          <span className="text-[12px] uppercase tracking-widest text-drift-danger/80">
+        <div className="mb-1.5 flex items-center justify-between px-1">
+          <span className="font-mono text-[10px] uppercase tracking-meta text-drift-danger/80">
             nsec privado
           </span>
           <button
             onClick={() => setReveal((r) => !r)}
-            className="text-[12px] uppercase tracking-widest text-drift-muted hover:text-drift-text"
+            className="font-mono text-[10px] uppercase tracking-meta text-drift-muted transition-colors hover:text-drift-text focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
           >
             {reveal ? 'ocultar' : 'revelar'}
           </button>
@@ -172,21 +175,23 @@ function BackupTab({ identity }: { identity: DriftIdentity }) {
 
         {reveal ? (
           <div className="space-y-3">
-            <div className="break-all rounded border border-drift-danger/60 bg-drift-danger/10 p-2 text-[12px] text-drift-danger">
+            <div className="break-all rounded-xl border border-drift-danger/20 bg-drift-danger/5 px-4 py-3 font-mono text-[12px] text-drift-danger">
               {identity.nsecBech32}
             </div>
 
-            <div className="flex justify-center">
+            <div className="rounded-xl border border-drift-border/30 bg-drift-surface/30 p-5">
               {qrUrl ? (
-                <img
-                  src={qrUrl}
-                  alt="QR code do nsec"
-                  className="rounded"
-                  width={240}
-                  height={240}
-                />
+                <div className="flex flex-col items-center gap-3">
+                  <img
+                    src={qrUrl}
+                    alt="QR code do nsec"
+                    className="rounded-lg"
+                    width={240}
+                    height={240}
+                  />
+                </div>
               ) : (
-                <div className="grid h-[240px] w-[240px] place-items-center rounded border border-drift-border text-[12px] text-drift-muted">
+                <div className="grid h-[240px] place-items-center font-mono text-[11px] text-drift-muted/40">
                   gerando QR…
                 </div>
               )}
@@ -195,28 +200,28 @@ function BackupTab({ identity }: { identity: DriftIdentity }) {
             <div className="flex gap-2">
               <button
                 onClick={handleCopy}
-                className="flex-1 rounded border border-drift-border px-3 py-2 text-[12px] uppercase tracking-widest text-drift-muted transition-colors hover:border-drift-accent hover:text-drift-accent"
+                className="flex-1 rounded-xl border border-drift-border/30 bg-drift-surface/30 px-3 py-3 font-mono text-[12px] uppercase tracking-meta text-drift-muted transition-colors hover:border-drift-accent2/30 hover:text-drift-accent2 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
               >
-                {copied ? 'copiado ✓' : 'copiar nsec'}
+                {copied ? '✓ copiado' : '⎘ copiar nsec'}
               </button>
               <button
                 onClick={handleDownload}
-                className="flex-1 rounded border border-drift-accent2 px-3 py-2 text-[12px] uppercase tracking-widest text-drift-accent2 transition-colors hover:bg-drift-accent2/10"
+                className="flex-1 rounded-xl border border-drift-accent2/25 bg-drift-surface/30 px-3 py-3 font-mono text-[12px] uppercase tracking-meta text-drift-accent2 transition-colors hover:bg-drift-accent2/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
                 title="Baixa um arquivo .json com nsec + npub + metadados. Guarde em local seguro."
               >
-                {downloaded ? 'baixado ✓' : 'baixar arquivo'}
+                {downloaded ? '✓ baixado' : '↓ baixar arquivo'}
               </button>
             </div>
           </div>
         ) : (
-          <div className="rounded border border-drift-border bg-black/30 p-2 text-[12px] text-drift-muted">
+          <div className="rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3 font-mono text-[12px] text-drift-muted/40">
             ••••••••••••••••••••••••••••••••••••••••••••••••••••••••
           </div>
         )}
       </div>
 
       {reveal && (
-        <label className="flex cursor-pointer items-start gap-3 rounded border border-drift-border p-3 text-[12px] leading-relaxed text-drift-text transition-colors hover:border-drift-accent2/40">
+        <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3.5 font-mono text-[12px] leading-relaxed text-drift-text transition-colors hover:border-drift-accent2/25 focus-within:ring-2 focus-within:ring-drift-accent2/40">
           <input
             type="checkbox"
             checked={confirmed}
@@ -232,7 +237,7 @@ function BackupTab({ identity }: { identity: DriftIdentity }) {
         </label>
       )}
 
-      <div className="rounded border border-drift-warning/60 bg-drift-warning/10 p-3 text-[12px] leading-relaxed text-drift-warning/80">
+      <div className="rounded-xl border border-drift-warning/20 bg-drift-warning/5 px-4 py-3 font-mono text-[11px] leading-relaxed text-drift-warning">
         Esta é a sua identidade na rede Drift. Quem tiver acesso a ela
         controla a sua conta — pode publicar como você, drift e
         sink como você. Guarde offline (papel, gerenciador de
@@ -310,7 +315,7 @@ function ImportTab({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {/* Track C.3 — file picker pra carregar backup .json. */}
       <div>
         <input
@@ -328,27 +333,27 @@ function ImportTab({ onClose }: { onClose: () => void }) {
         <button
           onClick={() => fileInputRef.current?.click()}
           disabled={busy}
-          className="w-full rounded border border-drift-accent2 bg-drift-accent2/5 px-3 py-2 text-[12px] uppercase tracking-widest text-drift-accent2 transition-colors hover:bg-drift-accent2/10 disabled:opacity-40"
+          className="w-full rounded-xl border border-drift-accent2/25 bg-drift-surface/30 px-4 py-3 font-mono text-[12px] uppercase tracking-meta text-drift-accent2 transition-colors hover:bg-drift-accent2/10 disabled:cursor-not-allowed disabled:opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
         >
           ⤓ carregar arquivo de backup (.json)
         </button>
         {loadedFrom && (
-          <div className="mt-1 truncate font-mono text-[12px] text-drift-accent2/80" title={loadedFrom}>
+          <div className="mt-2 truncate px-1 font-mono text-[11px] text-drift-accent2/80" title={loadedFrom}>
             ✓ carregado: {loadedFrom}
           </div>
         )}
       </div>
 
       <div className="flex items-center gap-3">
-        <div className="h-px flex-1 bg-drift-border" />
-        <span className="font-mono text-[12px] uppercase tracking-widest text-drift-muted">
+        <div className="h-px flex-1 bg-drift-border/40" />
+        <span className="font-mono text-[10px] uppercase tracking-meta text-drift-muted/50">
           ou cole manual
         </span>
-        <div className="h-px flex-1 bg-drift-border" />
+        <div className="h-px flex-1 bg-drift-border/40" />
       </div>
 
       <div>
-        <div className="mb-1 text-[12px] uppercase tracking-widest text-drift-muted">
+        <div className="mb-1.5 px-1 font-mono text-[10px] uppercase tracking-meta text-drift-muted/50">
           chave nsec
         </div>
         <textarea
@@ -359,17 +364,17 @@ function ImportTab({ onClose }: { onClose: () => void }) {
           spellCheck={false}
           autoCapitalize="off"
           autoCorrect="off"
-          className="w-full break-all rounded border border-drift-border bg-black/30 p-2 font-mono text-[12px] text-drift-text placeholder:text-drift-muted/60 focus:border-drift-accent focus:outline-none"
+          className="w-full break-all rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3 font-mono text-[12px] text-drift-text placeholder:text-drift-muted/25 focus:border-drift-accent2/40 focus:outline-none focus:ring-1 focus:ring-drift-accent2/20"
         />
       </div>
 
       {error && (
-        <div className="rounded border border-drift-danger/60 bg-drift-danger/10 p-2 text-[12px] text-drift-danger">
+        <div className="rounded-xl border border-drift-danger/20 bg-drift-danger/5 px-4 py-2.5 font-mono text-[11px] text-drift-danger">
           {error}
         </div>
       )}
 
-      <div className="rounded border border-drift-warning/60 bg-drift-warning/10 p-3 text-[12px] leading-relaxed text-drift-warning/80">
+      <div className="rounded-xl border border-drift-warning/20 bg-drift-warning/5 px-4 py-3 font-mono text-[11px] leading-relaxed text-drift-warning">
         Importar substitui a identidade atual. Posts publicados com a
         chave atual deixam de ser exibidos como "seus". Se você ainda
         não fez backup, volta na aba "backup" antes.
@@ -379,16 +384,16 @@ function ImportTab({ onClose }: { onClose: () => void }) {
         <button
           onClick={onClose}
           disabled={busy}
-          className="flex-1 rounded border border-drift-border px-3 py-2 text-[12px] uppercase tracking-widest text-drift-muted hover:text-drift-text disabled:opacity-40"
+          className="flex-1 rounded-xl border border-drift-border/30 bg-drift-surface/30 px-3 py-3 font-mono text-[12px] uppercase tracking-meta text-drift-muted transition-colors hover:text-drift-text disabled:cursor-not-allowed disabled:opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
         >
           cancelar
         </button>
         <button
           onClick={handleImport}
           disabled={busy || !nsec.trim()}
-          className="flex-1 rounded border border-drift-accent px-3 py-2 text-[12px] uppercase tracking-widest text-drift-accent transition-colors hover:bg-drift-accent/10 disabled:cursor-not-allowed disabled:opacity-30"
+          className="flex-1 rounded-xl bg-drift-accent2 px-3 py-3 font-mono text-[12px] uppercase tracking-meta font-medium text-drift-bg transition-colors hover:bg-drift-accent2/85 disabled:cursor-not-allowed disabled:opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
         >
-          {busy ? 'importando…' : 'importar'}
+          {busy ? 'importando…' : '⊕ importar'}
         </button>
       </div>
     </div>
@@ -451,7 +456,7 @@ function PasskeyTab({ npub }: { npub: string }) {
 
   if (!supported) {
     return (
-      <div className="rounded border border-drift-warning/60 bg-drift-warning/15 p-3 text-[12px] text-drift-warning">
+      <div className="rounded-xl border border-drift-warning/20 bg-drift-warning/5 px-4 py-3 font-mono text-[11px] leading-relaxed text-drift-warning">
         ⚠ WebAuthn não suportado neste browser. Passkey requer browser
         moderno (Chrome 67+, Safari 14+, Firefox 60+) em contexto seguro
         (HTTPS ou localhost).
@@ -460,46 +465,46 @@ function PasskeyTab({ npub }: { npub: string }) {
   }
 
   return (
-    <div>
-      <p className="mb-3 text-[12px] leading-relaxed text-drift-muted">
+    <div className="space-y-3">
+      <p className="px-1 font-mono text-[11px] leading-relaxed text-drift-muted/50">
         Passkey opt-in (WebAuthn) — adiciona um gate de autenticação local
         ao boot do app. Usa biometria (Touch ID, Face ID, Windows Hello)
         ou security key (YubiKey, etc.).
       </p>
-      <p className="mb-3 text-[12px] leading-relaxed text-drift-muted">
+      <p className="px-1 font-mono text-[11px] leading-relaxed text-drift-muted/50">
         ⚠ Passkey NÃO é a sua identidade — sua identidade é o nsec. Passkey
         só é gate local pra abrir o app aqui. Se você perder o device + nunca
         fez backup do nsec1, identidade some. Manifesto §3.
       </p>
 
       {error && (
-        <div className="mb-3 rounded border border-drift-danger/60 bg-drift-danger/10 p-2 text-[12px] text-drift-danger">
+        <div className="rounded-xl border border-drift-danger/20 bg-drift-danger/5 px-4 py-2.5 font-mono text-[11px] text-drift-danger">
           {error}
         </div>
       )}
 
       {enabled === null ? (
-        <div className="text-[12px] text-drift-muted">verificando…</div>
+        <div className="px-1 font-mono text-[11px] text-drift-muted/50">verificando…</div>
       ) : enabled ? (
-        <div>
-          <div className="mb-3 rounded border border-drift-spread/60 bg-drift-spread/10 p-2 text-[12px] text-drift-spread">
+        <div className="space-y-3">
+          <div className="rounded-xl border border-drift-spread/20 bg-drift-spread/5 px-4 py-3 font-mono text-[11px] text-drift-spread">
             ✓ Passkey ativo. Boot do app pede autenticação.
           </div>
           <button
             onClick={handleDisable}
             disabled={working}
-            className="w-full rounded border border-drift-danger/60 px-3 py-2 text-[12px] uppercase tracking-widest text-drift-danger hover:bg-drift-danger/15 disabled:opacity-50"
+            className="w-full rounded-xl border border-drift-warning/20 bg-drift-warning/5 px-4 py-3 font-mono text-[12px] uppercase tracking-meta text-drift-warning transition-colors hover:bg-drift-warning/10 disabled:cursor-not-allowed disabled:opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-warning/30"
           >
-            {working ? 'desabilitando…' : 'desabilitar passkey'}
+            {working ? 'desabilitando…' : '⊗ desabilitar passkey'}
           </button>
         </div>
       ) : (
         <button
           onClick={handleEnable}
           disabled={working}
-          className="w-full rounded border border-drift-accent px-3 py-2 text-[12px] uppercase tracking-widest text-drift-accent hover:bg-drift-accent/10 disabled:opacity-50"
+          className="w-full rounded-xl bg-drift-accent2 px-4 py-3 font-mono text-[12px] uppercase tracking-meta font-medium text-drift-bg transition-colors hover:bg-drift-accent2/85 disabled:cursor-not-allowed disabled:opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
         >
-          {working ? 'registrando…' : '+ habilitar passkey'}
+          {working ? 'registrando…' : '⊕ habilitar passkey'}
         </button>
       )}
     </div>

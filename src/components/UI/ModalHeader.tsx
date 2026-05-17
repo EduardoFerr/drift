@@ -21,6 +21,7 @@
 
 // `m` é o primitive leve do framer-motion (LazyMotion). Features via main.tsx.
 import { m } from 'framer-motion'
+import { DriftButton } from './DriftButton'
 
 export interface ModalHeaderProps {
   /** Texto principal do header (renderizado em <h2>). */
@@ -52,14 +53,16 @@ export function ModalHeader({ title, subtitle, onClose, tone = 'default', hideCl
         )}
       </div>
       {!hideClose && (
-        <m.button
-          whileTap={{ scale: 0.92 }}
-          onClick={onClose}
-          className="shrink-0 rounded border border-drift-border px-2 py-1 text-[12px] text-drift-muted transition-colors hover:border-drift-accent hover:text-drift-accent focus:border-drift-accent focus:text-drift-accent focus:outline-none"
-          aria-label="fechar"
-        >
-          ✕
-        </m.button>
+        <m.div whileTap={{ scale: 0.92 }} className="shrink-0">
+          <DriftButton
+            variant="ghost"
+            size="md"
+            onClick={onClose}
+            aria-label="fechar"
+          >
+            fechar
+          </DriftButton>
+        </m.div>
       )}
     </header>
   )
