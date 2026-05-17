@@ -19,6 +19,13 @@
 @import '@fontsource/dm-mono/300-italic.css';
 
 /*
+ * Theme palettes — Cinder (default) / Rosenholz / Velatura.
+ * @import must come BEFORE @tailwind directives (CSS spec requires
+ * @imports at the top). Vite + postcss-import resolve relative path.
+ */
+@import './styles/themes.css';
+
+/*
  * Round CWV-2 §3.4 — Font optimization. @fontsource ships
  * `font-display: swap` por default em versões recentes, mas reforça
  * explicitamente — Lighthouse audit (Robin §3.4.1) marca FOIT como
@@ -59,39 +66,17 @@
 @tailwind utilities;
 
 /*
- * CSS variables espelhando tokens Tailwind — útil pra inline styles
- * (decorative letter em SubpostLayout V4, animações framer-motion que
- * preferem hex direto). Source of truth = tailwind.config.js; aqui é
- * cópia. LOCK_VIA_TEST garante paridade.
+ * Tokens não-temáticos (layout, type scale, motion) — mesma vida útil
+ * que o app, não mudam por tema. Ficam em :root pra serem globais.
+ * Theme palettes (drift-* color vars) ficam em src/styles/themes.css,
+ * importado no topo deste arquivo antes dos @tailwind directives.
  */
 :root {
-  /* Surface */
-  --drift-bg: #0c0c0b;
-  --drift-surface: #15151a;
-  --drift-border: #2a2a2e;
-  /* Brand */
-  --drift-accent: #e8ff5a;
-  --drift-accent2: #5affd4;
-  /* Type */
-  --drift-text: #f0f0ea;
-  /* muted bumped novamente 2026-05-15: #6b6b66 → #828282. Lighthouse
-     a11y audit pegou 3.40:1 (FAIL) em vários sites. Novo #828282 →
-     4.74:1 sobre drift-surface (PASS WCAG AA). Vide tailwind.config.js. */
-  --drift-muted: #828282;
-  /* Role (protocolo) */
-  --drift-spread: #34d399;
-  --drift-bury: #f87171;
-  /* Intent (UI) — ver tailwind.config.js pra rationale + WCAG. */
-  --drift-warning: #fbbf24;
-  --drift-danger: #f87171;
   /*
    * Mockup v0.7 tokens — valores que não caem na escala 4px do
    * Tailwind. Definidos como CSS vars pra permitir override dinâmico
    * (theming, A/B, debug em DevTools). tailwind.config.js mapeia
-   * estes pra named utilities com fallback estático: ex
-   *   spacing: { 'card-x': 'var(--card-px, 17px)' }
-   * permite `px-card-x` no JSX. Se a var sumir, fallback estático
-   * mantém o layout — render nunca quebra.
+   * estes pra named utilities com fallback estático.
    */
   --card-px: 17px;
   --card-px-wide: 22px;
@@ -101,16 +86,11 @@
   --tracking-title: -0.3px;
   --leading-title: 1.08;
   --leading-body: 1.65;
-  /* body bumped 2026-05-15: #787874 → #909090. Lighthouse a11y audit
-     2026-05-15 — old 4.10:1 (FAIL AA), new 5.54:1 (PASS AA).
-     Hierarquia preservada: text > body > muted, todos ≥ 4.5:1. */
-  --drift-body: #909090;
   /*
    * Fluid type scale — clamp(min, vw, max). 6 levels canônicos.
    * Espelha tailwind.config.js theme.extend.fontSize.fluid-*.
    * Source of truth = tailwind.config.js; aqui é cópia útil pra inline
    * styles e debug em DevTools. LOCK_VIA_TEST garante paridade.
-   * Decisão de scale em Docs/sessions/text-responsivity-audit-2026-05-08.md §3-4.
    */
   --t-fluid-xs: clamp(9px, 2.4vw, 10px);
   --t-fluid-sm: clamp(10px, 2.8vw, 11px);

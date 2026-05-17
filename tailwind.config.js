@@ -1,74 +1,76 @@
 /** @type {import('tailwindcss').Config} */
 //
-// Drift design tokens — paleta v0.7 (chartreuse + mint).
-// Documentação completa em Docs/design-system.md.
+// Drift design tokens — multi-tema via CSS vars.
 //
-// CONVENÇÃO LÉXICA (importante):
-//   - Tokens `drift-spread` e `drift-bury` são CSS classes de **role
-//     semântica do código** (ação positiva/negativa no protocolo,
-//     kinds 9079/9080). NÃO renomear pra `drift-drift`/`drift-sink` —
-//     vocabulário UI muda em strings PT user-facing, não em
-//     identificadores de código. Ver vocabulary mapping em CLAUDE.md.
-//   - Tokens `drift-accent` (DRIFT, CTAs) e `drift-accent2` (sub-actions,
-//     focus) são tokens de **brand**. Usados onde o mockup chama
-//     accent/accent2.
-//   - `drift-text` / `drift-muted` são tokens de **type**. Substituem
-//     `text-slate-*` em componentes Drift-específicos; slate continua
-//     OK pra detalhes neutros (skeletons, decoração).
+// Fonte da verdade: `src/styles/themes.css` define `[data-theme="X"]`
+// blocks (Cinder default, Rosenholz, Velatura). Este config aponta as
+// utilities Tailwind (`bg-drift-bg`, `text-drift-text`, etc.) pra
+// `var(--drift-X)` — Tailwind v3 converte hex auto em alpha modifier;
+// pra CSS vars precisaria `<alpha-value>` placeholder, mas como os
+// valores são tipicamente sólidos em utilities tipo `bg-drift-bg`,
+// mantemos formato `var(--drift-X)` simples.
 //
-// Mudança 2026-05-04: paleta migrou de purple (#a78bfa) pra chartreuse
-// (#e8ff5a) + mint (#5affd4). Hex values atualizados; nomes preservados
-// pra evitar refactor cascata em ~200 consumidores.
+// CONVENÇÃO LÉXICA:
+//   - `drift-spread` (kind 9079) / `drift-bury` (kind 9080) — role tokens
+//     do protocolo. NÃO renomear pra `drift-drift`/`drift-sink`. UI
+//     traduz pra DRIFT/SINK só em strings PT user-facing.
+//   - `drift-accent` (CTAs primários) / `drift-accent2` (sub-actions,
+//     focus) — brand tokens. Variam por tema.
+//   - `drift-text` / `drift-muted` / `drift-body` — type tokens com
+//     hierarquia de luminance enforced (text > body > muted).
+//   - `drift-warning` (avisos não-destrutivos) / `drift-danger` (CTAs
+//     destrutivos UI). Em Rosenholz são hex distintos; em outras
+//     paletas podem coincidir mas semântica é independente.
+//
+// História:
+//   - 2026-05-04: paleta migrou purple (#a78bfa) → chartreuse (#e8ff5a) + mint
+//   - 2026-05-17: refactor pra CSS vars + 3 paletas com identidade editorial
+//     (Cinder default substitui chartreuse). Curadoria: Robin v4 com
+//     research Anthropic/Mercury/Rosé Pine/Catppuccin/Morandi.
 export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {
       colors: {
         drift: {
-          // Surface tokens (quase-preto warm + camadas)
-          bg: '#0c0c0b',
-          surface: '#15151a',
-          border: '#2a2a2e',
-          // Brand tokens (chartreuse + mint)
-          accent: '#e8ff5a',
-          accent2: '#5affd4',
+          // Surface tokens
+          bg: 'var(--drift-bg)',
+          surface: 'var(--drift-surface)',
+          'surface-1': 'var(--drift-surface-1)',
+          'surface-2': 'var(--drift-surface-2)',
+          'surface-3': 'var(--drift-surface-3)',
+          'surface-4': 'var(--drift-surface-4)',
+          border: 'var(--drift-border)',
+          // Brand tokens
+          accent: 'var(--drift-accent)',
+          accent2: 'var(--drift-accent2)',
           // Type tokens
-          text: '#f0f0ea',
-          // muted: #4a4a46 (V8) → #6b6b66 (2026-05-08) → #828282 (V9.32
-          // 2026-05-15). Cada bump motivado por audit Lighthouse a11y
-          // contrast. Última medida em #6b6b66 deu 3.40:1 sobre
-          // drift-surface (FAIL WCAG AA 4.5:1). Novo #828282 = 4.74:1
-          // (PASS); ainda visualmente "muted" — gray neutro luminance
-          // ~0.227 vs drift-text 0.84.
-          muted: '#828282',
-          // Body italic — mockup v0.7. CSS var permite override dinâmico,
-          // fallback estático garante render se var sumir. V9.32: bumped
-          // #787874 → #909090 pra preservar hierarquia (muted < body <
-          // text) acima do limiar AA. Body 5.54:1 sobre surface.
-          body: 'var(--drift-body, #909090)',
-          // Role tokens (semântica de protocolo — não renomear)
-          spread: '#34d399', // ação positiva (kind 9079, label UI = DRIFT)
-          bury: '#f87171', // ação negativa (kind 9080, label UI = SINK)
-          // Intent tokens (semântica de UI, NÃO de protocolo)
-          //   warning: avisos NÃO-destrutivos — CW chips, alerts informativos,
-          //            "segure pra moderar", GPS warnings, scaffold/stub notes.
-          //   danger:  ações destrutivas confirmáveis — Bloquear, Remover,
-          //            Report CTA, error states. Distinto de `drift-bury` que
-          //            é reservado pra ação semântica do protocolo (kind 9080).
-          // WCAG AA confirmado sobre drift-surface (#15151a) e drift-bg (#0c0c0b):
-          //   warning #fbbf24 (amber-400) = 10.45:1 sobre surface · 11.15:1 sobre bg
-          //   danger  #f87171 (red-400)   =  5.27:1 sobre surface ·  5.61:1 sobre bg
-          // `danger` reusa a paleta `drift-bury` (#f87171) deliberadamente — ambos
-          // expressam "ação negativa" do ponto de vista do usuário. Mantemos dois
-          // tokens com mesmo hex porque carregam INTENÇÃO distinta:
-          //   `drift-bury`   = role de PROTOCOLO (kind 9080, ranking deterministico).
-          //   `drift-danger` = intent de UI (Bloquear, Remover, Report CTA, destrutivo).
-          // Trocar a paleta de bury não deve mexer em CTAs de UI e vice-versa;
-          // por isso os dois tokens existem, mesmo que hoje compartilhem hex.
-          // Tokens semânticos (carregam intenção); não introduzir paletas.
-          warning: '#fbbf24',
-          danger: '#f87171',
+          text: 'var(--drift-text)',
+          muted: 'var(--drift-muted)',
+          body: 'var(--drift-body)',
+          // Role tokens (protocolo kind 9079/9080)
+          spread: 'var(--drift-spread)',
+          bury: 'var(--drift-bury)',
+          // Intent tokens (UI semântico)
+          warning: 'var(--drift-warning)',
+          danger: 'var(--drift-danger)',
         },
+      },
+      boxShadow: {
+        // Per-theme shadows tinted by bg hue (definidas em themes.css)
+        'drift-sm': 'var(--shadow-sm)',
+        'drift-md': 'var(--shadow-md)',
+        'drift-lg': 'var(--shadow-lg)',
+        'drift-glow': 'var(--shadow-glow)',
+        'drift-drag': 'var(--drag-shadow)',
+      },
+      backgroundImage: {
+        // Per-theme gradients (OKLCH interpolation, fallback via PostCSS)
+        'drift-canvas': 'var(--gradient-canvas)',
+        'drift-accent-soft': 'var(--gradient-accent-soft)',
+        'drift-edge': 'var(--gradient-edge)',
+        'drift-signature': 'var(--gradient-signature)',
+        'drift-hairline': 'var(--gradient-hairline)',
       },
       fontFamily: {
         // V2 (commit subsequente): fontes locais via @fontsource.
@@ -130,9 +132,14 @@ export default {
       },
       transitionTimingFunction: {
         // 3 easings cobrem 95% dos casos. Ver RFC §1.1.
-        'drift-out':    'cubic-bezier(0.0, 0.0, 0.2, 1)',     // ease-out canônico
-        'drift-inout':  'cubic-bezier(0.4, 0.0, 0.2, 1)',     // overlay enter/exit
-        'drift-spring': 'cubic-bezier(0.32, 0.72, 0, 1)',     // card stack, emphasis
+        'drift-out':       'cubic-bezier(0.0, 0.0, 0.2, 1)',     // ease-out canônico
+        'drift-inout':     'cubic-bezier(0.4, 0.0, 0.2, 1)',     // overlay enter/exit
+        'drift-spring':    'cubic-bezier(0.32, 0.72, 0, 1)',     // card stack, emphasis
+        // Per-theme signature easing — variável CSS sobrescrita por [data-theme].
+        // Cinder: cubic-bezier(0.32, 0.72, 0.32, 1) — brasa decay
+        // Rosenholz: cubic-bezier(0.16, 1, 0.3, 1) — página virando
+        // Velatura: cubic-bezier(0.4, 0, 0.2, 1) — tato físico
+        'drift-signature': 'var(--ease-signature)',
       },
     },
   },

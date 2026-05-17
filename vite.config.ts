@@ -152,8 +152,12 @@ export default defineConfig(async (): Promise<UserConfig> => ({
         // Sem isso, o plugin emite default 'en' que confunde screen readers.
         lang: 'pt-BR',
         dir: 'ltr',
-        theme_color: '#0c0c0b',
-        background_color: '#0c0c0b',
+        // Cinder (default theme) bg. PWA manifest theme_color é estático
+        // por spec — não muda quando user troca tema runtime. Outras
+        // paletas (Rosenholz/Velatura) ficam só no SPA. LOCK_VIA_TEST
+        // em manifesto-conformance.test.ts garante paridade com cinder.
+        theme_color: '#0e0e12',
+        background_color: '#0e0e12',
         display: 'standalone',
         // Fallback gracioso — alguns browsers desktop preferem
         // window-controls-overlay (WCO) pra integração de barra de título.

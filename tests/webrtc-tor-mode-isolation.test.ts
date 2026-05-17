@@ -112,6 +112,13 @@ vi.mock('../src/lib/sync', () => ({
 vi.mock('../src/lib/prefs', () => ({
   loadPrefs: loadPrefsMock,
   getPrefs: () => getPrefsMock(),
+  // Theme subscriber adicionado em bootstrap 2026-05-17 — mock minimal:
+  // store retorna prefs atual + cinder default; subscribe no-op (não
+  // testamos transição de tema aqui).
+  usePrefsStore: {
+    getState: () => ({ ...getPrefsMock(), theme_id: 'cinder' }),
+    subscribe: () => () => {},
+  },
 }))
 
 vi.mock('../src/lib/relays', () => ({

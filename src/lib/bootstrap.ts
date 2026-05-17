@@ -20,7 +20,8 @@ import { initDb, type StorageMode } from './db'
 import { getOrCreateIdentity } from './identity'
 import { checkRelayConnectivity, type RelayHealth } from './nostr'
 import { startSync } from './sync'
-import { loadPrefs } from './prefs'
+import { loadPrefs, usePrefsStore } from './prefs'
+import { applyTheme, DEFAULT_THEME_ID, isThemeId } from './theme'
 import { loadRelays } from './relays'
 import { loadIdentities } from './identities'
 import { loadFollows } from './follows'
@@ -178,6 +179,18 @@ async function doBootstrap(): Promise<void> {
     // Carrega preferências locais cedo — UI já consulta show_nsfw_default
     // etc. assim que o feed renderiza. Manifesto §27.
     await loadPrefs()
+
+    // Aplica tema CSS-var no <html data-theme="X"> antes do primeiro
+    // render — evita flash de tema default → tema persistido. Subscribe
+    // reativo ao store: qualquer mutação via setPref('theme_id', ...)
+    // dispara applyTheme automaticamente.
+    const initialThemeId = usePrefsStore.getState().theme_id
+    applyTheme(isThemeId(initialThemeId) ? initialThemeId : DEFAULT_THEME_ID)
+    usePrefsStore.subscribe((state, prev) => {
+      if (state.theme_id !== prev.theme_id && isThemeId(state.theme_id)) {
+        applyTheme(state.theme_id)
+      }
+    })
 
     // Carrega relays do banco. Primeira corrida popula seeds; corridas
     // subsequentes lêem o que o user acumulou (manualmente, NIP-65,

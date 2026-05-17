@@ -97,6 +97,14 @@ function applyRow(target: UserPrefs, key: string, value: string): void {
         target.thread_view_mode = value
       }
       return
+    case 'theme_id':
+      // 3 paletas com identidade editorial (2026-05-17). Valor inválido
+      // → mantém default. Aplicação visual ocorre em `lib/theme.ts:applyTheme`
+      // disparado pelo subscriber no boot + setPref.
+      if (value === 'cinder' || value === 'rosenholz' || value === 'velatura') {
+        target.theme_id = value
+      }
+      return
     default:
       // chave desconhecida — pode ser de fase futura, ignora silenciosamente
       return

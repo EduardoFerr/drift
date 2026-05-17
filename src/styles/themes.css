@@ -1,0 +1,293 @@
+/*
+ * Drift — Theme palettes
+ *
+ * 3 paletas com identidade estética distinta + WCAG AA garantido (AAA em
+ * text/bg nas três). Roles spread/bury preservam família verde/vermelho
+ * (kind 9079/9080), com luminance adaptada por tema.
+ *
+ * Default = Cinder (substitui legacy chartreuse). Trocar tema via
+ * `lib/theme.ts:applyTheme(id)` → setAttribute('data-theme', id) no <html>.
+ *
+ * Tokens por tema (53 total):
+ *   Base (12):       bg, surface, border, accent, accent2, text, muted, body,
+ *                    spread, bury, warning, danger
+ *   Elevation (4):   surface-1, surface-2, surface-3, surface-4
+ *   Gradientes (5):  gradient-canvas, gradient-accent-soft, gradient-edge,
+ *                    gradient-signature, gradient-hairline
+ *   Shadows (4):     shadow-sm, shadow-md, shadow-lg, shadow-glow
+ *   Gesture (8):     hover-overlay, active-press, focus-ring, drag-shadow,
+ *                    selected-bg, divider-soft, highlight-flash, scrim-modal
+ *   Motion (2):      ease-signature, easing favorito por tema; duration default
+ *
+ * Curadoria: Robin v4. Inspirações:
+ *   - Cinder    → Anthropic Labs + Mercury + Soulages + Morandi
+ *   - Rosenholz → Rosé Pine Moon + Hilma af Klint + Apartamento + Catppuccin
+ *   - Velatura  → Morandi + Rosé Pine Dawn + Cabana + velatura veneziana
+ *
+ * Princípios não-negociáveis (memory: feedback_design_beauty_principle.md):
+ *   - WCAG AA e beleza são metas SIMULTÂNEAS, não trade-off
+ *   - Não há cyberpunk-utility-óbvio; identidade editorial
+ *   - Shadows tinted (hue do bg, não preto puro)
+ *   - Gradientes via OKLCH (postcss-oklab-function gera fallback sRGB)
+ */
+
+/* ============================================================
+ * CINDER — Brasa quase apagada sob cinza monástico.
+ * Anthropic earth + Mercury restraint + Soulages outrenoir.
+ * Default theme.
+ * ============================================================ */
+:root,
+[data-theme='cinder'] {
+  /* Base */
+  --drift-bg: #0e0e12;
+  --drift-surface: #16161c;
+  --drift-border: #5e5e72;
+  --drift-accent: #d96452;
+  --drift-accent2: #d4a27f;
+  --drift-text: #ededf3;
+  --drift-muted: #9a9aad;
+  --drift-body: #c5c5d2;
+  --drift-spread: #7fb085;
+  --drift-bury: #c97c7c;
+  --drift-warning: #e8b87a;
+  --drift-danger: #e25c4f;
+
+  /* Elevation — luminance steps ~0.04 OKLCH */
+  --drift-surface-1: #16161c;
+  --drift-surface-2: #1c1c24;
+  --drift-surface-3: #23232d;
+  --drift-surface-4: #2b2b36;
+
+  /* Gradientes — OKLCH interpolation pra evitar zona cinza morta */
+  --gradient-canvas: linear-gradient(
+    in oklab,
+    180deg,
+    oklch(0.143 0.005 285) 0%,
+    oklch(0.180 0.008 280) 60%,
+    oklch(0.218 0.010 280) 100%
+  );
+  --gradient-accent-soft: radial-gradient(
+    circle at 50% 50%,
+    oklch(0.66 0.16 31 / 0.22) 0%,
+    oklch(0.66 0.16 31 / 0.10) 35%,
+    oklch(0.66 0.16 31 / 0) 70%
+  );
+  --gradient-edge: linear-gradient(
+    180deg,
+    oklch(0.143 0.005 285 / 1) 0%,
+    oklch(0.143 0.005 285 / 0) 100%
+  );
+  --gradient-signature: linear-gradient(
+    in oklab,
+    135deg,
+    oklch(0.20 0.012 280) 0%,
+    oklch(0.24 0.020 35) 50%,
+    oklch(0.32 0.045 31) 100%
+  );
+  --gradient-hairline: linear-gradient(
+    90deg,
+    oklch(0.40 0.005 285 / 0) 0%,
+    oklch(0.40 0.005 285 / 0.35) 50%,
+    oklch(0.40 0.005 285 / 0) 100%
+  );
+
+  /* Shadows — blueshift tint (hsl 245), não preto puro */
+  --shadow-sm: 0 1px 2px 0 hsl(245 20% 4% / 0.45),
+    0 1px 1px 0 hsl(245 20% 4% / 0.30);
+  --shadow-md: 0 4px 8px -2px hsl(245 25% 3% / 0.55),
+    0 2px 4px -1px hsl(245 25% 3% / 0.40),
+    0 0 0 1px hsl(245 15% 35% / 0.08);
+  --shadow-lg: 0 24px 48px -12px hsl(245 30% 2% / 0.70),
+    0 12px 24px -8px hsl(245 25% 3% / 0.50),
+    0 0 0 1px hsl(245 15% 40% / 0.10);
+  --shadow-glow: 0 0 0 1px oklch(0.66 0.16 31 / 0.60),
+    0 0 12px 2px oklch(0.66 0.16 31 / 0.35),
+    0 0 32px 8px oklch(0.66 0.16 31 / 0.18);
+
+  /* Gesture tokens */
+  --hover-overlay: oklch(0.66 0.16 31 / 0.08);
+  --active-press: oklch(0.10 0.005 285 / 0.55);
+  --focus-ring: oklch(0.72 0.14 31 / 0.85);
+  --drag-shadow: 0 16px 40px -8px oklch(0.66 0.16 31 / 0.22),
+    0 8px 20px -6px hsl(245 25% 3% / 0.55);
+  --selected-bg: oklch(0.66 0.16 31 / 0.12);
+  --divider-soft: oklch(0.40 0.008 285 / 0.40);
+  --highlight-flash: oklch(0.66 0.16 31 / 0.18);
+  --scrim-modal: oklch(0.10 0.008 280 / 0.72);
+
+  /* Motion — sentimento de gesto Cinder: brasa, decay rápido, sem bounce */
+  --ease-signature: cubic-bezier(0.32, 0.72, 0.32, 1);
+}
+
+/* ============================================================
+ * ROSENHOLZ — Madeira-de-rosa sob luz de luminária na biblioteca.
+ * Rosé Pine Moon + Hilma af Klint + Catppuccin Macchiato.
+ * ============================================================ */
+[data-theme='rosenholz'] {
+  /* Base */
+  --drift-bg: #181625;
+  --drift-surface: #211d33;
+  --drift-border: #6a6582;
+  --drift-accent: #c4a7e7;
+  --drift-accent2: #ebbcba;
+  --drift-text: #e8e6f4;
+  --drift-muted: #9b97b8;
+  --drift-body: #c7c3dc;
+  --drift-spread: #9ccfd8;
+  --drift-bury: #f08aa5;
+  --drift-warning: #f6c177;
+  --drift-danger: #eb6f92;
+
+  /* Elevation */
+  --drift-surface-1: #211d33;
+  --drift-surface-2: #28233e;
+  --drift-surface-3: #302a4a;
+  --drift-surface-4: #3a3357;
+
+  /* Gradientes */
+  --gradient-canvas: linear-gradient(
+    in oklab,
+    180deg,
+    oklch(0.183 0.030 285) 0%,
+    oklch(0.215 0.035 290) 70%,
+    oklch(0.250 0.042 290) 100%
+  );
+  --gradient-accent-soft: radial-gradient(
+    circle at 50% 50%,
+    oklch(0.79 0.10 305 / 0.20) 0%,
+    oklch(0.79 0.10 305 / 0.08) 40%,
+    oklch(0.79 0.10 305 / 0) 75%
+  );
+  --gradient-edge: linear-gradient(
+    180deg,
+    oklch(0.183 0.030 285 / 1) 0%,
+    oklch(0.183 0.030 285 / 0) 100%
+  );
+  --gradient-signature: linear-gradient(
+    in oklab,
+    135deg,
+    oklch(0.225 0.038 285) 0%,
+    oklch(0.32 0.055 320) 55%,
+    oklch(0.42 0.080 30) 100%
+  );
+  --gradient-hairline: linear-gradient(
+    90deg,
+    oklch(0.50 0.025 285 / 0) 0%,
+    oklch(0.50 0.025 285 / 0.40) 50%,
+    oklch(0.50 0.025 285 / 0) 100%
+  );
+
+  /* Shadows — índigo tint (hsl 258) */
+  --shadow-sm: 0 1px 2px 0 hsl(258 35% 5% / 0.50),
+    0 1px 1px 0 hsl(258 35% 5% / 0.32);
+  --shadow-md: 0 4px 10px -2px hsl(258 40% 4% / 0.55),
+    0 2px 5px -1px hsl(258 35% 5% / 0.40),
+    0 0 0 1px hsl(258 20% 45% / 0.10);
+  --shadow-lg: 0 24px 50px -14px hsl(258 45% 3% / 0.72),
+    0 14px 28px -8px hsl(258 35% 5% / 0.55),
+    0 0 0 1px hsl(258 25% 50% / 0.14);
+  --shadow-glow: 0 0 0 1px oklch(0.79 0.10 305 / 0.55),
+    0 0 14px 3px oklch(0.79 0.10 305 / 0.30),
+    0 0 36px 10px oklch(0.79 0.10 305 / 0.15);
+
+  /* Gesture tokens */
+  --hover-overlay: oklch(0.79 0.10 305 / 0.10);
+  --active-press: oklch(0.12 0.025 285 / 0.55);
+  --focus-ring: oklch(0.82 0.11 305 / 0.90);
+  --drag-shadow: 0 18px 44px -10px oklch(0.79 0.10 305 / 0.25),
+    0 8px 22px -6px hsl(258 40% 4% / 0.55);
+  --selected-bg: oklch(0.79 0.10 305 / 0.14);
+  --divider-soft: oklch(0.50 0.030 285 / 0.42);
+  --highlight-flash: oklch(0.79 0.10 305 / 0.18);
+  --scrim-modal: oklch(0.13 0.030 285 / 0.70);
+
+  /* Motion — sentimento Rosenholz: página virando, demora poética */
+  --ease-signature: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ============================================================
+ * VELATURA — Camada de tinta translúcida sobre gesso seco.
+ * Morandi + Rosé Pine Dawn + Cabana magazine + velatura veneziana.
+ * Light theme — surfaces SOBEM em luminance (papel velho → papel novo).
+ * ============================================================ */
+[data-theme='velatura'] {
+  /* Base */
+  --drift-bg: #f3eee6;
+  --drift-surface: #fbf7ef;
+  --drift-border: #8a7e69;
+  --drift-accent: #6e4e3f;
+  --drift-accent2: #5a5040;
+  --drift-text: #26241f;
+  --drift-muted: #6e6555;
+  --drift-body: #3e3a32;
+  --drift-spread: #3f6749;
+  --drift-bury: #9a4434;
+  --drift-warning: #8a6a2e;
+  --drift-danger: #8a2c2c;
+
+  /* Elevation — inverte: surface sobe em luminance */
+  --drift-surface-1: #f7f2ea;
+  --drift-surface-2: #fbf7ef;
+  --drift-surface-3: #fdf9f3;
+  --drift-surface-4: #fefbf6;
+
+  /* Gradientes */
+  --gradient-canvas: linear-gradient(
+    in oklab,
+    180deg,
+    oklch(0.939 0.016 75) 0%,
+    oklch(0.948 0.014 70) 50%,
+    oklch(0.957 0.012 65) 100%
+  );
+  --gradient-accent-soft: radial-gradient(
+    circle at 50% 50%,
+    oklch(0.40 0.045 50 / 0.14) 0%,
+    oklch(0.40 0.045 50 / 0.06) 45%,
+    oklch(0.40 0.045 50 / 0) 80%
+  );
+  --gradient-edge: linear-gradient(
+    180deg,
+    oklch(0.939 0.016 75 / 1) 0%,
+    oklch(0.939 0.016 75 / 0) 100%
+  );
+  --gradient-signature: linear-gradient(
+    in oklab,
+    135deg,
+    oklch(0.957 0.014 75) 0%,
+    oklch(0.85 0.030 80) 50%,
+    oklch(0.62 0.040 60) 100%
+  );
+  --gradient-hairline: linear-gradient(
+    90deg,
+    oklch(0.58 0.025 70 / 0) 0%,
+    oklch(0.58 0.025 70 / 0.45) 50%,
+    oklch(0.58 0.025 70 / 0) 100%
+  );
+
+  /* Shadows — warm tint (hsl 30), não preto frio */
+  --shadow-sm: 0 1px 2px 0 hsl(30 30% 25% / 0.06),
+    0 1px 1px 0 hsl(30 25% 20% / 0.04);
+  --shadow-md: 0 4px 12px -2px hsl(30 35% 22% / 0.10),
+    0 2px 6px -1px hsl(30 30% 25% / 0.07),
+    0 0 0 1px hsl(35 20% 55% / 0.08);
+  --shadow-lg: 0 20px 48px -12px hsl(30 40% 20% / 0.15),
+    0 10px 24px -6px hsl(30 35% 22% / 0.10),
+    0 0 0 1px hsl(35 20% 55% / 0.12);
+  --shadow-glow: 0 0 0 1.5px oklch(0.40 0.045 50 / 0.55),
+    0 0 10px 2px oklch(0.40 0.045 50 / 0.20),
+    0 0 28px 8px oklch(0.40 0.045 50 / 0.10);
+
+  /* Gesture tokens */
+  --hover-overlay: oklch(0.40 0.045 50 / 0.06);
+  --active-press: oklch(0.15 0.020 70 / 0.08);
+  --focus-ring: oklch(0.38 0.050 45 / 0.95);
+  --drag-shadow: 0 14px 36px -10px oklch(0.40 0.045 50 / 0.18),
+    0 6px 16px -4px hsl(30 35% 22% / 0.12);
+  --selected-bg: oklch(0.40 0.045 50 / 0.08);
+  --divider-soft: oklch(0.58 0.025 70 / 0.45);
+  --highlight-flash: oklch(0.40 0.045 50 / 0.12);
+  --scrim-modal: oklch(0.15 0.025 65 / 0.32);
+
+  /* Motion — sentimento Velatura: tato físico, papel afundando */
+  --ease-signature: cubic-bezier(0.4, 0, 0.2, 1);
+}

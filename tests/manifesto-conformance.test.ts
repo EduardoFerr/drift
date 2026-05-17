@@ -499,48 +499,50 @@ describe('Fontes self-hosted (V2 redesign — Marshall LOCK_VIA_TEST)', () => {
   })
 })
 
-describe('Theme color paridade 5-way (V1 redesign — Marshall LOCK_VIA_TEST)', () => {
-  // Paleta hex aparece em 5 fontes de verdade. Sem teste, próxima
-  // mudança de paleta esquece 1-2 e drifta silenciosamente. Espelha
-  // problema CSP que já foi resolvido. Source canônico: tailwind.config.js
-  // `theme.extend.colors.drift.bg`. Outras 4 fontes devem replicar.
-  it('theme_color/background_color batem entre tailwind, index.css, vite, index.html, tauri', () => {
-    // 1. Tailwind config (canônico)
-    const tailwindCfg = readFileSync(join(ROOT, 'tailwind.config.js'), 'utf8')
-    const tailwindBgMatch = tailwindCfg.match(/drift:\s*\{[^}]*\bbg:\s*['"]([^'"]+)['"]/s)
-    expect(tailwindBgMatch, 'tailwind.config.js deve definir drift.bg').toBeTruthy()
-    const canonicalBg = tailwindBgMatch![1].toLowerCase()
+describe('Theme color paridade 4-way (V2 multi-tema — Marshall LOCK_VIA_TEST)', () => {
+  // V2 (2026-05-17): paleta multi-tema. PWA manifest, index.html meta e
+  // tauri config são estáticos por spec (não suportam CSS vars) — devem
+  // bater com o DEFAULT theme (cinder). Outros temas (Rosenholz/Velatura)
+  // ficam só no SPA runtime; PWA shell mantém cinder.
+  //
+  // Source canônico: src/styles/themes.css bloco `[data-theme='cinder']`
+  // (e :root, que é alias do cinder default).
+  it('theme_color/background_color batem entre themes.css(cinder), vite, index.html, tauri', () => {
+    // 1. themes.css cinder block (canônico)
+    const themesCss = readFileSync(join(ROOT, 'src', 'styles', 'themes.css'), 'utf8')
+    // Extrai bloco cinder e captura --drift-bg.
+    const cinderBlockMatch = themesCss.match(
+      /(?::root,\s*)?\[data-theme=['"]cinder['"]\]\s*\{([\s\S]*?)^\}/m,
+    )
+    expect(cinderBlockMatch, 'themes.css deve ter bloco [data-theme="cinder"]').toBeTruthy()
+    const bgMatch = cinderBlockMatch![1].match(/--drift-bg:\s*([^;]+);/)
+    expect(bgMatch, 'cinder block deve definir --drift-bg').toBeTruthy()
+    const canonicalBg = bgMatch![1].trim().toLowerCase()
 
-    // 2. index.css :root --drift-bg
-    const indexCss = readFileSync(join(ROOT, 'src', 'index.css'), 'utf8')
-    const cssVarMatch = indexCss.match(/--drift-bg:\s*([^;]+);/)
-    expect(cssVarMatch, 'src/index.css deve definir --drift-bg em :root').toBeTruthy()
-    expect(cssVarMatch![1].trim().toLowerCase(), 'src/index.css --drift-bg deve bater com tailwind').toBe(canonicalBg)
-
-    // 3. vite.config.ts manifest theme_color + background_color
+    // 2. vite.config.ts manifest theme_color + background_color
     const viteCfg = readFileSync(join(ROOT, 'vite.config.ts'), 'utf8')
     const themeColorMatch = viteCfg.match(/theme_color:\s*['"]([^'"]+)['"]/)
     const bgColorMatch = viteCfg.match(/background_color:\s*['"]([^'"]+)['"]/)
     expect(themeColorMatch, 'vite.config.ts deve definir theme_color').toBeTruthy()
     expect(bgColorMatch, 'vite.config.ts deve definir background_color').toBeTruthy()
-    expect(themeColorMatch![1].toLowerCase(), 'vite theme_color deve bater com tailwind drift.bg').toBe(canonicalBg)
-    expect(bgColorMatch![1].toLowerCase(), 'vite background_color deve bater com tailwind drift.bg').toBe(canonicalBg)
+    expect(themeColorMatch![1].toLowerCase(), 'vite theme_color deve bater com cinder bg').toBe(canonicalBg)
+    expect(bgColorMatch![1].toLowerCase(), 'vite background_color deve bater com cinder bg').toBe(canonicalBg)
 
-    // 4. index.html <meta name="theme-color">
+    // 3. index.html <meta name="theme-color">
     const indexHtml = readFileSync(join(ROOT, 'index.html'), 'utf8')
     const metaThemeMatch = indexHtml.match(/<meta\s+name="theme-color"\s+content="([^"]+)"/)
     expect(metaThemeMatch, 'index.html deve ter <meta name="theme-color">').toBeTruthy()
-    expect(metaThemeMatch![1].toLowerCase(), 'index.html theme-color deve bater com tailwind drift.bg').toBe(
+    expect(metaThemeMatch![1].toLowerCase(), 'index.html theme-color deve bater com cinder bg').toBe(
       canonicalBg,
     )
 
-    // 5. tauri.conf.json window backgroundColor
+    // 4. tauri.conf.json window backgroundColor
     const tauriConf = JSON.parse(readFileSync(join(ROOT, 'src-tauri', 'tauri.conf.json'), 'utf8')) as {
       app?: { windows?: Array<{ backgroundColor?: string }> }
     }
     const tauriBg = tauriConf.app?.windows?.[0]?.backgroundColor
     expect(tauriBg, 'tauri.conf.json deve ter app.windows[0].backgroundColor').toBeTruthy()
-    expect(tauriBg!.toLowerCase(), 'tauri backgroundColor deve bater com tailwind drift.bg').toBe(canonicalBg)
+    expect(tauriBg!.toLowerCase(), 'tauri backgroundColor deve bater com cinder bg').toBe(canonicalBg)
   })
 })
 

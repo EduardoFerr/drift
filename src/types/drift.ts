@@ -160,6 +160,66 @@ export interface Post {
   authorWeight?: number
 }
 
+// ─── User metadata kind 0 (NIP-01 — opt-in identity) ────────────────
+
+/**
+ * Cache local de eventos kind 0 (NIP-01 profile metadata). Mirror da
+ * tabela `users_metadata`. Replaceable event — LWW por `eventCreatedAt`
+ * na ingestão.
+ *
+ * **Manifesto §5.3 / §28**: campos opt-in, default vazio = modo Anônimo.
+ * **NUNCA** participa de score/weight/feed ranking — LOCK_VIA_TEST.
+ *
+ * Whitelist NIP-01 puro. Drift NÃO inventa campos próprios em kind 0
+ * (manifesto §30 compat Nostr).
+ */
+export interface UserMetadata {
+  npub: string
+  name: string | null
+  displayName: string | null
+  about: string | null
+  picture: string | null
+  banner: string | null
+  website: string | null
+  nip05: string | null
+  lud16: string | null
+  eventCreatedAt: number // unix sec — tiebreaker LWW
+}
+
+/**
+ * Payload pra publish de kind 0. Whitelist estrito — keys fora desta
+ * lista são rejeitadas em build time pela conformance test.
+ *
+ * Campos undefined são omitidos do JSON serializado (NIP-01 prefer
+ * omissão sobre null pra campos vazios).
+ */
+export interface UserMetadataPayload {
+  name?: string
+  display_name?: string
+  about?: string
+  picture?: string
+  banner?: string
+  website?: string
+  nip05?: string
+  lud16?: string
+}
+
+/**
+ * Keys permitidas em kind 0 content (LOCK_VIA_TEST source-of-truth).
+ * Adicionar campo aqui requer (1) coluna em users_metadata schema,
+ * (2) atualização de UserMetadataPayload, (3) teste de conformance.
+ */
+export const KIND_0_ALLOWED_KEYS: readonly (keyof UserMetadataPayload)[] = [
+  'name',
+  'display_name',
+  'about',
+  'picture',
+  'banner',
+  'website',
+  'nip05',
+  'lud16',
+] as const
+
 // ─── Spread / Bury / Report ──────────────────────────────────────────
 
 export interface SpreadRecord {
@@ -326,7 +386,25 @@ export interface UserPrefs {
    * existentes (ver RFC §6.5 Opção C). Hoje: default `'list'` pra todos.
    */
   thread_view_mode: ThreadViewMode
+  /**
+   * Tema visual da UI. Default 'cinder' (substitui chartreuse legacy
+   * em 2026-05-17). Curadoria editorial — 3 paletas com identidade
+   * distinta: cinder (monástico), rosenholz (literário), velatura
+   * (artesanal light).
+   *
+   * Manifesto §7 (determinismo): tema é LOCAL, não vai pra rede, não
+   * afeta score/feed/weight. LOCK_VIA_TEST garante isolamento de
+   * scoring/weight/ranking.
+   */
+  theme_id: ThemeIdPref
 }
+
+/**
+ * `ThemeId` re-exportado como string pra evitar import cycle
+ * `types/drift` → `lib/theme` → `types/drift`. THEME_IDS canônico
+ * em `lib/theme.ts`; este type é só pra schema do UserPrefs.
+ */
+export type ThemeIdPref = 'cinder' | 'rosenholz' | 'velatura'
 
 /** Modo de renderização do `<ThreadView>` — list (default) ou cards (opt-in). */
 export type ThreadViewMode = 'list' | 'cards'
@@ -357,4 +435,5 @@ export const DEFAULT_USER_PREFS: UserPrefs = {
   use_ipfs: false,
   p2p_auto_follows: false,
   thread_view_mode: 'list',
+  theme_id: 'cinder',
 }
