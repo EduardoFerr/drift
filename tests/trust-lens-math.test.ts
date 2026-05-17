@@ -18,6 +18,16 @@ import {
   isValidComponents,
   sanitizeComponents,
 } from '../src/lib/trust/edges'
+import {
+  computePpr,
+  normalizePpr,
+  disjointPaths,
+  diversityCoeff,
+  applyDiversity,
+  viewMultiplier,
+  type AdjacencyList,
+  type PprEdge,
+} from '../src/lib/trust/ppr'
 import type { LensEdgeComponentsV1 } from '../src/types/drift'
 
 // ─── Helpers ──────────────────────────────────────────────────────
@@ -182,5 +192,173 @@ describe('Trust Lens math invariants — PR-2 (rng + edges)', () => {
     // Stage 3 doc cita 6.55x ≈ 7x; aceitar [5x, 9x] de tolerância
     expect(ratio).toBeGreaterThanOrEqual(5)
     expect(ratio).toBeLessThanOrEqual(9)
+  })
+})
+
+// ─── PR-3 tests (PPR + view multiplier + diversity) ───────────────
+
+describe('Trust Lens math invariants — PR-3 (ppr + multiplier)', () => {
+  /** Builds simple adjacency list helper for tests. */
+  function makeGraph(edges: Array<[string, string, number]>): AdjacencyList {
+    const graph: AdjacencyList = new Map()
+    for (const [src, tgt, infl] of edges) {
+      const list = graph.get(src) ?? []
+      list.push({ target: tgt, influence: infl })
+      graph.set(src, list)
+    }
+    return graph
+  }
+
+  // ─── #14 — ppr_score sum ≤ 1.0 + tolerance ε ──────────────────
+  it('#14 ppr_score sum sobre todos targets ≤ 1.0 (Monte Carlo invariant)', () => {
+    const source = 'npub_a'
+    const graph = makeGraph([
+      ['npub_a', 'npub_b', 0.8],
+      ['npub_a', 'npub_c', 0.5],
+      ['npub_a', 'npub_d', 0.3],
+      ['npub_b', 'npub_e', 0.7],
+      ['npub_b', 'npub_f', 0.6],
+      ['npub_c', 'npub_e', 0.5],
+      ['npub_d', 'npub_g', 0.4],
+    ])
+    const rng = createPprRng(source, 1717200000000)
+    const ppr = computePpr({ source, graph, rng })
+    let sum = 0
+    for (const score of ppr.values()) sum += score
+    // PPR Monte Carlo invariant: sum of visits/totalVisits = 1.0 (sem
+    // floating error em integer division). Tolerance ε = 1e-9 pra safety.
+    expect(sum).toBeGreaterThanOrEqual(1.0 - 1e-9)
+    expect(sum).toBeLessThanOrEqual(1.0 + 1e-9)
+  })
+
+  // ─── #15 — PPR cold-start: empty Map, no NaN propagation ──────
+  it('#15 PPR cold-start: source sem out-edges → empty Map (no NaN)', () => {
+    const source = 'npub_lonely'
+    const emptyGraph: AdjacencyList = new Map()
+    const rng = createPprRng(source, 1717200000000)
+    const ppr = computePpr({ source, graph: emptyGraph, rng })
+    expect(ppr.size).toBe(0)
+    // Verifica que multiplier downstream funciona com PPR vazio
+    const mult = viewMultiplier({ pprScore: 0, mutualSpreadPost: 0, strength: 1 })
+    expect(Number.isFinite(mult)).toBe(true)
+    expect(mult).toBeGreaterThanOrEqual(0.1)
+    expect(mult).toBeLessThanOrEqual(3.0)
+  })
+
+  // ─── #16 — PPR não overflow K=1000 L=6 alta densidade ─────────
+  it('#16 PPR não overflow K=1000 L=6 em adjacency densa', () => {
+    // Grafo denso: 20 nodes, cada um conectado a 10 outros
+    const nodes = Array.from({ length: 20 }, (_, i) => `npub_${i}`)
+    const graph: AdjacencyList = new Map()
+    for (const src of nodes) {
+      const edges: PprEdge[] = []
+      for (const tgt of nodes) {
+        if (tgt === src) continue
+        edges.push({ target: tgt, influence: 0.5 + Math.random() * 0.5 })
+      }
+      graph.set(src, edges)
+    }
+    const source = nodes[0]!
+    const rng = createPprRng(source, 1717200000000)
+    const ppr = computePpr({ source, graph, rng })
+    // Todos valores devem ser finite e ∈ [0, 1]
+    for (const score of ppr.values()) {
+      expect(Number.isFinite(score)).toBe(true)
+      expect(score).toBeGreaterThan(0)
+      expect(score).toBeLessThanOrEqual(1)
+    }
+    // PPR deve ter visitado vários nodes (não trava em 1 cycle)
+    expect(ppr.size).toBeGreaterThanOrEqual(10)
+  })
+
+  // ─── #18 — view multiplier nunca produz s_local < S_LOCAL_MIN ─
+  it('#18 viewMultiplier output sempre clip ∈ [S_LOCAL_MIN, S_LOCAL_MAX]', () => {
+    const cases = [
+      { pprScore: 0, mutualSpreadPost: 0, strength: 0 },
+      { pprScore: 0, mutualSpreadPost: 0, strength: 1 },
+      { pprScore: 1, mutualSpreadPost: 0, strength: 1 },
+      { pprScore: 0.05, mutualSpreadPost: 0, strength: 0.5 },
+      { pprScore: 0.1, mutualSpreadPost: 100, strength: 1 }, // alto mutual → clip max
+      { pprScore: -0.5, mutualSpreadPost: 0, strength: 1 }, // negativo (sanitize via normalizePpr)
+      { pprScore: 0, mutualSpreadPost: -10, strength: 1 }, // mutual negativo (sanitize)
+      { pprScore: 0.5, mutualSpreadPost: 5, strength: 2 }, // strength > 1 (clamp)
+    ]
+    for (const c of cases) {
+      const mult = viewMultiplier(c)
+      expect(Number.isFinite(mult)).toBe(true)
+      expect(mult).toBeGreaterThanOrEqual(0.1)
+      expect(mult).toBeLessThanOrEqual(3.0)
+    }
+  })
+
+  // ─── #19 — strength=0 → multiplier === 1.0 bit-exact ──────────
+  it('#19 strength=0 → multiplier = 1.0 bit-exact (off-state)', () => {
+    const cases = [
+      { pprScore: 0, mutualSpreadPost: 0 },
+      { pprScore: 0.5, mutualSpreadPost: 10 },
+      { pprScore: 1, mutualSpreadPost: 100 },
+      { pprScore: 0.001, mutualSpreadPost: 1 },
+    ]
+    for (const c of cases) {
+      const mult = viewMultiplier({ ...c, strength: 0 })
+      expect(mult).toBe(1.0) // bit-exact
+    }
+  })
+
+  // ─── #21 — diversity_coeff ∈ [0.7, 1.0] ────────────────────────
+  it('#21 diversityCoeff ∈ [0.7, 1.0] pra qualquer disjoint_paths', () => {
+    for (let p = 0; p <= 10; p++) {
+      const coeff = diversityCoeff(p)
+      expect(coeff).toBeGreaterThanOrEqual(0.7)
+      expect(coeff).toBeLessThanOrEqual(1.0)
+    }
+    // Negativos/inválidos clampam pra 0 paths
+    expect(diversityCoeff(-1)).toBe(0.7)
+    expect(diversityCoeff(0)).toBe(0.7)
+    // 3 ou mais paths saturate em 1.0
+    expect(diversityCoeff(3)).toBe(1.0)
+    expect(diversityCoeff(100)).toBe(1.0)
+    // applyDiversity = ppr × coeff
+    expect(applyDiversity(0.5, 0)).toBe(0.5 * 0.7)
+    expect(applyDiversity(0.5, 3)).toBe(0.5 * 1.0)
+  })
+
+  // ─── Bonus — normalizePpr corner cases ────────────────────────
+  it('normalizePpr handles edge cases (NaN, negatives, zero, infinity)', () => {
+    expect(normalizePpr(0)).toBe(0)
+    expect(normalizePpr(-1)).toBe(0)
+    expect(normalizePpr(NaN)).toBe(0)
+    expect(normalizePpr(Infinity)).toBe(0)
+    // Math sanity: log(1 + 100·ppr) / log(101)
+    expect(normalizePpr(0.01)).toBeCloseTo(0.150, 2) // log(2)/log(101)
+    expect(normalizePpr(0.10)).toBeCloseTo(0.520, 2) // log(11)/log(101)
+    expect(normalizePpr(1.0)).toBeCloseTo(1.0, 6) // log(101)/log(101)
+  })
+
+  // ─── Bonus — disjointPaths basic shape ────────────────────────
+  it('disjointPaths returns correct count for simple graph', () => {
+    // a → b → target | a → c → target | a → d → target
+    // 3 disjoint paths through b, c, d
+    const graph = makeGraph([
+      ['npub_a', 'npub_b', 0.5],
+      ['npub_a', 'npub_c', 0.5],
+      ['npub_a', 'npub_d', 0.5],
+      ['npub_b', 'npub_target', 0.5],
+      ['npub_c', 'npub_target', 0.5],
+      ['npub_d', 'npub_target', 0.5],
+    ])
+    const paths = disjointPaths('npub_a', 'npub_target', graph, 3, 3)
+    expect(paths).toBe(3)
+
+    // Single path: a → b → target
+    const singlePath = makeGraph([
+      ['npub_a', 'npub_b', 0.5],
+      ['npub_b', 'npub_target', 0.5],
+    ])
+    expect(disjointPaths('npub_a', 'npub_target', singlePath)).toBe(1)
+
+    // No path
+    const noPath = makeGraph([['npub_a', 'npub_b', 0.5]])
+    expect(disjointPaths('npub_a', 'npub_target', noPath)).toBe(0)
   })
 })
