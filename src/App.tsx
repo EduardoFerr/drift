@@ -195,9 +195,17 @@ function StatusCardLayer({ onClose }: { onClose: () => void }) {
 }
 
 function AboutCardLayer({ onClose }: { onClose: () => void }) {
+  // Accordion mutually exclusive (abrir um fecha outros).
+  // Versão sempre visível (não-collapsible) — info essencial no topo.
+  // 4 seções colapsáveis: manifesto, protocolo, atualizar versão, limpar cache.
+  // Default aberto: manifesto (índice 0).
+  const [openSection, setOpenSection] = useState<number | null>(0)
+  const toggle = (i: number) => setOpenSection((prev) => (prev === i ? null : i))
+
   return (
     <FullPageCard onClose={onClose} title="sobre" ariaLabel="sobre o cliente Drift">
       <div className="space-y-3 px-4 py-5 font-mono">
+        {/* Versão sempre visível — info-card sem accordion */}
         <div className="rounded-2xl border border-drift-border/40 bg-drift-surface/50 px-5 py-4">
           <div className="text-[10px] uppercase tracking-tag text-drift-muted/50">
             versão do cliente
@@ -210,67 +218,113 @@ function AboutCardLayer({ onClose }: { onClose: () => void }) {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-drift-border/40 bg-drift-surface/50 px-5 py-3.5">
-          <span className="font-display text-[14px] font-bold uppercase tracking-tag text-drift-accent">
-            manifesto
-          </span>
-        </div>
-        <p className="px-1 font-mono text-[10px] text-drift-muted/30">
-          drift é descentralizado sobre nostr. 34 princípios públicos definem o que o cliente pode e não pode fazer.
-        </p>
-        <div className="space-y-2 pl-3">
-          <div className="space-y-2 rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3.5">
-            <ManifestoLine n="§17" text="sem chave mestra — fundador não controla conteúdo" />
-            <ManifestoLine n="§22" text="sem afinidade no feed — ranking é função pura" />
-            <ManifestoLine n="§15" text="anti-censura por país — Tor + WebRTC" />
-            <ManifestoLine n="§16" text="disponibilidade distribuída — IPFS, sneakernet, BLE" />
-            <ManifestoLine n="§25" text="sem scanner automático — opt-in vence" />
-            <ManifestoLine n="§28" text="privacidade pelo mínimo — location off-default" />
+        {/* MANIFESTO */}
+        <AboutSectionHeader
+          title="manifesto"
+          expanded={openSection === 0}
+          onToggle={() => toggle(0)}
+        />
+        <Collapse open={openSection === 0}>
+          <div className="space-y-3">
+            <p className="px-1 font-mono text-[10px] text-drift-muted/30">
+              drift é descentralizado sobre nostr. 34 princípios públicos definem o que o cliente pode e não pode fazer.
+            </p>
+            <div className="space-y-2 pl-3">
+              <div className="space-y-2 rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3.5">
+                <ManifestoLine n="§17" text="sem chave mestra — fundador não controla conteúdo" />
+                <ManifestoLine n="§22" text="sem afinidade no feed — ranking é função pura" />
+                <ManifestoLine n="§15" text="anti-censura por país — Tor + WebRTC" />
+                <ManifestoLine n="§16" text="disponibilidade distribuída — IPFS, sneakernet, BLE" />
+                <ManifestoLine n="§25" text="sem scanner automático — opt-in vence" />
+                <ManifestoLine n="§28" text="privacidade pelo mínimo — location off-default" />
+              </div>
+              <a
+                href="https://github.com/EduardoFerr/drift/blob/main/Docs/manifesto.md"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block w-full rounded-xl bg-drift-accent2 px-4 py-3 text-center font-mono text-[12px] uppercase tracking-meta font-medium text-drift-bg transition-colors hover:bg-drift-accent2/85"
+              >
+                ler manifesto completo ↗
+              </a>
+            </div>
           </div>
-          <a
-            href="https://github.com/EduardoFerr/drift/blob/main/Docs/manifesto.md"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block w-full rounded-xl bg-drift-accent2 px-4 py-3 text-center font-mono text-[12px] uppercase tracking-meta font-medium text-drift-bg transition-colors hover:bg-drift-accent2/85"
-          >
-            ler manifesto completo ↗
-          </a>
-        </div>
+        </Collapse>
 
-        <div className="rounded-2xl border border-drift-border/40 bg-drift-surface/50 px-5 py-3.5">
-          <span className="font-display text-[14px] font-bold uppercase tracking-tag text-drift-accent">
-            protocolo
-          </span>
-        </div>
-        <p className="px-1 font-mono text-[10px] leading-relaxed text-drift-muted/30">
-          eventos imutáveis assinados (kinds 9078–9081). score determinístico. identidade portável via nsec1. PWA + tauri opcional.
-        </p>
+        {/* PROTOCOLO */}
+        <AboutSectionHeader
+          title="protocolo"
+          expanded={openSection === 1}
+          onToggle={() => toggle(1)}
+        />
+        <Collapse open={openSection === 1}>
+          <p className="px-1 font-mono text-[10px] leading-relaxed text-drift-muted/30">
+            eventos imutáveis assinados (kinds 9078–9081). score determinístico. identidade portável via nsec1. PWA + tauri opcional.
+          </p>
+        </Collapse>
 
-        <div className="rounded-2xl border border-drift-border/40 bg-drift-surface/50 px-5 py-3.5">
-          <span className="font-display text-[14px] font-bold uppercase tracking-tag text-drift-accent">
-            atualizar versão
-          </span>
-        </div>
-        <p className="px-1 font-mono text-[10px] leading-relaxed text-drift-muted/30">
-          se você dispensou o aviso de nova versão, pode aplicar a atualização aqui. fixes de segurança e novas features ficam pendentes até reload do service worker (manifesto §17 — sem update silencioso).
-        </p>
-        <div className="pl-3">
-          <UpdateVersionButton />
-        </div>
+        {/* ATUALIZAR VERSÃO */}
+        <AboutSectionHeader
+          title="atualizar versão"
+          expanded={openSection === 2}
+          onToggle={() => toggle(2)}
+        />
+        <Collapse open={openSection === 2}>
+          <div className="space-y-3">
+            <p className="px-1 font-mono text-[10px] leading-relaxed text-drift-muted/30">
+              se você dispensou o aviso de nova versão, pode aplicar a atualização aqui. fixes de segurança e novas features ficam pendentes até reload do service worker (manifesto §17 — sem update silencioso).
+            </p>
+            <div className="pl-3">
+              <UpdateVersionButton />
+            </div>
+          </div>
+        </Collapse>
 
-        <div className="rounded-2xl border border-drift-border/40 bg-drift-surface/50 px-5 py-3.5">
-          <span className="font-display text-[14px] font-bold uppercase tracking-tag text-drift-accent">
-            limpar cache
-          </span>
-        </div>
-        <p className="px-1 font-mono text-[10px] leading-relaxed text-drift-muted/30">
-          se algum painel ficou preso em 'erro ao carregar', limpa todos os caches do service worker e recarrega. mais agressivo que atualizar versão.
-        </p>
-        <div className="pl-3">
-          <ClearCacheButton />
-        </div>
+        {/* LIMPAR CACHE */}
+        <AboutSectionHeader
+          title="limpar cache"
+          expanded={openSection === 3}
+          onToggle={() => toggle(3)}
+        />
+        <Collapse open={openSection === 3}>
+          <div className="space-y-3">
+            <p className="px-1 font-mono text-[10px] leading-relaxed text-drift-muted/30">
+              se algum painel ficou preso em 'erro ao carregar', limpa todos os caches do service worker e recarrega. mais agressivo que atualizar versão.
+            </p>
+            <div className="pl-3">
+              <ClearCacheButton />
+            </div>
+          </div>
+        </Collapse>
       </div>
     </FullPageCard>
+  )
+}
+
+/** Section header local pra AboutCardLayer — accordion mode. */
+function AboutSectionHeader({
+  title,
+  expanded,
+  onToggle,
+}: {
+  title: string
+  expanded: boolean
+  onToggle: () => void
+}) {
+  return (
+    <button
+      onClick={onToggle}
+      aria-expanded={expanded}
+      className="flex w-full items-center gap-3 rounded-2xl border border-drift-border/40 bg-drift-surface/50 px-5 py-3.5 text-left transition-colors"
+    >
+      <span className="flex-1 font-display text-[14px] font-bold uppercase tracking-tag text-drift-accent">
+        {title}
+      </span>
+      <span
+        className={`shrink-0 text-drift-muted/40 transition-transform duration-motion-emphasis ease-drift-inout ${expanded ? 'rotate-180' : ''}`}
+      >
+        <ChevronDownIcon size={16} />
+      </span>
+    </button>
   )
 }
 
