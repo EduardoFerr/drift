@@ -28,7 +28,13 @@ import {
   type AdjacencyList,
   type PprEdge,
 } from '../src/lib/trust/ppr'
-import type { LensEdgeComponentsV1 } from '../src/types/drift'
+import {
+  parsePredicate,
+  evaluatePredicate,
+  rootAction,
+  type PredicateContext,
+} from '../src/lib/trust/predicate'
+import type { LensEdgeComponentsV1, LensFilterPredicate } from '../src/types/drift'
 
 // ─── Helpers ──────────────────────────────────────────────────────
 
@@ -360,5 +366,198 @@ describe('Trust Lens math invariants — PR-3 (ppr + multiplier)', () => {
     // No path
     const noPath = makeGraph([['npub_a', 'npub_b', 0.5]])
     expect(disjointPaths('npub_a', 'npub_target', noPath)).toBe(0)
+  })
+})
+
+// ─── PR-4a tests (predicate DSL) ──────────────────────────────────
+
+describe('Trust Lens — filter predicate DSL (Robin §27 loop)', () => {
+  // ─── #5 — parsePredicate rejeita inválidos sem throw ──────────
+  it('#5 parsePredicate rejeita v != 1 ou kind unknown sem throw (returns null)', () => {
+    const garbageInputs: unknown[] = [
+      null,
+      undefined,
+      {},
+      42,
+      'string',
+      { v: 2, kind: 'trust_threshold', op: 'lt', value: 0.1, action: 'hide' }, // wrong version
+      { v: 1, kind: 'unknown_kind', action: 'hide' }, // unknown kind
+      { v: 1, kind: 'trust_threshold', op: 'invalid_op', value: 0.1, action: 'hide' },
+      { v: 1, kind: 'trust_threshold', op: 'lt', value: 1.5, action: 'hide' }, // value > 1
+      { v: 1, kind: 'trust_threshold', op: 'lt', value: -0.1, action: 'hide' }, // value < 0
+      { v: 1, kind: 'trust_threshold', op: 'lt', value: NaN, action: 'hide' },
+      { v: 1, kind: 'trust_threshold', op: 'lt', value: 0.1, action: 'unknown_action' },
+      { v: 1, kind: 'tag_present', action: 'hide' }, // missing tag
+      { v: 1, kind: 'tag_present', tag: '', action: 'hide' }, // empty tag
+      { v: 1, kind: 'and', predicates: [], action: 'hide' }, // empty composição
+      { v: 1, kind: 'and', action: 'hide' }, // missing predicates
+      { v: 1, kind: 'or', predicates: 'not-array', action: 'hide' },
+      { v: 1, kind: 'not', action: 'hide' }, // missing predicate
+      { v: 1, kind: 'not', predicate: null, action: 'hide' },
+      // Nested invalid
+      {
+        v: 1, kind: 'and', action: 'hide',
+        predicates: [{ v: 2, kind: 'tag_present', tag: 'x', action: 'hide' }],
+      },
+    ]
+    for (const garbage of garbageInputs) {
+      expect(() => parsePredicate(garbage)).not.toThrow()
+      expect(parsePredicate(garbage)).toBeNull()
+    }
+  })
+
+  // ─── parsePredicate accept valid shapes ───────────────────────
+  it('parsePredicate aceita shapes válidos (5 kinds)', () => {
+    expect(
+      parsePredicate({
+        v: 1, kind: 'trust_threshold', op: 'lt', value: 0.1, action: 'hide',
+      }),
+    ).not.toBeNull()
+    expect(
+      parsePredicate({
+        v: 1, kind: 'tag_present', tag: 'content-warning', action: 'blur',
+      }),
+    ).not.toBeNull()
+    expect(
+      parsePredicate({
+        v: 1, kind: 'tag_present', tag: 'content-warning',
+        tag_value: 'nsfw', action: 'blur',
+      }),
+    ).not.toBeNull()
+    expect(
+      parsePredicate({
+        v: 1, kind: 'and', action: 'hide',
+        predicates: [
+          { v: 1, kind: 'trust_threshold', op: 'lt', value: 0.1, action: 'hide' },
+          { v: 1, kind: 'tag_present', tag: 'spam', action: 'hide' },
+        ],
+      }),
+    ).not.toBeNull()
+    expect(
+      parsePredicate({
+        v: 1, kind: 'or', action: 'dim',
+        predicates: [
+          { v: 1, kind: 'trust_threshold', op: 'gte', value: 0.5, action: 'dim' },
+        ],
+      }),
+    ).not.toBeNull()
+    expect(
+      parsePredicate({
+        v: 1, kind: 'not', action: 'collapse',
+        predicate: { v: 1, kind: 'trust_threshold', op: 'lt', value: 0.5, action: 'collapse' },
+      }),
+    ).not.toBeNull()
+  })
+
+  // ─── parsePredicate depth limit (DoS prevention) ──────────────
+  it('parsePredicate rejeita depth > 10 (DoS prevention)', () => {
+    let deep: unknown = {
+      v: 1, kind: 'trust_threshold', op: 'lt', value: 0.5, action: 'hide',
+    }
+    for (let i = 0; i < 15; i++) {
+      deep = { v: 1, kind: 'not', predicate: deep, action: 'hide' }
+    }
+    expect(parsePredicate(deep)).toBeNull()
+  })
+
+  // ─── evaluatePredicate: trust_threshold ───────────────────────
+  it('evaluatePredicate trust_threshold lt/gte funciona', () => {
+    const ctx: PredicateContext = { pprScore: 0.05, tags: [] }
+    const lt01: LensFilterPredicate = {
+      v: 1, kind: 'trust_threshold', op: 'lt', value: 0.1, action: 'hide',
+    }
+    expect(evaluatePredicate(lt01, ctx)).toBe(true) // 0.05 < 0.1
+    const gte02: LensFilterPredicate = {
+      v: 1, kind: 'trust_threshold', op: 'gte', value: 0.2, action: 'hide',
+    }
+    expect(evaluatePredicate(gte02, ctx)).toBe(false) // 0.05 not >= 0.2
+  })
+
+  // ─── evaluatePredicate: tag_present ───────────────────────────
+  it('evaluatePredicate tag_present com e sem tag_value', () => {
+    const ctxNsfw: PredicateContext = {
+      pprScore: 0.5,
+      tags: [['content-warning', 'nsfw'], ['t', 'art']],
+    }
+    // Presence only (tag_value undefined)
+    expect(
+      evaluatePredicate(
+        { v: 1, kind: 'tag_present', tag: 'content-warning', action: 'blur' },
+        ctxNsfw,
+      ),
+    ).toBe(true)
+    // Exact match
+    expect(
+      evaluatePredicate(
+        {
+          v: 1, kind: 'tag_present', tag: 'content-warning',
+          tag_value: 'nsfw', action: 'blur',
+        },
+        ctxNsfw,
+      ),
+    ).toBe(true)
+    // Mismatch
+    expect(
+      evaluatePredicate(
+        {
+          v: 1, kind: 'tag_present', tag: 'content-warning',
+          tag_value: 'spoiler', action: 'blur',
+        },
+        ctxNsfw,
+      ),
+    ).toBe(false)
+    // Tag absent
+    expect(
+      evaluatePredicate(
+        { v: 1, kind: 'tag_present', tag: 'absent', action: 'hide' },
+        ctxNsfw,
+      ),
+    ).toBe(false)
+  })
+
+  // ─── §27 loop completo: and(tag_present + trust_threshold) ────
+  it('Robin §27 loop: AND(content-warning=nsfw, ppr < 0.1)', () => {
+    const rule: LensFilterPredicate = {
+      v: 1, kind: 'and', action: 'hide',
+      predicates: [
+        { v: 1, kind: 'tag_present', tag: 'content-warning', tag_value: 'nsfw', action: 'hide' },
+        { v: 1, kind: 'trust_threshold', op: 'lt', value: 0.1, action: 'hide' },
+      ],
+    }
+    // Low trust + nsfw = hide
+    expect(
+      evaluatePredicate(rule, { pprScore: 0.05, tags: [['content-warning', 'nsfw']] }),
+    ).toBe(true)
+    // High trust + nsfw = NOT hide (passa pelo filter)
+    expect(
+      evaluatePredicate(rule, { pprScore: 0.5, tags: [['content-warning', 'nsfw']] }),
+    ).toBe(false)
+    // Low trust without nsfw = NOT hide
+    expect(
+      evaluatePredicate(rule, { pprScore: 0.05, tags: [] }),
+    ).toBe(false)
+    expect(rootAction(rule)).toBe('hide')
+  })
+
+  // ─── or + not composition ─────────────────────────────────────
+  it('evaluatePredicate or/not composição', () => {
+    const orRule: LensFilterPredicate = {
+      v: 1, kind: 'or', action: 'dim',
+      predicates: [
+        { v: 1, kind: 'trust_threshold', op: 'lt', value: 0.05, action: 'dim' },
+        { v: 1, kind: 'tag_present', tag: 'spam', action: 'dim' },
+      ],
+    }
+    expect(evaluatePredicate(orRule, { pprScore: 0.5, tags: [['spam', '']] })).toBe(true) // spam tag matches
+    expect(evaluatePredicate(orRule, { pprScore: 0.01, tags: [] })).toBe(true) // low ppr matches
+    expect(evaluatePredicate(orRule, { pprScore: 0.5, tags: [] })).toBe(false) // neither
+
+    const notRule: LensFilterPredicate = {
+      v: 1, kind: 'not', action: 'hide',
+      predicate: { v: 1, kind: 'trust_threshold', op: 'gte', value: 0.1, action: 'hide' },
+    }
+    // not(ppr >= 0.1) → ppr < 0.1 → hide
+    expect(evaluatePredicate(notRule, { pprScore: 0.05, tags: [] })).toBe(true)
+    expect(evaluatePredicate(notRule, { pprScore: 0.5, tags: [] })).toBe(false)
   })
 })
