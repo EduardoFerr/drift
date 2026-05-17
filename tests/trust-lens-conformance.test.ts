@@ -38,18 +38,87 @@ describe('Trust Lens — conformance (LOCK_VIA_TEST §17 §22 §24 §25 §27)', 
   // `UPDATE posts SET score` só pode aparecer em scoring.ts:
   // scheduleScoreRecalc + moderation.ts:maybeModerate. Em qualquer
   // outro arquivo = violação §22 (canônico mutado fora do owner).
-  it.todo('1. UPDATE posts SET score restrito a scoring.ts + moderation.ts')
+  it('1. UPDATE posts SET score restrito a scoring/moderation/events (recalc canônico)', () => {
+    // events.ts:scheduleScoreRecalc + applyCommentsContribution são parte
+    // do pipeline canônico (CLAUDE.md invariante #6 — debounced recalc).
+    // scoring.ts é puro (calculateScore) e moderation.ts é §26 reports
+    // threshold. Outros arquivos NÃO podem atualizar score.
+    const allowed = new Set([
+      'src/lib/scoring.ts',
+      'src/lib/moderation.ts',
+      'src/lib/events.ts',
+    ])
+    const violations: string[] = []
+    // Walk src/ procurando `UPDATE posts SET score`
+    function walk(dir: string): void {
+      for (const name of readdirSync(dir)) {
+        const full = join(dir, name)
+        const stat = statSync(full)
+        if (stat.isDirectory()) walk(full)
+        else if (full.endsWith('.ts') || full.endsWith('.tsx')) {
+          const rel = full.replace(/\\/g, '/')
+          const content = readFileSync(full, 'utf8')
+          // Strip comments — pattern em docstring não conta
+          const stripped = content
+            .replace(/\/\*[\s\S]*?\*\//g, '')
+            .replace(/^\s*\/\/.*$/gm, '')
+          if (/UPDATE\s+posts\s+SET\s+score/i.test(stripped)) {
+            if (!allowed.has(rel)) violations.push(rel)
+          }
+        }
+      }
+    }
+    walk('src')
+    expect(violations, `Violação §22: UPDATE posts SET score fora de ${[...allowed].join(', ')}`).toEqual([])
+  })
 
   // ─── #2 — s_local nunca persisted (Marshall) ─────────────────────
   // s_local é cálculo view-boundary; aplica no render do feed e morre.
   // Persistir em posts.score quebra §22 (lens vira ranking canônico).
-  // Grep `s_local` fora de trust-lens/* e feed.ts.
-  it.todo('2. s_local nunca aparece em writes ao DB (apenas render path)')
+  // Grep `s_local` fora de trust-lens/* e feed.ts + render path.
+  it('2. s_local nunca aparece em writes ao DB (apenas render path)', () => {
+    // Allowlist: arquivos onde s_local pode aparecer (pure compute + render)
+    const allowedPrefixes = [
+      'src/lib/trust-lens.ts',
+      'src/lib/trust/',
+      'src/lib/feed.ts',
+      'src/hooks/useFeed',
+      'src/components/', // render path em qualquer componente
+    ]
+    const violations: string[] = []
+    function walk(dir: string): void {
+      for (const name of readdirSync(dir)) {
+        const full = join(dir, name)
+        const stat = statSync(full)
+        if (stat.isDirectory()) walk(full)
+        else if (full.endsWith('.ts') || full.endsWith('.tsx')) {
+          const rel = full.replace(/\\/g, '/')
+          const content = readFileSync(full, 'utf8')
+          const stripped = content
+            .replace(/\/\*[\s\S]*?\*\//g, '')
+            .replace(/^\s*\/\/.*$/gm, '')
+          // Match `s_local` como identifier (não substring de outros)
+          if (/\bs_local\b/.test(stripped)) {
+            const allowed = allowedPrefixes.some((p) => rel.startsWith(p))
+            // Adicionalmente: se está em allowed e ALSO menciona db.run com
+            // s_local, é violação (persistir s_local em DB).
+            const persistViolation =
+              /db\.run[\s\S]{0,200}\bs_local\b|UPDATE[\s\S]{0,200}\bs_local\b/.test(stripped)
+            if (!allowed || persistViolation) violations.push(rel)
+          }
+        }
+      }
+    }
+    walk('src')
+    expect(violations, `Violação §22: s_local fora de render path ou persisted ao DB`).toEqual([])
+  })
 
   // ─── #3 — PPR Monte Carlo determinism (Marshall + Ted §7) ────────
   // Mesmo seed + mesma adjacency list → mesmo Map<target, score> bit-
   // exact. Cross-device convergence exige determinism. Quebra = §7
   // violado.
+  // DEFER: coberto por tests/trust-lens-math.test.ts (PPR Monte Carlo
+  // section); este conformance fica it.todo até refatorar suite.
   it.todo(
     '3. PPR Monte Carlo é determinístico dado mesma seed + adjacency',
   )
@@ -59,7 +128,28 @@ describe('Trust Lens — conformance (LOCK_VIA_TEST §17 §22 §24 §25 §27)', 
   // LensEdgeComponentsV1 → output ∈ [0, 1]. Defensável via sigmoid.
   // CHECK constraint em SQL já bound, mas pure function deve garantir
   // antes do write (defense em camada).
-  it.todo('4. edge influence ∈ [0, 1] pra todos inputs válidos')
+  it('4. edge influence ∈ [0, 1] pra todos inputs válidos', async () => {
+    const { computeInfluence, sanitizeComponents } = await import('../src/lib/trust/edges')
+    // Fuzz com 1000 inputs aleatórios em domínio válido
+    function randInt(min: number, max: number): number {
+      return Math.floor(Math.random() * (max - min + 1)) + min
+    }
+    for (let i = 0; i < 1000; i++) {
+      const raw = {
+        v: 1 as const,
+        follow: (i % 2) as 0 | 1,
+        mutual_spread: randInt(0, 100),
+        my_spread: randInt(0, 100),
+        my_bury: randInt(0, 100),
+        fof_paths: randInt(0, 50),
+      }
+      const components = sanitizeComponents(raw)
+      const inf = computeInfluence(components)
+      expect(inf, `influence fora de [0,1] em iteration ${i}: ${inf} (raw=${JSON.stringify(raw)})`).toBeGreaterThanOrEqual(0)
+      expect(inf).toBeLessThanOrEqual(1)
+      expect(Number.isFinite(inf)).toBe(true)
+    }
+  })
 
   // ─── #5 — Filter predicate schema valid (Marshall) ───────────────
   // Reader DSL rejeita gracefully (return null) quando:
@@ -67,7 +157,34 @@ describe('Trust Lens — conformance (LOCK_VIA_TEST §17 §22 §24 §25 §27)', 
   //   - kind desconhecido
   //   - shape inválido (e.g. predicates: missing)
   // Sem throw. Forward-compat pra Phase 2/3 onde v=2 aparece.
-  it.todo('5. parseFilterPredicate rejeita v != 1 ou kind unknown sem throw')
+  it('5. parseFilterPredicate rejeita v != 1 ou kind unknown sem throw', async () => {
+    const { parsePredicate } = await import('../src/lib/trust/predicate')
+    // Casos de input inválido — todos devem retornar null SEM throw
+    const invalidInputs: unknown[] = [
+      { v: 2, kind: 'all', action: 'hide' }, // v desconhecido
+      { v: 1, kind: 'unknown_kind', action: 'hide' }, // kind desconhecido
+      { v: 1, kind: 'all' }, // action missing
+      { v: 1 }, // kind+action missing
+      null,
+      undefined,
+      'string',
+      42,
+      [],
+      {},
+      { v: '1', kind: 'all', action: 'hide' }, // v como string
+    ]
+    for (const input of invalidInputs) {
+      let result: unknown
+      let threw = false
+      try {
+        result = parsePredicate(input)
+      } catch {
+        threw = true
+      }
+      expect(threw, `parsePredicate THROW pra input inválido: ${JSON.stringify(input)}`).toBe(false)
+      expect(result, `parsePredicate aceitou input inválido: ${JSON.stringify(input)}`).toBeNull()
+    }
+  })
 
   // ─── #6 — lens_edges nunca em raw_event nem em kind published ────
   // Manifesto §22: trust scores não saem do device. Grep em
