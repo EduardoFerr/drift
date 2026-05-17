@@ -85,12 +85,12 @@ export function driftChipVariantClass(
         : 'border-drift-bury/40 text-drift-bury hover:bg-drift-bury/10'
     case 'warning':
       return active
-        ? 'border-amber-400 bg-amber-500/15 text-amber-300'
-        : 'border-amber-400/60 bg-amber-500/10 text-amber-300'
+        ? 'border-drift-warning bg-drift-warning/15 text-drift-warning'
+        : 'border-drift-warning/40 bg-drift-warning/10 text-drift-warning'
     case 'spoiler':
       return active
-        ? 'border-amber-400 border-dashed bg-amber-500/15 text-amber-300'
-        : 'border-amber-400/60 border-dashed bg-amber-500/10 text-amber-300'
+        ? 'border-drift-warning border-dashed bg-drift-warning/15 text-drift-warning'
+        : 'border-drift-warning/40 border-dashed bg-drift-warning/10 text-drift-warning'
   }
 }
 

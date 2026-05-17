@@ -20,16 +20,16 @@ describe('driftChipVariantClass', () => {
     expect(cls).toContain('text-drift-muted')
   })
 
-  it('warning uses amber palette (high contrast over dark bg)', () => {
+  it('warning uses drift-warning token (high contrast over dark bg)', () => {
     const cls = driftChipVariantClass('warning', false)
-    expect(cls).toContain('amber-')
-    expect(cls).toContain('text-amber-300')
+    expect(cls).toContain('drift-warning')
+    expect(cls).toContain('text-drift-warning')
   })
 
   it('spoiler is warning + dashed border', () => {
     const cls = driftChipVariantClass('spoiler', false)
     expect(cls).toContain('border-dashed')
-    expect(cls).toContain('amber-')
+    expect(cls).toContain('drift-warning')
   })
 
   it('spread/bury use role-locked tokens (drift-spread / drift-bury)', () => {

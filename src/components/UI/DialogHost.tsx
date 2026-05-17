@@ -127,12 +127,12 @@ function DialogModal() {
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 8, scale: 0.98 }}
         transition={{ duration: 0.18, ease: [0.34, 1.56, 0.64, 1] }}
-        className="w-full max-w-[340px] rounded border border-drift-border bg-drift-surface p-5 shadow-[0_8px_32px_rgba(0,0,0,0.5)]"
+        className="w-full max-w-[340px] rounded-2xl border border-drift-border/40 bg-drift-surface p-5 shadow-[0_8px_32px_rgba(0,0,0,0.5)]"
       >
         {current.options.title && (
           <h2
             id="dialog-title"
-            className="mb-3 font-display text-[14px] font-extrabold uppercase tracking-meta text-drift-text"
+            className="mb-3 font-display text-[14px] font-extrabold uppercase tracking-tag text-drift-accent"
           >
             {current.options.title}
           </h2>
@@ -140,7 +140,7 @@ function DialogModal() {
 
         <p
           id="dialog-message"
-          className="whitespace-pre-wrap font-mono text-[12px] leading-relaxed text-drift-text"
+          className="whitespace-pre-wrap font-mono text-[12px] leading-relaxed text-drift-text/90"
         >
           {current.message}
         </p>
@@ -159,7 +159,7 @@ function DialogModal() {
             }}
             placeholder={current.options.placeholder}
             maxLength={current.options.maxLength}
-            className="mt-4 w-full rounded border border-drift-border bg-drift-bg px-3 py-2 font-mono text-[12px] text-drift-text placeholder:text-drift-muted/60 focus:border-drift-accent2 focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2"
+            className="mt-4 w-full rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3 font-mono text-[12px] text-drift-text placeholder:text-drift-muted/25 focus:border-drift-accent2/40 focus:outline-none focus:ring-1 focus:ring-drift-accent2/20"
           />
         )}
 
@@ -167,7 +167,7 @@ function DialogModal() {
           {showCancel && (
             <button
               onClick={handleCancel}
-              className="flex-1 rounded border border-drift-border px-3 py-2 font-mono text-[12px] uppercase tracking-meta text-slate-400 transition-colors hover:border-drift-text hover:text-drift-text focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2"
+              className="flex-1 rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3 font-mono text-[12px] uppercase tracking-meta text-drift-muted/70 transition-colors hover:border-drift-accent2/30 hover:text-drift-text focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
             >
               {cancelLabel}
             </button>
@@ -177,8 +177,8 @@ function DialogModal() {
             onClick={handleOk}
             className={
               danger
-                ? 'flex-1 rounded border border-drift-bury bg-drift-bury/10 px-3 py-2 font-mono text-[12px] uppercase tracking-meta text-drift-bury transition-colors hover:bg-drift-bury hover:text-drift-bg focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-bury focus-visible:ring-offset-2 focus-visible:ring-offset-drift-bg'
-                : 'flex-1 rounded bg-drift-accent px-3 py-2 font-mono text-[12px] font-bold uppercase tracking-meta text-drift-bg transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2 focus-visible:ring-offset-2 focus-visible:ring-offset-drift-bg'
+                ? 'flex-1 rounded-xl border border-drift-danger/30 bg-drift-danger/10 px-4 py-3 font-mono text-[12px] uppercase tracking-meta text-drift-danger transition-colors hover:bg-drift-danger/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-danger/40'
+                : 'flex-1 rounded-xl bg-drift-accent2 px-4 py-3 font-mono text-[12px] font-medium uppercase tracking-meta text-drift-bg transition-colors hover:bg-drift-accent2/85 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40'
             }
           >
             {okLabel}

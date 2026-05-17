@@ -234,7 +234,7 @@ export function Image({
       )}
 
       {state === 'error' && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 text-[12px] text-slate-600">
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 font-mono text-[11px] text-drift-muted/40">
           <span className="text-base">⊘</span>
           <span>imagem indisponível</span>
         </div>
