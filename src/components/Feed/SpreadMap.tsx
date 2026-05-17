@@ -515,11 +515,14 @@ function MapShell({
         </div>
       )}
 
-      <div className="pointer-events-none absolute bottom-3 left-3 rounded-lg bg-drift-bg/80 px-2.5 py-1 font-mono text-[11px] text-drift-muted/70 backdrop-blur-sm">
+      {/* WCAG: bg sobre tile dinâmico (mapa). Marshall regra de 2 camadas
+          — alpha mínimo /95 + text sem alpha. Tile pode ser claro ou
+          escuro; com /95 + text-muted sólido garantimos ≥ 4.5:1 nos 3 temas. */}
+      <div className="pointer-events-none absolute bottom-3 left-3 rounded-lg bg-drift-bg/95 px-2.5 py-1 font-mono text-[11px] text-drift-muted backdrop-blur-sm">
         {stats}
       </div>
       <div
-        className="pointer-events-auto absolute bottom-3 right-3 rounded-lg bg-drift-bg/80 px-2.5 py-1 text-[10px] text-drift-muted/50 backdrop-blur-sm [&_a]:underline [&_a]:hover:text-drift-text"
+        className="pointer-events-auto absolute bottom-3 right-3 rounded-lg bg-drift-bg/95 px-2.5 py-1 text-[10px] text-drift-muted backdrop-blur-sm [&_a]:underline [&_a]:hover:text-drift-text"
         dangerouslySetInnerHTML={{ __html: MAP_ATTRIBUTION }}
       />
     </div>

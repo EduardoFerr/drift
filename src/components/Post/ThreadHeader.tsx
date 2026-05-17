@@ -104,7 +104,7 @@ export function ThreadHeader({
 
   return (
     <header
-      className="flex shrink-0 items-center justify-between gap-3 border-b border-drift-border/40 bg-drift-surface/50 px-4 py-3.5 backdrop-blur-sm"
+      className="flex shrink-0 items-center justify-between gap-3 border-b border-drift-border/40 bg-drift-surface/95 px-4 py-3.5 backdrop-blur-sm"
       role="banner"
     >
       <div className="flex min-w-0 flex-1 flex-col gap-1">
