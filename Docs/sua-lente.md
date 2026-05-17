@@ -180,7 +180,7 @@ com um leve fio puxando pra perto".
 > "Esta lente reorganiza claramente seu feed."
 
 Aqui a Lente fica visível. Posts de pessoas próximas — quem você
-segue, quem tem mútuos contigo, quem você já curtiu antes — sobem
+segue, quem tem mútuos contigo, quem você já deu DRIFT antes — sobem
 de forma marcada. Você ainda recebe sinais de fora, mas eles
 competem em desvantagem.
 
@@ -190,12 +190,13 @@ Esse é o ponto que muita gente vai gostar de calibrar pra ficar.
 
 > "Esta lente domina seu feed — posts fora dela quase não aparecem."
 
-Em 100%, o boost por proximidade é máximo (multiplicador até 1.5x
-sobre o score global). Você vai ver quase exclusivamente conteúdo
-próximo da sua rede. Pode ser útil em momentos de saturação — "só
-quero ver minhas pessoas hoje". Mas note: a Lente em 100% **não é
-uma bolha completa**. Ela ainda respeita o score global como base —
-um post fortíssimo de fora ainda pode aparecer.
+Em 100%, o boost por proximidade é máximo (multiplicador capped em
+3x sobre o score global, com piso 0.1x). Você vai ver quase
+exclusivamente conteúdo próximo da sua rede. Pode ser útil em
+momentos de saturação — "só quero ver minhas pessoas hoje". Mas
+note: a Lente em 100% **não é uma bolha completa**. Ela ainda
+respeita o score global como base — um post fortíssimo de fora
+ainda pode aparecer.
 
 > **Você nunca perde nada por mover o slider.** A qualquer
 > momento, volte pra 0% e o feed cru reaparece intacto. A Lente
@@ -270,6 +271,42 @@ intermediária consegue influenciar muita coisa" (o "hub problem").
 A Lente vê até ~6 graus de separação, mas o sinal já decaiu tanto
 que pessoas tão distantes mal contam. Não é uma vigilância de rede
 global — é uma vizinhança natural ao seu redor.
+
+---
+
+## E se eu quiser tirar alguém da Lente?
+
+Independente do slider global, você pode **remover alguém específico
+da sua Lente** sem mexer no resto. No mapa da Rede (Phase 1.5), um
+long-press sobre o nó da pessoa abre opção "limpar da minha lente".
+Em qualquer post no feed, o inspector da Lente também oferece isso.
+
+Mecanicamente, isso cria uma **regra de filtro local** (`filter_rule`)
+que vive na sua tabela `lens_filter_rules` do SQLite. A regra é uma
+expressão composta — pode ser simples ("esconder posts de @x") ou
+combinada com tags ("esconder posts marcados `content-warning: nsfw`
+de autores com baixa proximidade"). É o que o manifesto §27 chama de
+"auto-classificação voluntária com filtros locais".
+
+Importante:
+- **Não muta seu grafo de follows.** Você continua seguindo @x —
+  só não vê os posts dela na sua Lente. Outras pessoas continuam
+  vendo normalmente.
+- **Não publica nada.** A regra fica no seu dispositivo, igual ao
+  resto da Lente.
+- **Você pode desfazer.** A regra é gerenciável em Settings → Sua
+  Lente → "Regras locais".
+- **Não dá poder a ninguém.** É só sua decisão sobre o que sua
+  Lente prioriza, exatamente como mute/block já funcionam hoje em
+  outras camadas locais.
+
+Há um ajuste técnico em curso (GAP-2 da auditoria Barney 2026-05-17):
+em Phase 1 a regra "limpar da lente" funciona como filtro de
+renderização, mas as walks PPR ainda passam pela pessoa removida e
+distribuem influência transitiva. Phase 1.5 vai propagar a regra pra
+edge influence (`influence_out = 0` se hide rule active), fechando o
+loop completo. Por enquanto, o efeito visual é o que você espera —
+a pessoa some da sua Lente — mas a defesa é parcial até o patch.
 
 ---
 
@@ -422,10 +459,11 @@ expectativa. Compute target: ~75ms em mid-range phone.
 Banda aceitável pra ordering local. Revisar K em Phase 2 se
 telemetria mostrar `top1_ppr_concentration_p95 > 0.30`.
 
-**Por que α=0.15**: damping clássico Brin/Page 1998. `E[walk
-length] = 1/α ≈ 6.67`. `P(reach hop 3) = 0.85^3 = 0.61`. Decay
-natural por distância — defesa anti-Sybil real é path diversity, não
-α agressivo.
+**Por que α=0.15**: damping clássico Brin/Page 1998. Convenção
+algorítmica do Drift (damping check ANTES do hop, geometric 0-indexed):
+`E[K_untruncated] = (1−α)/α ≈ 5.67`, truncado em L=6 dá `E[K_realized]
+≈ 5.79`. `P(reach hop 3) = 0.85^3 = 0.61`. Decay natural por
+distância — defesa anti-Sybil real é path diversity, não α agressivo.
 
 ### Edge influence formula
 
