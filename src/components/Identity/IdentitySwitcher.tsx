@@ -19,6 +19,7 @@
 
 import { useState } from 'react'
 import { FullPageCard } from '../UI/FullPageCard'
+import { PlusIcon, CopyIcon, DownloadIcon } from '../UI/Icons'
 import { dialog } from '../../lib/dialog'
 import {
   createNewIdentity,
@@ -302,16 +303,18 @@ export function IdentitySwitcher({ onRequestExport, onClose }: IdentitySwitcherP
               </button>
               <button
                 onClick={() => setMode('import')}
-                className="rounded-xl border border-drift-border/30 bg-drift-surface/30 px-3 py-3 font-mono text-[12px] uppercase tracking-meta text-drift-muted transition-colors hover:border-drift-accent2/30 hover:text-drift-accent2 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-drift-border/30 bg-drift-surface/30 px-3 py-3 font-mono text-[12px] uppercase tracking-meta text-drift-muted transition-colors hover:border-drift-accent2/30 hover:text-drift-accent2 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
               >
-                ↓ importar nsec1
+                <DownloadIcon size={14} />
+                importar nsec1
               </button>
               <button
                 onClick={() => setMode('bip39-import')}
-                className="rounded-xl border border-drift-border/30 bg-drift-surface/30 px-3 py-3 font-mono text-[12px] uppercase tracking-meta text-drift-muted transition-colors hover:border-drift-accent2/30 hover:text-drift-accent2 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-drift-border/30 bg-drift-surface/30 px-3 py-3 font-mono text-[12px] uppercase tracking-meta text-drift-muted transition-colors hover:border-drift-accent2/30 hover:text-drift-accent2 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
                 title="recupera identidade a partir de 12-24 palavras BIP39"
               >
-                ↓ importar palavras
+                <DownloadIcon size={14} />
+                importar palavras
               </button>
             </div>
           </>
@@ -340,9 +343,16 @@ export function IdentitySwitcher({ onRequestExport, onClose }: IdentitySwitcherP
               <button
                 onClick={handleCreate}
                 disabled={working}
-                className="flex-1 rounded-xl bg-drift-accent2 px-3 py-3 font-mono text-[12px] uppercase tracking-meta font-medium text-drift-bg transition-colors hover:bg-drift-accent2/85 disabled:cursor-not-allowed disabled:opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
+                className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-drift-accent2 px-3 py-3 font-mono text-[12px] uppercase tracking-meta font-medium text-drift-bg transition-colors hover:bg-drift-accent2/85 disabled:cursor-not-allowed disabled:opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
               >
-                {working ? 'criando…' : '⊕ criar'}
+                {working ? (
+                  'criando…'
+                ) : (
+                  <>
+                    <PlusIcon size={14} />
+                    criar
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -378,9 +388,16 @@ export function IdentitySwitcher({ onRequestExport, onClose }: IdentitySwitcherP
               <button
                 onClick={handleImport}
                 disabled={working || !importNsec.trim()}
-                className="flex-1 rounded-xl bg-drift-accent2 px-3 py-3 font-mono text-[12px] uppercase tracking-meta font-medium text-drift-bg transition-colors hover:bg-drift-accent2/85 disabled:cursor-not-allowed disabled:opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
+                className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-drift-accent2 px-3 py-3 font-mono text-[12px] uppercase tracking-meta font-medium text-drift-bg transition-colors hover:bg-drift-accent2/85 disabled:cursor-not-allowed disabled:opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
               >
-                {working ? 'importando…' : '⊕ importar'}
+                {working ? (
+                  'importando…'
+                ) : (
+                  <>
+                    <PlusIcon size={14} />
+                    importar
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -414,9 +431,16 @@ export function IdentitySwitcher({ onRequestExport, onClose }: IdentitySwitcherP
               <button
                 onClick={handleBip39Create}
                 disabled={working}
-                className="flex-1 rounded-xl bg-drift-accent2 px-3 py-3 font-mono text-[12px] uppercase tracking-meta font-medium text-drift-bg transition-colors hover:bg-drift-accent2/85 disabled:cursor-not-allowed disabled:opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
+                className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-drift-accent2 px-3 py-3 font-mono text-[12px] uppercase tracking-meta font-medium text-drift-bg transition-colors hover:bg-drift-accent2/85 disabled:cursor-not-allowed disabled:opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
               >
-                {working ? 'gerando…' : '⊕ gerar 12 palavras'}
+                {working ? (
+                  'gerando…'
+                ) : (
+                  <>
+                    <PlusIcon size={14} />
+                    gerar 12 palavras
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -446,9 +470,10 @@ export function IdentitySwitcher({ onRequestExport, onClose }: IdentitySwitcherP
                 onClick={() => {
                   void navigator.clipboard.writeText(bip39ShowResult.mnemonic)
                 }}
-                className="flex-1 rounded-xl border border-drift-border/30 bg-drift-surface/30 px-3 py-3 font-mono text-[12px] uppercase tracking-meta text-drift-muted transition-colors hover:border-drift-accent2/30 hover:text-drift-accent2 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
+                className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-drift-border/30 bg-drift-surface/30 px-3 py-3 font-mono text-[12px] uppercase tracking-meta text-drift-muted transition-colors hover:border-drift-accent2/30 hover:text-drift-accent2 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
               >
-                ⎘ copiar
+                <CopyIcon size={14} />
+                copiar
               </button>
               <button
                 onClick={() => {
@@ -502,9 +527,16 @@ export function IdentitySwitcher({ onRequestExport, onClose }: IdentitySwitcherP
               <button
                 onClick={handleBip39Import}
                 disabled={working || !bip39Phrase.trim()}
-                className="flex-1 rounded-xl bg-drift-accent2 px-3 py-3 font-mono text-[12px] uppercase tracking-meta font-medium text-drift-bg transition-colors hover:bg-drift-accent2/85 disabled:cursor-not-allowed disabled:opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
+                className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-drift-accent2 px-3 py-3 font-mono text-[12px] uppercase tracking-meta font-medium text-drift-bg transition-colors hover:bg-drift-accent2/85 disabled:cursor-not-allowed disabled:opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
               >
-                {working ? 'derivando…' : '⊕ importar'}
+                {working ? (
+                  'derivando…'
+                ) : (
+                  <>
+                    <PlusIcon size={14} />
+                    importar
+                  </>
+                )}
               </button>
             </div>
           </div>
