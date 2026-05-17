@@ -104,7 +104,7 @@ export function ThreadHeader({
 
   return (
     <header
-      className="flex shrink-0 items-center justify-between gap-3 border-b border-drift-border bg-drift-surface/95 px-4 py-3 backdrop-blur-sm"
+      className="flex shrink-0 items-center justify-between gap-3 border-b border-drift-border/40 bg-drift-surface/50 px-4 py-3.5 backdrop-blur-sm"
       role="banner"
     >
       <div className="flex min-w-0 flex-1 flex-col gap-1">
@@ -186,7 +186,7 @@ export function ThreadHeader({
               <button
                 onClick={onRefreshNew}
                 disabled={!onRefreshNew}
-                className="rounded border border-drift-accent2 px-2 py-0.5 uppercase tracking-meta text-drift-accent2 hover:bg-drift-accent2/10 disabled:opacity-50"
+                className="rounded-lg border border-drift-accent2/25 bg-drift-accent2/5 px-2 py-0.5 uppercase tracking-meta text-drift-accent2 hover:bg-drift-accent2/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40 disabled:opacity-50"
                 title="comments novos chegaram durante a navegação"
                 aria-label={`${newCount} comentários novos chegaram`}
               >
@@ -205,7 +205,7 @@ export function ThreadHeader({
         {onToggleViewMode && viewMode && (
           <button
             onClick={onToggleViewMode}
-            className="shrink-0 rounded border border-drift-border px-2 py-1 font-mono text-[12px] text-drift-muted hover:border-drift-accent hover:text-drift-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2"
+            className="shrink-0 rounded-xl border border-drift-border/30 bg-drift-surface/30 px-3 py-2 font-mono text-[12px] text-drift-muted transition-colors hover:border-drift-accent2/25 hover:text-drift-accent2 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
             aria-label={
               viewMode === 'list'
                 ? 'mudar pra modo cards (swipe imersivo)'
@@ -228,7 +228,7 @@ export function ThreadHeader({
         {onNewTopLevelComment && (
           <button
             onClick={onNewTopLevelComment}
-            className="shrink-0 rounded border border-drift-accent px-2 py-1 font-mono text-[12px] uppercase tracking-meta text-drift-accent hover:bg-drift-accent/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2"
+            className="shrink-0 rounded-xl border border-drift-accent2/25 bg-drift-surface/30 px-3 py-2 font-mono text-[12px] uppercase tracking-meta text-drift-accent2 transition-colors hover:bg-drift-accent2/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
             aria-label="comentar no post (top-level)"
             title="comentar no post (top-level)"
           >
@@ -237,7 +237,7 @@ export function ThreadHeader({
         )}
         <button
           onClick={onClose}
-          className="shrink-0 rounded border border-drift-border px-2 py-1 font-mono text-[12px] text-drift-muted hover:border-drift-accent hover:text-drift-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2"
+          className="shrink-0 rounded-xl border border-drift-border/30 bg-drift-surface/30 px-3 py-2 font-mono text-[12px] text-drift-muted transition-colors hover:border-drift-accent2/25 hover:text-drift-accent2 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
           aria-label="fechar thread"
           aria-keyshortcuts="Escape"
           title="fechar thread (Esc)"

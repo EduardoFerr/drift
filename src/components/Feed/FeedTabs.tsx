@@ -106,7 +106,7 @@ export function FeedTabs({ onActiveTabTap }: FeedTabsProps = {}) {
             (só em `domMax`, +25 KB). Spring values são equivalentes. */}
         <m.span
           aria-hidden="true"
-          className="pointer-events-none absolute -bottom-px left-0 h-[2px] w-1/3 bg-drift-accent"
+          className="pointer-events-none absolute -bottom-px left-0 h-[2px] w-1/3 bg-drift-accent2"
           animate={{ x: `${activeIndex * 100}%` }}
           transition={{
             type: 'spring',
@@ -129,7 +129,7 @@ export function FeedTabs({ onActiveTabTap }: FeedTabsProps = {}) {
       >
         <span
           className={`text-[14px] ${refreshing ? 'animate-spin' : ''} ${
-            unseenCount > 0 ? 'text-drift-accent' : ''
+            unseenCount > 0 ? 'text-drift-accent2' : ''
           }`}
           style={{
             display: 'inline-block',
@@ -141,7 +141,7 @@ export function FeedTabs({ onActiveTabTap }: FeedTabsProps = {}) {
         {unseenCount > 0 && (
           <span
             aria-hidden="true"
-            className="absolute -right-0.5 -top-0.5 min-w-[16px] rounded-full bg-drift-accent px-1 text-center text-[12px] font-bold leading-[16px] text-drift-bg"
+            className="absolute -right-0.5 -top-0.5 min-w-[16px] rounded-full bg-drift-accent2 px-1 text-center text-[12px] font-bold leading-[16px] text-drift-bg"
           >
             {unseenCount > 99 ? '99+' : unseenCount}
           </span>

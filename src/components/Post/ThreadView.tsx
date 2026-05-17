@@ -385,7 +385,7 @@ export function ThreadView({ postId, postAuthorPub, post, onClose }: ThreadViewP
               {hasNextSibling && (
                 <div
                   aria-hidden="true"
-                  className="pointer-events-none absolute inset-x-3 inset-y-3 -z-20 rounded border border-drift-border bg-drift-surface motion-reduce:hidden"
+                  className="pointer-events-none absolute inset-x-3 inset-y-3 -z-20 rounded-2xl border border-drift-border/40 bg-drift-surface motion-reduce:hidden"
                   style={{
                     transform: 'translateY(14px) scale(0.92)',
                     opacity: 0.18,
@@ -395,7 +395,7 @@ export function ThreadView({ postId, postAuthorPub, post, onClose }: ThreadViewP
               {hasNextSibling && (
                 <div
                   aria-hidden="true"
-                  className="pointer-events-none absolute inset-x-3 inset-y-3 -z-10 rounded border border-drift-border bg-drift-surface motion-reduce:hidden"
+                  className="pointer-events-none absolute inset-x-3 inset-y-3 -z-10 rounded-2xl border border-drift-border/40 bg-drift-surface motion-reduce:hidden"
                   style={{
                     transform: 'translateY(7px) scale(0.96)',
                     opacity: 0.4,
@@ -405,7 +405,7 @@ export function ThreadView({ postId, postAuthorPub, post, onClose }: ThreadViewP
               {hasChild && (
                 <div
                   aria-hidden="true"
-                  className="pointer-events-none absolute inset-x-3 inset-y-3 -z-10 rounded border border-drift-accent2/40 bg-drift-surface motion-reduce:hidden"
+                  className="pointer-events-none absolute inset-x-3 inset-y-3 -z-10 rounded-2xl border border-drift-accent2/25 bg-drift-surface motion-reduce:hidden"
                   style={{
                     transform: 'translateY(14px) scale(0.92)',
                     opacity: 0.4,
@@ -461,7 +461,7 @@ export function ThreadView({ postId, postAuthorPub, post, onClose }: ThreadViewP
             whileTap={{ scale: 0.95 }}
             transition={{ duration: 0.18, ease: [0.0, 0.0, 0.2, 1] }}
             onClick={openReplyToCursor}
-            className="absolute bottom-5 right-5 z-30 rounded-full border-2 border-drift-accent bg-drift-surface px-4 py-2 font-mono text-[12px] uppercase tracking-meta text-drift-accent shadow-lg hover:bg-drift-accent/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2 motion-reduce:!scale-100"
+            className="absolute bottom-5 right-5 z-30 rounded-xl bg-drift-accent2 px-5 py-3 font-mono text-[12px] uppercase tracking-meta font-medium text-drift-bg shadow-lg transition-colors hover:bg-drift-accent2/85 active:bg-drift-accent2/75 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40 motion-reduce:!scale-100"
             aria-label="responder este comentário"
             aria-keyshortcuts="Enter"
             title="responder (Enter)"
@@ -495,7 +495,7 @@ export function ThreadView({ postId, postAuthorPub, post, onClose }: ThreadViewP
               <button
                 onClick={dismissCoach}
                 aria-label="fechar dica"
-                className="pointer-events-auto rounded border border-drift-accent/40 bg-drift-surface/90 px-5 py-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2"
+                className="pointer-events-auto rounded-2xl border border-drift-border/40 bg-drift-surface/90 px-5 py-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
               >
                 <CoachContent />
               </button>
@@ -670,7 +670,7 @@ function EmptyState({ onReply }: { onReply: () => void }) {
       </span>
       <button
         onClick={onReply}
-        className="rounded border-2 border-drift-accent px-4 py-2 font-mono text-[12px] uppercase tracking-meta text-drift-accent hover:bg-drift-accent/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2"
+        className="rounded-xl bg-drift-accent2 px-5 py-3.5 font-mono text-[12px] uppercase tracking-meta font-medium text-drift-bg transition-colors hover:bg-drift-accent2/85 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
       >
         ↵ comentar
       </button>

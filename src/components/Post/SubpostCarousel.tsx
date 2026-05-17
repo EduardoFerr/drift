@@ -163,7 +163,7 @@ function SubpostCarouselComponent({
           animate="center"
           exit="exit"
           transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
-          className="absolute inset-0 overflow-hidden rounded border-2 border-drift-border bg-drift-surface"
+          className="absolute inset-0 overflow-hidden rounded-2xl border border-drift-border/40 bg-drift-surface"
         >
           {current && (
             <SubpostLayout

@@ -244,3 +244,23 @@ export function TrashIcon({ size = 18, className = '' }: IconProps) {
     </svg>
   )
 }
+
+export function ChevronDownIcon({ size = 18, className = '' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" className={className} {...base}>
+      <polyline points="6 9 12 15 18 9" />
+    </svg>
+  )
+}
+
+export function PaletteIcon({ size = 18, className = '' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" className={className} {...base}>
+      {/* Paleta abstrata — círculo + 3 swatches dentro evocando 3 temas */}
+      <path d="M12 22a10 10 0 1 1 10-10c0 3-2 5-5 5h-2a2 2 0 0 0 0 4 2 2 0 0 1-2 2 1 1 0 0 1-1-1Z" />
+      <circle cx="7" cy="11" r="1.2" fill="currentColor" />
+      <circle cx="12" cy="7" r="1.2" fill="currentColor" />
+      <circle cx="17" cy="11" r="1.2" fill="currentColor" />
+    </svg>
+  )
+}

@@ -505,21 +505,21 @@ function MapShell({
   stats: string
 }) {
   return (
-    <div className={`relative overflow-hidden rounded border border-drift-border ${className}`}>
+    <div className={`relative overflow-hidden rounded-2xl border border-drift-border/40 ${className}`}>
       <div ref={containerRef} className="h-full w-full" />
 
       {onModeChange && (
-        <div className="pointer-events-auto absolute left-2 top-2 flex overflow-hidden rounded border border-drift-border bg-drift-bg/90 backdrop-blur-sm">
+        <div className="pointer-events-auto absolute left-3 top-3 flex overflow-hidden rounded-xl border border-drift-border/40 bg-drift-bg/90 backdrop-blur-sm">
           <ModeBtn active={mode === 'post'} onClick={() => onModeChange('post')}>post</ModeBtn>
           <ModeBtn active={mode === 'global'} onClick={() => onModeChange('global')}>global</ModeBtn>
         </div>
       )}
 
-      <div className="pointer-events-none absolute bottom-2 left-2 rounded bg-drift-bg/80 px-2 py-1 font-mono text-[12px] text-drift-muted backdrop-blur-sm">
+      <div className="pointer-events-none absolute bottom-3 left-3 rounded-lg bg-drift-bg/80 px-2.5 py-1 font-mono text-[11px] text-drift-muted/70 backdrop-blur-sm">
         {stats}
       </div>
       <div
-        className="pointer-events-auto absolute bottom-2 right-2 rounded bg-drift-bg/80 px-2 py-1 text-[12px] text-drift-muted backdrop-blur-sm [&_a]:underline [&_a]:hover:text-drift-text"
+        className="pointer-events-auto absolute bottom-3 right-3 rounded-lg bg-drift-bg/80 px-2.5 py-1 text-[10px] text-drift-muted/50 backdrop-blur-sm [&_a]:underline [&_a]:hover:text-drift-text"
         dangerouslySetInnerHTML={{ __html: MAP_ATTRIBUTION }}
       />
     </div>
@@ -540,8 +540,10 @@ function ModeBtn({
   return (
     <button
       onClick={onClick}
-      className={`px-[10px] py-[5px] font-mono text-[12px] uppercase tracking-meta transition-colors ${
-        active ? 'bg-drift-accent/15 text-drift-accent' : 'text-drift-muted hover:text-drift-text'
+      className={`px-3.5 py-2 font-mono text-[11px] uppercase tracking-meta transition-colors ${
+        active
+          ? 'bg-drift-accent2 text-drift-bg'
+          : 'text-drift-muted/70 hover:text-drift-text'
       }`}
     >
       {children}
@@ -563,14 +565,18 @@ function Placeholder({
   action?: { label: string; onClick: () => void }
 }) {
   return (
-    <div className={`flex flex-col items-center justify-center gap-2 rounded border border-dashed border-drift-border bg-drift-surface/40 p-6 text-center text-[12px] text-drift-muted ${className}`}>
-      <span className="text-base">🗺️</span>
-      <strong className="text-drift-text">{title}</strong>
-      <p className="max-w-xs leading-relaxed">{body}</p>
+    <div className={`flex flex-col items-center justify-center gap-3 rounded-2xl border border-drift-border/40 bg-drift-surface/40 p-8 text-center ${className}`}>
+      <span aria-hidden="true" className="font-display text-[28px] text-drift-accent/70">◎</span>
+      <strong className="font-display text-[15px] font-extrabold uppercase tracking-tag text-drift-accent">
+        {title}
+      </strong>
+      <p className="max-w-xs font-mono text-[11px] leading-relaxed text-drift-muted/60">
+        {body}
+      </p>
       {action && (
         <button
           onClick={action.onClick}
-          className="mt-1 rounded border border-drift-accent px-3 py-1 text-[12px] uppercase tracking-widest text-drift-accent hover:bg-drift-accent/10"
+          className="mt-1 rounded-xl bg-drift-accent2 px-5 py-2.5 font-mono text-[12px] uppercase tracking-meta font-medium text-drift-bg transition-colors hover:bg-drift-accent2/85 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
         >
           {action.label}
         </button>

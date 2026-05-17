@@ -62,6 +62,7 @@ import { NavBar } from './components/UI/NavBar'
 import { FullPageCard } from './components/UI/FullPageCard'
 import { LayerRenderer } from './components/UI/LayerRenderer'
 import { LazyBoundary } from './components/UI/LazyBoundary'
+import { Collapse } from './components/UI/Collapse'
 import { DriftSkeleton } from './components/UI/DriftSkeleton'
 
 // Round CWV-2 §3.2 — Lazy boundaries pra todos os modal/overlay roots
@@ -94,6 +95,9 @@ const DiagnosticCard = lazy(() =>
 )
 const PermissionsCard = lazy(() =>
   import('./components/Settings/SettingsCards').then((m) => ({ default: m.PermissionsCard })),
+)
+const AppearanceCard = lazy(() =>
+  import('./components/Settings/AppearanceCard').then((m) => ({ default: m.AppearanceCard })),
 )
 const RelaySettings = lazy(() =>
   import('./components/Settings/RelaySettings').then((m) => ({ default: m.RelaySettings })),
@@ -143,6 +147,8 @@ import {
   ShieldIcon,
   PinOffIcon,
   LinkIcon,
+  ChevronDownIcon,
+  PaletteIcon,
 } from './components/UI/Icons'
 // SpreadMap pull MapLibre GL (1.1 MB) + Deck.gl ArcLayer (467 KB) —
 // só carrega quando user abre overlay de mapa. Ver MapOverlay abaixo.
@@ -175,7 +181,7 @@ function StatusCardLayer({ onClose }: { onClose: () => void }) {
   const boot = useBootStore()
   return (
     <FullPageCard onClose={onClose} title="status" ariaLabel="painel de diagnóstico">
-      <div className="p-5">
+      <div className="px-4 py-5">
         <DiagnosticPanel boot={boot} />
       </div>
     </FullPageCard>
@@ -185,30 +191,65 @@ function StatusCardLayer({ onClose }: { onClose: () => void }) {
 function AboutCardLayer({ onClose }: { onClose: () => void }) {
   return (
     <FullPageCard onClose={onClose} title="sobre" ariaLabel="sobre o cliente Drift">
-      <div className="space-y-4 p-5 font-mono">
-        <div className="rounded border border-drift-border bg-drift-bg/50 p-4">
-          <div className="text-[10px] uppercase tracking-[2px] text-drift-muted">
+      <div className="space-y-3 px-4 py-5 font-mono">
+        <div className="rounded-2xl border border-drift-border/40 bg-drift-surface/50 px-5 py-4">
+          <div className="text-[10px] uppercase tracking-tag text-drift-muted/50">
             versão do cliente
           </div>
-          <div className="mt-1 font-display text-[20px] font-extrabold text-drift-text">
+          <div className="mt-1 font-display text-[22px] font-extrabold text-drift-text">
             {CLIENT_VERSION}
           </div>
-          <div className="mt-2 text-[10px] leading-relaxed text-drift-muted">
-            cliente oficial Drift (
-            <code className="text-drift-text">drift-official</code>) —
-            vocab user-facing DRIFT/SINK/DERIVA · vocab spec SPREAD/
-            BURY (kinds 9079/9080).
+          <div className="mt-2 text-[10px] text-drift-muted/40">
+            cliente oficial <code className="text-drift-text/80">drift-official</code>
           </div>
         </div>
-        <p className="text-[10px] leading-relaxed text-drift-muted">
-          Drift é decentralized social network sobre Nostr.
-          Eventos imutáveis assinados, score determinístico,
-          sem afinidade no feed (manifesto §22), sem chave mestra
-          (§17). Cliente PWA + Tauri opcional. Identidade portável
-          via nsec1.
+
+        <div className="rounded-2xl border border-drift-border/40 bg-drift-surface/50 px-5 py-3.5">
+          <span className="font-display text-[14px] font-bold uppercase tracking-tag text-drift-accent">
+            manifesto
+          </span>
+        </div>
+        <p className="px-1 font-mono text-[10px] text-drift-muted/30">
+          drift é descentralizado sobre nostr. 34 princípios públicos definem o que o cliente pode e não pode fazer.
+        </p>
+        <div className="space-y-2 pl-3">
+          <div className="space-y-2 rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3.5">
+            <ManifestoLine n="§17" text="sem chave mestra — fundador não controla conteúdo" />
+            <ManifestoLine n="§22" text="sem afinidade no feed — ranking é função pura" />
+            <ManifestoLine n="§15" text="anti-censura por país — Tor + WebRTC" />
+            <ManifestoLine n="§16" text="disponibilidade distribuída — IPFS, sneakernet, BLE" />
+            <ManifestoLine n="§25" text="sem scanner automático — opt-in vence" />
+            <ManifestoLine n="§28" text="privacidade pelo mínimo — location off-default" />
+          </div>
+          <a
+            href="https://github.com/EduardoFerr/drift/blob/main/Docs/manifesto.md"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block w-full rounded-xl bg-drift-accent2 px-4 py-3 text-center font-mono text-[12px] uppercase tracking-meta font-medium text-drift-bg transition-colors hover:bg-drift-accent2/85"
+          >
+            ler manifesto completo ↗
+          </a>
+        </div>
+
+        <div className="rounded-2xl border border-drift-border/40 bg-drift-surface/50 px-5 py-3.5">
+          <span className="font-display text-[14px] font-bold uppercase tracking-tag text-drift-accent">
+            protocolo
+          </span>
+        </div>
+        <p className="px-1 font-mono text-[10px] leading-relaxed text-drift-muted/30">
+          eventos imutáveis assinados (kinds 9078–9081). score determinístico. identidade portável via nsec1. PWA + tauri opcional.
         </p>
       </div>
     </FullPageCard>
+  )
+}
+
+function ManifestoLine({ n, text }: { n: string; text: string }) {
+  return (
+    <div className="flex gap-3 font-mono text-[11px]">
+      <span className="shrink-0 text-drift-accent">{n}</span>
+      <span className="text-drift-muted/60">{text}</span>
+    </div>
   )
 }
 
@@ -865,8 +906,22 @@ function App() {
         onOpenLocation={() => pushLayer({ id: 'location', component: LocationCard })}
         onOpenNetworkMode={() => pushLayer({ id: 'network', component: NetworkModeCard })}
         onOpenStatus={() => pushLayer({ id: 'status', component: StatusCardLayer })}
-        onOpenIdentity={() => pushLayer({ id: 'identity', component: IdentityPanel })}
-        onOpenProfile={() => pushLayer({ id: 'profile', component: ProfileModal })}
+        onOpenIdentity={() => {
+          if (!boot.identity) return
+          pushLayer({
+            id: 'identity',
+            component: IdentityPanel,
+            props: { identity: boot.identity },
+          })
+        }}
+        onOpenProfile={() => {
+          if (!boot.identity) return
+          pushLayer({
+            id: 'profile',
+            component: ProfileModal,
+            props: { identity: boot.identity },
+          })
+        }}
         onActiveTabTap={() => setPostByIndex(0)}
       />
 
@@ -947,17 +1002,17 @@ function App() {
               <>
                 <div
                   aria-hidden="true"
-                  className="pointer-events-none absolute inset-x-4 top-3 bottom-2 rounded border border-drift-border bg-drift-surface"
+                  className="pointer-events-none absolute inset-x-4 top-3 bottom-2 rounded-2xl border border-drift-border/40 bg-drift-surface"
                   style={{ transform: 'translateY(14px) scale(0.92)', opacity: 0.18 }}
                 />
                 <div
                   aria-hidden="true"
-                  className="pointer-events-none absolute inset-x-4 top-3 bottom-2 rounded border border-drift-border bg-drift-surface"
+                  className="pointer-events-none absolute inset-x-4 top-3 bottom-2 rounded-2xl border border-drift-border/40 bg-drift-surface"
                   style={{ transform: 'translateY(7px) scale(0.96)', opacity: 0.4 }}
                 />
               </>
             )}
-            <div className="relative h-full w-full overflow-hidden rounded border border-drift-border bg-drift-surface">
+            <div className="relative h-full w-full overflow-hidden rounded-2xl border border-drift-border/40 bg-drift-surface">
               <AnimatePresence mode="wait" custom={exitDir}>
                 <PostViewer
                   key={currentPost.id}
@@ -1516,25 +1571,43 @@ type SettingsTarget =
   | 'status'
   | 'sobre'
   | 'permissoes'
+  | 'aparencia'
   | 'instalar'
   | 'limpar'
 
 function SettingsRoot({ onClose }: { onClose: () => void }) {
   const installPromptLocal = useInstallPrompt()
+  const identity = useBootStore((s) => s.identity)
+  const [expanded, setExpanded] = useState<number | null>(0)
+  function toggleSection(i: number) {
+    setExpanded((prev) => (prev === i ? null : i))
+  }
 
   function handleSettingsSelect(target: SettingsTarget) {
     const p = 'settings'
     switch (target) {
       case 'chave':
-        pushLayer({ id: 'identity', component: IdentityPanel, parent: p })
+        if (!identity) return
+        pushLayer({
+          id: 'identity',
+          component: IdentityPanel,
+          parent: p,
+          props: { identity },
+        })
         break
       case 'identidades':
         pushLayer({
           id: 'switcher', component: IdentitySwitcher, parent: p,
           props: {
             onRequestExport: () => {
+              if (!identity) return
               popLayer({ id: 'switcher' })
-              pushLayer({ id: 'identity', component: IdentityPanel, parent: p })
+              pushLayer({
+                id: 'identity',
+                component: IdentityPanel,
+                parent: p,
+                props: { identity },
+              })
             },
           },
         })
@@ -1566,6 +1639,9 @@ function SettingsRoot({ onClose }: { onClose: () => void }) {
       case 'permissoes':
         pushLayer({ id: 'permissions', component: PermissionsCard, parent: p })
         break
+      case 'aparencia':
+        pushLayer({ id: 'appearance', component: AppearanceCard, parent: p })
+        break
       case 'diagnostico':
         pushLayer({ id: 'diagnostic', component: DiagnosticCard, parent: p })
         break
@@ -1593,8 +1669,10 @@ function SettingsRoot({ onClose }: { onClose: () => void }) {
   // V9.2c — cada seção da ContentSettings também aparece como entry
   // direto no menu inicial (não nested). Click → scroll-to-section
   // em ContentSettings (rota direta sem buscar na overlay grande).
-  const groups: {
+  type SettingsGroup = {
     title: string
+    groupIcon: (props: { size?: number; className?: string }) => ReactElement
+    danger?: boolean
     items: {
       target: SettingsTarget
       label: string
@@ -1602,9 +1680,12 @@ function SettingsRoot({ onClose }: { onClose: () => void }) {
       hint: string
       icon: (props: { size?: number; className?: string }) => ReactElement
     }[]
-  }[] = [
+  }
+
+  const groups: SettingsGroup[] = [
     {
       title: 'identidade',
+      groupIcon: KeyIcon,
       items: [
         {
           target: 'chave',
@@ -1615,13 +1696,14 @@ function SettingsRoot({ onClose }: { onClose: () => void }) {
         {
           target: 'identidades',
           label: 'identidades',
-          hint: 'múltiplas identidades — manifesto §4',
+          hint: 'múltiplas identidades',
           icon: UsersIcon,
         },
       ],
     },
     {
       title: 'rede',
+      groupIcon: ServerIcon,
       items: [
         {
           target: 'relays',
@@ -1632,19 +1714,20 @@ function SettingsRoot({ onClose }: { onClose: () => void }) {
         {
           target: 'rede',
           label: 'modo de rede',
-          hint: 'clearnet / tor / onion-only — manifesto §15',
+          hint: 'clearnet / tor / onion-only',
           icon: GlobeIcon,
         },
         {
           target: 'peers',
           label: 'peers P2P',
-          hint: 'QR, link direto, bundle offline — §12',
+          hint: 'QR, link direto, bundle offline',
           icon: LinkIcon,
         },
       ],
     },
     {
       title: 'conteúdo',
+      groupIcon: SlidersIcon,
       items: [
         {
           target: 'filtros',
@@ -1655,7 +1738,7 @@ function SettingsRoot({ onClose }: { onClose: () => void }) {
         {
           target: 'location',
           label: 'location',
-          hint: 'granularidade nos meus posts — §28',
+          hint: 'granularidade nos meus posts',
           icon: PinIcon,
         },
         {
@@ -1667,13 +1750,14 @@ function SettingsRoot({ onClose }: { onClose: () => void }) {
         {
           target: 'listas',
           label: 'listas',
-          hint: 'pinned, blocked, muted (filtros locais)',
+          hint: 'pinned, blocked, muted',
           icon: ListIcon,
         },
       ],
     },
     {
       title: 'sistema',
+      groupIcon: ShieldIcon,
       items: [
         {
           target: 'permissoes',
@@ -1682,27 +1766,33 @@ function SettingsRoot({ onClose }: { onClose: () => void }) {
           icon: ShieldIcon,
         },
         {
+          target: 'aparencia',
+          label: 'aparência',
+          hint: 'tema visual — cinder / rosenholz / velatura',
+          icon: PaletteIcon,
+        },
+        {
           target: 'status',
           label: 'status',
-          hint: 'painel de diagnóstico em tempo real',
+          hint: 'diagnóstico em tempo real',
           icon: ActivityIcon,
         },
         {
           target: 'blobs',
           label: 'blobs (ipfs)',
-          hint: 'servindo blobs a peers — manifesto §16',
+          hint: 'servindo blobs a peers',
           icon: BoxIcon,
         },
         {
           target: 'diagnostico',
           label: 'redefinir cache',
-          hint: 'reconstrói banco local sem apagar identidade',
+          hint: 'reconstrói banco local',
           icon: RefreshIcon,
         },
         {
           target: 'sobre',
           label: `versão ${CLIENT_VERSION}`,
-          hint: 'cliente Drift, manifesto + licença',
+          hint: 'manifesto + licença',
           icon: InfoIcon,
         },
         ...(installPromptLocal.available
@@ -1710,16 +1800,23 @@ function SettingsRoot({ onClose }: { onClose: () => void }) {
               {
                 target: 'instalar' as SettingsTarget,
                 label: 'instalar app',
-                hint: 'PWA na tela inicial — manifesto §1',
+                hint: 'PWA na tela inicial',
                 icon: DownloadIcon,
               },
             ]
           : []),
+      ],
+    },
+    {
+      title: 'limpar local',
+      groupIcon: TrashIcon,
+      danger: true,
+      items: [
         {
           target: 'limpar',
-          label: 'limpar local',
+          label: 'apagar dados locais',
           danger: true,
-          hint: 'apaga banco local — destrutivo',
+          hint: 'remove banco SQLite — identidade preservada',
           icon: TrashIcon,
         },
       ],
@@ -1732,70 +1829,98 @@ function SettingsRoot({ onClose }: { onClose: () => void }) {
       title="configurações"
       ariaLabel="configurações"
     >
-      <div className="px-5 py-[18px]">
-        {groups.map((group, gi) => (
-          <section
-            key={group.title}
-            className={gi > 0 ? 'mt-[28px]' : ''}
-            aria-labelledby={`settings-group-${gi}`}
-          >
-            <h3
-              id={`settings-group-${gi}`}
-              className="mb-2 font-mono text-[9px] uppercase tracking-tag text-drift-accent"
-            >
-              {group.title}
-            </h3>
-            <ul className="divide-y divide-drift-border border-y border-drift-border">
-              {group.items.map((item) => {
-                const Icon = item.icon
-                return (
-                  <li key={item.target}>
-                    <button
-                      onClick={() => handleSettingsSelect(item.target)}
-                      className="group flex w-full items-center gap-3 px-1 py-[14px] text-left transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2 focus-visible:ring-offset-2 focus-visible:ring-offset-drift-bg"
-                    >
-                      <span
-                        aria-hidden="true"
-                        className={`shrink-0 transition-colors ${
-                          item.danger ? 'text-drift-bury' : 'text-drift-accent'
+      <div className="space-y-3 px-4 py-5">
+        {groups.map((group, gi) => {
+          const isOpen = expanded === gi
+          const GroupIcon = group.groupIcon
+          return (
+            <section key={group.title} aria-labelledby={`settings-group-${gi}`}>
+              <button
+                id={`settings-group-${gi}`}
+                onClick={() => toggleSection(gi)}
+                aria-expanded={isOpen}
+                className={`flex w-full items-center gap-3 rounded-2xl border px-5 py-4 text-left transition-colors ${
+                  group.danger
+                    ? 'border-drift-danger/20 bg-drift-danger/5'
+                    : 'border-drift-border/40 bg-drift-surface/50'
+                }`}
+              >
+                <span className={`shrink-0 ${group.danger ? 'text-drift-danger' : 'text-drift-accent'}`}>
+                  <GroupIcon size={18} />
+                </span>
+                <span
+                  className={`flex-1 font-display text-[14px] font-bold uppercase tracking-tag ${
+                    group.danger ? 'text-drift-danger' : 'text-drift-accent'
+                  }`}
+                >
+                  {group.title}
+                </span>
+                <span
+                  className={`shrink-0 transition-transform duration-motion-emphasis ease-drift-inout ${isOpen ? 'rotate-180' : ''} ${
+                    group.danger ? 'text-drift-danger/40' : 'text-drift-muted/40'
+                  }`}
+                >
+                  <ChevronDownIcon size={16} />
+                </span>
+              </button>
+
+              <Collapse open={isOpen}>
+                <div className="mt-1.5 space-y-1.5 pl-3">
+                  {group.items.map((item) => {
+                    const Icon = item.icon
+                    return (
+                      <button
+                        key={item.target}
+                        onClick={() => handleSettingsSelect(item.target)}
+                        tabIndex={isOpen ? 0 : -1}
+                        className={`group flex w-full items-center gap-3.5 rounded-xl border px-4 py-3.5 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40 ${
+                          item.danger
+                            ? 'border-drift-danger/15 bg-drift-danger/5 hover:border-drift-danger/30'
+                            : 'border-drift-border/30 bg-drift-surface/30 hover:border-drift-accent2/25'
                         }`}
                       >
-                        <Icon size={18} />
-                      </span>
-                      <div className="flex min-w-0 flex-1 flex-col gap-[2px]">
                         <span
-                          className={`font-mono text-[12px] uppercase tracking-[2px] ${
-                            item.danger ? 'text-drift-bury' : 'text-drift-text'
+                          aria-hidden="true"
+                          className={`shrink-0 ${item.danger ? 'text-drift-danger/60' : 'text-drift-accent2/70'}`}
+                        >
+                          <Icon size={16} />
+                        </span>
+                        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                          <span
+                            className={`font-mono text-[13px] ${
+                              item.danger ? 'text-drift-danger' : 'text-drift-text'
+                            }`}
+                          >
+                            {item.label}
+                          </span>
+                          <span
+                            className={`truncate font-mono text-[10px] ${
+                              item.danger ? 'text-drift-danger/30' : 'text-drift-muted/40'
+                            }`}
+                          >
+                            {item.hint}
+                          </span>
+                        </div>
+                        <span
+                          aria-hidden="true"
+                          className={`shrink-0 text-[14px] ${
+                            item.danger ? 'text-drift-danger/25' : 'text-drift-muted/20'
                           }`}
                         >
-                          {item.label}
+                          ›
                         </span>
-                        <span
-                          className={`truncate font-mono text-[10px] normal-case tracking-normal ${
-                            item.danger ? 'text-drift-bury/80' : 'text-drift-accent2'
-                          }`}
-                        >
-                          {item.hint}
-                        </span>
-                      </div>
-                      <span
-                        aria-hidden="true"
-                        className={`shrink-0 font-mono text-[12px] transition-colors ${
-                          item.danger ? 'text-drift-bury' : 'text-drift-accent'
-                        }`}
-                      >
-                        →
-                      </span>
-                    </button>
-                  </li>
-                )
-              })}
-            </ul>
-          </section>
-        ))}
-        {/* Padding bottom defensivo pra não cortar último item em
-            viewports curtos (anti-overflow V9.3). */}
-        <div className="h-6" aria-hidden="true" />
+                      </button>
+                    )
+                  })}
+                </div>
+              </Collapse>
+            </section>
+          )
+        })}
+
+        <p className="px-2 pt-2 font-mono text-[10px] leading-relaxed text-drift-muted/30">
+          algumas alterações podem exigir reinicialização do app.
+        </p>
       </div>
     </FullPageCard>
   )
@@ -2206,13 +2331,12 @@ function DiagnosticPanel({ boot }: { boot: BootState }) {
   const relaysOk = boot.relays?.filter((r) => r.ok).length ?? '?'
   const relaysTotal = boot.relays?.length ?? '?'
   return (
-    <div className="space-y-4">
-      <p className="font-mono text-[12px] leading-relaxed text-drift-muted">
-        Estado do cliente em tempo real. Use os botões abaixo se UI parecer
-        stale ou eventos pararem de chegar.
+    <div className="space-y-3">
+      <p className="px-1 font-mono text-[10px] text-drift-muted/30">
+        estado em tempo real. use os botões se UI parecer stale.
       </p>
 
-      <div className="space-y-2 rounded border border-drift-border bg-drift-surface p-4 font-mono text-[12px]">
+      <div className="space-y-2.5 rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3.5 font-mono text-[12px]">
         <Row label="storage" value={storageLabel} />
         <Row
           label="sync"
@@ -2225,63 +2349,54 @@ function DiagnosticPanel({ boot }: { boot: BootState }) {
           <Row
             label="rebuild em andamento"
             value={String(sync.rebuildsInProgress.length)}
-            valueClass="text-yellow-400"
+            valueClass="text-drift-warning"
           />
         )}
       </div>
 
-      {/* Botões de diagnóstico — pra forçar resync quando subscribe morre
-          silenciosamente, ou refresh manual quando suspeita de UI stale. */}
       <div className="flex gap-2">
         <button
           onClick={handleRefresh}
           disabled={refreshing}
-          className="flex-1 rounded border border-drift-border px-3 py-2 font-mono text-[10px] uppercase tracking-meta text-drift-muted transition-colors hover:border-drift-accent hover:text-drift-accent disabled:opacity-50 focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2"
-          title="re-query SQLite e atualiza o feed local — útil se UI parece stale"
+          className="flex-1 rounded-xl border border-drift-border/30 bg-drift-surface/30 px-3 py-2.5 font-mono text-[11px] uppercase tracking-meta text-drift-muted/70 transition-colors hover:border-drift-accent2/30 hover:text-drift-accent2 disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
+          title="re-query SQLite e atualiza o feed local"
         >
-          {refreshing ? '…' : '↻ atualizar feed'}
+          {refreshing ? '…' : '↻ feed'}
         </button>
         <button
           onClick={handleResync}
           disabled={resyncing}
-          className="flex-1 rounded border border-drift-border px-3 py-2 font-mono text-[10px] uppercase tracking-meta text-drift-muted transition-colors hover:border-drift-accent hover:text-drift-accent disabled:opacity-50 focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2"
-          title="re-subscrever em todos os relays do zero — útil se eventos pararam de chegar"
+          className="flex-1 rounded-xl border border-drift-border/30 bg-drift-surface/30 px-3 py-2.5 font-mono text-[11px] uppercase tracking-meta text-drift-muted/70 transition-colors hover:border-drift-accent2/30 hover:text-drift-accent2 disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
+          title="re-subscrever em todos os relays do zero"
         >
           {resyncing ? '…' : '↻ re-subscribe'}
         </button>
       </div>
 
-      {/* Backfill histórico — busca eventos do próprio nsec SEM o cap de
-          7d que startSync aplica. Útil quando user migra de cliente
-          antigo / device novo. V9.10b. */}
       <button
         onClick={handleFetchHistory}
         disabled={historyRebuilding || !npub}
-        className="w-full rounded border border-drift-accent/60 bg-drift-accent/10 px-3 py-2 font-mono text-[10px] uppercase tracking-meta text-drift-accent transition-colors hover:bg-drift-accent/20 disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2"
-        title="busca TODOS os eventos do meu nsec nos relays (sem janela de 7d) — útil pra recuperar histórico de cliente antigo"
+        className="w-full rounded-xl bg-drift-accent2 px-4 py-3 font-mono text-[12px] uppercase tracking-meta font-medium text-drift-bg transition-colors hover:bg-drift-accent2/85 disabled:cursor-not-allowed disabled:opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
+        title="busca TODOS os eventos do meu nsec nos relays (sem janela de 7d)"
       >
-        {historyRebuilding ? 'buscando histórico…' : '↻ buscar histórico do meu nsec'}
+        {historyRebuilding ? 'buscando histórico…' : '↻ buscar histórico completo'}
       </button>
 
-      {/* Ring buffer de últimos eventos recebidos — diagnóstico de
-          sincronização entre devices. Se cliente A publica spread e
-          cliente B não vê na lista aqui, o problema é propagação
-          (relay/network) e não rendering. */}
       {sync.recent.length > 0 && (
-        <details className="rounded border border-drift-border bg-drift-surface p-3">
-          <summary className="cursor-pointer font-mono text-[12px] text-drift-muted hover:text-drift-text">
+        <details className="rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3">
+          <summary className="cursor-pointer font-mono text-[11px] uppercase tracking-meta text-drift-muted/70 hover:text-drift-text">
             últimos eventos ({sync.recent.length})
           </summary>
-          <div className="mt-2 max-h-48 overflow-y-auto font-mono text-[10px]">
+          <div className="mt-3 max-h-48 overflow-y-auto font-mono text-[10px]">
             {sync.recent.map((e, i) => (
               <div key={`${e.id}-${i}`} className="flex gap-2 py-0.5">
-                <span className="text-drift-muted">
+                <span className="text-drift-muted/40">
                   {new Date(e.receivedAt).toLocaleTimeString()}
                 </span>
                 <span className={kindColor(e.kind)}>{kindLabel(e.kind)}</span>
-                <span className="text-drift-muted">{e.id.slice(0, 8)}</span>
+                <span className="text-drift-muted/60">{e.id.slice(0, 8)}</span>
                 {e.ref && (
-                  <span className="truncate text-drift-muted">
+                  <span className="truncate text-drift-muted/40">
                     → {e.ref.slice(0, 12)}
                   </span>
                 )}
@@ -2291,13 +2406,11 @@ function DiagnosticPanel({ boot }: { boot: BootState }) {
         </details>
       )}
 
-      <div className="overflow-hidden rounded border border-drift-border bg-drift-surface p-3">
-        <div className="mb-1 font-mono text-[10px] uppercase tracking-meta text-drift-muted">
+      <div className="rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3">
+        <div className="mb-1.5 font-mono text-[10px] uppercase tracking-meta text-drift-muted/50">
           minha npub
         </div>
-        {/* whitespace-pre-wrap necessário porque <pre> tem white-space:
-            pre por default e ignora break-all sozinho. */}
-        <pre className="whitespace-pre-wrap break-all font-mono text-[10px] text-drift-text">
+        <pre className="whitespace-pre-wrap break-all font-mono text-[10px] text-drift-text/80">
           {boot.identity?.npubBech32}
         </pre>
       </div>

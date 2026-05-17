@@ -19,8 +19,8 @@
 
 import { useState } from 'react'
 import type { ReportReason, Post } from '../../types/drift'
-import { SlideUpOverlay } from '../UI/SlideUpOverlay'
-import { ModalHeader } from '../UI/ModalHeader'
+import { FullPageCard } from '../UI/FullPageCard'
+import { DriftButton } from '../UI/DriftButton'
 
 export interface ReportModalProps {
   post: Post
@@ -33,32 +33,47 @@ interface ReasonOption {
   value: ReportReason
   label: string
   description: string
-  color: string
+  tone: 'danger' | 'warning' | 'muted'
 }
 
 const REASONS: ReasonOption[] = [
   {
     value: 'illegal',
     label: 'ilegal',
-    description:
-      'CSAM, violência real, ameaça concreta, ou outro conteúdo crime na sua jurisdição',
-    color: 'border-red-700/60 hover:bg-red-950/30 text-red-300',
+    description: 'CSAM, violência real, ameaça concreta',
+    tone: 'danger',
   },
   {
     value: 'harassment',
     label: 'assédio',
-    description:
-      'Bullying direcionado, doxxing, perseguição. Não é desacordo de opinião — é hostilidade pessoal sustentada.',
-    color: 'border-orange-700/60 hover:bg-orange-950/30 text-orange-300',
+    description: 'bullying direcionado, doxxing, perseguição',
+    tone: 'warning',
   },
   {
     value: 'spam',
     label: 'spam',
-    description:
-      'Conteúdo automatizado, propaganda repetitiva, scams, links maliciosos.',
-    color: 'border-yellow-700/60 hover:bg-yellow-950/30 text-yellow-300',
+    description: 'propaganda repetitiva, scams, links maliciosos',
+    tone: 'muted',
   },
 ]
+
+function toneClasses(tone: ReasonOption['tone'], active: boolean) {
+  const base = active
+    ? {
+        danger: 'border-drift-danger/50 bg-drift-danger/10 text-drift-danger',
+        warning: 'border-drift-warning/50 bg-drift-warning/10 text-drift-warning',
+        muted: 'border-drift-accent2/40 bg-drift-accent2/10 text-drift-accent2',
+      }
+    : {
+        danger:
+          'border-drift-border/30 bg-drift-surface/30 text-drift-text hover:border-drift-danger/30',
+        warning:
+          'border-drift-border/30 bg-drift-surface/30 text-drift-text hover:border-drift-warning/30',
+        muted:
+          'border-drift-border/30 bg-drift-surface/30 text-drift-text hover:border-drift-accent2/30',
+      }
+  return base[tone]
+}
 
 export function ReportModal({ post, pending, onSubmit, onClose }: ReportModalProps) {
   const [selected, setSelected] = useState<ReportReason | null>(null)
@@ -70,72 +85,81 @@ export function ReportModal({ post, pending, onSubmit, onClose }: ReportModalPro
   }
 
   return (
-    <SlideUpOverlay onClose={onClose} ariaLabel="denunciar post">
-      <ModalHeader title="denunciar post" onClose={onClose} tone="danger" />
+    <FullPageCard onClose={onClose} title="denunciar" ariaLabel="denunciar post">
+      <div className="space-y-3 px-4 py-5">
+        {!confirmStep && (
+          <>
+            <SectionHeader title="motivo" />
+            <p className="px-1 font-mono text-[10px] text-drift-muted/30">
+              reports são públicos e assinados. ao atingir threshold, post some do feed default.
+            </p>
 
-      <p className="mb-4 text-[12px] leading-relaxed text-drift-muted">
-        Reports são eventos públicos assinados (manifesto §26).
-        Quando o threshold dinâmico é atingido, o post some do feed
-        default — mas continua na rede. Cliente alternativo pode
-        exibir mesmo assim.
-      </p>
+            <div className="space-y-2 pl-3">
+              <div className="rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3 font-mono text-[11px]">
+                <div className="mb-1 text-[10px] uppercase tracking-meta text-drift-muted/40">
+                  post denunciado
+                </div>
+                <div className="line-clamp-3 text-drift-text/80">
+                  {post.subposts[0]?.text ?? '(imagem)'}
+                </div>
+              </div>
 
-      {!confirmStep && (
-        <>
-          <div className="mb-4 rounded border border-drift-border bg-drift-bg/50 p-3 text-[12px] text-drift-muted">
-            <div className="mb-1 text-drift-muted">post sendo denunciado:</div>
-            <div className="line-clamp-3 text-drift-text">
-              {post.subposts[0]?.text ?? '(imagem)'}
+              {REASONS.map((opt) => {
+                const active = selected === opt.value
+                return (
+                  <button
+                    key={opt.value}
+                    onClick={() => setSelected(opt.value)}
+                    className={`w-full rounded-xl border px-4 py-3.5 text-left transition-colors ${toneClasses(opt.tone, active)}`}
+                  >
+                    <div className="font-mono text-[13px]">
+                      {active ? '✓ ' : ''}
+                      {opt.label}
+                    </div>
+                    <div className="mt-0.5 font-mono text-[10px] opacity-60">
+                      {opt.description}
+                    </div>
+                  </button>
+                )
+              })}
             </div>
-          </div>
 
-          <div className="space-y-2">
-            {REASONS.map((opt) => (
-              <button
-                key={opt.value}
-                onClick={() => setSelected(opt.value)}
-                className={`w-full rounded border px-3 py-2 text-left transition-colors ${opt.color} ${
-                  selected === opt.value ? 'bg-opacity-50 ring-1 ring-current' : 'bg-transparent'
-                }`}
+            <div className="mt-4 flex justify-end gap-2 pl-3">
+              <DriftButton variant="ghost" size="md" onClick={onClose}>
+                cancelar
+              </DriftButton>
+              <DriftButton
+                variant="primary"
+                size="md"
+                onClick={() => selected && setConfirmStep(true)}
+                disabled={!selected}
               >
-                <div className="text-[12px] font-semibold">
-                  {selected === opt.value ? '✓ ' : ''}
-                  {opt.label}
-                </div>
-                <div className="mt-0.5 text-[12px] leading-relaxed opacity-80">
-                  {opt.description}
-                </div>
-              </button>
-            ))}
-          </div>
+                continuar →
+              </DriftButton>
+            </div>
+          </>
+        )}
 
-          <div className="mt-5 flex justify-end gap-2">
-            <button
-              onClick={onClose}
-              className="rounded border border-drift-border px-3 py-1 text-[12px] text-drift-muted hover:border-drift-text hover:text-drift-text"
-            >
-              cancelar
-            </button>
-            <button
-              onClick={() => selected && setConfirmStep(true)}
-              disabled={!selected}
-              className="rounded border border-drift-accent px-3 py-1 text-[12px] uppercase tracking-widest text-drift-accent hover:bg-drift-accent/10 disabled:cursor-not-allowed disabled:opacity-30"
-            >
-              continuar →
-            </button>
-          </div>
-        </>
-      )}
+        {confirmStep && selected && (
+          <ConfirmStep
+            reason={selected}
+            pending={pending}
+            onBack={() => setConfirmStep(false)}
+            onSubmit={handleSubmit}
+          />
+        )}
+      </div>
+    </FullPageCard>
+  )
+}
 
-      {confirmStep && selected && (
-        <ConfirmStep
-          reason={selected}
-          pending={pending}
-          onBack={() => setConfirmStep(false)}
-          onSubmit={handleSubmit}
-        />
-      )}
-    </SlideUpOverlay>
+function SectionHeader({ title }: { title: string }) {
+  return (
+    <div className="rounded-2xl border border-drift-border/40 bg-drift-surface/50 px-5 py-3.5">
+      <span className="font-display text-[14px] font-bold uppercase tracking-tag text-drift-accent">
+        {title}
+      </span>
+    </div>
   )
 }
 
@@ -151,36 +175,33 @@ function ConfirmStep({
   onSubmit: () => void
 }) {
   return (
-    <div>
-      <div className="mb-3 text-[12px] text-drift-text">
-        confirmar denúncia: <span className="text-drift-accent">{reason}</span>
+    <>
+      <SectionHeader title="confirmar" />
+      <div className="space-y-2 pl-3">
+        <div className="rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3 font-mono text-[12px]">
+          <span className="text-drift-muted/50">motivo: </span>
+          <span className="text-drift-accent">{reason}</span>
+        </div>
+        <p className="px-1 font-mono text-[10px] leading-relaxed text-drift-muted/40">
+          report vai ser publicado como evento nostr assinado. não pode ser desfeito — eventos drift são imutáveis (§6).
+        </p>
+
+        {reason === 'illegal' && <AuthoritiesBlock />}
+
+        <div className="mt-4 flex justify-end gap-2">
+          <DriftButton variant="ghost" size="md" onClick={onBack} disabled={pending}>
+            ← voltar
+          </DriftButton>
+          <button
+            onClick={onSubmit}
+            disabled={pending}
+            className="rounded-xl border border-drift-danger/30 bg-drift-danger/10 px-4 py-2.5 font-mono text-[12px] uppercase tracking-meta text-drift-danger transition-colors hover:bg-drift-danger/15 disabled:opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-danger/40"
+          >
+            {pending ? 'enviando…' : 'denunciar'}
+          </button>
+        </div>
       </div>
-
-      <p className="mb-4 text-[12px] leading-relaxed text-drift-muted">
-        O report vai ser publicado como evento Nostr assinado pela sua
-        identidade. Não pode ser desfeito — eventos Drift são imutáveis
-        (manifesto §6).
-      </p>
-
-      {reason === 'illegal' && <AuthoritiesBlock />}
-
-      <div className="mt-5 flex justify-end gap-2">
-        <button
-          onClick={onBack}
-          disabled={pending}
-          className="rounded border border-drift-border px-3 py-1 text-[12px] text-drift-muted hover:border-drift-border disabled:opacity-50"
-        >
-          ← voltar
-        </button>
-        <button
-          onClick={onSubmit}
-          disabled={pending}
-          className="rounded border border-drift-danger/60 bg-drift-danger/15 px-3 py-1 text-[12px] uppercase tracking-widest text-drift-danger hover:bg-drift-danger/25 disabled:opacity-50"
-        >
-          {pending ? 'enviando…' : 'denunciar'}
-        </button>
-      </div>
-    </div>
+    </>
   )
 }
 
@@ -199,27 +220,24 @@ const AUTHORITIES: Authority[] = [
 
 function AuthoritiesBlock() {
   return (
-    <div className="mb-2 rounded border border-drift-warning/60 bg-drift-warning/10 p-3">
-      <div className="mb-2 text-[12px] font-semibold text-drift-warning">
-        ⚠ conteúdo ilegal — denuncie também a autoridades
+    <div className="mt-3 rounded-xl border border-drift-warning/20 bg-drift-warning/5 px-4 py-3">
+      <div className="mb-1 font-mono text-[11px] font-semibold uppercase tracking-meta text-drift-warning">
+        denuncie também a autoridades
       </div>
-      <p className="mb-3 text-[12px] leading-relaxed text-drift-warning/80">
-        O Drift não substitui denúncia formal. Se viu conteúdo crime
-        (especialmente CSAM), denuncie ao canal oficial do seu país —
-        eles têm capacidade de investigação e ação que nenhuma rede
-        descentralizada tem (manifesto Nota Legal).
+      <p className="mb-3 font-mono text-[10px] leading-relaxed text-drift-warning/50">
+        drift não substitui denúncia formal. canais oficiais têm capacidade de investigação que nenhuma rede descentralizada tem.
       </p>
-      <div className="space-y-1">
+      <div className="space-y-1.5">
         {AUTHORITIES.map((a) => (
           <a
             key={a.url}
             href={a.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center justify-between rounded border border-drift-warning/40 bg-drift-warning/5 px-2 py-1 text-[12px] text-drift-warning hover:border-drift-warning/60 hover:bg-drift-warning/15"
+            className="flex items-center justify-between rounded-lg border border-drift-warning/20 bg-drift-warning/5 px-3 py-2 font-mono text-[11px] text-drift-warning transition-colors hover:bg-drift-warning/10"
           >
             <span className="truncate">{a.name}</span>
-            <span className="ml-2 shrink-0 text-drift-warning/70">{a.region} ↗</span>
+            <span className="ml-2 shrink-0 text-drift-warning/50">{a.region} ↗</span>
           </a>
         ))}
       </div>

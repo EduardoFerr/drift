@@ -590,7 +590,7 @@ export function ReplySheet({
             // Drag pra baixo dismissa via pointer events nativos (handlers
             // abaixo). Elastic 0.4 + threshold 80px + spring back replicam
             // bit-a-bit a versão framer-drag anterior.
-            className="flex max-h-[85dvh] w-full max-w-md flex-col overflow-hidden rounded-t-2xl border border-b-0 border-drift-border bg-drift-surface touch-pan-y"
+            className="flex max-h-[85dvh] w-full max-w-md flex-col overflow-hidden rounded-t-2xl border border-b-0 border-drift-border/40 bg-drift-surface touch-pan-y"
             onPointerDown={handleSheetPointerDown}
             onPointerMove={handleSheetPointerMove}
             onPointerUp={handleSheetPointerUp}
@@ -603,7 +603,7 @@ export function ReplySheet({
           >
             {/* Drag handle visual */}
             <div className="flex justify-center pt-2 pb-1">
-              <div className="h-1 w-10 rounded-full bg-drift-border" aria-hidden="true" />
+              <div className="h-1 w-10 rounded-full bg-drift-border/60" aria-hidden="true" />
             </div>
 
             {/* Header */}
@@ -631,7 +631,7 @@ export function ReplySheet({
               <button
                 onClick={onClose}
                 disabled={pending}
-                className="shrink-0 rounded border border-drift-border px-2 py-1 text-[12px] text-drift-muted transition-colors hover:border-drift-accent hover:text-drift-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2 disabled:opacity-40"
+                className="shrink-0 rounded-xl border border-drift-border/30 bg-drift-surface/30 px-3 py-2 text-[12px] text-drift-muted transition-colors hover:border-drift-accent2/25 hover:text-drift-accent2 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40 disabled:opacity-40"
                 aria-label="fechar"
                 aria-keyshortcuts="Escape"
               >
@@ -653,7 +653,7 @@ export function ReplySheet({
                 rows={4}
                 aria-label="texto da resposta"
                 aria-invalid={overLimit || !!error}
-                className="min-h-[6rem] w-full resize-y rounded border border-drift-border bg-drift-bg p-2 font-mono text-[12px] text-drift-text placeholder:text-drift-muted/60 focus:border-drift-accent2 focus:outline-none disabled:opacity-60"
+                className="min-h-[6rem] w-full resize-y rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3.5 font-mono text-[12px] text-drift-text placeholder:text-drift-muted/25 focus:border-drift-accent2/40 focus:outline-none focus:ring-1 focus:ring-drift-accent2/20 disabled:opacity-60"
               />
 
               {/* C.6.3 — image upload (cap 1 imagem por comment). */}
@@ -670,7 +670,7 @@ export function ReplySheet({
 
               {/* C.6.2 — content warning chips (manifesto §27). */}
               <div
-                className="mt-1 border-t border-drift-border pt-2"
+                className="mt-1 border-t border-drift-border/30 pt-2"
                 role="radiogroup"
                 aria-label="aviso de conteúdo (opcional)"
               >
@@ -691,10 +691,10 @@ export function ReplySheet({
                         aria-checked={active}
                         disabled={pending}
                         onClick={() => setContentWarning(active ? null : cw)}
-                        className={`rounded-sm border-[1.5px] px-2.5 py-1 font-mono text-[12px] uppercase tracking-meta transition-colors focus:outline-none focus:ring-1 focus:ring-drift-accent2 disabled:opacity-40 ${
+                        className={`rounded-lg border px-2.5 py-1 font-mono text-[12px] uppercase tracking-meta transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40 disabled:opacity-40 ${
                           active
-                            ? 'border-drift-warning bg-drift-warning/15 text-drift-warning'
-                            : 'border-drift-border text-drift-muted hover:border-drift-text hover:text-drift-text'
+                            ? 'border-drift-warning/40 bg-drift-warning/10 text-drift-warning'
+                            : 'border-drift-border/30 bg-drift-surface/30 text-drift-muted hover:border-drift-accent2/25 hover:text-drift-text'
                         }`}
                       >
                         {active ? '✓ ' : ''}
@@ -708,7 +708,7 @@ export function ReplySheet({
               {error && (
                 <div
                   role="alert"
-                  className="rounded border border-drift-bury/60 bg-drift-bury/10 px-2 py-1 text-[12px] text-drift-bury"
+                  className="rounded-xl border border-drift-danger/20 bg-drift-danger/5 px-4 py-3 font-mono text-[11px] leading-relaxed text-drift-danger"
                 >
                   {error}
                 </div>
@@ -716,7 +716,7 @@ export function ReplySheet({
             </div>
 
             {/* Footer */}
-            <footer className="flex items-center justify-between gap-3 border-t border-drift-border bg-drift-bg/40 px-4 py-3">
+            <footer className="flex items-center justify-between gap-3 border-t border-drift-border/30 bg-drift-bg/40 px-4 py-3">
               <span
                 className={`font-mono text-[12px] ${
                   overLimit ? 'text-drift-bury' : 'text-drift-muted'
@@ -738,7 +738,7 @@ export function ReplySheet({
                 <button
                   onClick={doPublish}
                   disabled={!canPublish}
-                  className="rounded bg-drift-accent px-4 py-1.5 text-[12px] font-semibold uppercase tracking-widest text-drift-bg transition-opacity hover:opacity-90 focus:outline-none focus:ring-1 focus:ring-drift-accent2 disabled:cursor-not-allowed disabled:opacity-30"
+                  className="rounded-xl bg-drift-accent2 px-5 py-2.5 font-mono text-[12px] uppercase tracking-meta font-medium text-drift-bg transition-colors hover:bg-drift-accent2/85 active:bg-drift-accent2/75 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40 disabled:cursor-not-allowed disabled:opacity-30"
                   aria-keyshortcuts="Meta+Enter Control+Enter"
                   title="publicar (⌘/Ctrl + Enter)"
                 >
@@ -779,7 +779,7 @@ function ReplyImagePicker({
   if (blobMeta) {
     return (
       <div className="flex flex-col gap-1.5">
-        <div className="relative h-[110px] w-full overflow-hidden rounded border border-drift-border">
+        <div className="relative h-[110px] w-full overflow-hidden rounded-xl border border-drift-border/30 bg-drift-surface/30">
           <Image
             src={blobMeta.url ?? ''}
             meta={blobMeta}
@@ -791,7 +791,7 @@ function ReplyImagePicker({
             type="button"
             onClick={onClear}
             disabled={disabled}
-            className="absolute right-1 top-1 rounded border border-drift-border bg-drift-bg/80 px-2 py-0.5 font-mono text-[12px] uppercase tracking-meta text-drift-muted hover:text-drift-bury focus:outline-none focus:ring-1 focus:ring-drift-accent2 disabled:opacity-40"
+            className="absolute right-1.5 top-1.5 rounded-lg border border-drift-danger/20 bg-drift-bg/80 px-2.5 py-1 font-mono text-[11px] uppercase tracking-meta text-drift-danger hover:bg-drift-danger/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-danger/30 disabled:opacity-40"
             aria-label="remover imagem"
           >
             remover
@@ -806,17 +806,17 @@ function ReplyImagePicker({
           maxLength={280}
           placeholder="descrição da imagem (alt) — opcional"
           aria-label="descrição da imagem para acessibilidade"
-          className="w-full rounded border border-drift-border bg-drift-bg px-2 py-1 font-mono text-[12px] text-drift-text placeholder:text-drift-muted/60 focus:border-drift-accent2 focus:outline-none disabled:opacity-60"
+          className="w-full rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3 font-mono text-[12px] text-drift-text placeholder:text-drift-muted/25 focus:border-drift-accent2/40 focus:outline-none focus:ring-1 focus:ring-drift-accent2/20 disabled:opacity-60"
         />
       </div>
     )
   }
   return (
     <label
-      className={`relative flex h-[70px] w-full cursor-pointer flex-col items-center justify-center gap-1 rounded border-[1.5px] border-dashed transition-colors ${
+      className={`relative flex h-[70px] w-full cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border border-dashed bg-drift-surface/30 transition-colors ${
         uploading
-          ? 'border-drift-border opacity-60'
-          : 'border-drift-border hover:border-drift-accent'
+          ? 'border-drift-border/30 opacity-60'
+          : 'border-drift-border/30 hover:border-drift-accent2/25'
       }`}
     >
       <span aria-hidden="true" className="text-[18px] opacity-40">
@@ -827,7 +827,7 @@ function ReplyImagePicker({
       </span>
       {uploadError && (
         <span
-          className="px-2 text-center font-mono text-[12px] text-drift-bury"
+          className="px-2 text-center font-mono text-[11px] text-drift-danger"
           title={uploadError}
         >
           {uploadError}

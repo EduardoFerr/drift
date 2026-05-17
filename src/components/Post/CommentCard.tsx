@@ -204,7 +204,7 @@ export function CommentCard({
       }`}
     >
       {/* Header: autor + tempo + content-warning chip (C.6.2) */}
-      <header className="flex items-center justify-between gap-2 border-b border-drift-border px-4 py-3">
+      <header className="flex items-center justify-between gap-2 border-b border-drift-border/40 px-4 py-3.5">
         <span className="font-display text-fluid-display font-bold uppercase tracking-tag text-drift-text">
           anon{truncate(node.author_pub)}
         </span>
@@ -293,7 +293,7 @@ export function CommentCard({
           UX-11 (Robin audit) — vira <button> tappable quando há filhos
           E o caller passou onDescend. Mantém swipe ↑ (gesto primário);
           tap é input alternativo pra users que não conhecem o gesto. */}
-      <footer className="flex items-center justify-between border-t border-drift-border px-4 py-2.5">
+      <footer className="flex items-center justify-between border-t border-drift-border/40 px-4 py-3.5">
         {childCount > 0 && onDescend ? (
           <button
             type="button"
@@ -348,7 +348,7 @@ function CwHiddenPlaceholder({
       </span>
       <button
         onClick={onReveal}
-        className="rounded border border-drift-accent2 px-3 py-1.5 font-mono text-[12px] uppercase tracking-meta text-drift-accent2 hover:bg-drift-accent2/10"
+        className="rounded-xl bg-drift-accent2 px-5 py-3.5 font-mono text-[12px] uppercase tracking-meta font-medium text-drift-bg transition-colors hover:bg-drift-accent2/85 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
       >
         ver mesmo assim
       </button>
@@ -367,7 +367,7 @@ function HiddenPlaceholder({ onReveal }: { onReveal: () => void }) {
       </span>
       <button
         onClick={onReveal}
-        className="rounded border border-drift-accent2 px-3 py-1.5 font-mono text-[12px] uppercase tracking-meta text-drift-accent2 hover:bg-drift-accent2/10"
+        className="rounded-xl bg-drift-accent2 px-5 py-3.5 font-mono text-[12px] uppercase tracking-meta font-medium text-drift-bg transition-colors hover:bg-drift-accent2/85 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
       >
         ver oculto
       </button>
@@ -507,7 +507,7 @@ function ListVariant({
           </span>
           {node.content_warning && (
             <span
-              className="shrink-0 rounded border border-drift-warning/60 bg-drift-warning/10 px-1.5 py-0.5 font-mono text-[12px] uppercase tracking-meta text-drift-warning"
+              className="shrink-0 rounded-lg border border-drift-warning/20 bg-drift-warning/5 px-1.5 py-0.5 font-mono text-[12px] uppercase tracking-meta text-drift-warning"
               title={`autor marcou: ${node.content_warning}`}
               aria-label={`aviso de conteúdo: ${node.content_warning}`}
             >
@@ -516,7 +516,7 @@ function ListVariant({
           )}
           {isNew && (
             <span
-              className="shrink-0 rounded border border-drift-accent2/60 bg-drift-accent2/10 px-1.5 py-0.5 font-mono text-[12px] uppercase tracking-meta text-drift-accent2"
+              className="shrink-0 rounded-lg border border-drift-accent2/20 bg-drift-accent2/5 px-1.5 py-0.5 font-mono text-[12px] uppercase tracking-meta text-drift-accent2"
               aria-label="comentário novo"
             >
               NOVO
@@ -530,7 +530,7 @@ function ListVariant({
               e.stopPropagation()
               onToggleExpand()
             }}
-            className="shrink-0 rounded border border-drift-border px-1.5 py-0.5 font-mono text-[12px] uppercase tracking-meta text-drift-muted hover:border-drift-accent2 hover:text-drift-accent2 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2"
+            className="shrink-0 rounded-lg border border-drift-border/30 bg-drift-surface/30 px-1.5 py-0.5 font-mono text-[12px] uppercase tracking-meta text-drift-muted hover:border-drift-accent2/25 hover:text-drift-accent2 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
             aria-label={
               isExpanded
                 ? `colapsar ${childCount} ${childCount === 1 ? 'resposta' : 'respostas'}`
