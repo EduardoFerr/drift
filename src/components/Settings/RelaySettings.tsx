@@ -13,6 +13,8 @@ import { useState } from 'react'
 import { FullPageCard } from '../UI/FullPageCard'
 import { addRelay, removeRelay, setRelayEnabled, useRelaysStore } from '../../lib/relays'
 import { entriesFromRecords, fetchRelayList, publishRelayList } from '../../lib/nip65'
+import { RelayTierBadge, deriveRelayTier, type RelayTier } from '../UI/RelayTierBadge'
+import { findRelayByUrl } from '../../config/relays-directory'
 import * as nip19 from 'nostr-tools/nip19'
 
 export interface RelaySettingsProps {
@@ -98,6 +100,24 @@ export function RelaySettings({ onClose }: RelaySettingsProps) {
     }
   }
 
+  // Compute tier per relay (D3) + detect if any relay is moderated (D2 trigger).
+  // Curated policy é autoritativo; relays não-curated viram `unknown`.
+  const relayTiers = list.map((r): { url: string; tier: RelayTier } => {
+    const curated = findRelayByUrl(r.url)
+    return {
+      url: r.url,
+      tier: deriveRelayTier({ curatedPolicy: curated?.policy }),
+    }
+  })
+  const hasModeratedRelay = relayTiers.some(
+    (rt) =>
+      rt.tier === 'ai-assisted-opt-in' ||
+      rt.tier === 'ai-automated' ||
+      rt.tier === 'manual-human' ||
+      rt.tier === 'private',
+  )
+  const hasUnknownRelay = relayTiers.some((rt) => rt.tier === 'unknown')
+
   return (
     <FullPageCard onClose={onClose} title="relays" ariaLabel="settings · relays">
       <div className="space-y-3 px-4 py-5">
@@ -105,6 +125,33 @@ export function RelaySettings({ onClose }: RelaySettingsProps) {
         <p className="px-1 font-mono text-[10px] text-drift-muted/30">
           relays intercambiáveis. remover um não tira você da rede.
         </p>
+
+        {/* D2 — aviso silent-drop sempre presente quando há relay com moderação.
+            Honra manifesto §17 adendo + invariante #18: cliente DEVE comunicar
+            que relays podem dropar posts sem notificar (W3C 2025 reconhece
+            esse gap protocolar). User clicou opt-in informado. */}
+        {hasModeratedRelay && (
+          <div
+            role="note"
+            aria-label="aviso sobre relays moderados"
+            className="rounded-xl border border-drift-warning/20 bg-drift-warning/5 px-4 py-3 font-mono text-[10px] leading-relaxed text-drift-warning"
+          >
+            você tem relay moderado ativo. relay pode dropar posts sem te notificar
+            — drift sempre publica em ≥2 relays paralelos (§14) pra mitigar. veja
+            política de cada relay no badge ao lado.
+          </div>
+        )}
+        {hasUnknownRelay && !hasModeratedRelay && (
+          <div
+            role="note"
+            aria-label="aviso sobre relays com política não declarada"
+            className="rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3 font-mono text-[10px] leading-relaxed text-drift-muted/60"
+          >
+            alguns relays não declaram política via NIP-11 (badge "política?"). não dá pra saber
+            se moderam — assuma que podem.
+          </div>
+        )}
+
         <div className="max-h-72 space-y-2 overflow-y-auto pl-3">
           {!loaded && (
             <div className="font-mono text-[11px] text-drift-muted/40">carregando…</div>
@@ -112,7 +159,7 @@ export function RelaySettings({ onClose }: RelaySettingsProps) {
           {loaded && list.length === 0 && (
             <div className="font-mono text-[11px] text-drift-muted/40">nenhum relay configurado</div>
           )}
-          {list.map((r) => {
+          {list.map((r, i) => {
             const now = Date.now()
             const isDemoted = r.demotedUntil > now
             const status = isDemoted ? '⏸' : r.lastErr ? '✗' : r.lastOkAt ? '✓' : '·'
@@ -129,10 +176,11 @@ export function RelaySettings({ onClose }: RelaySettingsProps) {
             const titleAttr = isDemoted
               ? `demoted ${demotedMin}min · fails ${r.consecutiveFails} · ${r.lastErr ?? '—'}`
               : r.lastErr ?? ''
+            const tier = relayTiers[i]?.tier ?? 'unknown'
             return (
               <div
                 key={r.url}
-                className={`flex items-center gap-2 rounded-xl border border-drift-border/30 bg-drift-surface/30 px-3 py-2.5 font-mono text-[11px] ${
+                className={`flex flex-wrap items-center gap-1.5 rounded-xl border border-drift-border/30 bg-drift-surface/30 px-3 py-2.5 font-mono text-[11px] ${
                   r.enabled ? '' : 'opacity-50'
                 }`}
               >
@@ -140,6 +188,7 @@ export function RelaySettings({ onClose }: RelaySettingsProps) {
                 <span className="flex-1 truncate text-drift-text/80" title={titleAttr}>
                   {r.url}
                 </span>
+                <RelayTierBadge tier={tier} size="xs" />
                 {isDemoted && (
                   <span className="rounded-md bg-drift-warning/10 px-1.5 py-0.5 text-[10px] text-drift-warning">
                     {demotedMin}m
