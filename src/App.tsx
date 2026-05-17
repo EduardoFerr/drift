@@ -1128,21 +1128,14 @@ function App() {
           />
         ) : currentPost ? (
           <>
-            {/* Shadow cards atrás (mockup .card-shadow). */}
-            {nextHomePost && (
-              <>
-                <div
-                  aria-hidden="true"
-                  className="pointer-events-none absolute inset-x-4 top-3 bottom-2 rounded-2xl border border-drift-border/40 bg-drift-surface"
-                  style={{ transform: 'translateY(14px) scale(0.92)', opacity: 0.18 }}
-                />
-                <div
-                  aria-hidden="true"
-                  className="pointer-events-none absolute inset-x-4 top-3 bottom-2 rounded-2xl border border-drift-border/40 bg-drift-surface"
-                  style={{ transform: 'translateY(7px) scale(0.96)', opacity: 0.4 }}
-                />
-              </>
-            )}
+            {/* Shadow stack legacy removido 2026-05-17 — `inset-x-4 top-3
+                bottom-2` colidia com `<main>` padding `px-4 pt-3 pb-[88px]`
+                (duplo recuo) + sem -z-index pra ficar atrás + main
+                `overflow-hidden` cortava translateY. PostViewer já mostra
+                "fila X/N" + "próximo: anon…XXX" textualmente via prop
+                `queue` (PostViewer.tsx:778-790). Shadow visual era
+                redundante. Pra restaurar pattern Tinder-like correto:
+                seguir DRIFT_CARD_SHADOW_BACK_CLASS em UI/DriftCard.tsx. */}
             <div className="relative h-full w-full overflow-hidden rounded-2xl border border-drift-border/40 bg-drift-surface">
               <AnimatePresence mode="wait" custom={exitDir}>
                 <PostViewer
