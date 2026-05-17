@@ -17,7 +17,7 @@
  */
 
 import { setPref, usePrefsStore } from '../../lib/prefs'
-import { THEME_IDS, THEME_META, type ThemeId } from '../../lib/theme'
+import { applyTheme, THEME_IDS, THEME_META, type ThemeId } from '../../lib/theme'
 import { FullPageCard } from '../UI/FullPageCard'
 
 interface CardProps {
@@ -29,8 +29,14 @@ export function AppearanceCard({ onClose }: CardProps) {
 
   function handleSelect(id: ThemeId) {
     if (id === current) return
+    // Apply visual IMMEDIATELY (síncrono — setAttribute no <html>).
+    // Não dependemos do subscribe do bootstrap pra disparar; chamar
+    // direto garante que troca aparece sem latência de Zustand.
+    applyTheme(id)
+    // Persist async em SQLite + Zustand store. Subscribe em
+    // bootstrap.ts ainda existe como redundância pra mudanças
+    // vindas de outros lugares (ex: cross-tab sync futuro).
     void setPref('theme_id', id)
-    // applyTheme dispara automaticamente via subscribe em bootstrap.ts.
   }
 
   return (
