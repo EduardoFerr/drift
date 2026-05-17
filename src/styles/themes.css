@@ -117,6 +117,16 @@
 
   /* Motion — sentimento de gesto Cinder: brasa, decay rápido, sem bounce */
   --ease-signature: cubic-bezier(0.32, 0.72, 0.32, 1);
+
+  /* Card overlay — gradient bottom→top no PostCard pra legibilidade de
+     texto sobre imagem. Reduzido de 0.96→0.78 base (user feedback
+     2026-05-17: estava "muito escuro"). Hue do bg pra coerência. */
+  --card-overlay-gradient: linear-gradient(
+    to top,
+    rgba(14, 14, 18, 0.78) 0%,
+    rgba(14, 14, 18, 0.38) 45%,
+    transparent 75%
+  );
 }
 
 /* ============================================================
@@ -203,6 +213,14 @@
 
   /* Motion — sentimento Rosenholz: página virando, demora poética */
   --ease-signature: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Card overlay — índigo profundo (bg rgb 24, 22, 37). Reduzido. */
+  --card-overlay-gradient: linear-gradient(
+    to top,
+    rgba(24, 22, 37, 0.78) 0%,
+    rgba(24, 22, 37, 0.38) 45%,
+    transparent 75%
+  );
 }
 
 /* ============================================================
@@ -290,4 +308,13 @@
 
   /* Motion — sentimento Velatura: tato físico, papel afundando */
   --ease-signature: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Card overlay — INVERTIDO pra light theme: papel claro semi-opaco
+     sobre imagem, faz texto escuro contrastar. (bg rgb 243, 238, 230) */
+  --card-overlay-gradient: linear-gradient(
+    to top,
+    rgba(243, 238, 230, 0.86) 0%,
+    rgba(243, 238, 230, 0.50) 45%,
+    transparent 75%
+  );
 }

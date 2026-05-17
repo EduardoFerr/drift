@@ -433,10 +433,7 @@ function PortraitLayout({
           Botão "ver mais" tem pointer-events-auto pra escapar. */}
       <div
         className="pointer-events-none absolute inset-0 z-[2]"
-        style={{
-          background:
-            'linear-gradient(to top, rgba(10,10,9,0.96) 0%, rgba(10,10,9,0.55) 45%, transparent 70%)',
-        }}
+        style={{ background: 'var(--card-overlay-gradient)' }}
       >
         <div className="absolute inset-x-0 bottom-0">
           <CardText
@@ -516,10 +513,7 @@ function LandscapeLayout({
           PortraitLayout acima. */}
       <div
         className="pointer-events-none absolute inset-0 z-[2]"
-        style={{
-          background:
-            'linear-gradient(to top, rgba(10,10,9,0.96) 0%, rgba(10,10,9,0.55) 45%, transparent 70%)',
-        }}
+        style={{ background: 'var(--card-overlay-gradient)' }}
       >
         {/* V9.2: CardDots saiu daqui pro SubpostCarousel (top bar). */}
         <div className="absolute inset-x-0 bottom-0">

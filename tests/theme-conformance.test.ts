@@ -53,6 +53,7 @@ const REQUIRED_GRADIENT_TOKENS = [
   'gradient-edge',
   'gradient-signature',
   'gradient-hairline',
+  'card-overlay-gradient',
 ] as const
 
 const REQUIRED_SHADOW_TOKENS = [
