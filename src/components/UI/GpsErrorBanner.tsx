@@ -174,7 +174,7 @@ function GpsHelpModal({ onClose }: { onClose: () => void }) {
 
         <div className="rounded-xl border border-drift-border/20 bg-drift-surface/20 px-4 py-3 font-mono text-[11px] text-drift-muted/40">
           Drift NUNCA envia coordenada precisa por padrão — você escolheu
-          a granularidade em Settings (manifesto §28).
+          a granularidade em Ajustes (manifesto §28).
         </div>
       </div>
     </FullPageCard>

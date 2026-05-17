@@ -105,12 +105,12 @@ export function OnboardingOverlay({ onClose, onOpenIdentity }: OnboardingOverlay
       body: (
         <>
           <p>
-            Se ativar em <code>Settings → location</code>, seus spreads aparecem no
-            mapa de outros posts. Default é <span className="text-drift-text">off</span>{' '}
+            Se ativar em <code>Ajustes → localização</code>, seus drifts aparecem no
+            mapa de outros posts. Padrão é <span className="text-drift-text">desligado</span>{' '}
             por privacidade (manifesto §28).
           </p>
           <p className="text-drift-muted">
-            Pode ativar depois — granularidade é sua (country, city ou precise).
+            Pode ativar depois — granularidade é sua (país, cidade ou GPS).
           </p>
         </>
       ),

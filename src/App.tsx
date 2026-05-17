@@ -1572,7 +1572,7 @@ function EndOfFeed({
   onJumpToTop: () => void
 }) {
   const tabLabel =
-    tab === 'following' ? 'seguindo' : tab === 'trending' ? 'trending' : 'global'
+    tab === 'following' ? 'seguindo' : tab === 'trending' ? 'em alta' : 'global'
   const [refreshing, setRefreshing] = useState(false)
   const [statusMsg, setStatusMsg] = useState<string | null>(null)
 

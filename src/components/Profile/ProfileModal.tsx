@@ -103,7 +103,7 @@ export function ProfileModal({ identity, onClose }: ProfileModalProps) {
     const target = identitiesList.find((id) => id.npub === npub)
     const targetLabel = target?.label ?? `${npub.slice(0, 8)}…`
     const ok = await dialog.confirm(
-      `Trocar para ${targetLabel}? Reload necessário pra reset do sync e feed.`,
+      `Trocar para ${targetLabel}? É preciso recarregar pra resetar sync e feed.`,
       { title: 'trocar identidade', okLabel: 'trocar' },
     )
     if (!ok) return
