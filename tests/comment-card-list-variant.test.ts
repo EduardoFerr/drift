@@ -134,14 +134,5 @@ describe('indentPxForDepth', () => {
   })
 })
 
-// ─── DEFAULT_USER_PREFS / thread_view_mode ───────────────────────────
-
-describe('DEFAULT_USER_PREFS.thread_view_mode', () => {
-  it("default = 'list' (RFC §10 Q3 cohort C — novos users)", () => {
-    expect(DEFAULT_USER_PREFS.thread_view_mode).toBe('list')
-  })
-
-  it('é uma das 2 opções válidas (list | cards)', () => {
-    expect(['list', 'cards']).toContain(DEFAULT_USER_PREFS.thread_view_mode)
-  })
-})
+// thread_view_mode removido 2026-05-17 (cards-mode descontinuado).
+// Tests legados deletados — list-mode é único modo.

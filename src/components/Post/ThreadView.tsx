@@ -1,82 +1,50 @@
 /**
- * Track C.4.2 — overlay sobre PostViewer com card stack swipe-navegável.
+ * Track C.4.2 — overlay sobre PostViewer com lista threaded de comentários.
  *
  * Spec: `Docs/design-comments.md` §1, §3, §4, §6, §7, §8, §9.
  *
- * Round Comments Nav Redesign — Phase A
- * (RFC `Docs/rfcs/2026-05-rfc-comments-navigation-redesign.md`)
- * --------------------------------------------------------------
- *  - Default novo: **list-mode** (scrollable threaded list). Alinha
- *    com Reddit/HN/Bluesky/Mastodon — UX familiar pra newcomer
- *    (RFC §2.9 prior art, §10 Q3 cohort C).
- *  - Card-stack swipe-driven preservado como **opt-in** via toggle
- *    no ThreadHeader (`☰`/`⊞`). Manifesto §28 (privacy default —
- *    user agency sobre experiência).
- *  - A11y: keyboard nav J/K (prev/next comment) preservado em ambos
- *    modos. List-mode adiciona scroll nativo + tap-to-reply.
+ * Round Comments Nav Redesign — Phase A finalizada em 2026-05-17
+ * (cards-mode legacy removido a pedido do user — sessão noite V).
+ *
+ *  - List-mode é o único modo agora. Alinha com Reddit/HN/Bluesky/
+ *    Mastodon (RFC §2.9 prior art, §10 Q3 cohort C).
  *  - Manifesto §22 score determinístico INALTERADO — sem sort
  *    selector; ordem from buildThread (created_at ASC, id ASC).
- *  - Manifesto §27 CW per-comment preservado em ambos modos.
+ *  - Manifesto §27 CW per-comment preservado.
  *  - Manifesto §28 privacy — sem read receipts, sem view counts.
  *
- *  Phase B (próximo sprint): virtualized list (`@tanstack/react-virtual`)
- *  + collapse persistido em user_prefs.comments_expanded_threads.
+ *  Phase B (próximo): collapse persistido em user_prefs.
  *  Phase C: jump-to-parent pill, breadcrumb expand on focus.
  *  Phase D: a11y deep dive (live regions, screen reader nav).
  *
- * Modelo (cards-mode legacy):
- *   - swipe ← / H : prevSibling
- *   - swipe → / L : nextSibling
- *   - swipe ↑ / K : descend (filho)
- *   - swipe ↓ / J : ascend (parent) — no root, fecha ThreadView
- *   - Esc / botão ✕: fecha
- *   - Enter: abre ReplySheet
- *
- * Modelo (list-mode novo):
- *   - scroll vertical nativo
+ * Modelo:
+ *   - scroll vertical nativo (virtualizado @tanstack/react-virtual)
  *   - tap em comment → ReplySheet com snapshot do target (UX-3 fix)
  *   - [-]/[+] toggle collapse subtree (state efêmero por sessão)
- *   - J/K keyboard mantém prev/next no flat order
  *   - Esc fecha
- *   - swipe DESLIGADO em list-mode (vertical scroll é nativo)
  *
  * State:
- *   - `cursor` (useState) — usado em cards-mode
- *   - `focusedId` (useState) — usado em list-mode (Phase A: shared
- *      com `cursor.path.at(-1)` na transição entre modos)
- *   - `expandedSet` (useState) — list-mode collapse/expand efêmero
+ *   - `focusedId` (useState) — comment com foco atual
+ *   - `collapsedSet` (useState) — collapse/expand efêmero
  *   - `tree` via `useThread(postId)` — Zustand store
  *   - `replyOpen` — local
- *   - `coachVisible` — local + usePrefsStore.thread_coach_seen
  *
- * Render lazy: cards-mode mantém CommentCard central + peek (DOM ~3).
- * List-mode (Phase A) renderiza forest flatten — non-virtualized.
- * Virtualization é Phase B (>200 comments => jank em low-end).
- *
- * A11y: `role="tree"`, ARIA level/posinset/setsize por card,
- * keyboard H/J/K/L + setas + Esc, focus trap, restore focus on close,
- * `prefers-reduced-motion` desabilita translate/scale (mantém fade).
+ * A11y: `role="tree"`, ARIA level/posinset/setsize por card, focus trap,
+ * restore focus on close, `prefers-reduced-motion` desabilita scale.
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 // `m` é o primitive leve do framer-motion (LazyMotion). Features via main.tsx.
-import { m, AnimatePresence, useReducedMotion } from 'framer-motion'
+import { m } from 'framer-motion'
 import { useThread } from '../../hooks/useThread'
 import { loadThread } from '../../lib/comments'
-import { usePrefsStore, setPref } from '../../lib/prefs'
 import {
-  ascend,
-  descend,
-  nextSibling,
-  prevSibling,
   type CommentNode,
   type ThreadCursor,
   type ThreadIndex,
 } from '../../lib/thread-cursor'
 import { flattenForList } from '../../lib/thread-list'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { siblingPosition } from '../../lib/thread-header'
-import { SwipeHandler } from './SwipeHandler'
 import { CommentCard } from './CommentCard'
 import { ThreadHeader } from './ThreadHeader'
 import { ReplySheet } from './ReplySheet'
@@ -98,12 +66,8 @@ export interface ThreadViewProps {
 
 export function ThreadView({ postId, postAuthorPub, post, onClose }: ThreadViewProps) {
   const { forest, index, loading } = useThread(postId)
-  const coachSeen = usePrefsStore((s) => s.thread_coach_seen)
-  // Phase A — view mode pref (default 'list', RFC §10 Q3 cohort C).
-  const viewMode = usePrefsStore((s) => s.thread_view_mode)
-  const reducedMotion = useReducedMotion()
 
-  // Phase A — list-mode state efêmero (Phase B: persistir em user_prefs).
+  // List-mode state efêmero (Phase B: persistir em user_prefs).
   // expandedSet armazena IDs COLAPSADOS (não os expandidos) — default
   // expanded é a opção mais user-friendly. ID na set = subtree colapsado.
   const [collapsedSet, setCollapsedSet] = useState<Set<string>>(() => new Set())
@@ -146,35 +110,16 @@ export function ThreadView({ postId, postAuthorPub, post, onClose }: ThreadViewP
 
   const [replyOpen, setReplyOpen] = useState(false)
   // UX-9 (Robin audit 2026-05-08) — modo de abertura da ReplySheet:
-  //   'cursor'   → reply ao comment do cursor atual (FAB ↵ default)
+  //   'cursor'   → reply ao comment focado atualmente
   //   'topLevel' → comment top-level no post (botão "+ no post" header,
   //                ou EmptyState se thread vazia)
   // Lido pelo IIFE de render do ReplySheet pra decidir replyTo/Kind/Pub.
   const [replyMode, setReplyMode] = useState<'cursor' | 'topLevel'>('cursor')
-  const [coachVisible, setCoachVisible] = useState(!coachSeen)
-  // polish: TV-P1 swipe-down feedback (Track C P1) — shake breve antes
-  // de exit quando user faz swipe ↓ no root, em vez de close abrupto.
-  const [exitShake, setExitShake] = useState(false)
 
   // Snapshot timestamp pra contar "novos durante navegação"
   // fix: TH-B1 dead UI (Track C debt) — openedAt agora é state pra refresh
   // resetar a baseline quando user clica "+N novos" no header.
   const [openedAt, setOpenedAt] = useState(() => Math.floor(Date.now() / 1000))
-
-  // Phase A — toggle list⇄cards. Preserva foco entre modos:
-  //   list → cards: focusedId vira cursor.path[único nó]. Cap simples
-  //                 (Phase A) — reconstrução exata do parent-chain é
-  //                 melhoria Phase B; aqui o user pode navegar normal.
-  //   cards → list: cursor.path.at(-1) vira focusedId.
-  function toggleViewMode(): void {
-    const nextMode = viewMode === 'list' ? 'cards' : 'list'
-    if (nextMode === 'cards' && focusedId && index.byId.has(focusedId)) {
-      setCursor({ path: [focusedId] })
-    } else if (nextMode === 'list' && cursor) {
-      setFocusedId(cursor.path.at(-1) ?? null)
-    }
-    void setPref('thread_view_mode', nextMode)
-  }
 
   // fix: TH-B1 dead UI (Track C debt) — handler real do badge "+N novos".
   // Re-carrega snapshot do thread + reseta baseline de "novos".
@@ -194,25 +139,9 @@ export function ThreadView({ postId, postAuthorPub, post, onClose }: ThreadViewP
     }
   }, [])
 
-  // Coach-mark: dismiss após 3s ou tap
-  useEffect(() => {
-    if (!coachVisible) return
-    const t = setTimeout(() => {
-      setCoachVisible(false)
-      void setPref('thread_coach_seen', true)
-    }, 3000)
-    return () => clearTimeout(t)
-  }, [coachVisible])
-
-  function dismissCoach() {
-    if (!coachVisible) return
-    setCoachVisible(false)
-    void setPref('thread_coach_seen', true)
-  }
-
   // UX-9 (Robin audit) — helpers de abertura da sheet. ReplySheet faz
   // snapshot dos targets ao open=true→x (UX-3, defesa contra mudança
-  // silenciosa do cursor durante typing).
+  // silenciosa durante typing).
   function openReplyToCursor() {
     setReplyMode('cursor')
     setReplyOpen(true)
@@ -220,39 +149,6 @@ export function ThreadView({ postId, postAuthorPub, post, onClose }: ThreadViewP
   function openReplyTopLevel() {
     setReplyMode('topLevel')
     setReplyOpen(true)
-  }
-
-  // ─── Cursor ops ────────────────────────────────────────────────────
-  function handleNext() {
-    if (!cursor) return
-    const c = nextSibling(cursor, index, postId)
-    if (c) setCursor(c)
-  }
-  function handlePrev() {
-    if (!cursor) return
-    const c = prevSibling(cursor, index, postId)
-    if (c) setCursor(c)
-  }
-  function handleDescend() {
-    if (!cursor) return
-    const c = descend(cursor, index)
-    if (c) setCursor(c)
-  }
-  function handleAscend() {
-    if (!cursor) return
-    const r = ascend(cursor)
-    if (r === 'exit') {
-      // polish: TV-P1 swipe-down feedback (Track C P1) — micro-shake
-      // confirma que ↓ no root vai fechar, em vez de exit abrupto.
-      if (reducedMotion) {
-        onClose()
-        return
-      }
-      setExitShake(true)
-      setTimeout(() => onClose(), 220)
-      return
-    }
-    setCursor(r)
   }
 
   // ─── Keyboard: Esc + Enter ─────────────────────────────────────────
@@ -273,35 +169,15 @@ export function ThreadView({ postId, postAuthorPub, post, onClose }: ThreadViewP
           setReplyOpen(false)
           return
         }
-        if (coachVisible) {
-          dismissCoach()
-          return
-        }
         onClose()
-      } else if (e.key === 'Enter' && !replyOpen) {
+      } else if (e.key === 'Enter' && !replyOpen && focusedId) {
         e.preventDefault()
         openReplyToCursor()
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onClose, replyOpen, coachVisible])
-
-  // ─── Render ────────────────────────────────────────────────────────
-  const currentNode = cursor ? index.byId.get(cursor.path.at(-1)!) : null
-  const { position, total } = cursor
-    ? siblingPosition(cursor, index)
-    : { position: 0, total: 0 }
-  const childCount = cursor
-    ? (index.childrenOf.get(cursor.path.at(-1)!) ?? []).length
-    : 0
-  const depth = cursor?.path.length ?? 0
-
-  // Peek shadow cards: existem só se há vizinhos (discoverability §4.1)
-  const hasNextSibling =
-    cursor && cursor.path.length > 0 && total > 0 && position < total
-  const hasPrevSibling = cursor && position > 1
-  const hasChild = childCount > 0
+  }, [onClose, replyOpen, focusedId])
 
   return (
     <m.div
@@ -310,21 +186,16 @@ export function ThreadView({ postId, postAuthorPub, post, onClose }: ThreadViewP
       aria-label="thread de comentários"
       tabIndex={-1}
       // TX-2 (Ted UX spike §2) — ThreadView NÃO usa FullPageCard porque
-      // tem semantics próprios (role=tree, swipe handler, peek shadows,
-      // bg semi-transparent + backdrop-blur). Mas precisa do mesmo cap
-      // visual max-w-md mx-auto pra não vazar edge-to-edge em viewport
-      // > 448px (mockup mobile-first). sm:border-x espelha FullPageCard.
+      // tem semantics próprios (role=tree, bg semi-transparent +
+      // backdrop-blur). Mas precisa do mesmo cap visual max-w-md mx-auto
+      // pra não vazar edge-to-edge em viewport > 448px (mockup mobile-first).
+      // sm:border-x espelha FullPageCard.
+      // design-system: ok reason=role-tree-bg-transparent-not-fullpage-card
       className="fixed inset-0 z-[60] mx-auto flex max-w-md flex-col border-drift-border bg-drift-bg/90 backdrop-blur-sm focus:outline-none motion-reduce:backdrop-blur-none sm:border-x"
       initial={{ opacity: 0 }}
-      // polish: TV-P1 swipe-down feedback (Track C P1) — shake quando
-      // exitShake=true antes de onClose dispara fade-out final.
-      animate={
-        exitShake && !reducedMotion
-          ? { opacity: 1, y: [0, 6, -3, 4, 0] }
-          : { opacity: 1 }
-      }
+      animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      transition={{ duration: exitShake ? 0.22 : 0.28, ease: [0.32, 0.72, 0, 1] }}
+      transition={{ duration: 0.28, ease: [0.32, 0.72, 0, 1] }}
     >
       <ThreadHeader
         cursor={cursor}
@@ -338,9 +209,6 @@ export function ThreadView({ postId, postAuthorPub, post, onClose }: ThreadViewP
           index.roots.length > 0 ? openReplyTopLevel : undefined
         }
         post={post}
-        // Phase A — toggle list⇄cards (RFC §5 mockup).
-        viewMode={viewMode}
-        onToggleViewMode={toggleViewMode}
       />
 
       <div className="relative flex-1 overflow-hidden">
@@ -350,8 +218,8 @@ export function ThreadView({ postId, postAuthorPub, post, onClose }: ThreadViewP
         )}
         {loading && index.roots.length === 0 && <LoadingState />}
 
-        {/* Phase A — list-mode (default novo, RFC §10 Q3 cohort C). */}
-        {viewMode === 'list' && index.roots.length > 0 && (
+        {/* List-mode (modo único desde 2026-05-17). */}
+        {index.roots.length > 0 && (
           <ListModeBody
             forest={forest}
             index={index}
@@ -371,141 +239,8 @@ export function ThreadView({ postId, postAuthorPub, post, onClose }: ThreadViewP
           />
         )}
 
-        {/* Cards-mode (legacy opt-in) — render swipe-stack original. */}
-        {viewMode === 'cards' && currentNode && (
-          <SwipeHandler
-            onPrev={hasPrevSibling ? handlePrev : undefined}
-            onNext={hasNextSibling ? handleNext : undefined}
-            onUp={hasChild ? handleDescend : undefined}
-            onDown={handleAscend}
-          >
-            <div className="relative h-full w-full">
-              {/* Peek shadow cards (visual hints) — aria-hidden, skip em
-                  reduced-motion (fade only). */}
-              {hasNextSibling && (
-                <div
-                  aria-hidden="true"
-                  className="pointer-events-none absolute inset-x-3 inset-y-3 -z-20 rounded-2xl border border-drift-border/40 bg-drift-surface motion-reduce:hidden"
-                  style={{
-                    transform: 'translateY(14px) scale(0.92)',
-                    opacity: 0.18,
-                  }}
-                />
-              )}
-              {hasNextSibling && (
-                <div
-                  aria-hidden="true"
-                  className="pointer-events-none absolute inset-x-3 inset-y-3 -z-10 rounded-2xl border border-drift-border/40 bg-drift-surface motion-reduce:hidden"
-                  style={{
-                    transform: 'translateY(7px) scale(0.96)',
-                    opacity: 0.4,
-                  }}
-                />
-              )}
-              {hasChild && (
-                <div
-                  aria-hidden="true"
-                  className="pointer-events-none absolute inset-x-3 inset-y-3 -z-10 rounded-2xl border border-drift-accent2/25 bg-drift-surface motion-reduce:hidden"
-                  style={{
-                    transform: 'translateY(14px) scale(0.92)',
-                    opacity: 0.4,
-                  }}
-                />
-              )}
-
-              <AnimatePresence mode="popLayout">
-                <m.div
-                  key={currentNode.id}
-                  initial={reducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.98 }}
-                  animate={reducedMotion ? { opacity: 1 } : { opacity: 1, scale: 1 }}
-                  exit={reducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.98 }}
-                  transition={{ duration: 0.32, ease: [0.32, 0.72, 0, 1] }}
-                  className="relative h-full w-full"
-                >
-                  <CommentCard
-                    node={currentNode}
-                    depth={depth}
-                    posInSet={position}
-                    setSize={total}
-                    childCount={childCount}
-                    postId={postId}
-                    // UX-5 (Robin audit) — sinaliza "chegou desde a abertura"
-                    // (ou último refresh). openedAt avança quando user clica
-                    // "+N novos", então o border-left some no próximo render.
-                    isNew={currentNode.created_at >= openedAt}
-                    // UX-11 (Robin audit) — tap no footer "↳ N respostas"
-                    // dispara descend; mantém swipe ↑ como gesture primário.
-                    onDescend={hasChild ? handleDescend : undefined}
-                  />
-                </m.div>
-              </AnimatePresence>
-            </div>
-          </SwipeHandler>
-        )}
-
-        {/* FAB Reply — sempre responde ao cursor atual (UX-9: top-level
-            agora tem botão dedicado no header).
-            UX fix 2026-05-08: thread vazia esconde FAB. EmptyState já
-            tem CTA "↵ comentar"; senão user vê 3 botões fazendo a mesma
-            coisa (top-level comment).
-            Round 4 Fase B (B5): wrapped em motion.button com hover
-            scale 1.05 + tap scale 0.95. Pulse sutil na primeira render
-            (chama atenção pro affordance) — tokenizado motion-fast.
-            Reduced motion: pulse some, scale colapsa. */}
-        {/* FAB ↵ — só em cards-mode. List-mode tem reply inline em cada
-            comment (tap-to-reply UX-3 snapshot). */}
-        {viewMode === 'cards' && currentNode && (
-          <m.button
-            initial={{ scale: 1 }}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            transition={{ duration: 0.18, ease: [0.0, 0.0, 0.2, 1] }}
-            onClick={openReplyToCursor}
-            className="absolute bottom-5 right-5 z-30 rounded-xl bg-drift-accent2 px-5 py-3 font-mono text-[12px] uppercase tracking-meta font-medium text-drift-bg shadow-lg transition-colors hover:bg-drift-accent2/85 active:bg-drift-accent2/75 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40 motion-reduce:!scale-100"
-            aria-label="responder este comentário"
-            aria-keyshortcuts="Enter"
-            title="responder (Enter)"
-          >
-            ↵ responder
-          </m.button>
-        )}
-
-        {/* Coach-mark first-time.
-            UX fix 2026-05-08: era `absolute inset-0 z-40` SEM
-            `pointer-events-none` → bloqueava swipe + tap-to-reveal por
-            3s (timer). User feedback: "só consigo swipe pelo header,
-            resto do card não permite". Agora overlay decorativo (passa
-            eventos) + botão dedicado pra dismiss. Touch em qualquer
-            lugar dispara dismissCoach via window listener. */}
-        {/* Coach mark — só em cards-mode (ensina swipe ↑↓←→).
-            List-mode é familiar (Reddit-style scrollable threaded) e
-            não precisa coach. RFC §9.6 risco mitigado. */}
-        <AnimatePresence>
-          {viewMode === 'cards' && coachVisible && (
-            <m.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.24 }}
-              className="pointer-events-none absolute inset-0 z-40 flex items-center justify-center bg-drift-bg/60 backdrop-blur-sm motion-reduce:backdrop-blur-none"
-              role="status"
-              aria-live="polite"
-              aria-label="dica de navegação por swipe"
-            >
-              <button
-                onClick={dismissCoach}
-                aria-label="fechar dica"
-                className="pointer-events-auto rounded-2xl border border-drift-border/40 bg-drift-surface/90 px-5 py-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
-              >
-                <CoachContent />
-              </button>
-            </m.div>
-          )}
-        </AnimatePresence>
-
-        {/* ReplySheet (Track C.4.4 Ted). Substitui ReplyPlaceholder
-            quando user toca FAB ↵. Reply targetId default = current
-            comment (cursor.path.at(-1)); top-level = postId.
+        {/* ReplySheet (Track C.4.4 Ted). Reply targetId default = comment
+            focado (cursor.path.at(-1)); top-level = postId.
             UX-9 (Robin audit) — replyMode 'topLevel' força target = post
             mesmo que cursor esteja em algum nó.
             UX-3 (Robin audit) — ReplySheet faz snapshot interno desses
@@ -691,27 +426,3 @@ function LoadingState() {
   )
 }
 
-function CoachContent() {
-  return (
-    <div className="flex flex-col gap-5 px-6 text-center">
-      <span className="font-display text-base font-bold uppercase tracking-tag text-drift-text">
-        navegação por swipe
-      </span>
-      <ul className="flex flex-col gap-2 font-mono text-[12px] tracking-meta text-drift-muted">
-        <li>
-          <span className="text-drift-accent">←</span> irmão anterior ·{' '}
-          <span className="text-drift-accent">→</span> próximo
-        </li>
-        <li>
-          <span className="text-drift-accent">↑</span> descer pra resposta
-        </li>
-        <li>
-          <span className="text-drift-accent">↓</span> subir / sair
-        </li>
-      </ul>
-      <span className="font-mono text-[12px] text-drift-muted">
-        toque pra fechar
-      </span>
-    </div>
-  )
-}

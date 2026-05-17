@@ -11,7 +11,7 @@
  * (puros, testados).
  */
 
-import type { Post, ThreadViewMode } from '../../types/drift'
+import type { Post } from '../../types/drift'
 import type { ThreadCursor, ThreadIndex } from '../../lib/thread-cursor'
 import {
   buildBreadcrumb,
@@ -44,15 +44,6 @@ export interface ThreadHeaderProps {
    * `splitTitleBody(post.subposts[0]?.text)` ou `synthesizeTag(post)`.
    */
   post?: Post
-  /**
-   * Round Comments Nav Redesign — Phase A. Modo atual de render do
-   * ThreadView. Toggle no header alterna entre 'list' (default novo,
-   * scrollable threaded) e 'cards' (legacy swipe-stack opt-in).
-   * Persistido via `setPref('thread_view_mode', …)` pelo caller.
-   */
-  viewMode?: ThreadViewMode
-  /** Phase A — callback do toggle list⇄cards. */
-  onToggleViewMode?: () => void
 }
 
 /**
@@ -81,8 +72,6 @@ export function ThreadHeader({
   onRefreshNew,
   onNewTopLevelComment,
   post,
-  viewMode,
-  onToggleViewMode,
 }: ThreadHeaderProps) {
   const breadcrumb = cursor ? buildBreadcrumb(cursor, index) : []
   const { position, total } = cursor
@@ -198,29 +187,6 @@ export function ThreadHeader({
       </div>
 
       <div className="flex shrink-0 items-center gap-1.5">
-        {/* Round Comments Nav Redesign Phase A — toggle list⇄cards.
-            Default 'list' (RFC §10 Q3 cohort C). User pode voltar pro
-            card-stack swipe-driven se preferir muscle memory. Persistido
-            em user_prefs.thread_view_mode (manifesto §28). */}
-        {onToggleViewMode && viewMode && (
-          <button
-            onClick={onToggleViewMode}
-            className="shrink-0 rounded-xl border border-drift-border/30 bg-drift-surface/30 px-3 py-2 font-mono text-[12px] text-drift-muted transition-colors hover:border-drift-accent2/25 hover:text-drift-accent2 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
-            aria-label={
-              viewMode === 'list'
-                ? 'mudar pra modo cards (swipe imersivo)'
-                : 'mudar pra modo lista (scrollable)'
-            }
-            aria-pressed={viewMode === 'cards'}
-            title={
-              viewMode === 'list'
-                ? 'modo: lista · clique pra cards'
-                : 'modo: cards · clique pra lista'
-            }
-          >
-            {viewMode === 'list' ? '☰' : '⊞'}
-          </button>
-        )}
         {/* UX-9 (Robin audit) — CTA top-level sempre visível, em vez de
             depender só do EmptyState (que só aparece com thread vazia)
             ou do FAB "↵ responder" (que sempre vira sibling do current).

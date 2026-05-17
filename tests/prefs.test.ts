@@ -61,9 +61,7 @@ describe('DEFAULT_USER_PREFS', () => {
     expect(DEFAULT_USER_PREFS.use_ipfs).toBe(false)
   })
 
-  it('thread_view_mode é "list"', () => {
-    expect(DEFAULT_USER_PREFS.thread_view_mode).toBe('list')
-  })
+  // thread_view_mode removido 2026-05-17 (cards-mode descontinuado)
 
   it('store inicia com defaults', () => {
     expect(getPrefs()).toEqual(DEFAULT_USER_PREFS)
@@ -139,13 +137,7 @@ describe('setPref', () => {
     expect(getPrefs().network_mode).toBe('tor')
   })
 
-  it('atualiza thread_view_mode', async () => {
-    await setPref('thread_view_mode', 'cards')
-    expect(getPrefs().thread_view_mode).toBe('cards')
-
-    await setPref('thread_view_mode', 'list')
-    expect(getPrefs().thread_view_mode).toBe('list')
-  })
+  // 'atualiza thread_view_mode' removido 2026-05-17 (cards-mode descontinuado)
 })
 
 // ─── loadPrefs — população da store ──────────────────────────────────
@@ -174,7 +166,6 @@ describe('loadPrefs', () => {
           { key: 'onboarding_done', value: '1' },
           { key: 'thread_coach_seen', value: '1' },
           { key: 'use_ipfs', value: '1' },
-          { key: 'thread_view_mode', value: 'cards' },
         ]),
         run: vi.fn(),
       },
@@ -192,7 +183,6 @@ describe('loadPrefs', () => {
     expect(state.onboarding_done).toBe(true)
     expect(state.thread_coach_seen).toBe(true)
     expect(state.use_ipfs).toBe(true)
-    expect(state.thread_view_mode).toBe('cards')
   })
 
   it('é idempotente — segunda chamada é no-op', async () => {
@@ -297,20 +287,9 @@ describe('applyRow (via loadPrefs)', () => {
     expect(state.network_mode).toBe(DEFAULT_USER_PREFS.network_mode)
   })
 
-  it('thread_view_mode aceita "list"', async () => {
-    const state = await loadWith([{ key: 'thread_view_mode', value: 'list' }])
-    expect(state.thread_view_mode).toBe('list')
-  })
-
-  it('thread_view_mode aceita "cards"', async () => {
-    const state = await loadWith([{ key: 'thread_view_mode', value: 'cards' }])
-    expect(state.thread_view_mode).toBe('cards')
-  })
-
-  it('thread_view_mode rejeita valor inválido — mantém default', async () => {
-    const state = await loadWith([{ key: 'thread_view_mode', value: 'grid' }])
-    expect(state.thread_view_mode).toBe(DEFAULT_USER_PREFS.thread_view_mode)
-  })
+  // thread_view_mode removido 2026-05-17 (cards-mode descontinuado).
+  // Key persistida é ignorada silenciosamente (cai no `return` no-op
+  // do applyRow, conforme migração graceful).
 
   it('chave desconhecida é ignorada silenciosamente', async () => {
     const state = await loadWith([

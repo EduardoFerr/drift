@@ -91,11 +91,8 @@ function applyRow(target: UserPrefs, key: string, value: string): void {
       target.p2p_auto_follows = value === '1'
       return
     case 'thread_view_mode':
-      // Round Comments Nav Redesign Phase A — list é default novo,
-      // cards preservado opt-in. Valor inválido cai pro default.
-      if (value === 'list' || value === 'cards') {
-        target.thread_view_mode = value
-      }
+      // Cards-mode removido 2026-05-17 (user feedback). Pref legacy
+      // ignorada silenciosamente — list-mode é único agora.
       return
     case 'theme_id':
       // 3 paletas com identidade editorial (2026-05-17). Valor inválido
