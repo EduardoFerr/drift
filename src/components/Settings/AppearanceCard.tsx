@@ -19,6 +19,7 @@
 import { setPref, usePrefsStore } from '../../lib/prefs'
 import { applyTheme, THEME_IDS, THEME_META, type ThemeId } from '../../lib/theme'
 import { FullPageCard } from '../UI/FullPageCard'
+import { SectionHeader } from '../UI/SectionHeader'
 
 interface CardProps {
   onClose: () => void
@@ -161,12 +162,3 @@ function Swatch({
   )
 }
 
-function SectionHeader({ title }: { title: string }) {
-  return (
-    <div className="rounded-2xl border border-drift-border/40 bg-drift-surface/50 px-5 py-3.5">
-      <span className="font-display text-[14px] font-bold uppercase tracking-tag text-drift-accent">
-        {title}
-      </span>
-    </div>
-  )
-}

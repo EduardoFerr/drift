@@ -40,7 +40,8 @@ import type {
 } from '../../types/drift'
 import { FullPageCard } from '../UI/FullPageCard'
 import { Collapse } from '../UI/Collapse'
-import { ChevronDownIcon, RefreshIcon } from '../UI/Icons'
+import { RefreshIcon } from '../UI/Icons'
+import { SectionHeader } from '../UI/SectionHeader'
 
 // ─── Accordion helpers ──────────────────────────────────────────
 
@@ -48,43 +49,6 @@ function useAccordion(initial: number | null = 0) {
   const [open, setOpen] = useState<number | null>(initial)
   const toggle = (i: number) => setOpen((prev) => (prev === i ? null : i))
   return { open, toggle }
-}
-
-function SectionHeader({
-  title,
-  expanded,
-  onToggle,
-}: {
-  title: string
-  expanded?: boolean
-  onToggle?: () => void
-}) {
-  // Static header (sem accordion) quando não recebe handlers — usado em cards single-section
-  if (!onToggle) {
-    return (
-      <div className="rounded-2xl border border-drift-border/40 bg-drift-surface/50 px-5 py-3.5">
-        <span className="font-display text-[14px] font-bold uppercase tracking-tag text-drift-accent">
-          {title}
-        </span>
-      </div>
-    )
-  }
-  return (
-    <button
-      onClick={onToggle}
-      aria-expanded={expanded}
-      className="flex w-full items-center gap-3 rounded-2xl border border-drift-border/40 bg-drift-surface/50 px-5 py-3.5 text-left transition-colors"
-    >
-      <span className="flex-1 font-display text-[14px] font-bold uppercase tracking-tag text-drift-accent">
-        {title}
-      </span>
-      <span
-        className={`shrink-0 text-drift-muted/40 transition-transform duration-motion-emphasis ease-drift-inout ${expanded ? 'rotate-180' : ''}`}
-      >
-        <ChevronDownIcon size={16} />
-      </span>
-    </button>
-  )
 }
 
 function Toggle({

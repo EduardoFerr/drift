@@ -21,7 +21,7 @@ import { useEffect, useState } from 'react'
 import { db } from '../../lib/db'
 import { FullPageCard } from '../UI/FullPageCard'
 import { Collapse } from '../UI/Collapse'
-import { ChevronDownIcon } from '../UI/Icons'
+import { SectionHeader } from '../UI/SectionHeader'
 import { DriftButton } from '../UI/DriftButton'
 import { useUserWeight } from '../../hooks/useUserWeight'
 import { getWeightTier, type WeightTier } from '../../lib/weight'
@@ -272,32 +272,6 @@ export function ProfileModal({ identity, onClose }: ProfileModalProps) {
   )
 }
 
-function SectionHeader({
-  title,
-  expanded,
-  onToggle,
-}: {
-  title: string
-  expanded: boolean
-  onToggle: () => void
-}) {
-  return (
-    <button
-      onClick={onToggle}
-      aria-expanded={expanded}
-      className="flex w-full items-center gap-3 rounded-2xl border border-drift-border/40 bg-drift-surface/50 px-5 py-3.5 text-left transition-colors"
-    >
-      <span className="flex-1 font-display text-[14px] font-bold uppercase tracking-tag text-drift-accent">
-        {title}
-      </span>
-      <span
-        className={`shrink-0 text-drift-muted/40 transition-transform duration-motion-emphasis ease-drift-inout ${expanded ? 'rotate-180' : ''}`}
-      >
-        <ChevronDownIcon size={16} />
-      </span>
-    </button>
-  )
-}
 
 function Avatar({
   metadata,

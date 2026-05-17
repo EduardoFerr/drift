@@ -21,6 +21,7 @@ import { useState } from 'react'
 import type { ReportReason, Post } from '../../types/drift'
 import { FullPageCard } from '../UI/FullPageCard'
 import { DriftButton } from '../UI/DriftButton'
+import { SectionHeader } from '../UI/SectionHeader'
 
 export interface ReportModalProps {
   post: Post
@@ -153,15 +154,6 @@ export function ReportModal({ post, pending, onSubmit, onClose }: ReportModalPro
   )
 }
 
-function SectionHeader({ title }: { title: string }) {
-  return (
-    <div className="rounded-2xl border border-drift-border/40 bg-drift-surface/50 px-5 py-3.5">
-      <span className="font-display text-[14px] font-bold uppercase tracking-tag text-drift-accent">
-        {title}
-      </span>
-    </div>
-  )
-}
 
 function ConfirmStep({
   reason,

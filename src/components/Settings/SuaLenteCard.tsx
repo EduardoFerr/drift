@@ -20,6 +20,7 @@ import { useEffect, useState } from 'react'
 import { setLensStrength, useLensStore } from '../../lib/trust-lens'
 import { db } from '../../lib/db'
 import { FullPageCard } from '../UI/FullPageCard'
+import { SectionHeader } from '../UI/SectionHeader'
 
 interface CardProps {
   onClose: () => void
@@ -174,12 +175,3 @@ export function SuaLenteCard({ onClose }: CardProps) {
   )
 }
 
-function SectionHeader({ title }: { title: string }) {
-  return (
-    <div className="rounded-2xl border border-drift-border/40 bg-drift-surface/50 px-5 py-3.5">
-      <span className="font-display text-[14px] font-bold uppercase tracking-tag text-drift-accent">
-        {title}
-      </span>
-    </div>
-  )
-}
