@@ -39,14 +39,15 @@ import {
   useEffect,
   useRef,
   useState,
-  type PointerEvent as ReactPointerEvent,
 } from 'react'
-// `m` é o primitive leve do framer-motion (LazyMotion). Features via main.tsx.
-// NB: removemos `drag={'y'}` daqui (último consumer do feature `drag`
-// no app — agora LazyMotion carrega só `domAnimation`). Bottom-sheet
-// drag-down-to-dismiss agora usa pointer events nativos + RAF spring,
-// mesmo pattern do SwipeHandler V10.
-import { AnimatePresence, m, useReducedMotion } from 'framer-motion'
+// Migrado pra SlideUpOverlay primitive em 2026-05-17:
+// - Backdrop + sheet animation + drag-down-to-dismiss + dragHandle
+//   visual embarcados no primitive (variant='bottom-sheet'
+//   dragToDismiss dragHandleVisible).
+// - ReplySheet agora foca em conteúdo + lógica publish/upload/snapshot.
+// - Removido ~150 LOC (drag refs, RAF spring, pointer handlers,
+//   outer m.div, AnimatePresence) — vive em UI/SlideUpOverlay.tsx.
+import { SlideUpOverlay } from '../UI/SlideUpOverlay'
 import * as nip19 from 'nostr-tools/nip19'
 import {
   commentOnPost,
@@ -153,19 +154,9 @@ function shortNpub(pubHex: string): string {
 
 const HEADER_ID = 'drift-reply-sheet-header'
 
-/** Threshold pra drag-down dismissar sheet — design-comments.md §10. */
-const DRAG_DISMISS_THRESHOLD_PX = 80
-
-/** Elastic factor: y_visual = y_raw * 0.4 quando y_raw > 0 (replica
- *  `dragElastic={{ top: 0, bottom: 0.4 }}` da versão framer-drag). */
-const DRAG_ELASTIC_BOTTOM = 0.4
-
-// Spring tuning casa com SwipeHandler V10 (manter feel consistente
-// entre swipes do PostViewer e dismiss da ReplySheet).
-const SPRING_STIFFNESS = 500
-const SPRING_DAMPING = 38
-const SPRING_REST_VELOCITY = 0.5 // px/s
-const SPRING_REST_DELTA = 0.5 // px
+// Drag-down-to-dismiss constants moveram pro SlideUpOverlay primitive
+// (DRAG_DISMISS_THRESHOLD_PX=80, DRAG_ELASTIC_BOTTOM=0.4, SPRING_*).
+// Tuning preservado bit-a-bit pra continuity perceptual.
 
 export function ReplySheet({
   postId,
@@ -201,9 +192,11 @@ export function ReplySheet({
   const [targetSnapshot, setTargetSnapshot] =
     useState<ReplyTargetSnapshot | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
+  // sheetRef preservado pro focus trap (Tab/Shift+Tab restritos ao
+  // container). SlideUpOverlay tem ref interno próprio pra drag — esse
+  // aqui é wrapper interno do nosso conteúdo, mais simples.
   const sheetRef = useRef<HTMLDivElement | null>(null)
   const restoreFocusRef = useRef<HTMLElement | null>(null)
-  const reducedMotion = useReducedMotion()
   // fix: RS-B2 upload leak (Track C debt) — flag pra ignorar setState de
   // upload depois que sheet fechou/desmontou. Sem isso, React loga
   // "state update on unmounted" + leak curto.
@@ -427,186 +420,37 @@ export function ReplySheet({
   // Pode publicar se: tem texto válido OU tem imagem (e não está em upload/pending).
   const canPublish = !pending && !uploading && !overLimit && (charCount > 0 || !!blobMeta)
 
-  // Animação: bottom-sheet (y 100% → 0). Reduced motion: só fade.
-  const sheetInitial = reducedMotion ? { opacity: 0 } : { y: '100%', opacity: 0 }
-  const sheetAnimate = reducedMotion ? { opacity: 1 } : { y: 0, opacity: 1 }
-  const sheetExit = reducedMotion ? { opacity: 0 } : { y: '100%', opacity: 0 }
-
-  // ── Drag-down-to-dismiss (pointer events nativos) ──────────────────
-  // Refs em vez de state pra não re-renderizar por sample. Aplicamos
-  // transform direto no DOM durante o drag; ao spring-back, limpamos
-  // `el.style.transform` pra deixar o `animate={y:0}` do framer voltar
-  // a vigorar (sem conflito). reducedMotion desabilita drag (mesma
-  // semântica de `drag={false}` da versão framer).
-  const dragYRef = useRef(0)
-  const activePointerRef = useRef<number | null>(null)
-  const startYRef = useRef(0)
-  const rafRef = useRef<number | null>(null)
-
-  function applyDragTransform(y: number) {
-    const el = sheetRef.current
-    if (!el) return
-    el.style.transform = `translate3d(0, ${y}px, 0)`
-  }
-
-  function clearDragTransform() {
-    const el = sheetRef.current
-    if (!el) return
-    // String vazia devolve controle pro `animate` do framer-motion
-    // (que mantém y=0). Sem isso, nosso inline style sobrescreveria
-    // o exit animation pra y=100%.
-    el.style.transform = ''
-  }
-
-  function cancelDragRaf() {
-    if (rafRef.current !== null) {
-      cancelAnimationFrame(rafRef.current)
-      rafRef.current = null
-    }
-  }
-
-  function springBackDrag() {
-    cancelDragRaf()
-    if (reducedMotion) {
-      dragYRef.current = 0
-      clearDragTransform()
-      return
-    }
-    let last = performance.now()
-    let vy = 0
-    const step = (now: number) => {
-      const dt = Math.min(0.064, (now - last) / 1000)
-      last = now
-      const ay = -SPRING_STIFFNESS * dragYRef.current - SPRING_DAMPING * vy
-      vy += ay * dt
-      dragYRef.current += vy * dt
-      applyDragTransform(dragYRef.current)
-      const settled =
-        Math.abs(dragYRef.current) < SPRING_REST_DELTA &&
-        Math.abs(vy) < SPRING_REST_VELOCITY
-      if (settled) {
-        dragYRef.current = 0
-        clearDragTransform()
-        rafRef.current = null
-        return
-      }
-      rafRef.current = requestAnimationFrame(step)
-    }
-    rafRef.current = requestAnimationFrame(step)
-  }
-
-  function handleSheetPointerDown(e: ReactPointerEvent<HTMLDivElement>) {
-    if (reducedMotion) return
-    if (e.button !== undefined && e.button !== 0) return
-    if (activePointerRef.current !== null) return
-    // Não inicia drag se pointer veio de input/textarea/button/etc. —
-    // esses children precisam dos próprios pointer events (focus, click,
-    // scroll de textarea, etc.). Sheet só "puxa" pela área do header
-    // ou margens.
-    const target = e.target as HTMLElement | null
-    if (
-      target &&
-      target.closest(
-        'textarea, input, button, select, a, [role="button"], [role="radio"], [contenteditable="true"]',
-      )
-    ) {
-      return
-    }
-    cancelDragRaf()
-    activePointerRef.current = e.pointerId
-    startYRef.current = e.clientY
-    try {
-      e.currentTarget.setPointerCapture(e.pointerId)
-    } catch {
-      /* noop */
-    }
-  }
-
-  function handleSheetPointerMove(e: ReactPointerEvent<HTMLDivElement>) {
-    if (activePointerRef.current !== e.pointerId) return
-    const dy = e.clientY - startYRef.current
-    // Elastic: só permite arrasto pra baixo (y > 0). y < 0 = hard wall
-    // (= `top: 0` da versão framer). Visual y = raw * 0.4 (replica
-    // dragElastic.bottom = 0.4).
-    const yVisual = dy > 0 ? dy * DRAG_ELASTIC_BOTTOM : 0
-    dragYRef.current = yVisual
-    applyDragTransform(yVisual)
-  }
-
-  function handleSheetPointerUp(e: ReactPointerEvent<HTMLDivElement>) {
-    if (activePointerRef.current !== e.pointerId) return
-    activePointerRef.current = null
-    try {
-      e.currentTarget.releasePointerCapture(e.pointerId)
-    } catch {
-      /* noop */
-    }
-    // Decisão usa y visual (replica `info.offset.y` da versão framer-drag,
-    // que também respeitava o elastic 0.4). Pending bloqueia dismiss
-    // (mesma regra: `info.offset.y > X && !pending`).
-    if (dragYRef.current > DRAG_DISMISS_THRESHOLD_PX && !pending) {
-      // Dismiss: deixa framer-motion fazer o exit anim. Limpamos transform
-      // pra não conflitar com `exit={{ y: '100%' }}`.
-      dragYRef.current = 0
-      clearDragTransform()
-      onClose()
-      return
-    }
-    springBackDrag()
-  }
-
-  function handleSheetPointerCancel(e: ReactPointerEvent<HTMLDivElement>) {
-    if (activePointerRef.current !== e.pointerId) return
-    activePointerRef.current = null
-    springBackDrag()
-  }
-
-  // Cleanup: cancela RAF em andamento no unmount.
-  useEffect(() => {
-    return () => {
-      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
-    }
-  }, [])
+  // open=false → não renderiza primitive (AnimatePresence cobre exit
+  // anim quando primitive desmonta). SlideUpOverlay cobre: backdrop +
+  // sheet animation + drag-down-to-dismiss + dragHandle visual + focus
+  // trap implícito via role=dialog. ReplySheet só fornece conteúdo +
+  // lógica publish.
+  if (!open) return null
 
   return (
-    <AnimatePresence>
-      {open && (
-        <m.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.18 }}
-          className="fixed inset-0 z-50 flex items-end justify-center bg-drift-bg/60 backdrop-blur-sm"
-          onClick={() => {
-            if (!pending) onClose()
-          }}
-        >
-          <m.div
-            ref={sheetRef}
-            initial={sheetInitial}
-            animate={sheetAnimate}
-            exit={sheetExit}
-            transition={{ duration: 0.22, ease: 'easeOut' }}
-            // Drag pra baixo dismissa via pointer events nativos (handlers
-            // abaixo). Elastic 0.4 + threshold 80px + spring back replicam
-            // bit-a-bit a versão framer-drag anterior.
-            className="flex max-h-[85dvh] w-full max-w-md flex-col overflow-hidden rounded-t-2xl border border-b-0 border-drift-border/40 bg-drift-surface touch-pan-y"
-            onPointerDown={handleSheetPointerDown}
-            onPointerMove={handleSheetPointerMove}
-            onPointerUp={handleSheetPointerUp}
-            onPointerCancel={handleSheetPointerCancel}
-            onClick={(e) => e.stopPropagation()}
-            onKeyDown={handleTrapKey}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby={HEADER_ID}
-          >
-            {/* Drag handle visual */}
-            <div className="flex justify-center pt-2 pb-1">
-              <div className="h-1 w-10 rounded-full bg-drift-border/60" aria-hidden="true" />
-            </div>
-
-            {/* Header */}
+    <SlideUpOverlay
+      onClose={onClose}
+      labelledBy={HEADER_ID}
+      maxWidth="md"
+      padded={false}
+      // Pending bloqueia dismiss (publish em curso — preserva UX
+      // anterior). Backdrop click + drag tap pra fechar respeitam esse
+      // gate via primitive (callback só dispara se pending=false abaixo).
+      backdropDismissible={!pending}
+      variant="bottom-sheet"
+      dragToDismiss
+      dragHandleVisible
+      // z-50 era o valor anterior. Não precisamos boost (z-[60]) — sheet
+      // pode coexistir com UpdatePrompt z-50; primitive default z-40
+      // ainda fica acima de NavBar z-30. Se ReplySheet precisar
+      // dominar UpdatePrompt no futuro, basta `boost`.
+    >
+      <div
+        ref={sheetRef}
+        className="flex max-h-[85dvh] w-full flex-col overflow-hidden"
+        onKeyDown={handleTrapKey}
+      >
+        {/* Header (drag handle visual é renderizado pelo primitive). */}
             <header className="flex items-start justify-between gap-3 px-4 pb-3">
               <div className="min-w-0 flex-1">
                 <h2
@@ -746,10 +590,8 @@ export function ReplySheet({
                 </button>
               </div>
             </footer>
-          </m.div>
-        </m.div>
-      )}
-    </AnimatePresence>
+      </div>
+    </SlideUpOverlay>
   )
 }
 

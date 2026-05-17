@@ -62,13 +62,13 @@ function fileImportsPrimitive(content: string, primitives: string[]): boolean {
  * NOVA entry exige justificativa no PR review (não é trivial).
  *
  * Migrações concluídas (removidas):
- *   - OnboardingOverlay [f8db7XX] → SlideUpOverlay com boost prop
+ *   - OnboardingOverlay [7fa7280] → SlideUpOverlay com boost prop
+ *   - ReplySheet [pending-commit] → SlideUpOverlay variant=bottom-sheet
+ *     + dragToDismiss + dragHandleVisible (primitive extension)
  *
  * Migrações pendentes:
  */
 const OVERLAY_LEGACY_ALLOWLIST = new Set([
-  // Lily ROI #2 — bottom-sheet manual com drag-to-dismiss próprio
-  'src/components/Post/ReplySheet.tsx',
   // ComposeOverlay sub-overlay interno (preview/abort) — refactor maior
   'src/components/Create/ComposeOverlay.tsx',
   // PostViewer ModalWrapper interno — refactor maior
