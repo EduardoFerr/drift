@@ -63,6 +63,7 @@ import { FullPageCard } from './components/UI/FullPageCard'
 import { LayerRenderer } from './components/UI/LayerRenderer'
 import { LazyBoundary } from './components/UI/LazyBoundary'
 import { Collapse } from './components/UI/Collapse'
+import { useRegisterSW } from 'virtual:pwa-register/react'
 import { DriftSkeleton } from './components/UI/DriftSkeleton'
 
 // Round CWV-2 §3.2 — Lazy boundaries pra todos os modal/overlay roots
@@ -242,14 +243,26 @@ function AboutCardLayer({ onClose }: { onClose: () => void }) {
 
         <div className="rounded-2xl border border-drift-border/40 bg-drift-surface/50 px-5 py-3.5">
           <span className="font-display text-[14px] font-bold uppercase tracking-tag text-drift-accent">
-            atualizar
+            atualizar versão
           </span>
         </div>
         <p className="px-1 font-mono text-[10px] leading-relaxed text-drift-muted/30">
-          drift é PWA; cache do service worker pode segurar versão antiga por até 24h após deploy. forçar atualização limpa o cache e recarrega.
+          se você dispensou o aviso de nova versão, pode aplicar a atualização aqui. fixes de segurança e novas features ficam pendentes até reload do service worker (manifesto §17 — sem update silencioso).
         </p>
         <div className="pl-3">
-          <RefreshAppButton />
+          <UpdateVersionButton />
+        </div>
+
+        <div className="rounded-2xl border border-drift-border/40 bg-drift-surface/50 px-5 py-3.5">
+          <span className="font-display text-[14px] font-bold uppercase tracking-tag text-drift-accent">
+            limpar cache
+          </span>
+        </div>
+        <p className="px-1 font-mono text-[10px] leading-relaxed text-drift-muted/30">
+          se algum painel ficou preso em 'erro ao carregar', limpa todos os caches do service worker e recarrega. mais agressivo que atualizar versão.
+        </p>
+        <div className="pl-3">
+          <ClearCacheButton />
         </div>
       </div>
     </FullPageCard>
@@ -257,28 +270,99 @@ function AboutCardLayer({ onClose }: { onClose: () => void }) {
 }
 
 /**
- * R33 — botão "atualizar app" pra forçar refresh do PWA cache.
- * Reusa `clearServiceWorkerAndReload` do LazyBoundary (mesma lógica
- * do retry de chunk fail). User-reportado: cliente fica em versão
- * stale após deploy; SW pode demorar até 24h pra detectar nova
- * versão. Botão manual dá agência ao user (manifesto §1 existência
- * autônoma — não depende de timing de SW).
+ * R33 — botão "atualizar versão" pra aplicar SW novo pendente.
+ *
+ * Reusa o mesmo fluxo do `UpdatePrompt` (`virtual:pwa-register/react`):
+ * `updateServiceWorker(true)` faz skipWaiting do SW waiting + reload.
+ * Útil quando user dispensou o banner "Mais tarde" e quer aplicar
+ * depois. Manifesto §17 — sem update silencioso, consent explícito.
+ *
+ * Se NÃO há SW waiting, dispara `registration.update()` pra forçar
+ * check do servidor. Se ainda não há, dá feedback "você está na
+ * versão mais recente".
  */
-function RefreshAppButton() {
-  const [refreshing, setRefreshing] = useState(false)
-  async function handleRefresh() {
-    if (refreshing) return
-    setRefreshing(true)
+function UpdateVersionButton() {
+  const [busy, setBusy] = useState(false)
+  const [status, setStatus] = useState<'idle' | 'checking' | 'latest'>('idle')
+  const {
+    needRefresh: [needRefresh],
+    updateServiceWorker,
+  } = useRegisterSW({
+    onRegisterError() {
+      // SW não suportado neste contexto — botão fica disabled
+    },
+  })
+
+  async function handleClick() {
+    if (busy) return
+    setBusy(true)
+    setStatus('checking')
+    try {
+      if (needRefresh) {
+        // SW novo já está waiting → aplicar imediatamente
+        await updateServiceWorker(true)
+        // Reload acontece dentro de updateServiceWorker; este código não executa
+      } else {
+        // Força check no servidor; se houver SW novo, registra como waiting
+        // e o hook atualiza needRefresh assincronamente. Damos 2s pra resposta.
+        const reg = await navigator.serviceWorker?.getRegistration()
+        if (reg) await reg.update()
+        // Pequena espera pro hook detectar mudança
+        await new Promise((r) => setTimeout(r, 2000))
+        // Se needRefresh continua false, está na última versão
+        setStatus('latest')
+        setTimeout(() => setStatus('idle'), 3000)
+      }
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const label = busy
+    ? 'aplicando…'
+    : needRefresh
+    ? '↻ aplicar nova versão'
+    : status === 'latest'
+    ? '✓ versão mais recente'
+    : '↻ verificar atualizações'
+
+  return (
+    <button
+      onClick={() => void handleClick()}
+      disabled={busy}
+      className={`w-full rounded-xl px-4 py-3 font-mono text-[12px] uppercase tracking-meta font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40 ${
+        needRefresh
+          ? 'bg-drift-accent2 text-drift-bg hover:bg-drift-accent2/85'
+          : 'border border-drift-border/30 bg-drift-surface/30 text-drift-muted/70 hover:text-drift-text'
+      }`}
+    >
+      {label}
+    </button>
+  )
+}
+
+/**
+ * Botão "limpar cache" — cache nuke agressivo (unregister SW + caches).
+ * Reusa `clearServiceWorkerAndReload` exportado de LazyBoundary. Mais
+ * destrutivo que `UpdateVersionButton`: força recovery do estado mas
+ * perde tudo que estava em cache (chunks, blobs IPFS pinados não, esses
+ * vivem em IndexedDB separado).
+ */
+function ClearCacheButton() {
+  const [busy, setBusy] = useState(false)
+  async function handleClick() {
+    if (busy) return
+    setBusy(true)
     const { clearServiceWorkerAndReload } = await import('./components/UI/LazyBoundary')
     await clearServiceWorkerAndReload()
   }
   return (
     <button
-      onClick={() => void handleRefresh()}
-      disabled={refreshing}
-      className="w-full rounded-xl bg-drift-accent2 px-4 py-3 font-mono text-[12px] uppercase tracking-meta font-medium text-drift-bg transition-colors hover:bg-drift-accent2/85 disabled:cursor-not-allowed disabled:opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
+      onClick={() => void handleClick()}
+      disabled={busy}
+      className="w-full rounded-xl border border-drift-warning/20 bg-drift-warning/5 px-4 py-3 font-mono text-[12px] uppercase tracking-meta text-drift-warning transition-colors hover:bg-drift-warning/10 disabled:cursor-not-allowed disabled:opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-warning/30"
     >
-      {refreshing ? 'recarregando…' : '↻ atualizar app'}
+      {busy ? 'limpando…' : '↻ limpar cache e recarregar'}
     </button>
   )
 }
