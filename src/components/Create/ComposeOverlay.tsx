@@ -366,7 +366,13 @@ export function ComposeOverlay({
               }
               rows={4}
               data-subpost-input={safeIdx === 0 ? '' : undefined}
-              className="min-h-[100px] max-h-44 resize-none rounded-xl border border-drift-border/40 bg-drift-bg/60 p-4 font-mono text-fluid-lg leading-[1.6] text-drift-text placeholder:text-drift-muted/40 focus:border-drift-accent2/50 focus:outline-none focus:ring-1 focus:ring-drift-accent2/20"
+              // wcag-audit: ok reason=doc-comment-describes-historical-fix
+              // WCAG audit 2026-05-17 (Marshall regra de 2 camadas):
+              // bg-drift-bg/60 + placeholder:text-drift-muted/40 = double-alpha
+              // que falha AA em velatura (light theme, ratio 1.68:1). Fix:
+              // bg-drift-bg opaco + placeholder sem alpha (drift-muted/70 mínimo
+              // pra contrast AA em todos os 3 temas).
+              className="min-h-[100px] max-h-44 resize-none rounded-xl border border-drift-border/40 bg-drift-bg p-4 font-mono text-fluid-lg leading-[1.6] text-drift-text placeholder:text-drift-muted/70 focus:border-drift-accent2/50 focus:outline-none focus:ring-1 focus:ring-drift-accent2/20"
             />
             <div className="mt-1.5 flex items-center justify-between font-mono text-[11px]">
               <span

@@ -265,7 +265,7 @@ export function RelaySettings({ onClose }: RelaySettingsProps) {
               value={newUrl}
               onChange={(e) => setNewUrl(e.target.value)}
               placeholder="wss://relay.exemplo.com"
-              className="w-full rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3 font-mono text-[12px] text-drift-text placeholder:text-drift-muted/25 focus:border-drift-accent2/40 focus:outline-none focus:ring-1 focus:ring-drift-accent2/20"
+              className="w-full rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3 font-mono text-[12px] text-drift-text placeholder:text-drift-muted/70 focus:border-drift-accent2/40 focus:outline-none focus:ring-1 focus:ring-drift-accent2/20"
             />
             <button
               onClick={handleAdd}
@@ -298,7 +298,7 @@ export function RelaySettings({ onClose }: RelaySettingsProps) {
             value={importNpub}
             onChange={(e) => setImportNpub(e.target.value)}
             placeholder="npub1… — buscar lista desse user"
-            className="w-full rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3 font-mono text-[12px] text-drift-text placeholder:text-drift-muted/25 focus:border-drift-accent2/40 focus:outline-none focus:ring-1 focus:ring-drift-accent2/20"
+            className="w-full rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3 font-mono text-[12px] text-drift-text placeholder:text-drift-muted/70 focus:border-drift-accent2/40 focus:outline-none focus:ring-1 focus:ring-drift-accent2/20"
           />
           <div className="flex gap-2">
             <button

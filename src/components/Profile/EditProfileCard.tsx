@@ -130,7 +130,7 @@ export function EditProfileCard({ currentMetadata, onClose }: EditProfileCardPro
             onChange={(e) => setDisplayName(e.target.value)}
             maxLength={PROFILE_LIMITS.display_name}
             placeholder="anônimo"
-            className="w-full rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3 font-mono text-[13px] text-drift-text placeholder:text-drift-muted/30 focus:border-drift-accent2/40 focus:outline-none focus:ring-1 focus:ring-drift-accent2/20"
+            className="w-full rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3 font-mono text-[13px] text-drift-text placeholder:text-drift-muted/70 focus:border-drift-accent2/40 focus:outline-none focus:ring-1 focus:ring-drift-accent2/20"
           />
           {civilWarning && (
             <p className="mt-1.5 font-mono text-[10px] text-drift-warning/70">
@@ -151,7 +151,7 @@ export function EditProfileCard({ currentMetadata, onClose }: EditProfileCardPro
             maxLength={PROFILE_LIMITS.about}
             rows={3}
             placeholder="conta um pouco… (opcional)"
-            className="w-full resize-none rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3 font-mono text-[12px] leading-relaxed text-drift-text placeholder:text-drift-muted/30 focus:border-drift-accent2/40 focus:outline-none focus:ring-1 focus:ring-drift-accent2/20"
+            className="w-full resize-none rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3 font-mono text-[12px] leading-relaxed text-drift-text placeholder:text-drift-muted/70 focus:border-drift-accent2/40 focus:outline-none focus:ring-1 focus:ring-drift-accent2/20"
           />
           <div className="mt-1 text-right font-mono text-[10px] text-drift-muted/40">
             {about.length} / {PROFILE_LIMITS.about}
@@ -170,7 +170,7 @@ export function EditProfileCard({ currentMetadata, onClose }: EditProfileCardPro
             onChange={(e) => setPicture(e.target.value)}
             maxLength={PROFILE_LIMITS.picture}
             placeholder="https://…"
-            className="w-full rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3 font-mono text-[12px] text-drift-text placeholder:text-drift-muted/30 focus:border-drift-accent2/40 focus:outline-none focus:ring-1 focus:ring-drift-accent2/20"
+            className="w-full rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3 font-mono text-[12px] text-drift-text placeholder:text-drift-muted/70 focus:border-drift-accent2/40 focus:outline-none focus:ring-1 focus:ring-drift-accent2/20"
           />
         </Field>
 
@@ -186,7 +186,7 @@ export function EditProfileCard({ currentMetadata, onClose }: EditProfileCardPro
             onChange={(e) => setNip05(e.target.value)}
             maxLength={PROFILE_LIMITS.nip05}
             placeholder="seuapelido@example.com"
-            className="w-full rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3 font-mono text-[12px] text-drift-text placeholder:text-drift-muted/30 focus:border-drift-accent2/40 focus:outline-none focus:ring-1 focus:ring-drift-accent2/20"
+            className="w-full rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3 font-mono text-[12px] text-drift-text placeholder:text-drift-muted/70 focus:border-drift-accent2/40 focus:outline-none focus:ring-1 focus:ring-drift-accent2/20"
           />
         </Field>
 

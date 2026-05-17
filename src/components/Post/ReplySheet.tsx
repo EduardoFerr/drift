@@ -653,7 +653,7 @@ export function ReplySheet({
                 rows={4}
                 aria-label="texto da resposta"
                 aria-invalid={overLimit || !!error}
-                className="min-h-[6rem] w-full resize-y rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3.5 font-mono text-[12px] text-drift-text placeholder:text-drift-muted/25 focus:border-drift-accent2/40 focus:outline-none focus:ring-1 focus:ring-drift-accent2/20 disabled:opacity-60"
+                className="min-h-[6rem] w-full resize-y rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3.5 font-mono text-[12px] text-drift-text placeholder:text-drift-muted/70 focus:border-drift-accent2/40 focus:outline-none focus:ring-1 focus:ring-drift-accent2/20 disabled:opacity-60"
               />
 
               {/* C.6.3 — image upload (cap 1 imagem por comment). */}
@@ -806,7 +806,7 @@ function ReplyImagePicker({
           maxLength={280}
           placeholder="descrição da imagem (alt) — opcional"
           aria-label="descrição da imagem para acessibilidade"
-          className="w-full rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3 font-mono text-[12px] text-drift-text placeholder:text-drift-muted/25 focus:border-drift-accent2/40 focus:outline-none focus:ring-1 focus:ring-drift-accent2/20 disabled:opacity-60"
+          className="w-full rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3 font-mono text-[12px] text-drift-text placeholder:text-drift-muted/70 focus:border-drift-accent2/40 focus:outline-none focus:ring-1 focus:ring-drift-accent2/20 disabled:opacity-60"
         />
       </div>
     )

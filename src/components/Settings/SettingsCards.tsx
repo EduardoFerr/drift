@@ -905,7 +905,7 @@ export function PeersCard({ onClose }: CardProps) {
                   setConnectOk(false)
                 }}
                 placeholder="npub1… ou nprofile1…"
-                className="w-full rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3 font-mono text-[12px] text-drift-text placeholder:text-drift-muted/25 focus:border-drift-accent2/40 focus:outline-none focus:ring-1 focus:ring-drift-accent2/20"
+                className="w-full rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3 font-mono text-[12px] text-drift-text placeholder:text-drift-muted/70 focus:border-drift-accent2/40 focus:outline-none focus:ring-1 focus:ring-drift-accent2/20"
               />
               <p className="px-1 font-mono text-[10px] text-drift-warning/40">
                 conexão direta — seu IP será visível para este peer
