@@ -11,6 +11,8 @@
 
 import { useState } from 'react'
 import { FullPageCard } from '../UI/FullPageCard'
+import { Collapse } from '../UI/Collapse'
+import { ChevronDownIcon } from '../UI/Icons'
 import { addRelay, removeRelay, setRelayEnabled, useRelaysStore } from '../../lib/relays'
 import { entriesFromRecords, fetchRelayList, publishRelayList } from '../../lib/nip65'
 import { RelayTierBadge, deriveRelayTier, type RelayTier } from '../UI/RelayTierBadge'
@@ -24,6 +26,9 @@ export interface RelaySettingsProps {
 export function RelaySettings({ onClose }: RelaySettingsProps) {
   const list = useRelaysStore((s) => s.list)
   const loaded = useRelaysStore((s) => s.loaded)
+
+  const [openSection, setOpenSection] = useState<number | null>(0)
+  const toggle = (i: number) => setOpenSection((prev) => (prev === i ? null : i))
 
   const [newUrl, setNewUrl] = useState('')
   const [adding, setAdding] = useState(false)
@@ -147,38 +152,44 @@ export function RelaySettings({ onClose }: RelaySettingsProps) {
           </span>
         </button>
 
-        <SectionHeader title="conectados" />
-        <p className="px-1 font-mono text-[10px] text-drift-muted/30">
-          relays intercambiáveis. remover um não tira você da rede.
-        </p>
+        <SectionHeader
+          title="conectados"
+          expanded={openSection === 0}
+          onToggle={() => toggle(0)}
+        />
+        <Collapse open={openSection === 0}>
+          <div className="space-y-3">
+            <p className="px-1 font-mono text-[10px] text-drift-muted/30">
+              relays intercambiáveis. remover um não tira você da rede.
+            </p>
 
-        {/* D2 — aviso silent-drop sempre presente quando há relay com moderação.
-            Honra manifesto §17 adendo + invariante #18: cliente DEVE comunicar
-            que relays podem dropar posts sem notificar (W3C 2025 reconhece
-            esse gap protocolar). User clicou opt-in informado. */}
-        {hasModeratedRelay && (
-          <div
-            role="note"
-            aria-label="aviso sobre relays moderados"
-            className="rounded-xl border border-drift-warning/20 bg-drift-warning/5 px-4 py-3 font-mono text-[10px] leading-relaxed text-drift-warning"
-          >
-            você tem relay moderado ativo. relay pode dropar posts sem te notificar
-            — drift sempre publica em ≥2 relays paralelos (§14) pra mitigar. veja
-            política de cada relay no badge ao lado.
-          </div>
-        )}
-        {hasUnknownRelay && !hasModeratedRelay && (
-          <div
-            role="note"
-            aria-label="aviso sobre relays com política não declarada"
-            className="rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3 font-mono text-[10px] leading-relaxed text-drift-muted/60"
-          >
-            alguns relays não declaram política via NIP-11 (badge "política?"). não dá pra saber
-            se moderam — assuma que podem.
-          </div>
-        )}
+            {/* D2 — aviso silent-drop sempre presente quando há relay com moderação.
+                Honra manifesto §17 adendo + invariante #18: cliente DEVE comunicar
+                que relays podem dropar posts sem notificar (W3C 2025 reconhece
+                esse gap protocolar). User clicou opt-in informado. */}
+            {hasModeratedRelay && (
+              <div
+                role="note"
+                aria-label="aviso sobre relays moderados"
+                className="rounded-xl border border-drift-warning/20 bg-drift-warning/5 px-4 py-3 font-mono text-[10px] leading-relaxed text-drift-warning"
+              >
+                você tem relay moderado ativo. relay pode dropar posts sem te notificar
+                — drift sempre publica em ≥2 relays paralelos (§14) pra mitigar. veja
+                política de cada relay no badge ao lado.
+              </div>
+            )}
+            {hasUnknownRelay && !hasModeratedRelay && (
+              <div
+                role="note"
+                aria-label="aviso sobre relays com política não declarada"
+                className="rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3 font-mono text-[10px] leading-relaxed text-drift-muted/60"
+              >
+                alguns relays não declaram política via NIP-11 (badge "política?"). não dá pra saber
+                se moderam — assuma que podem.
+              </div>
+            )}
 
-        <div className="max-h-72 space-y-2 overflow-y-auto pl-3">
+            <div className="max-h-72 space-y-2 overflow-y-auto pl-3">
           {!loaded && (
             <div className="font-mono text-[11px] text-drift-muted/40">carregando…</div>
           )}
@@ -238,36 +249,50 @@ export function RelaySettings({ onClose }: RelaySettingsProps) {
               </div>
             )
           })}
-        </div>
-
-        <SectionHeader title="adicionar" />
-        <div className="space-y-2 pl-3">
-          <input
-            type="text"
-            value={newUrl}
-            onChange={(e) => setNewUrl(e.target.value)}
-            placeholder="wss://relay.exemplo.com"
-            className="w-full rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3 font-mono text-[12px] text-drift-text placeholder:text-drift-muted/25 focus:border-drift-accent2/40 focus:outline-none focus:ring-1 focus:ring-drift-accent2/20"
-          />
-          <button
-            onClick={handleAdd}
-            disabled={adding || !newUrl.trim()}
-            className="w-full rounded-xl bg-drift-accent2 px-4 py-3 font-mono text-[12px] uppercase tracking-meta font-medium text-drift-bg transition-colors hover:bg-drift-accent2/85 disabled:cursor-not-allowed disabled:opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
-          >
-            {adding ? 'adicionando…' : '⊕ adicionar relay'}
-          </button>
-          {error && (
-            <div className="rounded-xl border border-drift-danger/20 bg-drift-danger/5 px-4 py-2.5 font-mono text-[11px] text-drift-danger">
-              {error}
             </div>
-          )}
-        </div>
+          </div>
+        </Collapse>
 
-        <SectionHeader title="NIP-65" />
-        <p className="px-1 font-mono text-[10px] text-drift-muted/30">
-          descobrir relays de outro user ou publicar a sua lista.
-        </p>
-        <div className="space-y-2 pl-3">
+        <SectionHeader
+          title="adicionar"
+          expanded={openSection === 1}
+          onToggle={() => toggle(1)}
+        />
+        <Collapse open={openSection === 1}>
+          <div className="space-y-2 pl-3">
+            <input
+              type="text"
+              value={newUrl}
+              onChange={(e) => setNewUrl(e.target.value)}
+              placeholder="wss://relay.exemplo.com"
+              className="w-full rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3 font-mono text-[12px] text-drift-text placeholder:text-drift-muted/25 focus:border-drift-accent2/40 focus:outline-none focus:ring-1 focus:ring-drift-accent2/20"
+            />
+            <button
+              onClick={handleAdd}
+              disabled={adding || !newUrl.trim()}
+              className="w-full rounded-xl bg-drift-accent2 px-4 py-3 font-mono text-[12px] uppercase tracking-meta font-medium text-drift-bg transition-colors hover:bg-drift-accent2/85 disabled:cursor-not-allowed disabled:opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
+            >
+              {adding ? 'adicionando…' : '⊕ adicionar relay'}
+            </button>
+            {error && (
+              <div className="rounded-xl border border-drift-danger/20 bg-drift-danger/5 px-4 py-2.5 font-mono text-[11px] text-drift-danger">
+                {error}
+              </div>
+            )}
+          </div>
+        </Collapse>
+
+        <SectionHeader
+          title="NIP-65"
+          expanded={openSection === 2}
+          onToggle={() => toggle(2)}
+        />
+        <Collapse open={openSection === 2}>
+          <div className="space-y-3">
+            <p className="px-1 font-mono text-[10px] text-drift-muted/30">
+              descobrir relays de outro user ou publicar a sua lista.
+            </p>
+            <div className="space-y-2 pl-3">
           <input
             type="text"
             value={importNpub}
@@ -296,24 +321,43 @@ export function RelaySettings({ onClose }: RelaySettingsProps) {
               {importMsg}
             </div>
           )}
-          {publishMsg && (
-            <div className="rounded-xl border border-drift-border/20 bg-drift-surface/20 px-4 py-2.5 font-mono text-[11px] text-drift-muted/60">
-              {publishMsg}
+            {publishMsg && (
+              <div className="rounded-xl border border-drift-border/20 bg-drift-surface/20 px-4 py-2.5 font-mono text-[11px] text-drift-muted/60">
+                {publishMsg}
+              </div>
+            )}
             </div>
-          )}
-        </div>
+          </div>
+        </Collapse>
       </div>
     </FullPageCard>
   )
 }
 
-function SectionHeader({ title }: { title: string }) {
+function SectionHeader({
+  title,
+  expanded,
+  onToggle,
+}: {
+  title: string
+  expanded: boolean
+  onToggle: () => void
+}) {
   return (
-    <div className="rounded-2xl border border-drift-border/40 bg-drift-surface/50 px-5 py-3.5">
-      <span className="font-display text-[14px] font-bold uppercase tracking-tag text-drift-accent">
+    <button
+      onClick={onToggle}
+      aria-expanded={expanded}
+      className="flex w-full items-center gap-3 rounded-2xl border border-drift-border/40 bg-drift-surface/50 px-5 py-3.5 text-left transition-colors"
+    >
+      <span className="flex-1 font-display text-[14px] font-bold uppercase tracking-tag text-drift-accent">
         {title}
       </span>
-    </div>
+      <span
+        className={`shrink-0 text-drift-muted/40 transition-transform duration-motion-emphasis ease-drift-inout ${expanded ? 'rotate-180' : ''}`}
+      >
+        <ChevronDownIcon size={16} />
+      </span>
+    </button>
   )
 }
 

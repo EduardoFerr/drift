@@ -40,7 +40,7 @@ import type {
 } from '../../types/drift'
 import { FullPageCard } from '../UI/FullPageCard'
 import { Collapse } from '../UI/Collapse'
-import { ChevronDownIcon } from '../UI/Icons'
+import { ChevronDownIcon, RefreshIcon } from '../UI/Icons'
 
 // ─── Accordion helpers ──────────────────────────────────────────
 
@@ -624,9 +624,9 @@ export function BlobsCard({ onClose }: CardProps) {
               <div className="mt-3 flex gap-2">
                 <button
                   onClick={() => void refresh()}
-                  className="flex-1 rounded-xl border border-drift-border/30 bg-drift-surface/30 px-3 py-2.5 text-[12px] uppercase tracking-meta text-drift-muted transition-colors hover:text-drift-text focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
+                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-drift-border/30 bg-drift-surface/30 px-3 py-2.5 text-[12px] uppercase tracking-meta text-drift-muted transition-colors hover:text-drift-text focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
                 >
-                  ↻ atualizar
+                  <RefreshIcon size={14} /> atualizar
                 </button>
                 {stats.running && (
                   <button
@@ -685,6 +685,7 @@ export function PeersCard({ onClose }: CardProps) {
   const prefs = usePrefsStore()
   const [qrUrl, setQrUrl] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [npubCopied, setNpubCopied] = useState(false)
   const [peerInput, setPeerInput] = useState('')
   const [connecting, setConnecting] = useState(false)
   const [connectError, setConnectError] = useState<string | null>(null)
@@ -721,6 +722,13 @@ export function PeersCard({ onClose }: CardProps) {
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     }
+  }
+
+  async function handleCopyNpub() {
+    if (!identity?.npubBech32 || !navigator.clipboard) return
+    await navigator.clipboard.writeText(identity.npubBech32)
+    setNpubCopied(true)
+    setTimeout(() => setNpubCopied(false), 2000)
   }
 
   async function handleConnect() {
@@ -856,11 +864,22 @@ export function PeersCard({ onClose }: CardProps) {
                     height={200}
                     className="rounded-lg"
                   />
-                  <span className="font-mono text-[10px] text-drift-muted/40 break-all text-center">
-                    {identity?.npubBech32
-                      ? identity.npubBech32.slice(0, 20) + '…' + identity.npubBech32.slice(-8)
-                      : ''}
-                  </span>
+                  <button
+                    onClick={() => void handleCopyNpub()}
+                    disabled={!identity?.npubBech32}
+                    aria-label="copiar npub"
+                    title={identity?.npubBech32 ?? ''}
+                    className="group flex items-center gap-2 rounded-lg border border-drift-border/30 bg-drift-surface/40 px-2.5 py-1.5 font-mono text-[10px] text-drift-muted/60 transition-colors hover:border-drift-accent2/30 hover:text-drift-accent2 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
+                  >
+                    <span className="break-all">
+                      {identity?.npubBech32
+                        ? identity.npubBech32.slice(0, 20) + '…' + identity.npubBech32.slice(-8)
+                        : ''}
+                    </span>
+                    <span aria-hidden="true" className="shrink-0">
+                      {npubCopied ? '✓' : '⎘'}
+                    </span>
+                  </button>
                 </div>
               ) : (
                 <div className="font-mono text-[11px] text-drift-muted/40 text-center py-8">
@@ -1091,9 +1110,15 @@ export function DiagnosticCard({ onClose }: CardProps) {
               <button
                 onClick={handleFetchHistory}
                 disabled={historyRebuilding || !npub}
-                className="w-full rounded-xl bg-drift-accent2 px-4 py-3 font-mono text-[12px] uppercase tracking-meta font-medium text-drift-bg transition-colors hover:bg-drift-accent2/85 disabled:cursor-not-allowed disabled:opacity-25 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-drift-accent2 px-4 py-3 font-mono text-[12px] uppercase tracking-meta font-medium text-drift-bg transition-colors hover:bg-drift-accent2/85 disabled:cursor-not-allowed disabled:opacity-25 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
               >
-                {historyRebuilding ? 'reconstruindo…' : '↻ buscar histórico'}
+                {historyRebuilding ? (
+                  'reconstruindo…'
+                ) : (
+                  <>
+                    <RefreshIcon size={14} /> buscar histórico
+                  </>
+                )}
               </button>
             </div>
           </>
@@ -1109,9 +1134,15 @@ export function DiagnosticCard({ onClose }: CardProps) {
               <button
                 onClick={handleRebuild}
                 disabled={rebuilding}
-                className="w-full rounded-xl border border-drift-warning/20 bg-drift-warning/5 px-4 py-3 font-mono text-[12px] uppercase tracking-meta text-drift-warning transition-colors hover:bg-drift-warning/10 disabled:cursor-not-allowed disabled:opacity-25 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-warning/30"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-drift-warning/20 bg-drift-warning/5 px-4 py-3 font-mono text-[12px] uppercase tracking-meta text-drift-warning transition-colors hover:bg-drift-warning/10 disabled:cursor-not-allowed disabled:opacity-25 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-warning/30"
               >
-                {rebuilding ? 'reconstruindo…' : '↻ redefinir cache local'}
+                {rebuilding ? (
+                  'reconstruindo…'
+                ) : (
+                  <>
+                    <RefreshIcon size={14} /> redefinir cache local
+                  </>
+                )}
               </button>
             </div>
           </>
