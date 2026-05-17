@@ -50,6 +50,7 @@ import { DRIFT_LIMITS } from '../../config/constants'
 import { Image } from '../UI/Image'
 import { FullPageCard } from '../UI/FullPageCard'
 import { DriftButton } from '../UI/DriftButton'
+import { SubpostLayout } from '../Post/SubpostLayout'
 
 export interface ComposeOverlayProps {
   publishing: boolean
@@ -130,6 +131,7 @@ export function ComposeOverlay({
     null,
   )
   const [currentIdx, setCurrentIdx] = useState(0)
+  const [showPreview, setShowPreview] = useState(false)
 
   // Clamp idx — pode acontecer ao remover subpost.
   const safeIdx = Math.max(0, Math.min(currentIdx, drafts.length - 1))
@@ -223,14 +225,15 @@ export function ComposeOverlay({
   // Botão CANCELAR no header right (mockup pattern). Em vez do default
   // FECHAR; UX semântico — "cancela a composição" é mais claro que "fecha".
   const headerRight = (
-    <button
+    <DriftButton
+      variant="ghost"
+      size="md"
       onClick={onClose}
       disabled={publishing}
-      className="rounded border border-drift-border px-3 py-[5px] font-mono text-[12px] uppercase tracking-[2px] text-drift-muted transition-colors hover:text-drift-text disabled:opacity-40 focus:outline-none focus:ring-1 focus:ring-drift-accent2"
       aria-label="cancelar"
     >
       cancelar
-    </button>
+    </DriftButton>
   )
 
   // Footer com -SUB + DRIFT ↑. -SUB só aparece se >1 subpost.
@@ -240,10 +243,10 @@ export function ComposeOverlay({
         <button
           onClick={removeCurrent}
           disabled={publishing}
-          className="rounded border border-drift-border px-[14px] font-mono text-[12px] uppercase tracking-[1px] text-drift-bury transition-colors hover:border-drift-bury disabled:opacity-40 focus:outline-none focus:ring-1 focus:ring-drift-accent2"
+          className="rounded-xl border border-drift-danger/30 bg-drift-danger/5 px-4 font-mono text-[12px] uppercase tracking-meta text-drift-danger transition-colors hover:bg-drift-danger/10 disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-danger/30"
           aria-label="remover subpost atual"
         >
-          - SUB
+          − sub
         </button>
       )}
       {/* DRIFT ↑ via DriftButton primitive (variant primary, size lg).
@@ -300,10 +303,10 @@ export function ComposeOverlay({
                 // pra delimitar; antes era #1e1e1c custom — consolidado em token.
                 className={`relative flex h-[27px] w-[27px] shrink-0 items-center justify-center rounded-full border-[1.5px] font-mono text-[12px] transition-colors focus:outline-none focus:ring-1 focus:ring-drift-accent2 focus:ring-offset-1 focus:ring-offset-drift-bg ${
                   isActive
-                    ? 'border-drift-accent bg-drift-accent font-bold text-drift-bg'
+                    ? 'border-drift-accent2 bg-drift-accent2 font-bold text-drift-bg'
                     : isFilled
-                    ? 'border-drift-border bg-drift-bg text-drift-text'
-                    : 'border-drift-border bg-drift-bg text-drift-muted'
+                    ? 'border-drift-border/40 bg-drift-bg text-drift-text'
+                    : 'border-drift-border/40 bg-drift-bg text-drift-muted'
                 }`}
                 aria-label={`ir pro subpost ${i + 1}`}
                 aria-current={isActive ? 'true' : undefined}
@@ -348,39 +351,47 @@ export function ComposeOverlay({
             onClear={clearImage}
           />
 
-          {/* Textarea (.post-ta) flex:1. Min-height pra evitar CLS quando
-              imagem é adicionada/removida. Placeholder genérico —
-              caption opcional, post de texto puro também aceito. */}
-          <div className="flex min-h-0 flex-1 flex-col">
+          {/* Textarea. Tamanho cap (max-h-44 = ~176px) — 250 chars cabe em
+              ~6 linhas; mais que isso vira scroll interno. Sem flex-1
+              pra não ocupar toda viewport. */}
+          <div className="flex min-h-0 flex-col">
             <textarea
               value={draft.text}
               onChange={(e) => updateCurrent({ text: e.target.value })}
+              maxLength={DRIFT_LIMITS.TEXT_MAX_CHARS}
               placeholder={
                 draft.imageUrl
                   ? 'legenda (opcional)…'
                   : 'escreva o que vai derivar… (ou anexe uma imagem)'
               }
-              rows={5}
+              rows={4}
               data-subpost-input={safeIdx === 0 ? '' : undefined}
-              // Textarea usa drift-bg pra inset visual vs drift-surface do painel.
-              className="min-h-[85px] flex-1 resize-none rounded-sm border-[1.5px] border-drift-border bg-drift-bg p-3 font-mono text-fluid-lg leading-[1.6] text-drift-text placeholder:text-drift-muted focus:border-drift-accent focus:outline-none"
+              className="min-h-[100px] max-h-44 resize-none rounded-xl border border-drift-border/40 bg-drift-bg/60 p-4 font-mono text-fluid-lg leading-[1.6] text-drift-text placeholder:text-drift-muted/40 focus:border-drift-accent2/50 focus:outline-none focus:ring-1 focus:ring-drift-accent2/20"
             />
-            <div className="mt-1 flex items-center justify-between text-[12px]">
+            <div className="mt-1.5 flex items-center justify-between font-mono text-[11px]">
               <span
                 className={
                   overLimit
-                    ? 'text-drift-bury'
+                    ? 'text-drift-danger'
                     : nearLimit
                     ? 'text-drift-warning'
-                    : 'text-drift-muted'
+                    : 'text-drift-muted/50'
                 }
                 title={`${used} de ${DRIFT_LIMITS.TEXT_MAX_CHARS} caracteres usados`}
                 aria-label={`${used} de ${DRIFT_LIMITS.TEXT_MAX_CHARS} caracteres usados`}
               >
                 {used} / {DRIFT_LIMITS.TEXT_MAX_CHARS}
               </span>
+              <button
+                type="button"
+                onClick={() => setShowPreview(true)}
+                disabled={allEmpty}
+                className="rounded-lg border border-drift-accent2/30 bg-drift-surface/30 px-3 py-1 font-mono text-[10px] uppercase tracking-meta text-drift-accent2 transition-colors hover:bg-drift-accent2/10 disabled:cursor-not-allowed disabled:opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
+              >
+                ◐ prévia
+              </button>
               {draft.uploadError && (
-                <span className="ml-3 truncate font-mono text-drift-bury" title={draft.uploadError}>
+                <span className="ml-3 truncate text-drift-danger" title={draft.uploadError}>
                   {draft.uploadError}
                 </span>
               )}
@@ -402,19 +413,118 @@ export function ComposeOverlay({
             <div
               role="note"
               aria-label="sugestão de aviso de conteúdo"
-              className="rounded border border-drift-warning/40 bg-drift-warning/5 px-3 py-2 font-mono text-[12px] leading-snug text-drift-warning"
+              className="rounded-xl border border-drift-warning/20 bg-drift-warning/5 px-4 py-3 font-mono text-[11px] leading-snug text-drift-warning"
             >
-              <span className="mr-1" aria-hidden="true">⚠</span>
-              Seu post tem imagem mas nenhum aviso de conteúdo. Considere
-              adicionar (NSFW, violência, spoiler, ad) acima — ajuda quem
-              filtra. Manifesto §27 — auto-classificação voluntária.
+              post com imagem sem aviso. considere marcar acima (NSFW, violência, spoiler, ad) — ajuda quem filtra.
             </div>
           )}
         </div>
       </div>
+
+      {showPreview && (
+        <PreviewOverlay
+          drafts={drafts}
+          contentWarning={contentWarning}
+          onClose={() => setShowPreview(false)}
+        />
+      )}
     </FullPageCard>
   )
 }
+
+// ─── Preview overlay ─────────────────────────────────────────────────
+
+/**
+ * PreviewOverlay — renderiza o draft como o card apareceria no feed.
+ * Constrói um Post mock a partir dos drafts não-vazios; SubpostLayout
+ * cuida do render (mesmo componente do feed, manifesto §7 determinismo).
+ *
+ * Carrossel simples (← →) entre subposts quando há mais de 1.
+ */
+function PreviewOverlay({
+  drafts,
+  contentWarning,
+  onClose,
+}: {
+  drafts: DraftSubpost[]
+  contentWarning: ContentWarning | null
+  onClose: () => void
+}) {
+  const filled = drafts.filter((d) => !isDraftEmpty(d))
+  const subposts: Subpost[] = filled.length === 0
+    ? [{ id: 'preview-empty', type: 'text', text: '(vazio)', imageUrl: null, order: 0, layout: 'text' }]
+    : filled.map((d, i) => draftToSubpost(d, i))
+  const [idx, setIdx] = useState(0)
+  const safeIdx = Math.max(0, Math.min(idx, subposts.length - 1))
+  const total = subposts.length
+
+  const mockPost: import('../../types/drift').Post = {
+    id: 'preview-mock',
+    authorPub: 'preview',
+    content: '',
+    subposts,
+    createdAt: Math.floor(Date.now() / 1000),
+    category: null,
+    location: null,
+    client: 'drift-official',
+    contentWarning,
+    score: 0,
+    spreads: 0,
+    buries: 0,
+    authorAlias: 'você',
+  }
+
+  return (
+    <div
+      className="absolute inset-0 z-10 flex flex-col bg-drift-bg"
+      role="dialog"
+      aria-modal="true"
+      aria-label="prévia do post"
+    >
+      <header className="flex shrink-0 items-center justify-between border-b border-drift-border/40 px-5 py-[15px]">
+        <h2 className="font-display text-[14px] font-bold uppercase tracking-tag text-drift-accent">
+          prévia
+        </h2>
+        <DriftButton variant="ghost" size="md" onClick={onClose} aria-label="voltar à edição">
+          voltar
+        </DriftButton>
+      </header>
+
+      <div className="flex min-h-0 flex-1 flex-col px-4 py-4">
+        <div className="relative flex-1 overflow-hidden rounded-2xl border border-drift-border/40 bg-drift-surface">
+          <SubpostLayout subpost={subposts[safeIdx]!} post={mockPost} subpostIdx={safeIdx} subpostsTotal={total} />
+        </div>
+
+        {total > 1 && (
+          <div className="mt-3 flex shrink-0 items-center justify-center gap-3">
+            <button
+              type="button"
+              onClick={() => setIdx((i) => Math.max(0, i - 1))}
+              disabled={safeIdx === 0}
+              className="rounded-lg border border-drift-border/30 bg-drift-surface/30 px-3 py-1.5 font-mono text-[12px] text-drift-muted/70 transition-colors hover:text-drift-text disabled:opacity-25"
+              aria-label="subpost anterior"
+            >
+              ←
+            </button>
+            <span className="font-mono text-[11px] uppercase tracking-meta text-drift-muted/50">
+              {safeIdx + 1} / {total}
+            </span>
+            <button
+              type="button"
+              onClick={() => setIdx((i) => Math.min(total - 1, i + 1))}
+              disabled={safeIdx === total - 1}
+              className="rounded-lg border border-drift-border/30 bg-drift-surface/30 px-3 py-1.5 font-mono text-[12px] text-drift-muted/70 transition-colors hover:text-drift-text disabled:opacity-25"
+              aria-label="próximo subpost"
+            >
+              →
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 
 // ─── Drop area ───────────────────────────────────────────────────────
 
@@ -430,10 +540,10 @@ function ImageDrop({
   // Altura fixa 125px = anti-CLS quando imagem carrega.
   return (
     <label
-      className={`relative flex h-[125px] shrink-0 cursor-pointer flex-col items-center justify-center gap-[7px] overflow-hidden rounded-sm border-[1.5px] border-dashed transition-colors ${
+      className={`relative flex h-[125px] shrink-0 cursor-pointer flex-col items-center justify-center gap-2 overflow-hidden rounded-xl border border-dashed transition-colors ${
         draft.imageUrl
-          ? 'border-drift-border'
-          : 'border-drift-border hover:border-drift-accent'
+          ? 'border-drift-border/40'
+          : 'border-drift-border/40 bg-drift-bg/30 hover:border-drift-accent2/40'
       }`}
     >
       {draft.imageUrl ? (
@@ -456,17 +566,17 @@ function ImageDrop({
               e.preventDefault()
               onClear()
             }}
-            className="absolute right-[7px] top-[7px] z-[2] rounded border border-drift-border bg-[rgba(0,0,0,0.75)] px-2 py-[3px] font-mono text-[12px] text-drift-bury transition-colors hover:border-drift-bury"
+            className="absolute right-2 top-2 z-[2] rounded-lg border border-drift-danger/30 bg-drift-bg/75 px-2.5 py-1 font-mono text-[11px] uppercase tracking-meta text-drift-danger transition-colors hover:bg-drift-danger/15"
           >
-            REMOVER
+            remover
           </button>
         </>
       ) : (
         <>
-          <span aria-hidden="true" className="text-[24px] opacity-35">
-            🖼
+          <span aria-hidden="true" className="text-[20px] opacity-50">
+            ◐
           </span>
-          <span className="font-mono text-[12px] uppercase tracking-meta text-drift-muted">
+          <span className="font-mono text-[11px] uppercase tracking-meta text-drift-muted/60">
             {draft.uploading ? 'fazendo upload…' : 'adicionar imagem'}
           </span>
         </>
@@ -496,14 +606,14 @@ function ContentWarningRow({
   onChange: (v: ContentWarning | null) => void
 }) {
   return (
-    <div className="shrink-0 border-t border-drift-border pt-[10px]">
+    <div className="shrink-0 border-t border-drift-border/40 pt-3">
       <div
-        className="mb-[7px] font-mono text-[12px] uppercase tracking-[2px] text-drift-muted"
+        className="mb-2 font-mono text-[11px] uppercase tracking-meta text-drift-muted/50"
         title="manifesto §27 — autor declara, leitor filtra"
       >
         marcar conteúdo (opcional)
       </div>
-      <div className="flex flex-wrap gap-[5px]">
+      <div className="flex flex-wrap gap-1.5">
         {CONTENT_WARNING_VALUES.map((cw) => {
           const active = value === cw
           return (
@@ -511,10 +621,10 @@ function ContentWarningRow({
               key={cw}
               type="button"
               onClick={() => onChange(active ? null : cw)}
-              className={`rounded-sm border-[1.5px] px-[10px] py-[5px] font-mono text-[12px] uppercase tracking-meta transition-colors focus:outline-none focus:ring-1 focus:ring-drift-accent2 ${
+              className={`rounded-lg border px-3 py-1.5 font-mono text-[11px] uppercase tracking-meta transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40 ${
                 active
-                  ? 'border-drift-warning bg-drift-warning/15 text-drift-warning'
-                  : 'border-drift-border text-drift-muted hover:border-drift-text hover:text-drift-text'
+                  ? 'border-drift-warning/50 bg-drift-warning/10 text-drift-warning'
+                  : 'border-drift-border/30 bg-drift-surface/30 text-drift-muted hover:border-drift-accent2/30 hover:text-drift-text'
               }`}
             >
               {active ? '✓ ' : ''}

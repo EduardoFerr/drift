@@ -30,17 +30,13 @@ export const DRIFT_KIND = {
 /** Conjunto para checagem rápida de kind Drift (early return em events.ts) */
 export const DRIFT_KIND_SET: ReadonlySet<number> = new Set(Object.values(DRIFT_KIND))
 
-// 256 chars = power-of-2, alinha com memory page allocators.
-// 8 subposts × 256 = 2048 chars = 2KB exact slot. Convenção CS clássica
-// de byte-economy. Aplicado uniformemente em posts E comments (user
-// feedback 2026-05-08): mesmo cap pra ambos previne divergência visual
-// + força brevidade. Antes: 280 posts / 1000 comments — divergente,
-// comments podiam estourar card.
-// 250 → 256 user-deliberado: "verifique melhor uso de memória entre
-// 200 e 300 caracteres, não queremos desperdiçar bytes" — power-of-2
-// ganha trade-off vs 250 round ou 280 Twitter-familiar.
+// 250 chars (user feedback 2026-05-17): cap round + enforced via
+// textarea `maxLength`. Antes 256 (power-of-2 byte-economy), revertido
+// porque user prefere UX previsível ("250" no contador) sobre
+// alinhamento de memória — diff é 6 bytes/post, irrelevante.
+// 8 subposts × 250 = 2000 chars body máximo.
 export const DRIFT_LIMITS = {
-  TEXT_MAX_CHARS: 256,
+  TEXT_MAX_CHARS: 250,
   MAX_SUBPOSTS_ABS: 8,
   MAX_POSTS_CACHE: 10_000,
   CACHE_CLEANUP_MS: 6 * 60 * 60 * 1000, // 6h
