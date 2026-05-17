@@ -21,7 +21,23 @@ import {
   isPasskeySupported,
 } from '../../lib/passkey'
 import type { DriftIdentity } from '../../types/drift'
-import { CopyIcon, CheckIcon, DownloadIcon } from '../UI/Icons'
+import { CopyIcon, CheckIcon, DownloadIcon, WarningIcon, PlusIcon, XIcon } from '../UI/Icons'
+
+// ─── Barney security guards — manifesto §8 (nsec NUNCA persiste em claro) ──
+//
+// Threats: Win+V clipboard history (default ON desde Windows 10 1809),
+// iCloud Universal Clipboard (sincroniza pra outros devices Apple),
+// 3rd-party clipboard managers (Gboard/SwiftKey/Samsung), extensões
+// Chrome com `clipboardRead`. Sem guards, copy = persistência em claro
+// fora do controle do app → viola §8 literalmente.
+//
+// Mitigações shipped 2026-05-17 (HIMYM Barney audit):
+//   - Auto-clear clipboard após NSEC_CLIPBOARD_TTL_MS (30s)
+//   - Auto-hide reveal após NSEC_REVEAL_TTL_MS (60s) sem interação
+//   - Warning explícito acima do bloco copy/download
+//   - QR + download visualmente promovidos (primary > copy)
+const NSEC_CLIPBOARD_TTL_MS = 30_000
+const NSEC_REVEAL_TTL_MS = 60_000
 
 /**
  * Modal de identidade.
@@ -96,6 +112,9 @@ function BackupTab({ identity }: { identity: DriftIdentity }) {
   const [reveal, setReveal] = useState(false)
   const [qrUrl, setQrUrl] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  // Countdown ms restante até clipboard ser limpo (Barney §8 guard).
+  // null = sem copy ativo ou já limpo.
+  const [clipboardTtlMs, setClipboardTtlMs] = useState<number | null>(null)
   const [npubCopied, setNpubCopied] = useState(false)
   const [downloaded, setDownloaded] = useState(false)
   // Track C.3 — checkbox de confirmação. UX guia: user precisa
@@ -103,6 +122,8 @@ function BackupTab({ identity }: { identity: DriftIdentity }) {
   // só sinaliza visualmente. Manifesto §3 — usuário detém a chave.
   const [confirmed, setConfirmed] = useState(false)
   const qrRef = useRef<string | null>(null)
+  const clipboardClearAtRef = useRef<number | null>(null)
+  const revealStartedAtRef = useRef<number | null>(null)
 
   useEffect(() => {
     if (!reveal) return
@@ -118,11 +139,52 @@ function BackupTab({ identity }: { identity: DriftIdentity }) {
       .catch((err) => console.error('[qr]', err))
   }, [reveal, identity.nsecBech32])
 
+  // Auto-hide reveal após NSEC_REVEAL_TTL_MS sem interação — reduz
+  // screenshot/screen-share leak window (Barney §8 guard).
+  useEffect(() => {
+    if (!reveal) {
+      revealStartedAtRef.current = null
+      return
+    }
+    revealStartedAtRef.current = Date.now()
+    const timer = window.setTimeout(() => {
+      setReveal(false)
+      setQrUrl(null)
+      qrRef.current = null
+    }, NSEC_REVEAL_TTL_MS)
+    return () => window.clearTimeout(timer)
+  }, [reveal])
+
+  // Tick clipboard countdown a cada 1s + clear quando TTL expira.
+  useEffect(() => {
+    if (clipboardTtlMs === null) return
+    if (clipboardTtlMs <= 0) {
+      // Limpa clipboard se ainda contém nosso nsec (best-effort —
+      // outras escritas podem ter sobrescrito; safe overwrite).
+      void navigator.clipboard.writeText('').catch(() => {
+        // Permissão clipboard negada após copy? Silencioso —
+        // user já foi alertado pelo warning banner.
+      })
+      clipboardClearAtRef.current = null
+      setClipboardTtlMs(null)
+      setCopied(false)
+      return
+    }
+    const tick = window.setTimeout(() => {
+      const deadline = clipboardClearAtRef.current
+      if (deadline === null) return
+      const remaining = deadline - Date.now()
+      setClipboardTtlMs(Math.max(0, remaining))
+    }, 1000)
+    return () => window.clearTimeout(tick)
+  }, [clipboardTtlMs])
+
   async function handleCopy() {
     try {
       await navigator.clipboard.writeText(identity.nsecBech32)
       setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      clipboardClearAtRef.current = Date.now() + NSEC_CLIPBOARD_TTL_MS
+      setClipboardTtlMs(NSEC_CLIPBOARD_TTL_MS)
     } catch (err) {
       console.error('[copy]', err)
     }
@@ -190,6 +252,7 @@ function BackupTab({ identity }: { identity: DriftIdentity }) {
           </span>
           <button
             onClick={() => setReveal((r) => !r)}
+            title={reveal ? 'ocultar automaticamente em 60s' : 'revelar — auto-oculta em 60s'}
             className="font-mono text-[10px] uppercase tracking-meta text-drift-muted transition-colors hover:text-drift-text focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
           >
             {reveal ? 'ocultar' : 'revelar'}
@@ -202,7 +265,9 @@ function BackupTab({ identity }: { identity: DriftIdentity }) {
               {identity.nsecBech32}
             </div>
 
-            <div className="rounded-xl border border-drift-border/30 bg-drift-surface/30 p-5">
+            {/* QR code — caminho primário (sem clipboard exposure).
+                Manifesto §8 — preferir QR/download a copy. */}
+            <div className="rounded-xl border border-drift-accent2/25 bg-drift-surface/30 p-5">
               {qrUrl ? (
                 <div className="flex flex-col items-center gap-3">
                   <img
@@ -212,6 +277,9 @@ function BackupTab({ identity }: { identity: DriftIdentity }) {
                     width={240}
                     height={240}
                   />
+                  <p className="text-center font-mono text-[10px] uppercase tracking-meta text-drift-accent2/70">
+                    escaneie pra importar em outro device
+                  </p>
                 </div>
               ) : (
                 <div className="grid h-[240px] place-items-center font-mono text-[11px] text-drift-muted/40">
@@ -220,25 +288,52 @@ function BackupTab({ identity }: { identity: DriftIdentity }) {
               )}
             </div>
 
-            <div className="flex gap-2">
-              <button
-                onClick={handleCopy}
-                aria-label="copiar nsec"
-                className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-drift-border/30 bg-drift-surface/30 px-3 py-3 font-mono text-[12px] uppercase tracking-meta text-drift-muted transition-colors hover:border-drift-accent2/30 hover:text-drift-accent2 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
-              >
-                {copied ? <CheckIcon size={14} /> : <CopyIcon size={14} />}
-                <span aria-live="polite">{copied ? 'copiado' : 'copiar nsec'}</span>
-              </button>
-              <button
-                onClick={handleDownload}
-                aria-label="baixar arquivo de backup"
-                title="Baixa um arquivo .json com nsec + npub + metadados. Guarde em local seguro."
-                className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-drift-accent2/25 bg-drift-surface/30 px-3 py-3 font-mono text-[12px] uppercase tracking-meta text-drift-accent2 transition-colors hover:bg-drift-accent2/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
-              >
-                {downloaded ? <CheckIcon size={14} /> : <DownloadIcon size={14} />}
-                <span aria-live="polite">{downloaded ? 'baixado' : 'baixar arquivo'}</span>
-              </button>
+            {/* Download primary CTA — arquivo local, sem clipboard. */}
+            <button
+              onClick={handleDownload}
+              aria-label="baixar arquivo de backup"
+              title="Baixa um arquivo .json com nsec + npub + metadados. Guarde em local seguro."
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-drift-accent2/40 bg-drift-accent2/10 px-3 py-3.5 font-mono text-[12px] uppercase tracking-meta text-drift-accent2 transition-colors hover:bg-drift-accent2/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
+            >
+              {downloaded ? <CheckIcon size={14} /> : <DownloadIcon size={14} />}
+              <span aria-live="polite">
+                {downloaded ? 'baixado' : 'baixar arquivo (recomendado)'}
+              </span>
+            </button>
+
+            {/* Warning Barney §8: clipboard pode vazar via Win+V/iCloud.
+                Visível ANTES do botão copy. */}
+            <div
+              role="alert"
+              className="flex items-start gap-2 rounded-xl border border-drift-warning/30 bg-drift-warning/5 px-3 py-2.5 font-mono text-[11px] leading-relaxed text-drift-warning"
+            >
+              <span className="mt-0.5 shrink-0" aria-hidden="true">
+                <WarningIcon size={14} />
+              </span>
+              <span>
+                Copy expõe o nsec ao clipboard do sistema (histórico do
+                Windows com Win+V, área de transferência universal do iCloud,
+                gerenciadores de senhas e extensões do navegador podem ler).
+                <strong className="text-drift-warning"> Prefira QR ou arquivo</strong>.
+              </span>
             </div>
+
+            {/* Copy secondary — só pra quem entende o tradeoff. Com
+                countdown visível e auto-clear em 30s. */}
+            <button
+              onClick={handleCopy}
+              aria-label="copiar nsec apesar do risco"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-drift-border/30 bg-drift-surface/20 px-3 py-3 font-mono text-[11px] uppercase tracking-meta text-drift-muted/70 transition-colors hover:border-drift-warning/30 hover:text-drift-warning focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
+            >
+              {copied ? <CheckIcon size={14} /> : <CopyIcon size={14} />}
+              <span aria-live="polite">
+                {copied && clipboardTtlMs !== null
+                  ? `copiado · limpa em ${Math.ceil(clipboardTtlMs / 1000)}s`
+                  : copied
+                  ? 'limpo do clipboard'
+                  : 'copiar mesmo assim'}
+              </span>
+            </button>
           </div>
         ) : (
           <div className="rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3 font-mono text-[12px] text-drift-muted/40">
@@ -360,9 +455,10 @@ function ImportTab({ onClose }: { onClose: () => void }) {
         <button
           onClick={() => fileInputRef.current?.click()}
           disabled={busy}
-          className="w-full rounded-xl border border-drift-accent2/25 bg-drift-surface/30 px-4 py-3 font-mono text-[12px] uppercase tracking-meta text-drift-accent2 transition-colors hover:bg-drift-accent2/10 disabled:cursor-not-allowed disabled:opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-drift-accent2/25 bg-drift-surface/30 px-4 py-3 font-mono text-[12px] uppercase tracking-meta text-drift-accent2 transition-colors hover:bg-drift-accent2/10 disabled:cursor-not-allowed disabled:opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
         >
-          ⤓ carregar arquivo de backup (.json)
+          <DownloadIcon size={14} />
+          carregar arquivo de backup (.json)
         </button>
         {loadedFrom && (
           <div className="mt-2 truncate px-1 font-mono text-[11px] text-drift-accent2/80" title={loadedFrom}>
@@ -418,9 +514,16 @@ function ImportTab({ onClose }: { onClose: () => void }) {
         <button
           onClick={handleImport}
           disabled={busy || !nsec.trim()}
-          className="flex-1 rounded-xl bg-drift-accent2 px-3 py-3 font-mono text-[12px] uppercase tracking-meta font-medium text-drift-bg transition-colors hover:bg-drift-accent2/85 disabled:cursor-not-allowed disabled:opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
+          className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-drift-accent2 px-3 py-3 font-mono text-[12px] uppercase tracking-meta font-medium text-drift-bg transition-colors hover:bg-drift-accent2/85 disabled:cursor-not-allowed disabled:opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
         >
-          {busy ? 'importando…' : '⊕ importar'}
+          {busy ? (
+            'importando…'
+          ) : (
+            <>
+              <PlusIcon size={14} />
+              importar
+            </>
+          )}
         </button>
       </div>
     </div>
@@ -520,18 +623,32 @@ function PasskeyTab({ npub }: { npub: string }) {
           <button
             onClick={handleDisable}
             disabled={working}
-            className="w-full rounded-xl border border-drift-warning/20 bg-drift-warning/5 px-4 py-3 font-mono text-[12px] uppercase tracking-meta text-drift-warning transition-colors hover:bg-drift-warning/10 disabled:cursor-not-allowed disabled:opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-warning/30"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-drift-warning/20 bg-drift-warning/5 px-4 py-3 font-mono text-[12px] uppercase tracking-meta text-drift-warning transition-colors hover:bg-drift-warning/10 disabled:cursor-not-allowed disabled:opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-warning/30"
           >
-            {working ? 'desabilitando…' : '⊗ desabilitar passkey'}
+            {working ? (
+              'desabilitando…'
+            ) : (
+              <>
+                <XIcon size={14} />
+                desabilitar passkey
+              </>
+            )}
           </button>
         </div>
       ) : (
         <button
           onClick={handleEnable}
           disabled={working}
-          className="w-full rounded-xl bg-drift-accent2 px-4 py-3 font-mono text-[12px] uppercase tracking-meta font-medium text-drift-bg transition-colors hover:bg-drift-accent2/85 disabled:cursor-not-allowed disabled:opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-drift-accent2 px-4 py-3 font-mono text-[12px] uppercase tracking-meta font-medium text-drift-bg transition-colors hover:bg-drift-accent2/85 disabled:cursor-not-allowed disabled:opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
         >
-          {working ? 'registrando…' : '⊕ habilitar passkey'}
+          {working ? (
+            'registrando…'
+          ) : (
+            <>
+              <PlusIcon size={14} />
+              habilitar passkey
+            </>
+          )}
         </button>
       )}
     </div>

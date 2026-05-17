@@ -47,6 +47,45 @@ Quando user fecha, marcar `[x]` com data + 1 linha de resolução.
 
 ---
 
+## Infra / Arquitetura — adicionados 2026-05-17 (sessão noite)
+
+- [ ] **i18n — spike + POC + relatório** — investigar internacionalização
+  do Drift. App hoje é monolinguagem PT-BR (com termos protocolares EN).
+  Spike deve cobrir:
+    - Bibliotecas avaliadas: react-intl (FormatJS), i18next + react-i18next,
+      LinguiJS, Format-Message, custom Zustand-based, $localize Angular-style
+    - Custo de bundle (gz delta), runtime overhead, DX
+    - Modelo de chaves: hierárquico (`settings.network.title`) vs flat
+      (`settings_network_title`)
+    - ICU MessageFormat (plural/gender) — necessário pro Drift?
+    - Pluralização PT-BR (singular/plural) — quão crítico?
+    - RTL languages (árabe, hebraico) — escopo Phase 2?
+    - Como interagir com glossário protocolar (DRIFT, SPREAD, BURY, nsec)
+      que NUNCA traduz?
+    - Onde guardar strings: JSON imports vs inline + extract script?
+    - Workflow tradução: machine-only, comunidade, ambos?
+    - Detecção idioma: navigator.language? user pref override?
+  Entregar: relatório em `Docs/sessions/i18n-spike-2026-MM-DD.md` com
+  recomendação + custo + roadmap (não código de produção).
+  Bloqueio: precisa decisão de prioridade vs outros gaps; aguardando
+  go pra spike.
+
+- [ ] **Ícones header (🌐 NetworkMode + 📍 LocationGranularity) — escopo
+  expandido?** — hoje são dual-path pra Settings (atalhos visuais).
+  User questiona: vale centralizar mais funções neles? Ex:
+    - Long-press → status detalhado (peers, relays, latência)
+    - Tap → cycle entre presets (clearnet → tor → onion-only)
+    - Combinar com PeersCard / RelaySettings no mesmo card
+  HIMYM deliberou (relatório nesta sessão).
+  Bloqueio: aguardando decisão pós-deliberação.
+
+- [ ] **Atomic Design adoption** — user perguntou se seguir atomic design
+  (atoms / molecules / organisms / templates / pages) facilitaria
+  construções como StatusIndicators + tooltips + tab groups. HIMYM
+  deliberou (relatório nesta sessão).
+  Bloqueio: aguardando decisão de scope (refactor grande vs grandfather
+  existente + aplicar só em novos components).
+
 ## UX / Design — adicionados 2026-05-17 (sessão tarde)
 
 - [ ] **Refresh icon location no header** — o ícone de atualizar próximo ao
