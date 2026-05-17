@@ -290,8 +290,29 @@ export async function commentOnPost(input: CommentOnPostInput): Promise<SignedEv
   return event
 }
 
+/**
+ * Publica DUAL report (kind 9081 Drift native + kind 1984 NIP-56).
+ *
+ * Manifesto §29 (compat Nostr) — Drift agora interopera com Damus,
+ * Snort, Iris via NIP-56 sem perder pipeline interno (weight,
+ * threshold dinâmico §26). Ingestão local via `onNostrEvent` dedupliza
+ * via UNIQUE (post_id, reporter_pub).
+ *
+ * Retorna o evento PRIMÁRIO (9081) pra compat com callers existentes
+ * que esperam SignedEvent único. O evento 1984 vai pros mesmos relays
+ * lado-a-lado, fire-and-forget.
+ *
+ * Privacy WARNING — D4 do plano relay moderation: reporter pubkey é
+ * PÚBLICO em AMBOS os eventos (assinatura Schnorr). UI deve avisar
+ * antes de chamar isso. Multi-identidade (§15) permite usar nsec
+ * descartável pra reports sensíveis.
+ */
 export async function reportPost(input: ReportPostInput): Promise<SignedEvent> {
-  const event = await signDriftEvent({
+  const { mapDriftToNip56 } = await import('./nip56-mapping')
+  const nip56Type = mapDriftToNip56(input.reason)
+
+  // Kind 9081 Drift native — pipeline interno (weight + threshold §26).
+  const event9081 = await signDriftEvent({
     kind: DRIFT_KIND.REPORT,
     tags: [
       ['e', input.postId],
@@ -300,6 +321,29 @@ export async function reportPost(input: ReportPostInput): Promise<SignedEvent> {
     ],
     content: '',
   })
-  await publishToRelays(event)
-  return event
+
+  // Kind 1984 NIP-56 — compat ecossistema Nostr. report_type vai
+  // como [3] de `e`/`p` (spec literal). Drift-version tag distingue
+  // emit Drift do externo (anti-weaponization cross-client).
+  const event1984 = await signDriftEvent({
+    kind: 1984,
+    tags: [
+      ['e', input.postId, '', nip56Type],
+      ['p', input.authorPub, '', nip56Type],
+      ['drift-version', '1'],
+    ],
+    content: '',
+  })
+
+  // Broadcast paralelo — ambos os events vão pros mesmos relays.
+  // 9081 retornado primeiro pra preservar API callers; 1984 não-aguardado
+  // já é publicado em paralelo. Eventual failure de 1984 não bloqueia.
+  const publish9081 = publishToRelays(event9081)
+  const publish1984 = publishToRelays(event1984).catch((err) => {
+    // Log mas não throw — 9081 é o caminho crítico pro pipeline interno.
+    console.warn('[protocol] NIP-56 (kind 1984) publish falhou:', err)
+  })
+  await Promise.all([publish9081, publish1984])
+
+  return event9081
 }

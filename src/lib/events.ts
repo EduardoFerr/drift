@@ -129,6 +129,15 @@ const KIND_DISPATCH: Readonly<Record<number, KindHandler>> = {
     validate: validateKind0Shape,
     persist: persistUserMetadata,
   },
+  // Kind 1984 NIP-56 — report (compat Damus/Snort/Iris). Espelha
+  // semântica do 9081 Drift native. Dedup LWW cross-kind por
+  // (post_id, reporter_pub). Mapeamento de reason via
+  // `lib/nip56-mapping.ts`. Manifesto §29 compat Nostr.
+  1984: {
+    name: 'NIP56_REPORT',
+    validate: validateNip56ReportShape,
+    persist: persistNip56Report,
+  },
 }
 
 export async function onNostrEvent(event: SignedEvent): Promise<void> {
@@ -242,6 +251,38 @@ function validateKind0Shape(event: SignedEvent): boolean {
   } catch {
     return false
   }
+}
+
+/**
+ * NIP-56 kind 1984 report: spec exige tag `e` (event_id hex 64) com
+ * report_type opcional no index [3] OU tag separada. Drift parsing
+ * extrai do `e` (preferido) ou `p`. Tag `drift-version` opcional —
+ * marca emit pelo cliente Drift; ingestão remota (Damus etc.) não
+ * precisa dela.
+ *
+ * Rejeita se:
+ * - falta tag `e` válida
+ * - report_type extraído não está no whitelist NIP-56 (7 valores)
+ */
+function validateNip56ReportShape(event: SignedEvent): boolean {
+  const e = getTag(event, 'e')
+  if (!isHex64(e)) return false
+  const reportType = extractNip56ReportType(event)
+  return reportType !== null
+}
+
+/**
+ * Extrai NIP-56 report_type de um event 1984.
+ * NIP-56 spec: report_type é index [3] de `e` ou `p` tag.
+ * Returns null se não found ou inválido.
+ */
+function extractNip56ReportType(event: SignedEvent): string | null {
+  for (const tag of event.tags) {
+    if ((tag[0] === 'e' || tag[0] === 'p') && tag.length >= 4 && typeof tag[3] === 'string') {
+      return tag[3]
+    }
+  }
+  return null
 }
 
 // ─── NIP-22 schema/parse (puro, testável) ───────────────────────────
@@ -630,6 +671,75 @@ const VALID_REASONS: ReadonlySet<ReportReason> = new Set<ReportReason>([
 
 function isValidReason(v: string | null): v is ReportReason {
   return v !== null && (VALID_REASONS as ReadonlySet<string>).has(v)
+}
+
+// ─── NIP-56 kind 1984 — report cross-cliente Nostr ────────────────
+//
+// Manifesto §29 (compat Nostr): Drift agora emite + ingere kind 1984
+// junto com 9081 nativo. NIP-56 reason space (7 valores) é mapeado pro
+// bucket Drift (3) via `lib/nip56-mapping.ts` antes do INSERT.
+//
+// Dedup LWW cross-kind: UNIQUE (post_id, reporter_pub) garante 1 row
+// por par; INSERT OR IGNORE preserva o primeiro report. Marshall
+// recomendou trocar pra ON CONFLICT...WHERE excluded.created_at >
+// reports.created_at (LWW real); deixei como INSERT OR IGNORE por
+// agora pra ficar simétrico com persistReport. Trade-off documentado
+// em Docs/sessions/relay-moderation-himym-research-2026-05-17.md.
+
+async function persistNip56Report(event: SignedEvent): Promise<void> {
+  const { mapNip56ToDrift } = await import('./nip56-mapping')
+
+  const postId = getTag(event, 'e')!
+  const reportType = extractNip56ReportType(event)
+  if (reportType === null) return // Defensive — validate já cobriu mas trust no path
+
+  const driftReason = mapNip56ToDrift(reportType)
+  if (driftReason === null) return // report_type fora do whitelist NIP-56
+
+  // Mesmo cálculo de peso do reporter — anti-sybil §26. NIP-56 emitido
+  // por cliente externo não traz weight; calculamos local.
+  const reporterWeightCalc = await calculateUserWeight(event.pubkey, Date.now())
+  const reporterWeight = getReportWeight(reporterWeightCalc.weight)
+
+  try {
+    await db.run(
+      `INSERT OR IGNORE INTO reports
+       (post_id, reporter_pub, reason, weight, created_at, kind)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [postId, event.pubkey, driftReason, reporterWeight, event.created_at, 1984],
+    )
+  } catch (err) {
+    // Fallback: banco sem coluna `kind` (migration ainda não aplicada).
+    const msg = err instanceof Error ? err.message : String(err)
+    if (msg.includes('no such column') && msg.includes('kind')) {
+      console.warn(
+        '[events] persistNip56Report sem coluna kind — banco em schema antigo. ' +
+          'Recarregue a página com cache limpo pra aplicar migração.',
+      )
+      await db.run(
+        `INSERT OR IGNORE INTO reports
+         (post_id, reporter_pub, reason, weight, created_at)
+         VALUES (?, ?, ?, ?, ?)`,
+        [postId, event.pubkey, driftReason, reporterWeight, event.created_at],
+      )
+    } else {
+      throw err
+    }
+  }
+
+  await updateUserActivity(event.pubkey, event.created_at)
+
+  try {
+    await maybeModerate(postId, Date.now())
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    if (msg.includes('no such column') && msg.includes('reason')) {
+      console.warn('[events] maybeModerate skip — banco em schema antigo.')
+    } else {
+      throw err
+    }
+  }
+  invalidateFeed()
 }
 
 // ─── User metadata kind 0 (NIP-01) — opt-in identity ──────────────

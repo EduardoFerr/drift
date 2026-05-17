@@ -92,6 +92,24 @@ CREATE TABLE IF NOT EXISTS buries (
 CREATE INDEX IF NOT EXISTS idx_buries_post ON buries(post_id);
 
 -- ── Reports ──────────────────────────────────────────────────────
+-- Reports (kind 9081 Drift native + kind 1984 NIP-56 dual stack).
+--
+-- Manifesto §29 (compat Nostr): Drift emite AMBOS kind 9081 (pipeline
+-- interno com weight + threshold dinâmico §26) E kind 1984 NIP-56
+-- (compat Damus/Snort/Iris). Cliente ingere ambos; dedup LWW por
+-- (post_id, reporter_pub, created_at) — primeiro report do par stays;
+-- segundo (mesmo reporter+post, kind diferente) faz UPDATE só se
+-- created_at é mais recente.
+--
+-- `kind`: 9081 (Drift native) ou 1984 (NIP-56). Default 9081 pra retro
+-- compat com bases pré-2026-05-17 (migration adiciona coluna com
+-- default; rows existentes herdam 9081).
+--
+-- `reason`: bucket Drift normalizado ('illegal' | 'spam' | 'harassment').
+-- NIP-56 emite 7 reasons canônicos (nudity, malware, profanity, illegal,
+-- spam, impersonation, other); ingestão mapeia via tabela em
+-- src/lib/nip56-mapping.ts antes do INSERT. Tag `reason` Drift no kind
+-- 9081 é o source bruto.
 CREATE TABLE IF NOT EXISTS reports (
   id           INTEGER PRIMARY KEY AUTOINCREMENT,
   post_id      TEXT NOT NULL,
@@ -99,6 +117,7 @@ CREATE TABLE IF NOT EXISTS reports (
   reason       TEXT NOT NULL,            -- 'illegal' | 'spam' | 'harassment'
   weight       REAL NOT NULL,
   created_at   INTEGER NOT NULL,
+  kind         INTEGER NOT NULL DEFAULT 9081, -- 9081 Drift | 1984 NIP-56
   UNIQUE(post_id, reporter_pub)
 );
 CREATE INDEX IF NOT EXISTS idx_reports_post   ON reports(post_id);

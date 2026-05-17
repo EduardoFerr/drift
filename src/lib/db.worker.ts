@@ -322,6 +322,15 @@ function applyMigrations(schema: string) {
       column: 'last_err_at',
       sql: `ALTER TABLE relays_user ADD COLUMN last_err_at INTEGER`,
     },
+    {
+      // Fase A relay moderation 2026-05-17 — kind dual stack (9081 Drift
+      // native + 1984 NIP-56 compat). Default 9081 preserva retro compat
+      // pra rows existentes pré-migration.
+      name: 'add_kind_to_reports',
+      table: 'reports',
+      column: 'kind',
+      sql: `ALTER TABLE reports ADD COLUMN kind INTEGER NOT NULL DEFAULT 9081`,
+    },
   ]
 
   let anyFailed = false
