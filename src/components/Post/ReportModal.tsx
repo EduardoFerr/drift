@@ -182,8 +182,32 @@ function ConfirmStep({
           <span className="text-drift-muted/50">motivo: </span>
           <span className="text-drift-accent">{reason}</span>
         </div>
+
+        {/* D4 — warning pré-submit. Reporter pubkey vai PÚBLICO em
+            ambos kind 9081 (Drift) + kind 1984 (NIP-56) com assinatura
+            Schnorr. Target sabe quem reportou; stalker pode mapear
+            padrões (Barney threat 2026-05-17 Tier 1 risk).
+            Mitigation: multi-id (§15) permite descartável. */}
+        <div
+          role="note"
+          aria-label="aviso de privacidade do reporter"
+          className="rounded-xl border border-drift-warning/20 bg-drift-warning/5 px-4 py-3 font-mono text-[10px] leading-relaxed text-drift-warning"
+        >
+          <div className="mb-1 font-bold uppercase tracking-meta text-drift-warning">
+            ⚠ privacy
+          </div>
+          <p>
+            seu npub vai PÚBLICO em ambos os reports (kind 9081 + kind 1984
+            NIP-56 pra interop). o autor reportado verá quem o reportou.
+            stalker pode mapear padrões.
+          </p>
+          <p className="mt-1.5">
+            considere trocar pra uma identidade descartável (§15 multi-id)
+            antes de denunciar conteúdo sensível.
+          </p>
+        </div>
         <p className="px-1 font-mono text-[10px] leading-relaxed text-drift-muted/40">
-          report vai ser publicado como evento nostr assinado. não pode ser desfeito — eventos drift são imutáveis (§6).
+          report é evento nostr imutável. não pode ser desfeito (§6).
         </p>
 
         {reason === 'illegal' && <AuthoritiesBlock />}
