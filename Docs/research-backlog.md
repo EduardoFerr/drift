@@ -421,16 +421,11 @@ side é jogo aberto.
 
 ## Fase 5/6 (UX pequeno — adicionado 2026-05-17)
 
-### R33 — Botão "atualizar" em Settings > Sobre
-**Pergunta**: trivial — apenas implementação. Trigger de service worker
-update (`skipWaiting` + `clients.claim`), hard reload, cache nuke.
-**Por quê informa**: user reporta que app fica em versão stale após
-deploy. PWA service worker pode demorar até 24h pra detectar nova
-versão. Botão manual em Sobre dá agência ao user.
-**Workaround interim**: cache nuke já existe no LazyBoundary retry
-button (auto on chunk fail). Falta entrada manual.
-**Fonte ideal**: própria — implementar reusando `clearServiceWorkerAndReload`
-de `LazyBoundary.tsx`. Botão em `AboutCardLayer` (App.tsx).
+### R33 — Botão "atualizar" em Settings > Sobre — ✅ RESOLVIDO 2026-05-17
+**Implementado em commit `4c9f5a8`**. `clearServiceWorkerAndReload`
+exportado de `LazyBoundary.tsx`; `RefreshAppButton` em `AboutCardLayer`
+(App.tsx). CTA sólido mint padrão novo; lazy import pra não acoplar
+chunk.
 
 ---
 

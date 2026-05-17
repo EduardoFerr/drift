@@ -273,6 +273,38 @@ Re-broadcast oportunista dispara via `addRelay()` quando o user
 adiciona relay novo. Probe anti-eclipse roda a cada 30min via
 `startProbe()` em bootstrap.
 
+### 18. Relay moderado é opt-in adicional, NUNCA default
+
+Cliente oficial NUNCA pré-popula `SEED_RELAY_CONFIGS` com relay que
+faz AI moderation, NSFW filter, hate speech filter ou qualquer filtro
+não-anti-spam-técnico. Relay moderado é **opção adicional** que user
+escolhe conscientemente (em Discovery UX, Settings > Relays).
+
+Razão (manifesto §17 adendo 2026-05-17): operator de relay é
+autoridade independente do cliente. §17 protege a REDE da chave-mestra
+do fundador, mas user pode escolher subset moderado se quiser —
+desde que escolha consciente. Pré-popular relay moderado no seed
+violaria essa escolha.
+
+**Regra dura:**
+- `src/config/relays.ts` SEED_RELAY_CONFIGS só contém relays com
+  política `none` (sem moderação) ou `manual-spam-only` (anti-spam
+  técnico padrão NIP, sem AI scan)
+- LOCK_VIA_TEST em `tests/manifesto-conformance.test.ts` valida
+  que SEED não tem relay flagged como `ai-assisted` ou `ai-automated`
+- Discovery UX (Settings > Relays > Descobrir) é o veículo pra user
+  ADICIONAR relay moderado se quiser — sub-card com tabs por política
+  (recomendados/moderated/livre/community/onion) e badge tier visível
+- Onboarding NUNCA empurra relay moderado; banner one-time pós-7-dias
+  é o limite ético (dismissible permanente)
+
+Sub-princípios derivados:
+- Cliente sempre publica em ≥2 relays paralelos (já em §14)
+- UI sempre indica TIER de moderação por relay (none/manual/
+  ai-assisted/ai-automated) — defesa contra silent-drop invisível
+- Reports (kind 9081 / NIP-56 1984) sempre com warning pré-submit
+  sobre privacidade do reporter (evento público assinado)
+
 ---
 
 ## Stack — não trocar sem combinar

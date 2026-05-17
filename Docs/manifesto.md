@@ -370,6 +370,28 @@ Nem o criador da rede pode censurá-la. Esta é a propriedade central.
 - Licença MIT irrevogável desde o primeiro commit
 - Build reproduzível via Tauri + lockfiles (Fase 6)
 
+**Adendo de escopo (2026-05-17):** §17 vincula o **cliente oficial**.
+Não estende a **operadores de relay**. Relay é infra de transporte;
+operator decide política de aceite/rejeição (spam, NSFW, illegal,
+KYC, paywall). Cliente Drift NUNCA escaneia conteúdo (§25), MAS
+relay operator é livre — inclusive pra rodar AI moderation. A
+ressalva é que esta liberdade do operator NÃO pode virar default
+imposto pelo cliente:
+
+- Cliente oficial NUNCA default-on relay moderado (consent explícito)
+- Relay moderado é **opção adicional** que user adiciona em Settings,
+  não substituto do feed neutro
+- Cliente sempre publica em ≥2 relays paralelos (manifesto §14) pra
+  mitigar silent-drop de operator
+- UI deve indicar TIER de moderação visível por relay (none/manual/
+  ai-assisted/ai-automated) — transparência > opacidade
+- "Run-your-own-relay" com moderação é receita pública (Docs/) pra
+  comunidades que queiram, sem implicação de §17 violado
+
+Resumo: §17 protege a REDE da chave-mestra do fundador. Não impede
+que user **escolha** participar de subset moderado da rede — desde
+que escolha consciente.
+
 ### 18. Cliente Oficial sem Privilégios sobre a Rede
 
 O cliente oficial é uma implementação de referência, não uma
