@@ -403,6 +403,38 @@ Quem quiser fork "Drift Family" pode — manifesto próprio. Cliente oficial nã
 5. Lente pre-fab "anti-CSAM/extremismo" hardcoded com escopo amplo no client default
 6. "Stealth mode" lente (ativa sem indicator visible)
 
+**5 bandeiras adicionais Barney 2026-05-17** (`Docs/sessions/trust-lens-wot-deep-dive-barney-2026-05-17.md`):
+7. Auto-boost por NIP-05 verified — prova DNS, não trust
+8. PPR feedback "você tem PPR alto" — karma vira catedral
+9. Anchor follow auto-suggest onboarding — default trust list de facto
+10. Telemetry PPR computation via network — agregado vira sinal
+11. ML "lente recomendada" — catedral amazon-style
+
+### 2.10 GAP-CLUSTER + cluster detection (Ted 2026-05-17 nodes/clusters)
+
+Path diversity (§1.2) protege contra **chains lineares** mas NÃO contra **anéis densos** (Cenário B Barney — 50 sock puppets coordenados em 6 meses). Drift Phase 1 trata nó e cluster como mesmo objeto — gap estrutural.
+
+**Plano Ted nodes/clusters** (`Docs/sessions/trust-lens-nodes-clusters-ted-2026-05-17.md`):
+
+| Phase | Componente | Custo | Tipo |
+|---|---|---|---|
+| **Phase 1.5** | Clustering coefficient como **telemetria local gratuita** (reusa BFS depth-3 do path diversity) | ~0ms marginal | Observability only — alerta se cluster anomaly detectado |
+| **Phase 2** | Label Propagation Algorithm (LPA) + edge penalty multiplicativo (0.5-1.0, não exclusão) | +50ms (125→175ms total) | Defesa ativa Cenário B |
+| **Phase 3+** | Louvain (mais preciso, mais caro) | TBD | Só se telemetria Phase 2 mostrar LPA insuficiente |
+
+**Math da integração** (Phase 2): edge weight penalty multiplicativo em `edges.ts:upsertEdge`, antes do clip. Determinismo preservado via LPA semeado com `hash(source||epoch)`.
+
+**3 conformance tests novos** (#25-27):
+- LPA determinístico dado seed fixo + adjacency
+- Cluster penalty respeita bound [0.5, 1.0]
+- Cenário B sintético (ring 50 npubs) detectado com modularity Q > threshold
+
+**Cenários Barney mapping nó/cluster**:
+- A (hijack famous) + E (whaling hub) = **NÓ** → TOFU alarm + aggregate cap (Phase 2)
+- B (coordinated campaign) = **CLUSTER** paradigmático → LPA penalty (Phase 2)
+- C (mass-mute brigading) = **CLUSTER anti-vítima** → self-isolation alarm (Phase 2)
+- D (state actor lente) = **CLUSTER de listas externas** → discovery hardening (Phase 3 multi-list)
+
 Detalhes: `Docs/sessions/trust-lens-multilist-barney-2026-05-17.md` + `trust-lens-multilist-lily-2026-05-17.md`
 
 Robin research ainda rodando — quando completar, integra NIP-51 adoção + Argon2id WASM size (nota: relevância reduzida sem password lock) + anti-centralização patterns Phase 3.
