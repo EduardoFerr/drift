@@ -389,11 +389,11 @@ src/
 - ✅ **Fase 5** — PWA polish, NIP-65, NIP-02, NIP-06 (BIP39 opt-in), Passkey opt-in, multi-identidade, probe anti-eclipse, re-broadcast oportunista, pinning UI, block/mute, feed tabs (Global/Seguindo/Trending), Profile, kvvfs fallback, 399 tests Vitest
 - ✅ **Fase 5.x (operacional)** — versionamento + CHANGELOG, CI GitHub Actions (tsc + tests + build), PWA polish (manifest enriched + shortcuts + meta description + ?action= URL handling), deploy Vercel + GitHub integration, release automation (tag v* → GitHub Release com dist.zip + SHA256SUMS)
 - ⏳ **Fase 6** — Cliente nativo Tauri (Tor via arti, WebRTC P2P, multi-transport orchestration), build reproduzível. PeersCard UI (QR, link direto, bundle offline, auto-discovery). **Capacidade técnica** de §15 (anti-censura por país)
-- ⏳ **Fase 7** — Distribuição do cliente E do protocolo: TWA Android (✅ antecipada — Bubblewrap CI), Capacitor (alternativa), F-Droid manifest, Play Store opcional, IPFS pin via helia, run-your-own-relay, sneakernet bundle. **Garantia política** de §16 (disponibilidade distribuída) e §17 (sem chave mestra na distribuição)
+- ⏳ **Fase 7** — Distribuição do cliente E do protocolo: TWA Android (✅ antecipada — Bubblewrap CI), Capacitor (alternativa), F-Droid manifest, Play Store opcional, IPFS pin via helia, run-your-own-relay, sneakernet bundle, Bluetooth LE transport (btleplug — sync offline entre devices próximos). **Garantia política** de §16 (disponibilidade distribuída) e §17 (sem chave mestra na distribuição)
 
 Fase 6 + Fase 7 são compromissos do manifesto, não opções:
 - §15 anti-censura por país → cabe em Fase 6 (transporte: Tor + WebRTC)
-- §16 disponibilidade distribuída → cabe em Fase 7 (IPFS pin, sneakernet, re-broadcast, run-your-own-relay)
+- §16 disponibilidade distribuída → cabe em Fase 7 (IPFS pin, sneakernet, BLE transport, re-broadcast, run-your-own-relay)
 - §17 sem chave mestra + build reproduzível → cabe em Fase 7 (F-Droid build reproduzível, hashes públicos, sideload sem store)
 
 ---
