@@ -749,7 +749,7 @@ export function PostViewer({
                 setShowActionsMenu((v) => !v)
               }}
               size="xl"
-              className="absolute right-4 top-4 z-30"
+              className="absolute right-4 top-4 z-30 shadow-drift-md"
               aria-label={showActionsMenu ? 'fechar ações' : 'abrir ações'}
               title="ações rápidas"
               // V10.6 — opt-out de long-press (segurar ⋮ não deve virar
@@ -808,7 +808,7 @@ export function PostViewer({
                 e.stopPropagation()
                 setShowThread(true)
               }}
-              className="absolute right-[68px] top-4 z-30 flex h-11 min-w-[44px] items-center justify-center gap-1 rounded-full border border-drift-border bg-drift-surface/80 px-3 text-drift-muted backdrop-blur-sm transition-colors hover:border-drift-accent2 hover:text-drift-accent2 focus:outline-none focus:ring-1 focus:ring-drift-accent2"
+              className="absolute right-[68px] top-4 z-30 flex h-11 min-w-[44px] items-center justify-center gap-1 rounded-full border border-drift-border bg-drift-surface/80 px-3 text-drift-muted shadow-drift-md backdrop-blur-sm transition-colors hover:border-drift-accent2 hover:text-drift-accent2 focus:outline-none focus:ring-1 focus:ring-drift-accent2"
               style={{ touchAction: 'manipulation' }}
               aria-label={`abrir comentários${commentCount > 0 ? ` (${commentCount})` : ''}`}
               title="comentários (thread)"
@@ -839,7 +839,7 @@ export function PostViewer({
                 e.stopPropagation()
                 setShowMap((v) => !v)
               }}
-              className={`absolute right-[132px] top-4 z-30 flex h-11 w-11 items-center justify-center rounded-full border bg-drift-surface/80 backdrop-blur-sm transition-colors focus:outline-none focus:ring-1 focus:ring-drift-accent2 ${
+              className={`absolute right-[132px] top-4 z-30 flex h-11 w-11 items-center justify-center rounded-full border bg-drift-surface/80 shadow-drift-md backdrop-blur-sm transition-colors focus:outline-none focus:ring-1 focus:ring-drift-accent2 ${
                 showMap
                   ? 'border-drift-accent text-drift-accent'
                   : 'border-drift-border text-drift-muted hover:border-drift-accent hover:text-drift-accent'
