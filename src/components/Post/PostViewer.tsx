@@ -1159,43 +1159,90 @@ function ActionsFan({
           // parent. Touch sustentado no fan não deve disparar slim toggle.
           data-no-longpress="true"
         >
-          {/* V11.10 (2026-05-17 round 6 — user feedback "ficou mais feio,
-              e deveria alinhar a direita"): retiradas as stamps sólidas
-              (V11.9 era WCAG OK mas brutal demais — name-tag stickers).
-              Nova abordagem:
-                - Container MAIS OPACO (bg-drift-surface solid, sem /85)
-                  = labels viram texto puro dentro dele, sem precisar de
-                  bg próprio. Container é o buffer visual contra foto.
-                - Labels = plain text drift-text font-medium tracking
-                  generoso. Sem bg, sem border, sem shadow.
-                - justify-end na row → alinhamento direita determinístico
-                  (label right edge sempre adjacente ao icon left edge).
-              Resultado: editorial limpo, contraste alto (texto sobre
-              surface sólida), brand-coherent. */}
+          {/* V11.11 (2026-05-17 round 7 — Lily audit inline depois de user
+              "está feio"). Mudanças coordenadas:
+              (1) MODERAR vira ÚLTIMA ROW do container (separator border-
+                  top drift-bury/30). Antes era mini-container separado —
+                  parecia afterthought. Agora é uma seção destrutiva
+                  dentro do mesmo menu.
+              (2) Inner buttons PERDEM border+bg próprio. Container já
+                  provê chrome; circle-inside-rectangle era ruído (esp.
+                  em Velatura, 3 papéis competindo). Hover ganha bg-
+                  drift-accent/10 (era /15) — mais sutil.
+              (3) Active state ad-hoc pra mapOpen=true: row inteira
+                  ganha bg-drift-accent/8 + text-drift-accent — user vê
+                  que o mapa está aberto sem clicar. (#4 critique
+                  parcialmente fechado.) */}
           <div
-            className="flex flex-col gap-1 rounded-2xl border border-drift-border bg-drift-surface p-2 shadow-lg"
+            className="flex flex-col rounded-2xl border border-drift-border bg-drift-surface p-1.5 shadow-lg"
             role="group"
             aria-label="ações do post"
           >
-            {neutralItems.map((item, i) => (
+            {neutralItems.map((item, i) => {
+              // Active state: por enquanto só mapOpen (icon é '🗺' OR
+              // do mapa). buildFanItems já swap icons pra pinned/follow
+              // (📌/📍, ✓/➕), então estado visual deles vem do icon.
+              // mapOpen não muda icon → adicionamos visual aqui.
+              const isActive = item.key === 'mapa' && mapOpen
+              return (
+                <m.div
+                  key={item.key}
+                  initial={{ opacity: 0, x: 8 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 8 }}
+                  transition={{ duration: 0.16, delay: i * 0.035, ease: [0.22, 1, 0.36, 1] }}
+                  className={`flex items-center justify-end gap-3 rounded-lg px-1 py-0.5 transition-colors ${
+                    isActive ? 'bg-drift-accent/10' : ''
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none whitespace-nowrap font-mono text-[11px] font-medium uppercase tracking-meta ${
+                      isActive ? 'text-drift-accent' : 'text-drift-text'
+                    }`}
+                    aria-hidden="true"
+                  >
+                    {item.label}
+                  </span>
+                  {/* Inner button SEM border/bg — só hover effect. Container
+                      é o chrome. */}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      if (!item.disabled) item.onClick()
+                    }}
+                    disabled={item.disabled}
+                    aria-label={item.label}
+                    title={item.hint}
+                    className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-drift-accent/10 hover:text-drift-accent focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2 disabled:cursor-not-allowed disabled:opacity-40 ${
+                      isActive ? 'text-drift-accent' : 'text-drift-text'
+                    }`}
+                  >
+                    <span aria-hidden="true">
+                      <FanIcon icon={item.icon} size={22} strokeWidth={2} />
+                    </span>
+                  </button>
+                </m.div>
+              )
+            })}
+            {/* (1) MODERAR INSIDE container — separator border-top drift-
+                bury/30 anuncia a seção destrutiva sem precisar de mini-
+                container próprio. mt-1.5 + pt-1.5 cria respiro visual. */}
+            {destructiveItems.map((item, i) => (
               <m.div
                 key={item.key}
                 initial={{ opacity: 0, x: 8 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 8 }}
-                transition={{ duration: 0.16, delay: i * 0.035, ease: [0.22, 1, 0.36, 1] }}
-                className="flex items-center justify-end gap-3"
+                transition={{ duration: 0.16, delay: 0.035 * (neutralItems.length + i), ease: [0.22, 1, 0.36, 1] }}
+                className="mt-1.5 flex items-center justify-end gap-3 border-t border-drift-bury/30 px-1 pt-1.5 pb-0.5"
               >
-                {/* Label = plain text dentro do container opaco. Sem bg/
-                    border/shadow — container já provê visual grouping +
-                    contraste. font-medium pra peso visual sem stamp. */}
                 <span
-                  className="pointer-events-none whitespace-nowrap font-mono text-[11px] font-medium uppercase tracking-meta text-drift-text"
+                  className="pointer-events-none whitespace-nowrap font-mono text-[11px] font-medium uppercase tracking-meta text-drift-bury"
                   aria-hidden="true"
                 >
                   {item.label}
                 </span>
-                {/* Botão: border accent/55, bg neutro, strokeWidth 2 */}
                 <button
                   type="button"
                   onClick={(e) => {
@@ -1205,7 +1252,7 @@ function ActionsFan({
                   disabled={item.disabled}
                   aria-label={item.label}
                   title={item.hint}
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-drift-accent/55 bg-drift-bg text-drift-text transition-colors hover:border-drift-accent hover:bg-drift-accent/15 hover:text-drift-accent focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-drift-bury transition-colors hover:bg-drift-bury/15 focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-bury disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <span aria-hidden="true">
                     <FanIcon icon={item.icon} size={22} strokeWidth={2} />
@@ -1214,46 +1261,6 @@ function ActionsFan({
               </m.div>
             ))}
           </div>
-
-          {/* (6) Destrutivo SEPARADO — fora do container neutro, mini-
-              container próprio com mesma anatomia (bg sólido + border
-              + shadow). Cor semântica drift-bury preserva color-coding
-              sem voltar pro stamp inverted brutal. */}
-          {destructiveItems.map((item) => (
-            <m.div
-              key={item.key}
-              initial={{ opacity: 0, x: 8 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 8 }}
-              transition={{ duration: 0.16, delay: 0.04 * (neutralItems.length + 1), ease: [0.22, 1, 0.36, 1] }}
-              className="flex items-center justify-end gap-3 rounded-2xl border border-drift-bury/40 bg-drift-bury/10 p-2 shadow-lg backdrop-blur-md"
-            >
-              {/* Label destrutivo = plain text drift-bury dentro do mini-
-                  container. Mesma anatomia dos neutros — container provê
-                  o visual buffer + color-coding. */}
-              <span
-                className="pointer-events-none whitespace-nowrap font-mono text-[11px] font-medium uppercase tracking-meta text-drift-bury"
-                aria-hidden="true"
-              >
-                {item.label}
-              </span>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  if (!item.disabled) item.onClick()
-                }}
-                disabled={item.disabled}
-                aria-label={item.label}
-                title={item.hint}
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-drift-bury/55 bg-drift-bury/10 text-drift-bury transition-colors hover:border-drift-bury hover:bg-drift-bury/20 focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-bury disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                <span aria-hidden="true">
-                  <FanIcon icon={item.icon} size={22} strokeWidth={2} />
-                </span>
-              </button>
-            </m.div>
-          ))}
         </m.div>
       )}
     </AnimatePresence>
