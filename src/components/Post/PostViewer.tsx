@@ -1159,9 +1159,21 @@ function ActionsFan({
           // parent. Touch sustentado no fan não deve disparar slim toggle.
           data-no-longpress="true"
         >
-          {/* (1) Container único pros items neutros */}
+          {/* V11.10 (2026-05-17 round 6 — user feedback "ficou mais feio,
+              e deveria alinhar a direita"): retiradas as stamps sólidas
+              (V11.9 era WCAG OK mas brutal demais — name-tag stickers).
+              Nova abordagem:
+                - Container MAIS OPACO (bg-drift-surface solid, sem /85)
+                  = labels viram texto puro dentro dele, sem precisar de
+                  bg próprio. Container é o buffer visual contra foto.
+                - Labels = plain text drift-text font-medium tracking
+                  generoso. Sem bg, sem border, sem shadow.
+                - justify-end na row → alinhamento direita determinístico
+                  (label right edge sempre adjacente ao icon left edge).
+              Resultado: editorial limpo, contraste alto (texto sobre
+              surface sólida), brand-coherent. */}
           <div
-            className="flex flex-col gap-2 rounded-2xl border border-drift-border/60 bg-drift-surface/85 p-2 backdrop-blur-md shadow-lg"
+            className="flex flex-col gap-1 rounded-2xl border border-drift-border bg-drift-surface p-2 shadow-lg"
             role="group"
             aria-label="ações do post"
           >
@@ -1172,24 +1184,18 @@ function ActionsFan({
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 8 }}
                 transition={{ duration: 0.16, delay: i * 0.035, ease: [0.22, 1, 0.36, 1] }}
-                className="flex items-center gap-2"
+                className="flex items-center justify-end gap-3"
               >
-                {/* (3) Label inverted stamp — V11.9 (2026-05-17 round 5
-                    after user screenshot): translucent /70 sobre foto
-                    desapareceu em Velatura (papel sobre tom de pele).
-                    Inverted: bg sólido drift-text (escuro/dark, claro/
-                    light) + texto drift-bg (papel) = contraste trivial
-                    WCAG AA em qualquer tema sobre qualquer foto. Sem
-                    border, sem shadow — stamp editorial limpo (Read.cv
-                    /Linear/Cosmos pattern). */}
+                {/* Label = plain text dentro do container opaco. Sem bg/
+                    border/shadow — container já provê visual grouping +
+                    contraste. font-medium pra peso visual sem stamp. */}
                 <span
-                  className="pointer-events-none whitespace-nowrap rounded bg-drift-text px-2.5 py-1 font-mono text-[11px] font-medium uppercase tracking-meta text-drift-bg shadow-sm"
+                  className="pointer-events-none whitespace-nowrap font-mono text-[11px] font-medium uppercase tracking-meta text-drift-text"
                   aria-hidden="true"
                 >
                   {item.label}
                 </span>
-                {/* (2) (3) Botão mais sólido: size xl (44px tap), border
-                    accent/55, text-drift-text (era muted), strokeWidth 2 */}
+                {/* Botão: border accent/55, bg neutro, strokeWidth 2 */}
                 <button
                   type="button"
                   onClick={(e) => {
@@ -1199,7 +1205,7 @@ function ActionsFan({
                   disabled={item.disabled}
                   aria-label={item.label}
                   title={item.hint}
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-drift-accent/55 bg-drift-surface/90 text-drift-text transition-colors hover:border-drift-accent hover:bg-drift-accent/15 hover:text-drift-accent focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-drift-accent/55 bg-drift-bg text-drift-text transition-colors hover:border-drift-accent hover:bg-drift-accent/15 hover:text-drift-accent focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <span aria-hidden="true">
                     <FanIcon icon={item.icon} size={22} strokeWidth={2} />
@@ -1209,9 +1215,10 @@ function ActionsFan({
             ))}
           </div>
 
-          {/* (6) Destrutivo SEPARADO — fora do container neutro, cor
-              semântica drift-bury, sem glass wrapping. Hierarquia clara:
-              user vê que é categoria diferente antes mesmo de ler. */}
+          {/* (6) Destrutivo SEPARADO — fora do container neutro, mini-
+              container próprio com mesma anatomia (bg sólido + border
+              + shadow). Cor semântica drift-bury preserva color-coding
+              sem voltar pro stamp inverted brutal. */}
           {destructiveItems.map((item) => (
             <m.div
               key={item.key}
@@ -1219,13 +1226,13 @@ function ActionsFan({
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 8 }}
               transition={{ duration: 0.16, delay: 0.04 * (neutralItems.length + 1), ease: [0.22, 1, 0.36, 1] }}
-              className="flex items-center gap-2"
+              className="flex items-center justify-end gap-3 rounded-2xl border border-drift-bury/40 bg-drift-bury/10 p-2 shadow-lg backdrop-blur-md"
             >
-              {/* Destrutivo inverted stamp — bg drift-bury sólido +
-                  texto drift-bg. Mantém color-coding semântico (vermelho-
-                  ish) MAS com contraste WCAG AA garantido. */}
+              {/* Label destrutivo = plain text drift-bury dentro do mini-
+                  container. Mesma anatomia dos neutros — container provê
+                  o visual buffer + color-coding. */}
               <span
-                className="pointer-events-none whitespace-nowrap rounded bg-drift-bury px-2.5 py-1 font-mono text-[11px] font-medium uppercase tracking-meta text-drift-bg shadow-sm"
+                className="pointer-events-none whitespace-nowrap font-mono text-[11px] font-medium uppercase tracking-meta text-drift-bury"
                 aria-hidden="true"
               >
                 {item.label}
