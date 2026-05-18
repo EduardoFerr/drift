@@ -80,7 +80,7 @@ Robin propôs clipPath **radial** from button; Lily contraproposta clipPath **in
 
 ---
 
-## 7. Shipado em [PENDING]
+## 7. Shipado em [0b4e8e4]
 
 `src/components/Post/PostViewer.tsx`:
 - `useReducedMotion()` no PostViewer scope (era só em EmbeddedWrapper)
