@@ -294,14 +294,25 @@ function CardText({
   const titleSize = variant === 'centered' ? 'text-fluid-display' : 'text-xl'
   const titleClamp = ''
 
+  // User feedback 2026-05-17: texto sobre imagem ainda perde contraste
+  // em fotos super claras (gradient ajuda mas não basta). Aplica
+  // text-shadow halo+offset SÓ na variant 'overlay' (Landscape com
+  // gradient sobre foto). 'inset' e 'centered' têm bg sólido drift-
+  // surface → shadow ali polui sem ganho. Classes em index.css
+  // @layer utilities. Tunável (alpha+blur) sem tocar markup.
+  const overImage = variant === 'overlay'
+  const titleShadow = overImage ? 'text-on-image-title' : ''
+  const bodyShadow = overImage ? 'text-on-image-body' : ''
+  const metaShadow = overImage ? 'text-on-image-meta' : ''
+
   return (
     <div className={`relative ${wrapperBg} ${padding} ${flex}`}>
-      <div className="mb-[5px] font-mono text-[12px] uppercase tracking-tag text-drift-muted">
+      <div className={`mb-[5px] font-mono text-[12px] uppercase tracking-tag text-drift-muted ${metaShadow}`}>
         {tag}
       </div>
       {title && (
         <h2
-          className={`mb-2 font-display font-bold leading-title tracking-title text-drift-text ${titleSize} ${titleClamp}`}
+          className={`mb-2 font-display font-bold leading-title tracking-title text-drift-text ${titleSize} ${titleClamp} ${titleShadow}`}
         >
           {title}
         </h2>
@@ -309,7 +320,7 @@ function CardText({
       {body && (
         <p
           ref={bodyRef}
-          className={`mb-1 font-mono text-xs italic leading-body text-drift-body ${bodyClamp}`}
+          className={`mb-1 font-mono text-xs italic leading-body text-drift-body ${bodyClamp} ${bodyShadow}`}
         >
           {body}
         </p>
@@ -342,7 +353,7 @@ function CardText({
           abreviações em três idiomas conceituais (verbo PT/EN, plural EN,
           advérbio PT). Agora: símbolos universais + número.
           Tooltips preservam significado pra screen readers. */}
-      <div className="flex gap-3 font-mono text-[12px] uppercase tracking-meta text-drift-muted">
+      <div className={`flex gap-3 font-mono text-[12px] uppercase tracking-meta text-drift-muted ${metaShadow}`}>
         <span title={`drifts: ${drift}`} aria-label={`${drift} drifts`}>
           <span aria-hidden="true">↑</span>{' '}
           <span className="text-drift-accent2">{drift}</span>

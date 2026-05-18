@@ -100,6 +100,51 @@
   --t-fluid-hero: clamp(20px, 6vw, 30px);
 }
 
+@layer utilities {
+  /*
+   * Text legibility utilities pra TEXTO SOBRE IMAGEM — só usar quando
+   * bg não é controlado (variant='overlay' do SubpostLayout, banners
+   * sobre fotos, etc.). NÃO usar em UI normal sobre drift-surface; o
+   * shadow ali polui visualmente sem ganhar contraste.
+   *
+   * Estratégia: sombra suave dupla (offset + halo) > stroke pesado.
+   * Stroke (`-webkit-text-stroke`) muda métricas da fonte (paint-order
+   * deixa texto mais grosso/lento de ler). Sombra preserva o glyph
+   * original, só adiciona profundidade.
+   *
+   * Tuning user feedback 2026-05-17: começamos suave; se ainda
+   * ilegível em fotos super claras, bumpamos alpha das sombras.
+   *
+   *   .text-on-image-title — pra h2 títulos (font-display, bold)
+   *     • offset 0 1px 3px alpha 0.6 (deslocamento sutil)
+   *     • halo 0 0 8px alpha 0.45 (glow amplo difuso)
+   *   .text-on-image-body — pra body italic (font-mono)
+   *     • offset 0 1px 2px alpha 0.7
+   *     • halo 0 0 4px alpha 0.5
+   *   .text-on-image-meta — pra chips/tags meta line
+   *     • offset 0 1px 1px alpha 0.7
+   *
+   * Stroke alternativo (comentado): se sombra não bastar em casos
+   * extremos, descomentar `-webkit-text-stroke` no `.text-on-image-*`.
+   * Paint-order=stroke garante stroke ATRÁS do fill (não engrossa).
+   */
+  .text-on-image-title {
+    text-shadow:
+      0 1px 3px rgba(0, 0, 0, 0.6),
+      0 0 8px rgba(0, 0, 0, 0.45);
+    /* paint-order: stroke fill;
+       -webkit-text-stroke: 0.5px rgba(0, 0, 0, 0.4); */
+  }
+  .text-on-image-body {
+    text-shadow:
+      0 1px 2px rgba(0, 0, 0, 0.7),
+      0 0 4px rgba(0, 0, 0, 0.5);
+  }
+  .text-on-image-meta {
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.7);
+  }
+}
+
 @layer base {
   html,
   body,
@@ -158,3 +203,4 @@ body::after {
   pointer-events: none;
   z-index: 999;
 }
+
