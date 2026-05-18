@@ -203,7 +203,7 @@ Plano Ted HIMYM 2026-05-17 (analysis registrada em commit do PR1 [c823e8f]).
   antigo → "Expected JavaScript module but server responded with MIME
   type text/html". Bootstrap fail em `identity` (passkey é lazy chunk
   da etapa 3).
-  Recuperação imediata shipada em [PENDING-fix]: ambos botões do
+  Recuperação imediata shipada em [2f453a8]: ambos botões do
   error screen + novo "↻ forçar atualização" desregistram SW + limpam
   Cache API antes do reload.
   Fix de causa raiz pendente: SW config (vite.config.ts workbox)
