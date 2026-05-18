@@ -615,24 +615,11 @@ export function PostViewer({
       </div>
       )}
 
-      <AnimatePresence>
-        {showMap && (
-          <m.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 240, opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="overflow-hidden border-b border-drift-border"
-          >
-            <LazyBoundary fallback={<DriftSkeleton variant="image" aspect="16/9" />}>
-              <SpreadMap
-                postId={post.id}
-                className="h-60 w-full"
-                {...(onOpenLocationSettings ? { onOpenLocationSettings } : {})}
-              />
-            </LazyBoundary>
-          </m.div>
-        )}
-      </AnimatePresence>
+      {/* Mapa de spread render removido daqui (V12 2026-05-18) — antes
+          era strip horizontal de 240px ABOVE conteúdo (50/50 split). Agora
+          é absolute inset-0 INSIDE o card-area abaixo, tomando 100% do
+          espaço quando aberto (user pedido: 'ao clicar no mapa seja
+          100%'). */}
 
       {/* Conteúdo com gestos — V3.1 card stack:
           2 shadow cards atrás (próximos da fila) com scale 0.96/0.92,
@@ -646,6 +633,32 @@ export function PostViewer({
         onPointerCancel={cancelLongPress}
         onPointerLeave={cancelLongPress}
       >
+        {/* Mapa de spread como FULL overlay (V12 2026-05-18) — absolute
+            inset-0 cobre 100% do card-area. z-20 fica ABAIXO dos botões
+            do header (z-30) → user pode fechar o mapa pelo mesmo botão
+            mapa que abriu. Fade + scale-up sutil na entrada. */}
+        <AnimatePresence>
+          {showMap && (
+            <m.div
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+              className="absolute inset-0 z-20 overflow-hidden rounded-2xl bg-drift-bg"
+              // Opt-out de long-press do card parent — interagir com o
+              // mapa (pan/zoom) não deve disparar slim mode toggle.
+              data-no-longpress="true"
+            >
+              <LazyBoundary fallback={<DriftSkeleton variant="image" aspect="1/1" />}>
+                <SpreadMap
+                  postId={post.id}
+                  className="h-full w-full"
+                  {...(onOpenLocationSettings ? { onOpenLocationSettings } : {})}
+                />
+              </LazyBoundary>
+            </m.div>
+          )}
+        </AnimatePresence>
         {/* V9.16 — long-press progress bar (top edge, 4px, drift-bury).
             Preenche linearmente em 5s. V9.24 — label "moderação" central
             aparece em 600ms (após o user já passou da janela de "tap
@@ -716,14 +729,9 @@ export function PostViewer({
               isMine={isMine}
               pinned={pinned}
               isFollowing={isFollowing}
-              mapOpen={showMap}
               currentHasImage={!!post.subposts[subpostIdx]?.imageUrl}
               onPinToggle={() => {
                 void handleTogglePin()
-                setShowActionsMenu(false)
-              }}
-              onMapToggle={() => {
-                setShowMap((v) => !v)
                 setShowActionsMenu(false)
               }}
               onFollowToggle={() => {
@@ -773,6 +781,34 @@ export function PostViewer({
                   {commentCount}
                 </span>
               )}
+            </button>
+            {/* Mapa de spread — V12 (user pedido 2026-05-18): mapa virou
+                first-class no header (antes era item do ActionsFan). Visu-
+                alização geográfica é descoberta primária, não secundária.
+                Active state: showMap=true → border-drift-accent + text-
+                drift-accent (visual diff sem ambiguidade). Posição:
+                right-[132px] = right-4 (16) + 44 (⋮) + 8 (gap) + 44
+                (comment) + 8 (gap) ≈ 120... bump pra 132 = 12px gap
+                visual entre os 3 botões. */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                setShowMap((v) => !v)
+              }}
+              className={`absolute right-[132px] top-4 z-30 flex h-11 w-11 items-center justify-center rounded-full border bg-drift-surface/80 backdrop-blur-sm transition-colors focus:outline-none focus:ring-1 focus:ring-drift-accent2 ${
+                showMap
+                  ? 'border-drift-accent text-drift-accent'
+                  : 'border-drift-border text-drift-muted hover:border-drift-accent hover:text-drift-accent'
+              }`}
+              style={{ touchAction: 'manipulation' }}
+              aria-label={showMap ? 'fechar mapa de spread' : 'abrir mapa de spread'}
+              aria-pressed={showMap}
+              title="mapa de spread (geografia de quem drift-ou)"
+              data-no-longpress="true"
+            >
+              <span aria-hidden="true">
+                <MapIcon size={18} strokeWidth={2} />
+              </span>
             </button>
             {/* Trust Lens inspector chip — bottom-right do card.
                 Aparece só quando lens strength > 0 E post foi tocado. */}
@@ -1089,10 +1125,8 @@ function ActionsFan({
   isMine,
   pinned,
   isFollowing,
-  mapOpen,
   currentHasImage,
   onPinToggle,
-  onMapToggle,
   onFollowToggle,
   onMute,
   onSharePost,
@@ -1103,11 +1137,9 @@ function ActionsFan({
   isMine: boolean
   pinned: boolean | null
   isFollowing: boolean
-  mapOpen: boolean
   /** Subpost atual tem imagem? Controla render do share-image. */
   currentHasImage: boolean
   onPinToggle: () => void
-  onMapToggle: () => void
   onFollowToggle: () => void
   onMute: () => void
   onSharePost: () => void
@@ -1118,11 +1150,9 @@ function ActionsFan({
     isMine,
     pinned,
     isFollowing,
-    mapOpen,
     currentHasImage,
     handlers: {
       onPinToggle,
-      onMapToggle,
       onFollowToggle,
       onMute,
       onSharePost,
@@ -1203,53 +1233,40 @@ function ActionsFan({
             role="group"
             aria-label="ações do post"
           >
-            {neutralItems.map((item, i) => {
-              // Active state: por enquanto só mapOpen (icon é '🗺' OR
-              // do mapa). buildFanItems já swap icons pra pinned/follow
-              // (📌/📍, ✓/➕), então estado visual deles vem do icon.
-              // mapOpen não muda icon → adicionamos visual aqui.
-              const isActive = item.key === 'mapa' && mapOpen
-              return (
-                <m.div
-                  key={item.key}
-                  initial={{ opacity: 0, x: 8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 8 }}
-                  transition={{ duration: 0.16, delay: i * 0.035, ease: [0.22, 1, 0.36, 1] }}
-                  className={`flex items-center justify-end gap-3 rounded-lg px-1 py-0.5 transition-colors ${
-                    isActive ? 'bg-drift-accent/10' : ''
-                  }`}
+            {neutralItems.map((item, i) => (
+              <m.div
+                key={item.key}
+                initial={{ opacity: 0, x: 8 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 8 }}
+                transition={{ duration: 0.16, delay: i * 0.035, ease: [0.22, 1, 0.36, 1] }}
+                className="flex items-center justify-end gap-3 rounded-lg px-1 py-0.5"
+              >
+                <span
+                  className="pointer-events-none whitespace-nowrap font-mono text-[11px] font-medium uppercase tracking-meta text-drift-text"
+                  aria-hidden="true"
                 >
-                  <span
-                    className={`pointer-events-none whitespace-nowrap font-mono text-[11px] font-medium uppercase tracking-meta ${
-                      isActive ? 'text-drift-accent' : 'text-drift-text'
-                    }`}
-                    aria-hidden="true"
-                  >
-                    {item.label}
+                  {item.label}
+                </span>
+                {/* Inner button SEM border/bg — só hover effect. Container
+                    é o chrome. */}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    if (!item.disabled) item.onClick()
+                  }}
+                  disabled={item.disabled}
+                  aria-label={item.label}
+                  title={item.hint}
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-drift-text transition-colors hover:bg-drift-accent/10 hover:text-drift-accent focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <span aria-hidden="true">
+                    <FanIcon icon={item.icon} size={22} strokeWidth={2} />
                   </span>
-                  {/* Inner button SEM border/bg — só hover effect. Container
-                      é o chrome. */}
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      if (!item.disabled) item.onClick()
-                    }}
-                    disabled={item.disabled}
-                    aria-label={item.label}
-                    title={item.hint}
-                    className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-drift-accent/10 hover:text-drift-accent focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2 disabled:cursor-not-allowed disabled:opacity-40 ${
-                      isActive ? 'text-drift-accent' : 'text-drift-text'
-                    }`}
-                  >
-                    <span aria-hidden="true">
-                      <FanIcon icon={item.icon} size={22} strokeWidth={2} />
-                    </span>
-                  </button>
-                </m.div>
-              )
-            })}
+                </button>
+              </m.div>
+            ))}
             {/* (1) MODERAR INSIDE container — separator border-top drift-
                 bury/30 anuncia a seção destrutiva sem precisar de mini-
                 container próprio. mt-1.5 + pt-1.5 cria respiro visual. */}

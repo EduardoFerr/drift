@@ -16,7 +16,6 @@ import {
 function makeHandlers(): FanHandlers {
   return {
     onPinToggle: vi.fn(),
-    onMapToggle: vi.fn(),
     onFollowToggle: vi.fn(),
     onMute: vi.fn(),
     onSharePost: vi.fn(),
@@ -30,7 +29,6 @@ function base(overrides: Partial<BuildFanItemsInput> = {}): BuildFanItemsInput {
     isMine: false,
     pinned: false,
     isFollowing: false,
-    mapOpen: false,
     currentHasImage: false,
     handlers: makeHandlers(),
     ...overrides,
@@ -38,29 +36,33 @@ function base(overrides: Partial<BuildFanItemsInput> = {}): BuildFanItemsInput {
 }
 
 describe('buildFanItems', () => {
-  it('isMine=true + currentHasImage=true → share-post, share-image, map, pin (sem follow/mute)', () => {
+  // 2026-05-18: 'map' removido do fan — mapa virou first-class no
+  // PostViewer header (botão dedicado ao lado do comment-bubble), não
+  // item escondido em menu secundário. mapOpen + onMapToggle removidos
+  // da API. Tests abaixo refletem a nova ordem.
+
+  it('isMine=true + currentHasImage=true → share-post, share-image, pin (sem follow/mute/map)', () => {
     const items = buildFanItems(base({ isMine: true, currentHasImage: true }))
     expect(items.map((i) => i.key)).toEqual([
       'share-post',
       'share-image',
-      'map',
       'pin',
     ])
     expect(items.find((i) => i.key === 'follow')).toBeUndefined()
     expect(items.find((i) => i.key === 'mute')).toBeUndefined()
+    expect(items.find((i) => i.key === 'map')).toBeUndefined()
   })
 
-  it('isMine=true + currentHasImage=false → share-post, map, pin (3 itens, sem share-image)', () => {
+  it('isMine=true + currentHasImage=false → share-post, pin (2 itens, sem share-image/map)', () => {
     const items = buildFanItems(base({ isMine: true, currentHasImage: false }))
-    expect(items.map((i) => i.key)).toEqual(['share-post', 'map', 'pin'])
+    expect(items.map((i) => i.key)).toEqual(['share-post', 'pin'])
   })
 
-  it('isMine=false + currentHasImage=true → 7 itens (com follow/mute/moderar)', () => {
+  it('isMine=false + currentHasImage=true → 6 itens (com follow/mute/moderar, sem map)', () => {
     const items = buildFanItems(base({ isMine: false, currentHasImage: true }))
     expect(items.map((i) => i.key)).toEqual([
       'share-post',
       'share-image',
-      'map',
       'pin',
       'follow',
       'mute',
@@ -68,16 +70,27 @@ describe('buildFanItems', () => {
     ])
   })
 
-  it('isMine=false + currentHasImage=false → 6 itens (sem share-image)', () => {
+  it('isMine=false + currentHasImage=false → 5 itens (sem share-image/map)', () => {
     const items = buildFanItems(base({ isMine: false, currentHasImage: false }))
     expect(items.map((i) => i.key)).toEqual([
       'share-post',
-      'map',
       'pin',
       'follow',
       'mute',
       'moderar',
     ])
+  })
+
+  it('mapa nunca aparece no fan (responsabilidade do header)', () => {
+    for (const isMine of [true, false]) {
+      for (const currentHasImage of [true, false]) {
+        const items = buildFanItems(base({ isMine, currentHasImage }))
+        expect(
+          items.find((i) => i.key === 'map'),
+          `isMine=${isMine} currentHasImage=${currentHasImage}`,
+        ).toBeUndefined()
+      }
+    }
   })
 
   it('pinned=null → item pin tem disabled=true (loading state)', () => {
@@ -102,18 +115,6 @@ describe('buildFanItems', () => {
     expect(pin?.disabled).toBe(false)
   })
 
-  it('mapOpen=true → label do mapa é "fechar mapa"', () => {
-    const items = buildFanItems(base({ mapOpen: true }))
-    const map = items.find((i) => i.key === 'map')
-    expect(map?.label).toBe('fechar mapa')
-  })
-
-  it('mapOpen=false → label "mapa de spread"', () => {
-    const items = buildFanItems(base({ mapOpen: false }))
-    const map = items.find((i) => i.key === 'map')
-    expect(map?.label).toBe('mapa de spread')
-  })
-
   it('isFollowing=true → label do follow é "deixar de seguir" + ícone ✓', () => {
     const items = buildFanItems(base({ isMine: false, isFollowing: true }))
     const follow = items.find((i) => i.key === 'follow')
@@ -135,13 +136,11 @@ describe('buildFanItems', () => {
     )
     items.find((i) => i.key === 'share-post')?.onClick()
     items.find((i) => i.key === 'share-image')?.onClick()
-    items.find((i) => i.key === 'map')?.onClick()
     items.find((i) => i.key === 'pin')?.onClick()
     items.find((i) => i.key === 'follow')?.onClick()
     items.find((i) => i.key === 'mute')?.onClick()
     expect(handlers.onSharePost).toHaveBeenCalledTimes(1)
     expect(handlers.onShareImage).toHaveBeenCalledTimes(1)
-    expect(handlers.onMapToggle).toHaveBeenCalledTimes(1)
     expect(handlers.onPinToggle).toHaveBeenCalledTimes(1)
     expect(handlers.onFollowToggle).toHaveBeenCalledTimes(1)
     expect(handlers.onMute).toHaveBeenCalledTimes(1)

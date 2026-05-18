@@ -27,7 +27,6 @@ export interface FanItem {
 
 export interface FanHandlers {
   onPinToggle: () => void
-  onMapToggle: () => void
   onFollowToggle: () => void
   onMute: () => void
   onSharePost: () => void
@@ -41,7 +40,6 @@ export interface BuildFanItemsInput {
   /** `null` enquanto carrega do SQLite. Item `pin` fica disabled nesse caso. */
   pinned: boolean | null
   isFollowing: boolean
-  mapOpen: boolean
   /** Subpost atual tem imagem? Controla render do item `share-image`. */
   currentHasImage: boolean
   handlers: FanHandlers
@@ -52,11 +50,14 @@ export function buildFanItems(input: BuildFanItemsInput): FanItem[] {
     isMine,
     pinned,
     isFollowing,
-    mapOpen,
     currentHasImage,
     handlers,
   } = input
 
+  // Mapa de spread NÃO está mais aqui — user pedido 2026-05-18: mapa
+  // é first-class no header (botão dedicado ao lado do comment-bubble),
+  // não item escondido em menu de ações secundárias. Visualização
+  // geográfica de "quem drift-ou este post" é descoberta primária.
   const items: FanItem[] = [
     {
       key: 'share-post',
@@ -76,13 +77,6 @@ export function buildFanItems(input: BuildFanItemsInput): FanItem[] {
     })
   }
   items.push(
-    {
-      key: 'map',
-      icon: '🗺',
-      label: mapOpen ? 'fechar mapa' : 'mapa de spread',
-      hint: 'visualização geográfica de quem drift-ou este post',
-      onClick: handlers.onMapToggle,
-    },
     {
       key: 'pin',
       icon: pinned ? '📌' : '📍',
