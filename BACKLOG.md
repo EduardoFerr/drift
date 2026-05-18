@@ -164,26 +164,18 @@ Plano Ted HIMYM 2026-05-17 (analysis registrada em commit do PR1 [c823e8f]).
 
 ## Infra / Arquitetura — adicionados 2026-05-17 (sessão noite)
 
-- [ ] **i18n — spike + POC + relatório** — investigar internacionalização
-  do Drift. App hoje é monolinguagem PT-BR (com termos protocolares EN).
-  Spike deve cobrir:
-    - Bibliotecas avaliadas: react-intl (FormatJS), i18next + react-i18next,
-      LinguiJS, Format-Message, custom Zustand-based, $localize Angular-style
-    - Custo de bundle (gz delta), runtime overhead, DX
-    - Modelo de chaves: hierárquico (`settings.network.title`) vs flat
-      (`settings_network_title`)
-    - ICU MessageFormat (plural/gender) — necessário pro Drift?
-    - Pluralização PT-BR (singular/plural) — quão crítico?
-    - RTL languages (árabe, hebraico) — escopo Phase 2?
-    - Como interagir com glossário protocolar (DRIFT, SPREAD, BURY, nsec)
-      que NUNCA traduz?
-    - Onde guardar strings: JSON imports vs inline + extract script?
-    - Workflow tradução: machine-only, comunidade, ambos?
-    - Detecção idioma: navigator.language? user pref override?
-  Entregar: relatório em `Docs/sessions/i18n-spike-2026-MM-DD.md` com
-  recomendação + custo + roadmap (não código de produção).
-  Bloqueio: precisa decisão de prioridade vs outros gaps; aguardando
-  go pra spike.
+- [x] **i18n — spike + relatório** — fechado em [PENDING].
+  Relatório completo em `Docs/sessions/i18n-spike-2026-05-17.md`.
+  Recomendação: **LinguiJS v4** (bundle ~2 KB, macros AOT, ICU
+  completo, types gerados). Catalog PO files por locale em
+  `src/locales/<lang>/messages.po`. Weblate self-host pra workflow
+  comunidade (manifesto §17 — sem chave mestra em plataforma de
+  tradução). Phase 1A: PT-BR + EN (10 dias, +8 KB bundle, dentro do
+  budget). RTL (AR/HE) defer pra Phase 2. Glossário protocolar
+  (SPREAD/BURY/NIP-*/nsec/npub) congelado via LOCK_VIA_TEST. Decisões
+  abertas: GO/NO-GO Phase 1A, Weblate hosting, initial locales,
+  CONTRIBUTING-i18n.md author. Bloqueio: aguardando user direcionar
+  scheduling.
 
 - [ ] **Ícones header (🌐 NetworkMode + 📍 LocationGranularity) — escopo
   expandido?** — hoje são dual-path pra Settings (atalhos visuais).
@@ -216,6 +208,21 @@ Plano Ted HIMYM 2026-05-17 (analysis registrada em commit do PR1 [c823e8f]).
   Fix: estados visuais granulares (checking/applying/reloading/latest),
   `window.location.reload()` explícito como fallback após 800ms,
   bg color diferenciado por fase, aria-live="polite".
+
+## Satoshi adversarial audit — lacunas pendentes
+
+- [ ] **Satoshi Lacunas 1/3/4/5 — definição + priorização** — após
+  Lacuna 2 (nsec exposure guards) ship em [b76245b], lacunas restantes
+  não foram registradas no repo com definição crisp. Hipóteses
+  candidatas mencionadas em sessões anteriores:
+    - PPR (Personal Page Rank) gaming via Sybil/coordinated farming
+    - Eviction silenciosa de posts pinned vs spread cache (§16 vector)
+    - NIP-65 fingerprint (relay list pública vaza social graph)
+    - Reports kind 9081 doxxing (reporter pubkey exposto, vetor de
+      retaliation se chains de reports forem auditáveis)
+  Bloqueio: precisa Satoshi HIMYM dispatch dedicado pra threat-modelar
+  cada uma + priorização (qual viola manifesto mais urgentemente).
+  Não shipping cego — risco de fix superficial que não resolve raiz.
 
 ## RFC reviews — adicionados 2026-05-17 (sessão noite VI)
 
