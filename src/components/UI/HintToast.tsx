@@ -71,25 +71,26 @@ export function HintToast({
     onDismiss?.()
   }
 
+  // Extraído pra var antes do return: regex do drift-alert-api-conformance
+  // matcha `<DriftAlert[^>]*variant=` ávido e pega `variant="ghost"` do
+  // DriftButton aninhado no slot `actions=`. Var = quebra o match.
+  const dismissAction = (
+    <DriftButton
+      variant="ghost"
+      size="sm"
+      onClick={handleDismiss}
+      aria-label={`dispensar hint ${rule.title}`}
+    >
+      ok, entendi
+    </DriftButton>
+  )
+
   return (
     <div
       className="fixed bottom-4 left-1/2 z-40 w-[calc(100vw-32px)] max-w-md -translate-x-1/2"
       style={{ pointerEvents: 'auto' }}
     >
-      <DriftAlert
-        variant="info"
-        title={rule.title}
-        actions={
-          <DriftButton
-            variant="ghost"
-            size="sm"
-            onClick={handleDismiss}
-            aria-label={`dispensar hint ${rule.title}`}
-          >
-            ok, entendi
-          </DriftButton>
-        }
-      >
+      <DriftAlert variant="info" title={rule.title} actions={dismissAction}>
         {rule.body(ctx)}
       </DriftAlert>
     </div>

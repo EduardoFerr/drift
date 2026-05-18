@@ -1369,7 +1369,7 @@ function SovereigntyField({
           value={local}
           onChange={(e) => setLocal(e.target.value)}
           placeholder={placeholder}
-          className="flex-1 min-w-0 rounded-lg border border-drift-border/40 bg-drift-surface/30 px-3 py-2 font-mono text-[12px] text-drift-text placeholder:text-drift-muted/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
+          className="flex-1 min-w-0 rounded-lg border border-drift-border/40 bg-drift-surface/30 px-3 py-2 font-mono text-[12px] text-drift-text placeholder:text-drift-muted/70 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
           aria-label={label}
         />
         <button
