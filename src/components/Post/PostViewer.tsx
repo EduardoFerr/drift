@@ -692,12 +692,16 @@ export function PostViewer({
             </>
           )}
         </AnimatePresence>
-        {/* V11 — botão ⋮ menu de ações (embedded mode only).
+        {/* V11 — botões do header (⋮ ações + 💬 comments + 🗺 mapa).
             Absolute top-right do card area, z-30 pra ficar acima do
             SwipeHandler. onClick stopPropagation pra evitar conflito
-            com swipe gesture. Mockup-aligned: ícone discreto, abre
-            SlideUpOverlay com lista de ações. */}
-        {embedded && (
+            com swipe gesture.
+            V12 (2026-05-18 user feedback): em slim mode os botões ficavam
+            ghosted/visíveis BEHIND o banner 'modo slim segure 5s pra sair'
+            no top. Slim = chrome-free → todos os 3 botões hidden. User
+            sai do slim com long-press 5s no card pra recuperar o chrome
+            (label do progress bar dá feedback). */}
+        {embedded && !isSlim && (
           <>
             <GlassIconButton
               onClick={(e) => {
