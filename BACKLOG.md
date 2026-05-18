@@ -97,7 +97,7 @@ Plano Ted HIMYM 2026-05-17 (analysis registrada em commit do PR1 [c823e8f]).
 ## Sovereignty / Power-user — UI pending
 
 - [x] **ComposeOverlay PreviewOverlay → FullPageCard** — fechado em
-  [PENDING]. PreviewOverlay (preview do post antes de publicar) usava
+  [9454384]. PreviewOverlay (preview do post antes de publicar) usava
   `<div absolute inset-0 z-10>` + `role="dialog"` ad-hoc. Migrado pra
   FullPageCard primitive (gerencia role/aria-modal/ESC/headerRight).
   Header "prévia" + botão "voltar" via headerRight. Allowlist
