@@ -97,7 +97,7 @@ Plano Ted HIMYM 2026-05-17 (analysis registrada em commit do PR1 [c823e8f]).
 ## Sovereignty / Power-user — UI pending
 
 - [x] **Settings UI pra 3 endpoints customizáveis** — fechado em
-  [PENDING]. Decisão UX: card próprio (`SovereigntyCard`) em "sistema"
+  [e213c24]. Decisão UX: card próprio (`SovereigntyCard`) em "sistema"
   group (não nested em NetworkMode/MapView — mistura semânticas
   heterogêneas que dividem único princípio §17 "rotear pra infra
   própria"). 3 campos com inputs livres + botão salvar (dirty-only) +
