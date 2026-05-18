@@ -25,6 +25,87 @@ o "porquê" via `git show <hash>`.
 
 ---
 
+## ✅ Fechados — sessão 2026-05-17 (rounds finais)
+
+Sequência de 7 rounds shipped após HIMYM dispatches. Todos pushed:
+
+- [x] **#1 UserPrefs sovereignty bump** (3 endpoints customizáveis) —
+  fechado em [f8db723]. `upload_endpoint` + `map_tile_url_template` +
+  `report_threshold_override` em UserPrefs schema; readers em upload.ts,
+  SpreadMap.tsx, moderation.ts com fallback default. Conformance 3
+  it.todo → it() em `no-telemetry.test.ts`.
+
+- [x] **#2 OnboardingOverlay → SlideUpOverlay** — fechado em [7fa7280].
+  SlideUpOverlay ganha prop `boost?: boolean` (z-[60] dominância sobre
+  UpdatePrompt). Allowlist conformance #2 enforce com 4 legacy
+  documentados.
+
+- [x] **#3 SuaLenteCard polish** (Lily approach a) — fechado em [4c36a18].
+  Labels descritivos ("sem reordenação" / "levemente prioriza..."), helper
+  text com exemplos concretos, CTA "ver feed agora" (EyeIcon), "como
+  funciona" reorganizado em 3 linhas estruturadas.
+
+- [x] **#5 ReplySheet → SlideUpOverlay bottom-sheet** — fechado em
+  [9fb525f]. SlideUpOverlay estendido com `variant='bottom-sheet'` +
+  `dragToDismiss` + `dragHandleVisible` (embarca pointer events + RAF
+  spring back; tuning bit-a-bit do ReplySheet pre-migration). Allowlist
+  reduzida pra 3 entries.
+
+- [x] **#4 Satoshi Lacuna 2: nsec exposure guards** — fechado em [b76245b].
+  `lib/identity-exposure.ts` com `recordExposure` + `requirePasskeyForExport`
+  + `isOverRateLimit` + `formatLastExposed`. Passkey gate em
+  reveal/copy/download. Audit chip top-of-tab "última exposição: X
+  atrás". Rate-limit warning ≥3 exposures em 10min. 8 conformance tests.
+
+- [x] **#8 RFC DAOP-001 Phase 1 PR1** (refactor puro) — fechado em
+  [c823e8f]. `lib/guidance.tsx` com `ONBOARDING_RULES` declarativo (5
+  IDs estáveis: welcome/swipes/identity/location/manifest-rules).
+  OnboardingOverlay vira consumer puro. 9 conformance tests. Abre
+  caminho pra PR2 (capabilities) + PR3 (HintChip/Toast/Modal).
+
+- [x] **Slim mode UX (long-press 5s)** — fechado em [848d78b]. Long-press
+  5s troca semantics: moderação → toggle modo slim (chrome hidden, card
+  fullscreen). Moderação migrou pro ActionsFan item `moderar`.
+
+---
+
+## RFC DAOP-001 — próximos PRs (Phase 1)
+
+Plano Ted HIMYM 2026-05-17 (analysis registrada em commit do PR1 [c823e8f]).
+
+- [ ] **DAOP PR2: `lib/capabilities.ts`** — capacidades derivadas de
+  queries puras SQLite locais. API minimal: `hasFirstPost`, `hasFirstSpread`,
+  `hasBackup`, `hasFollow`. Funções puras testáveis (CLAUDE.md invariante
+  #16). `user_prefs.capabilities_dismissed` bag substitui `onboarding_done`
+  boolean por granularidade. GuidanceRule ganha campo opcional
+  `appliesIf?: (caps) => boolean`.
+  Bloqueio: nenhum — caminho aberto pelo PR1. ~3-4h.
+
+- [ ] **DAOP PR3: HintChip / HintToast / HintModal primitives** —
+  3 componentes UI que consomem rules + capabilities pra mostrar hints
+  ambient. HintChip = passive (chip discreto), HintToast = reactive
+  (responde a comportamento), HintModal = interactive (overlay opcional).
+  OnboardingOverlay vira HintModal especial (sequência de rules sem
+  capability gates).
+  Bloqueio: requer PR2 capabilities concluído. ~3-4h.
+
+---
+
+## Sovereignty / Power-user — UI pending
+
+- [ ] **Settings UI pra 3 endpoints customizáveis** — após [f8db723]
+  shipped, falta UI pro user definir esses 3 valores:
+    - `upload_endpoint` (Blossom server URL https://)
+    - `map_tile_url_template` (XYZ tile template com {x}{y}{z})
+    - `report_threshold_override` (integer ≥1)
+  Decisão UX pendente: card próprio em Settings ("avançado/sovereignty"?)
+  ou seções dentro de cards existentes (NetworkMode pro upload, MapView
+  pro tile, Moderation futuro pro threshold)?
+  Bloqueio: HIMYM Lily — decidir arquitetura informacional. Hoje os
+  campos existem mas só editáveis via SQLite direto (debug).
+
+---
+
 ## Trust Lens Phase 1 — decisões políticas abertas
 
 (Originadas das deliberações HIMYM Stage 1-3, ainda não resolvidas.)
