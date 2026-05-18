@@ -7,10 +7,19 @@
 // padrões repetidos ad-hoc.
 //
 // Estratégia em 2 fases:
-//   FASE OBSERVE (atual): tests rodam como `it.todo` listando violations
+//   FASE OBSERVE (legacy): tests rodam como `it.todo` listando violations
 //     atuais congeladas em comentário. Não falha build.
-//   FASE ENFORCE (PR por test, junto com fix): converter `it.todo` → `it()`
-//     após audit Lily decidir migrar a view. Zero janela broken.
+//   FASE ENFORCE: converter `it.todo` → `it()` com allowlist explícita
+//     das views legacy. Cada migration remove 1 entry da allowlist
+//     (ratchet). Nova violation fora da allowlist falha imediato.
+//
+// Status 2026-05-17 (pós OnboardingOverlay + ReplySheet migrations):
+//   - #1 role="dialog" → primitive: ENFORCE ✅
+//   - #2 fixed inset-0 z-* fora UI/: ENFORCE ✅
+//   - banner inline pattern: ENFORCE ✅
+//
+// Allowlist atual (3 views, era 5): ComposeOverlay sub-overlay,
+// PostViewer ModalWrapper, ThreadView role="tree" exceção.
 //
 // Heurísticas testadas (com FP rate estimado):
 //   1. `role="dialog"` sem import de UI/{SlideUpOverlay,FullPageCard,DialogHost}
@@ -78,14 +87,44 @@ const OVERLAY_LEGACY_ALLOWLIST = new Set([
 ])
 
 describe('Design system primitives — modal/overlay usage', () => {
-  // FASE OBSERVE — violations restantes (post OnboardingOverlay migration):
-  //   - src/components/Create/ComposeOverlay.tsx (sub-overlay interno)
-  //   - src/components/Post/ReplySheet.tsx (bottom-sheet manual)
-  //   - src/components/Post/PostViewer.tsx (ModalWrapper interno)
-  //   - src/components/Post/ThreadView.tsx (overlay manual exceção docs)
-  it.todo(
-    '1. role="dialog" deve importar de SlideUpOverlay/FullPageCard/DialogHost',
-  )
+  // ENFORCE (2026-05-17 pós-migrations OnboardingOverlay [7fa7280] +
+  // ReplySheet [9fb525f]). Allowlist explícita das 3 views legacy
+  // restantes. Cada migration futura REMOVE 1 entry — ratchet força
+  // progresso. Allowlist mesma do #2 (overlay manual) — convergência.
+  it('1. role="dialog" sem import de primitive — usar SlideUpOverlay/FullPageCard/DialogHost', () => {
+    const violations: string[] = []
+    for (const file of walk('src/components')) {
+      if (PRIMITIVE_WHITELIST.has(file)) continue
+      if (OVERLAY_LEGACY_ALLOWLIST.has(file)) continue
+      const content = readFileSync(file, 'utf8')
+      // Whitelist por comentário (`// design-system: ok` ou JSX block).
+      if (/(?:\/\/|\/\*)\s*design-system:\s*ok/.test(content)) continue
+      // Strip comments antes do match (não conta menção a 'dialog' em
+      // docstring/comment).
+      const stripped = content
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .replace(/^\s*\/\/.*$/gm, '')
+      // Detecta role="dialog" como atributo JSX (não em string literal
+      // qualquer). Regex match: `role="dialog"` ou `role={"dialog"}`.
+      if (!/role=(?:["']dialog["']|\{['"]dialog['"]\})/.test(stripped)) continue
+      // Tem role="dialog" — exige primitive import (caller controla
+      // backdrop/overlay via SlideUpOverlay/FullPageCard/DialogHost).
+      const importsPrimitive = fileImportsPrimitive(content, [
+        'SlideUpOverlay',
+        'FullPageCard',
+        'DialogHost',
+      ])
+      if (!importsPrimitive) {
+        violations.push(file)
+      }
+    }
+    expect(
+      violations,
+      `\n${violations.join(
+        '\n',
+      )}\nFix: importar SlideUpOverlay/FullPageCard/DialogHost e delegar role="dialog" pro primitive. Ou adicionar à OVERLAY_LEGACY_ALLOWLIST com justificativa no PR.`,
+    ).toEqual([])
+  })
 
   // ENFORCE (Marshall Tier 1 #5 post-OnboardingOverlay migration 2026-05-17):
   // Detecta NOVAS violations. Allowlist contém 4 legacy aguardando migração
