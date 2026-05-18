@@ -73,7 +73,7 @@ Sequência de 7 rounds shipped após HIMYM dispatches. Todos pushed:
 
 Plano Ted HIMYM 2026-05-17 (analysis registrada em commit do PR1 [c823e8f]).
 
-- [x] **DAOP PR2: `lib/capabilities.ts`** — fechado em [PENDING].
+- [x] **DAOP PR2: `lib/capabilities.ts`** — fechado em [3299b26].
   Capabilities derivadas (`hasFirstPost`, `hasFirstSpread`, `hasFollow`,
   `hasBackup`, `dismissedRuleIds`) via queries puras SQLite + bag em
   `user_prefs.capabilities_dismissed`. `GuidanceRule.appliesIf?` opcional;
