@@ -35,6 +35,8 @@ import {
   XIcon,
   ShareIcon,
   ImageIcon,
+  MessageCircleIcon,
+  MoreVerticalIcon,
 } from '../UI/Icons'
 
 /**
@@ -697,7 +699,13 @@ export function PostViewer({
               // moderation; ⋮ é ação explícita de abrir fan menu).
               data-no-longpress="true"
             >
-              <span aria-hidden="true">{showActionsMenu ? '×' : '⋮'}</span>
+              <span aria-hidden="true">
+                {showActionsMenu ? (
+                  <XIcon size={18} strokeWidth={2} />
+                ) : (
+                  <MoreVerticalIcon size={18} strokeWidth={2} />
+                )}
+              </span>
             </GlassIconButton>
             {/* V9.15 (user pedido 2026-05-14): tap em ⋮ expande em fan
                 de quick actions. V_2026-05-17: item `moderar` adicionado
@@ -753,7 +761,13 @@ export function PostViewer({
               aria-label={`abrir comentários${commentCount > 0 ? ` (${commentCount})` : ''}`}
               title="comentários (thread)"
             >
-              <span className="text-[16px] leading-none">💬</span>
+              {/* Round Lily 2026-05-17 (B): emoji 💬 colorido destoava
+                  do design system stroke-based. MessageCircleIcon
+                  monocromático currentColor herda text-drift-muted +
+                  hover text-drift-accent2 do button. */}
+              <span aria-hidden="true">
+                <MessageCircleIcon size={18} strokeWidth={2} />
+              </span>
               {commentCount > 0 && (
                 <span className="text-[12px] leading-none font-mono tabular-nums">
                   {commentCount}
@@ -874,11 +888,18 @@ export function PostViewer({
           {/* Track C.4.2 — comments trigger (modal mode) */}
           <button
             onClick={() => setShowThread(true)}
-            className="inline-flex h-11 min-w-[44px] items-center justify-center rounded border border-drift-border px-2 text-drift-muted hover:border-drift-accent2 hover:text-drift-accent2"
+            className="inline-flex h-11 min-w-[44px] items-center justify-center gap-1 rounded border border-drift-border px-2 text-drift-muted hover:border-drift-accent2 hover:text-drift-accent2"
             title="abrir comentários"
             aria-label={`Comentários${commentCount > 0 ? ` (${commentCount})` : ''}`}
           >
-            💬{commentCount > 0 ? ` ${commentCount}` : ''}
+            <span aria-hidden="true">
+              <MessageCircleIcon size={18} strokeWidth={2} />
+            </span>
+            {commentCount > 0 && (
+              <span className="text-[12px] leading-none font-mono tabular-nums">
+                {commentCount}
+              </span>
+            )}
           </button>
           <button
             onClick={onSpread}
