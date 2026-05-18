@@ -78,8 +78,6 @@ function fileImportsPrimitive(content: string, primitives: string[]): boolean {
  * Migrações pendentes:
  */
 const OVERLAY_LEGACY_ALLOWLIST = new Set([
-  // ComposeOverlay sub-overlay interno (preview/abort) — refactor maior
-  'src/components/Create/ComposeOverlay.tsx',
   // PostViewer ModalWrapper interno — refactor maior
   'src/components/Post/PostViewer.tsx',
   // ThreadView role="tree" + bg semi-transparent — exceção documentada

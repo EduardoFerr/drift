@@ -481,21 +481,16 @@ function PreviewOverlay({
   }
 
   return (
-    <div
-      className="absolute inset-0 z-10 flex flex-col bg-drift-bg"
-      role="dialog"
-      aria-modal="true"
-      aria-label="prévia do post"
-    >
-      <header className="flex shrink-0 items-center justify-between border-b border-drift-border/40 px-5 py-[15px]">
-        <h2 className="font-display text-[14px] font-bold uppercase tracking-tag text-drift-accent">
-          prévia
-        </h2>
+    <FullPageCard
+      onClose={onClose}
+      title="prévia"
+      ariaLabel="prévia do post"
+      headerRight={
         <DriftButton variant="ghost" size="md" onClick={onClose} aria-label="voltar à edição">
           voltar
         </DriftButton>
-      </header>
-
+      }
+    >
       <div className="flex min-h-0 flex-1 flex-col px-4 py-4">
         <div className="relative flex-1 overflow-hidden rounded-2xl border border-drift-border/40 bg-drift-surface">
           <SubpostLayout subpost={subposts[safeIdx]!} post={mockPost} subpostIdx={safeIdx} subpostsTotal={total} />
@@ -527,7 +522,7 @@ function PreviewOverlay({
           </div>
         )}
       </div>
-    </div>
+    </FullPageCard>
   )
 }
 
