@@ -83,13 +83,14 @@ Plano Ted HIMYM 2026-05-17 (analysis registrada em commit do PR1 [c823e8f]).
   filtered rules + `dismissRules()` no finish (permite PR3 re-mostrar
   rules como hints contextuais). 12 conformance tests novos.
 
-- [ ] **DAOP PR3: HintChip / HintToast / HintModal primitives** —
-  3 componentes UI que consomem rules + capabilities pra mostrar hints
-  ambient. HintChip = passive (chip discreto), HintToast = reactive
-  (responde a comportamento), HintModal = interactive (overlay opcional).
-  OnboardingOverlay vira HintModal especial (sequência de rules sem
-  capability gates).
-  Bloqueio: requer PR2 capabilities concluído. ~3-4h.
+- [x] **DAOP PR3: HintChip / HintToast / HintModal primitives** —
+  fechado em [PENDING]. 3 componentes UI consumindo GuidanceRule +
+  capabilities. HintChip (passive, DriftChip + dismiss X), HintToast
+  (reactive, DriftAlert fixed-bottom + auto-dismiss 8s), HintModal
+  (interactive, SlideUpOverlay + snooze). Todos respeitam appliesIf +
+  dismissedRuleIds. Manifesto §28: zero fetch/Nostr — local-only.
+  15 conformance tests novos. Hint surfaces prontas pra adoção por
+  features (caller decide quando montar).
 
 ---
 
