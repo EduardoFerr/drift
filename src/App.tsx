@@ -2341,6 +2341,48 @@ function BootView({ state }: { state: BootState }) {
   // actions inline. Cada Check ganha botão discreto na própria etapa
   // que falhou — usuário comum encontra mitigação no contexto.
   const reloadPage = () => window.location.reload()
+
+  /**
+   * Force-update path: bootstrap interrompido frequentemente é causado
+   * por **service worker stale** — o SW serve `index.html` em cache que
+   * referencia um chunk JS antigo (e.g. `passkey-B2ccoolv.js`) que sumiu
+   * após deploy novo no Vercel. Reload simples só re-instala o mesmo
+   * HTML cacheado, loop infinito.
+   *
+   * Solução: desregistrar TODOS os SWs + apagar todos os Cache Storage
+   * antes do reload. Próximo load pega o `index.html` fresh do server
+   * com os hashes atuais.
+   *
+   * Best-effort: cada operação falha silenciosamente; pior caso o user
+   * cai no reload normal sem cleanup (= comportamento atual quebrado,
+   * mas pelo menos não trava).
+   */
+  const forceUpdateAndReload = async () => {
+    try {
+      // 1. Unregister TODOS os service workers no scope atual.
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations()
+        await Promise.all(regs.map((r) => r.unregister().catch(() => false)))
+      }
+    } catch {
+      /* SW unregister best-effort */
+    }
+    try {
+      // 2. Apaga TODOS os Cache Storage (Workbox precaches, runtime caches).
+      if ('caches' in window) {
+        const keys = await caches.keys()
+        await Promise.all(keys.map((k) => caches.delete(k).catch(() => false)))
+      }
+    } catch {
+      /* Cache delete best-effort */
+    }
+    // 3. Reload com query bust pra forçar bypass de qualquer HTTP cache
+    //    intermediário que ainda esteja servindo HTML stale.
+    const url = new URL(window.location.href)
+    url.searchParams.set('_drift_force_reload', String(Date.now()))
+    window.location.replace(url.toString())
+  }
+
   const clearLocalAndReload = async () => {
     try {
       // Limpa OPFS storage (sqlite-wasm) + IndexedDB (master key) +
@@ -2380,10 +2422,14 @@ function BootView({ state }: { state: BootState }) {
       } catch {
         /* localStorage clean best-effort */
       }
-      window.location.reload()
+      // Crítico: clearLocal sem unregister SW + clear caches deixa o
+      // SW servindo `index.html` cacheado → loop bootstrap error.
+      // forceUpdateAndReload já faz reload (com query bust), não chama
+      // window.location.reload() depois.
+      await forceUpdateAndReload()
     } catch (err) {
       console.error('clearLocalAndReload falhou:', err)
-      window.location.reload()
+      await forceUpdateAndReload()
     }
   }
 
@@ -2570,18 +2616,25 @@ function BootView({ state }: { state: BootState }) {
               </p>
             </div>
 
-            {/* Secondary CTA: simple reload — for transient errors */}
+            {/* Secondary CTA: força atualização (SW unregister + caches
+                clear + reload). Em estado de erro, reload simples
+                geralmente não resolve — SW continua servindo HTML stale
+                que referencia chunks JS antigos (deploy novo Vercel
+                quebrou cache). forceUpdateAndReload mata o SW + caches
+                antes do reload. */}
             <div className="flex flex-col items-center gap-2 border-t border-drift-border pt-4">
               <button
                 type="button"
-                onClick={reloadPage}
+                onClick={() => void forceUpdateAndReload()}
                 className="rounded border border-drift-accent/60 bg-drift-bg/40 px-4 py-2 font-mono text-[12px] uppercase tracking-[2px] text-drift-accent transition-colors hover:border-drift-accent hover:bg-drift-accent/10 focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2"
-                title="recarrega a página — resolve race conditions transientes"
+                title="desregistra service worker + limpa caches + recarrega — resolve deploy stale"
               >
-                ↻ recarregar pagina
+                ↻ forçar atualização
               </button>
               <p className="text-[12px] text-drift-muted">
-                Se o erro for passageiro, recarregar pode resolver.
+                Desregistra service worker + limpa caches.
+                <br />
+                Útil quando deploy novo quebrou o cache antigo.
               </p>
             </div>
           </div>

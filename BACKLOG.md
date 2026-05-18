@@ -195,6 +195,29 @@ Plano Ted HIMYM 2026-05-17 (analysis registrada em commit do PR1 [c823e8f]).
 
 ## BUGS — prioridade alta (correção sem polish)
 
+- [ ] **PWA SW serve HTML stale após deploy Vercel novo** — causa raiz
+  do bug user reportou 2026-05-17. Cenário: deploy gera hashes novos
+  (`assets/passkey-Xxxxx.js`); SW antigo do user continua servindo
+  `index.html` cacheado que referencia hashes antigos; Vercel SPA
+  fallback devolve NOVO `index.html` (text/html) na request do JS
+  antigo → "Expected JavaScript module but server responded with MIME
+  type text/html". Bootstrap fail em `identity` (passkey é lazy chunk
+  da etapa 3).
+  Recuperação imediata shipada em [PENDING-fix]: ambos botões do
+  error screen + novo "↻ forçar atualização" desregistram SW + limpam
+  Cache API antes do reload.
+  Fix de causa raiz pendente: SW config (vite.config.ts workbox)
+  precisa (a) `cleanupOutdatedCaches: true`, (b) NetworkFirst pra
+  navigation requests, (c) revisar `registerType: 'prompt'` vs
+  manifesto §17 (autoUpdate é "chave mestra disfarçada"). Decisão
+  política: aceitar que user precisa clicar "atualizar" no prompt e
+  documentar workaround quando ignora — ou flexibilizar §17 interp
+  pra silent SW update?
+  Bloqueio: deliberação HIMYM (Ted SW config + Barney threat-model
+  silent update vs §17 + Lily UX prompt flow).
+
+
+
 - [x] **BUG-LONGPRESS-FAN** — fechado 2026-05-17 em [aff356d].
   `data-no-longpress="true"` no wrapper `<m.div>` de cada FanItem.
   Pattern já estabelecido pra ⋮ trigger (linha 671 PostViewer).
