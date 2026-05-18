@@ -369,14 +369,19 @@
      imagem clara → halo CLARO (papel rgb 243, 238, 230) atrás do glyph
      escuro cria efeito "letra recortada sobre papel" (editorial). Halo
      escuro aqui pioraria (escuro sobre escuro = mancha).
-     Alphas mais altos que Cinder/Rosenholz pq halo claro precisa mais
-     opacidade pra ser perceptível atrás de glyph escuro. */
+
+     User feedback 2026-05-18 (round 3 — light theme tuning): halo
+     blur amplo (8px/4px) dispersava demais, virava nuvem ao redor do
+     texto em vez de recortar. Apertado pra blur 1-2px com alpha=1 =
+     paint-stroke tight (efeito 'recorte sobre papel' nítido, sem
+     dispersão). Mesma fórmula em offset (1-2px) + halo (1-2px) cria
+     outline crisp. */
   --text-on-image-title-shadow:
-    0 1px 3px rgba(243, 238, 230, 0.85),
-    0 0 8px rgba(243, 238, 230, 0.7);
+    0 1px 2px rgba(243, 238, 230, 1),
+    0 0 2px rgba(243, 238, 230, 1);
   --text-on-image-body-shadow:
-    0 1px 2px rgba(243, 238, 230, 0.9),
-    0 0 4px rgba(243, 238, 230, 0.75);
+    0 1px 1.5px rgba(243, 238, 230, 1),
+    0 0 1.5px rgba(243, 238, 230, 1);
   --text-on-image-meta-shadow:
-    0 1px 1px rgba(243, 238, 230, 0.9);
+    0 1px 1px rgba(243, 238, 230, 1);
 }
