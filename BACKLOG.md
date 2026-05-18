@@ -195,6 +195,33 @@ Plano Ted HIMYM 2026-05-17 (analysis registrada em commit do PR1 [c823e8f]).
 
 ## BUGS — prioridade alta (correção sem polish)
 
+- [ ] **Radio-group active state invisível em Velatura (light theme)** —
+  user report 2026-05-18 com screenshot: LocationCard granularidade
+  (OFF/PAÍS/CIDADE/GPS) — selecionando opção mas UI não indica
+  seleção. Causa: pattern de alphas baixos em Velatura morre.
+    - Active: `border-drift-accent/50 bg-drift-accent/10
+      text-drift-accent`
+    - Inactive: `border-drift-border/30 bg-drift-surface/30
+      text-drift-muted`
+  Em Velatura, drift-accent é rosé Morandi pálido (#a87870); /10 e
+  /30 sobre papel claro = todos parecem o mesmo.
+  Mesmo padrão presente em outros cards potencialmente: MapViewCard
+  segmented control, NetworkModeCard, FiltersCard toggles. Audit
+  necessário.
+  Fix proposto (Lily/Marshall HIMYM):
+    - Active: bumpar pra `bg-drift-accent/20` + `border-drift-accent`
+      (alpha 100% na border)
+    - OU usar inversão estilo stamp: `bg-drift-accent text-drift-bg`
+      pra active, mais discriminação
+    - Inactive: pode ficar /30 (contraste de luminance vs active
+      preenchido resolve)
+  Cross-component audit + LOCK_VIA_TEST `radio-active-contrast` que
+  valida diff de luminance/saturation entre active/inactive states
+  em todos os 3 temas (idealmente WCAG 3:1 mínimo entre estados).
+  Bloqueio: deliberação Lily (UX pattern unificado) + Marshall
+  (conformance test) + decidir se aplicar fix point-by-point ou
+  extract num primitive (`RadioGroupButton` / `SegmentedControl`).
+
 - [ ] **PWA SW serve HTML stale após deploy Vercel novo** — causa raiz
   do bug user reportou 2026-05-17. Cenário: deploy gera hashes novos
   (`assets/passkey-Xxxxx.js`); SW antigo do user continua servindo
