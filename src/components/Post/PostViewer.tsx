@@ -1174,11 +1174,16 @@ function ActionsFan({
                 transition={{ duration: 0.16, delay: i * 0.035, ease: [0.22, 1, 0.36, 1] }}
                 className="flex items-center gap-2"
               >
-                {/* (3) Label permanente — contraste forte: accent border
-                    + text-drift-text (não muted). text-on-image-meta
-                    preservado caso fan abra sobre foto. */}
+                {/* (3) Label inverted stamp — V11.9 (2026-05-17 round 5
+                    after user screenshot): translucent /70 sobre foto
+                    desapareceu em Velatura (papel sobre tom de pele).
+                    Inverted: bg sólido drift-text (escuro/dark, claro/
+                    light) + texto drift-bg (papel) = contraste trivial
+                    WCAG AA em qualquer tema sobre qualquer foto. Sem
+                    border, sem shadow — stamp editorial limpo (Read.cv
+                    /Linear/Cosmos pattern). */}
                 <span
-                  className="pointer-events-none whitespace-nowrap rounded border border-drift-accent/55 bg-drift-bg/70 px-2.5 py-1 font-mono text-[11px] uppercase tracking-meta text-drift-text text-on-image-meta"
+                  className="pointer-events-none whitespace-nowrap rounded bg-drift-text px-2.5 py-1 font-mono text-[11px] font-medium uppercase tracking-meta text-drift-bg shadow-sm"
                   aria-hidden="true"
                 >
                   {item.label}
@@ -1216,8 +1221,11 @@ function ActionsFan({
               transition={{ duration: 0.16, delay: 0.04 * (neutralItems.length + 1), ease: [0.22, 1, 0.36, 1] }}
               className="flex items-center gap-2"
             >
+              {/* Destrutivo inverted stamp — bg drift-bury sólido +
+                  texto drift-bg. Mantém color-coding semântico (vermelho-
+                  ish) MAS com contraste WCAG AA garantido. */}
               <span
-                className="pointer-events-none whitespace-nowrap rounded border border-drift-bury/55 bg-drift-bg/70 px-2.5 py-1 font-mono text-[11px] uppercase tracking-meta text-drift-bury text-on-image-meta"
+                className="pointer-events-none whitespace-nowrap rounded bg-drift-bury px-2.5 py-1 font-mono text-[11px] font-medium uppercase tracking-meta text-drift-bg shadow-sm"
                 aria-hidden="true"
               >
                 {item.label}
