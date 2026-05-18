@@ -10,14 +10,16 @@
  * direto, fácil de pular.
  */
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 // `m` é o primitive leve do framer-motion (LazyMotion). Features via main.tsx.
 import { m, AnimatePresence } from 'framer-motion'
 import { setPref, usePrefsStore } from '../../lib/prefs'
 import {
   ONBOARDING_RULES,
+  filterApplicableRules,
   type GuidanceRuleContext,
 } from '../../lib/guidance'
+import { dismissRules, useCapabilitiesStore } from '../../lib/capabilities'
 import { DriftButton } from '../UI/DriftButton'
 import { SlideUpOverlay } from '../UI/SlideUpOverlay'
 
@@ -33,8 +35,20 @@ export function OnboardingOverlay({ onClose, onOpenIdentity }: OnboardingOverlay
   // novos aqui exige extension do GuidanceRuleContext em lib/guidance.ts.
   const ruleContext: GuidanceRuleContext = { onOpenIdentity }
 
-  const currentRule = ONBOARDING_RULES[step]
-  const isLast = step === ONBOARDING_RULES.length - 1
+  // PR2 DAOP-001 (2026-05-17): filtra regras por capabilities. User que
+  // já fez backup do nsec pula 'identity'. Snapshot é estável dentro do
+  // overlay (caps capturado no mount via useMemo) — mudar mid-flow seria
+  // jarring (steps somem). Se loaded=false (race no boot), fallback é
+  // mostrar lista inteira (paridade PR1).
+  const caps = useCapabilitiesStore((s) => s.caps)
+  const applicableRules = useMemo(
+    () => filterApplicableRules(ONBOARDING_RULES, caps),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  )
+
+  const currentRule = applicableRules[step]
+  const isLast = step === applicableRules.length - 1
 
   function finish() {
     // Store primeiro (síncrono) → onClose segundo (síncrono) → persist
@@ -45,6 +59,12 @@ export function OnboardingOverlay({ onClose, onOpenIdentity }: OnboardingOverlay
     onClose()
     setPref('onboarding_done', true).catch((err) => {
       console.warn('[OnboardingOverlay] setPref onboarding_done falhou:', err)
+    })
+    // PR2: marca regras mostradas como dispensadas. Permite PR3 (hints
+    // contextuais) re-mostrar regras NÃO incluídas no onboarding atual
+    // (ex.: user que pulou backup vê hint contextual depois).
+    dismissRules(applicableRules.map((r) => r.id)).catch((err) => {
+      console.warn('[OnboardingOverlay] dismissRules falhou:', err)
     })
   }
 
@@ -73,7 +93,7 @@ export function OnboardingOverlay({ onClose, onOpenIdentity }: OnboardingOverlay
       <div className="flex flex-col px-4 py-5">
         {/* Progress bar estilo Stories — itera sobre ONBOARDING_RULES */}
         <div className="mb-4 flex gap-1">
-          {ONBOARDING_RULES.map((_, i) => (
+          {applicableRules.map((_, i) => (
             <div
               key={i}
               className={`h-0.5 flex-1 rounded-full ${

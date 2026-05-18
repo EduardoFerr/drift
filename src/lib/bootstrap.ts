@@ -246,6 +246,18 @@ async function doBootstrap(): Promise<void> {
     const { loadExposureState } = await import('./identity-exposure')
     await loadExposureState()
 
+    // Capabilities snapshot — RFC DAOP-001 Phase 1 PR2.
+    // Computa hasFirstPost/Spread/Follow/Backup + carrega
+    // `capabilities_dismissed` bag pra guidance rules. Falha silenciosa
+    // OK (default seguro = caps null, regras aplicam todas).
+    try {
+      const { loadCapabilities } = await import('./capabilities')
+      await loadCapabilities(identity.npub)
+    } catch {
+      // Sem capabilities snapshot — UI cai em fallback (mostra todas
+      // rules sem filtro). Próximo boot tenta de novo.
+    }
+
     setBoot((p) => ({ ...p, step: 'sync' }))
 
     // ─── Modo Tor (Fase 6.4 etapa 4) ──────────────────────────────

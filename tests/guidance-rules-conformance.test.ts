@@ -92,7 +92,25 @@ describe('OnboardingOverlay.tsx — consumer puro de ONBOARDING_RULES', () => {
     expect(PANEL).toMatch(/currentRule\?\.body\s*\(\s*ruleContext\s*\)/)
   })
 
-  it('itera ONBOARDING_RULES.map pra progress bar', () => {
-    expect(PANEL).toMatch(/ONBOARDING_RULES\.map/)
+  it('itera applicableRules.map pra progress bar (PR2: filtered por capabilities)', () => {
+    // PR1 era ONBOARDING_RULES.map; PR2 (DAOP-001 2026-05-17) trocou pra
+    // applicableRules = filterApplicableRules(ONBOARDING_RULES, caps).
+    expect(PANEL).toMatch(/applicableRules\.map/)
+  })
+})
+
+describe('OnboardingOverlay.tsx — PR2 capabilities integration', () => {
+  it('importa filterApplicableRules + useCapabilitiesStore + dismissRules', () => {
+    expect(PANEL).toMatch(/filterApplicableRules/)
+    expect(PANEL).toMatch(/useCapabilitiesStore/)
+    expect(PANEL).toMatch(/dismissRules/)
+  })
+
+  it('finish() chama dismissRules pra registrar regras dispensadas', () => {
+    const stripped = PANEL.replace(/\/\*[\s\S]*?\*\//g, '').replace(
+      /^\s*\/\/.*$/gm,
+      '',
+    )
+    expect(stripped).toMatch(/dismissRules\s*\(/)
   })
 })

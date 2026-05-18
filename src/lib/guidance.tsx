@@ -1,19 +1,20 @@
 /**
  * Guidance — regras declarativas pra onboarding + hints contextuais.
  *
- * Source: RFC DAOP-001 Phase 1 PR1 (Ted HIMYM analysis 2026-05-17).
+ * Source: RFC DAOP-001 Phase 1 PR1+PR2 (Ted HIMYM analysis 2026-05-17).
  *
  * Filosofia: onboarding NÃO é tutorial linear hardcoded em JSX. É uma
  * coleção de regras declarativas em dados — cada regra descreve uma
- * unidade pedagógica (título + body + futuros triggers/capabilities).
+ * unidade pedagógica (título + body + capability triggers).
  *
- * **PR1 (este)** — refactor puro, paridade visual: extrai as 5 telas
- * de `OnboardingOverlay.tsx` pra `ONBOARDING_RULES` aqui. Componente
- * vira consumer puro.
+ * **PR1 [c823e8f]** — refactor puro, paridade visual: extraídas 5 telas
+ * de `OnboardingOverlay.tsx` pra `ONBOARDING_RULES`. Componente virou
+ * consumer puro.
  *
- * **PR2 (futuro)** — capability detection (`hasFirstPost`, `hasBackup`,
- * etc.) em `lib/capabilities.ts`. Regras ganham triggers `appliesIf:
- * (caps) => boolean`. Hints contextuais surgem do mesmo schema.
+ * **PR2 (este)** — capability detection (`lib/capabilities.ts`). Regras
+ * ganham `appliesIf?: (caps) => boolean`. Hints contextuais surgem do
+ * mesmo schema — uma regra pode ser onboarding step OU hint reativo
+ * dependendo do trigger.
  *
  * **PR3 (futuro)** — HintChip / HintToast / HintModal primitives que
  * consomem regras + capabilities pra mostrar hints ambient (não
@@ -21,14 +22,15 @@
  *
  * Manifesto §17 (sem chave mestra): regras vivem NO REPO, versionadas
  * em código. Não há "engine remoto" servindo guidance — auditável,
- * imutável post-deploy (até próximo PR).
+ * imutável post-deploy.
  *
  * Manifesto §28 (privacy mínima): zero behavioral signal exportado.
- * Capability state futuro será 100% local (SQLite + Zustand).
+ * Capability state é 100% local (SQLite + Zustand).
  */
 
 import type { ReactNode } from 'react'
 import { DriftButton } from '../components/UI/DriftButton'
+import type { Capabilities } from './capabilities'
 
 /**
  * Context injetado pelo caller (OnboardingOverlay, futuros consumers
@@ -58,6 +60,24 @@ export interface GuidanceRule {
    * Casos sem context usam `() => <>...</>`.
    */
   body: (ctx: GuidanceRuleContext) => ReactNode
+  /**
+   * Capability trigger (PR2). Quando definido, regra só "aplica" se
+   * retornar true pra capabilities atuais. Default (undefined) = sempre
+   * aplica.
+   *
+   * Exemplos:
+   *  - `(caps) => !caps.hasFirstPost` — hint só pra quem não postou
+   *  - `(caps) => caps.hasFollow && !caps.hasFirstSpread` — hint pra
+   *    quem segue alguém mas nunca drift-ou
+   *
+   * Para regras de onboarding (PR1), `appliesIf` é tipicamente
+   * `(caps) => !caps.dismissedRuleIds.has(this.id)` — só mostra se
+   * user não dispensou. Caller pode adicionar lógica mais sofisticada.
+   *
+   * Função pura (sem side effects) — testável + safe pra chamar várias
+   * vezes em render.
+   */
+  appliesIf?: (caps: Capabilities) => boolean
 }
 
 /**
@@ -139,6 +159,11 @@ export const ONBOARDING_RULES: readonly GuidanceRule[] = [
         </DriftButton>
       </>
     ),
+    // PR2: regra só aplica se user AINDA não fez backup do nsec.
+    // hasBackup é derivado de `last_nsec_export_at` (Satoshi guard
+    // [b76245b]). User que já clicou reveal/copy/download pula essa
+    // tela — onboarding adapta ao estado real, não roteiro fixo.
+    appliesIf: (caps) => !caps.hasBackup,
   },
   {
     id: 'location',
@@ -188,9 +213,31 @@ export const ONBOARDING_RULES: readonly GuidanceRule[] = [
 ] as const
 
 /**
- * Lookup helper — usado por tests + futuros PRs (PR2 capability checks).
+ * Lookup helper — usado por tests + capability checks.
  * Returns rule por id ou undefined.
  */
 export function getOnboardingRule(id: string): GuidanceRule | undefined {
   return ONBOARDING_RULES.find((r) => r.id === id)
+}
+
+/**
+ * Filtra regras aplicáveis dado snapshot de capabilities (PR2).
+ *
+ * Regras sem `appliesIf` SEMPRE aplicam (default seguro pra onboarding).
+ * Regras com `appliesIf` aplicam se função retorna true.
+ *
+ * Pure — não muta input, não toca DOM. Caller usa em render path
+ * (memoize se profile mostrar gargalo; hoje N=5 rules dispensa cache).
+ *
+ * @param rules Lista de regras (use ONBOARDING_RULES ou subset)
+ * @param caps Snapshot atual (null = retorna lista inteira — defaults
+ *   aplicam, preservando paridade com PR1 quando capabilities ainda
+ *   loading)
+ */
+export function filterApplicableRules(
+  rules: readonly GuidanceRule[],
+  caps: Capabilities | null,
+): readonly GuidanceRule[] {
+  if (caps === null) return rules
+  return rules.filter((r) => !r.appliesIf || r.appliesIf(caps))
 }

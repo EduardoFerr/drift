@@ -73,13 +73,15 @@ Sequência de 7 rounds shipped após HIMYM dispatches. Todos pushed:
 
 Plano Ted HIMYM 2026-05-17 (analysis registrada em commit do PR1 [c823e8f]).
 
-- [ ] **DAOP PR2: `lib/capabilities.ts`** — capacidades derivadas de
-  queries puras SQLite locais. API minimal: `hasFirstPost`, `hasFirstSpread`,
-  `hasBackup`, `hasFollow`. Funções puras testáveis (CLAUDE.md invariante
-  #16). `user_prefs.capabilities_dismissed` bag substitui `onboarding_done`
-  boolean por granularidade. GuidanceRule ganha campo opcional
-  `appliesIf?: (caps) => boolean`.
-  Bloqueio: nenhum — caminho aberto pelo PR1. ~3-4h.
+- [x] **DAOP PR2: `lib/capabilities.ts`** — fechado em [PENDING].
+  Capabilities derivadas (`hasFirstPost`, `hasFirstSpread`, `hasFollow`,
+  `hasBackup`, `dismissedRuleIds`) via queries puras SQLite + bag em
+  `user_prefs.capabilities_dismissed`. `GuidanceRule.appliesIf?` opcional;
+  regra `identity` skipa pra quem já fez backup (reusa `last_nsec_export_at`
+  do guard Satoshi [b76245b]). `filterApplicableRules()` puro + testável.
+  `useCapabilitiesStore` reativo via Zustand. OnboardingOverlay consome
+  filtered rules + `dismissRules()` no finish (permite PR3 re-mostrar
+  rules como hints contextuais). 12 conformance tests novos.
 
 - [ ] **DAOP PR3: HintChip / HintToast / HintModal primitives** —
   3 componentes UI que consomem rules + capabilities pra mostrar hints
