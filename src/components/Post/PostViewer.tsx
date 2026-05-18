@@ -206,6 +206,11 @@ export function PostViewer({
 }: PostViewerProps) {
   const prefs = usePrefsStore()
   const hint: RenderHint = applyContentFilters(post, prefs)
+  // V12 (2026-05-18): respeitar prefers-reduced-motion no map sanfona
+  // animation. WCAG 2.3.3 — animation maior que 5s ou parallax/clipPath
+  // complex precisa fallback. Hook retorna boolean | null (null = sem
+  // preference detectada → trata como false).
+  const reducedMotion = useReducedMotion() ?? false
 
   // Flag local: leitor pode revelar mesmo se prefs mandam blur/hide.
   // Não mexe em prefs globais — é override por post.
@@ -637,25 +642,69 @@ export function PostViewer({
             inset-0 cobre 100% do card-area. z-20 fica ABAIXO dos botões
             do header (z-30) → user pode fechar o mapa pelo mesmo botão
             mapa que abriu. Fade + scale-up sutil na entrada. */}
+        {/* V12 (HIMYM Robin+Lily 2026-05-18): map open/close vira efeito
+            sanfona/persiana — clipPath inset from top desdobra o mapa de
+            cima pra baixo, conteúdo interno (canvas) aparece com leve
+            counter-anim translateY pra dar camadas de papel se assentando.
+            Editorial + neo-brutalist soft (sem bounce, sem swoosh).
+            Reduced motion → fade cross 150ms (WCAG 2.3.3).
+              - Open: clipPath inset(0 0 100% 0)→0, 320ms expo-out custom
+              - Close: 220ms expo-in (70% do open, heurística Material)
+              - Inner translateY -16→0, delay 80ms (assenta depois) */}
         <AnimatePresence>
           {showMap && (
             <m.div
-              initial={{ opacity: 0, scale: 0.98 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.98 }}
-              transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+              initial={
+                reducedMotion
+                  ? { opacity: 0 }
+                  : { clipPath: 'inset(0 0 100% 0)', opacity: 1 }
+              }
+              animate={
+                reducedMotion
+                  ? { opacity: 1 }
+                  : { clipPath: 'inset(0 0 0% 0)', opacity: 1 }
+              }
+              exit={
+                reducedMotion
+                  ? { opacity: 0, transition: { duration: 0.15 } }
+                  : {
+                      clipPath: 'inset(0 0 100% 0)',
+                      transition: { duration: 0.22, ease: [0.7, 0, 0.84, 0] },
+                    }
+              }
+              transition={{
+                duration: reducedMotion ? 0.15 : 0.32,
+                ease: reducedMotion ? 'linear' : [0.16, 1, 0.3, 1],
+              }}
               className="absolute inset-0 z-20 overflow-hidden rounded-2xl bg-drift-bg"
+              // will-change durante anim ajuda GPU (clipPath compositing).
+              // Removido após animation completar via onAnimationComplete
+              // seria ideal, mas Framer Motion não tem hook idle simples —
+              // aceitar overhead constante (compose layer pequeno).
+              style={{ willChange: 'clip-path' }}
               // Opt-out de long-press do card parent — interagir com o
               // mapa (pan/zoom) não deve disparar slim mode toggle.
               data-no-longpress="true"
             >
-              <LazyBoundary fallback={<DriftSkeleton variant="image" aspect="1/1" />}>
-                <SpreadMap
-                  postId={post.id}
-                  className="h-full w-full"
-                  {...(onOpenLocationSettings ? { onOpenLocationSettings } : {})}
-                />
-              </LazyBoundary>
+              <m.div
+                initial={reducedMotion ? { opacity: 1 } : { opacity: 0, y: -16 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, transition: { duration: 0.15 } }}
+                transition={{
+                  duration: reducedMotion ? 0 : 0.28,
+                  delay: reducedMotion ? 0 : 0.08,
+                  ease: [0.16, 1, 0.3, 1],
+                }}
+                className="h-full w-full"
+              >
+                <LazyBoundary fallback={<DriftSkeleton variant="image" aspect="1/1" />}>
+                  <SpreadMap
+                    postId={post.id}
+                    className="h-full w-full"
+                    {...(onOpenLocationSettings ? { onOpenLocationSettings } : {})}
+                  />
+                </LazyBoundary>
+              </m.div>
             </m.div>
           )}
         </AnimatePresence>
