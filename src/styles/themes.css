@@ -133,6 +133,19 @@
     rgba(14, 14, 18, 0.18) 22%,
     transparent 38%
   );
+
+  /* Text-on-image shadows — usados em .text-on-image-{title,body,meta}
+     (src/index.css @layer utilities). Cinder: glyphs CLAROS sobre
+     imagem → sombra PRETA pura (offset + halo) cria depth + contraste.
+     User feedback 2026-05-17 round 2. */
+  --text-on-image-title-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.6),
+    0 0 8px rgba(0, 0, 0, 0.45);
+  --text-on-image-body-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.7),
+    0 0 4px rgba(0, 0, 0, 0.5);
+  --text-on-image-meta-shadow:
+    0 1px 1px rgba(0, 0, 0, 0.7);
 }
 
 /* ============================================================
@@ -234,6 +247,18 @@
     rgba(24, 22, 37, 0.18) 22%,
     transparent 38%
   );
+
+  /* Text-on-image shadows — Rosenholz: glyphs CLAROS sobre imagem →
+     sombra ÍNDIGO ESCURO (rgb do bg) preserva hue do tema; preto puro
+     seria intruso visual no índigo. Mesmo alpha curve do Cinder. */
+  --text-on-image-title-shadow:
+    0 1px 3px rgba(24, 22, 37, 0.65),
+    0 0 8px rgba(24, 22, 37, 0.5);
+  --text-on-image-body-shadow:
+    0 1px 2px rgba(24, 22, 37, 0.72),
+    0 0 4px rgba(24, 22, 37, 0.55);
+  --text-on-image-meta-shadow:
+    0 1px 1px rgba(24, 22, 37, 0.72);
 }
 
 /* ============================================================
@@ -339,4 +364,19 @@
     rgba(243, 238, 230, 0.25) 22%,
     transparent 38%
   );
+
+  /* Text-on-image shadows — VELATURA INVERTIDA: glyphs ESCUROS sobre
+     imagem clara → halo CLARO (papel rgb 243, 238, 230) atrás do glyph
+     escuro cria efeito "letra recortada sobre papel" (editorial). Halo
+     escuro aqui pioraria (escuro sobre escuro = mancha).
+     Alphas mais altos que Cinder/Rosenholz pq halo claro precisa mais
+     opacidade pra ser perceptível atrás de glyph escuro. */
+  --text-on-image-title-shadow:
+    0 1px 3px rgba(243, 238, 230, 0.85),
+    0 0 8px rgba(243, 238, 230, 0.7);
+  --text-on-image-body-shadow:
+    0 1px 2px rgba(243, 238, 230, 0.9),
+    0 0 4px rgba(243, 238, 230, 0.75);
+  --text-on-image-meta-shadow:
+    0 1px 1px rgba(243, 238, 230, 0.9);
 }

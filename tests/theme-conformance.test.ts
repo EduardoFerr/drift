@@ -61,6 +61,13 @@ const REQUIRED_SHADOW_TOKENS = [
   'shadow-md',
   'shadow-lg',
   'shadow-glow',
+  // Text-on-image shadows (2026-05-17 round 3): cada tema define o
+  // próprio hue+lightness pra glyph sobre imagem. Cinder/Rosenholz
+  // sombra escura; Velatura sombra clara (halo papel atrás de glyph
+  // escuro — light theme).
+  'text-on-image-title-shadow',
+  'text-on-image-body-shadow',
+  'text-on-image-meta-shadow',
 ] as const
 
 const REQUIRED_GESTURE_TOKENS = [

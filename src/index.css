@@ -112,36 +112,32 @@
    * deixa texto mais grosso/lento de ler). Sombra preserva o glyph
    * original, só adiciona profundidade.
    *
-   * Tuning user feedback 2026-05-17: começamos suave; se ainda
-   * ilegível em fotos super claras, bumpamos alpha das sombras.
+   * **Tema-aware (user feedback 2026-05-17 round 3):** as utilities
+   * consomem CSS vars `--text-on-image-{title,body,meta}-shadow`
+   * definidas por tema em styles/themes.css. Sombra muda hue + light/
+   * dark inversion per tema:
+   *   - Cinder (dark, glyph claro): sombra preta pura
+   *   - Rosenholz (dark, glyph claro): sombra índigo (preserva hue)
+   *   - Velatura (light, glyph escuro): halo CLARO papel (recorta
+   *     glyph escuro sobre foto clara — efeito editorial)
    *
    *   .text-on-image-title — pra h2 títulos (font-display, bold)
-   *     • offset 0 1px 3px alpha 0.6 (deslocamento sutil)
-   *     • halo 0 0 8px alpha 0.45 (glow amplo difuso)
    *   .text-on-image-body — pra body italic (font-mono)
-   *     • offset 0 1px 2px alpha 0.7
-   *     • halo 0 0 4px alpha 0.5
    *   .text-on-image-meta — pra chips/tags meta line
-   *     • offset 0 1px 1px alpha 0.7
    *
-   * Stroke alternativo (comentado): se sombra não bastar em casos
-   * extremos, descomentar `-webkit-text-stroke` no `.text-on-image-*`.
-   * Paint-order=stroke garante stroke ATRÁS do fill (não engrossa).
+   * Tuning: alpha dos tokens é mutável sem tocar markup. Stroke
+   * alternativo via `-webkit-text-stroke` + `paint-order: stroke fill`
+   * disponível caso shadow não baste em fotos extremas (não usado por
+   * default — paint-order quebra suavidade do font-display).
    */
   .text-on-image-title {
-    text-shadow:
-      0 1px 3px rgba(0, 0, 0, 0.6),
-      0 0 8px rgba(0, 0, 0, 0.45);
-    /* paint-order: stroke fill;
-       -webkit-text-stroke: 0.5px rgba(0, 0, 0, 0.4); */
+    text-shadow: var(--text-on-image-title-shadow);
   }
   .text-on-image-body {
-    text-shadow:
-      0 1px 2px rgba(0, 0, 0, 0.7),
-      0 0 4px rgba(0, 0, 0, 0.5);
+    text-shadow: var(--text-on-image-body-shadow);
   }
   .text-on-image-meta {
-    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.7);
+    text-shadow: var(--text-on-image-meta-shadow);
   }
 }
 
