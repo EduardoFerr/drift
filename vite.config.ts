@@ -353,8 +353,17 @@ export default defineConfig(async (): Promise<UserConfig> => ({
       // envia Cross-Origin-Resource-Policy). Chrome 96+, Edge 96+,
       // Firefox 119+. Safari ainda não suporta — mas o app já depende
       // de Chrome/Firefox para outras features (WebRTC + COOP).
+      //
+      // Exceção dev HTTP (DRIFT_DEV_HTTP=1, ex.: Claude preview via
+      // Electron 41.5/Chrome 146): `credentialless` reportava
+      // crossOriginIsolated=false. Possível incompatibilidade Electron
+      // ou interação com worker contexts. Switch pra `require-corp`
+      // em dev HTTP — assets locais Vite são same-origin (não disparam
+      // CORP check), imagens nostr.build não funcionam mas tudo bem
+      // pra preview de UI (placeholder). Prod e dev HTTPS mantêm
+      // `credentialless` (necessário pra CDN externa).
       'Cross-Origin-Opener-Policy': 'same-origin',
-      'Cross-Origin-Embedder-Policy': 'credentialless',
+      'Cross-Origin-Embedder-Policy': useHttp ? 'require-corp' : 'credentialless',
     },
   },
   worker: {

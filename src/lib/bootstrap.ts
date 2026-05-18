@@ -168,9 +168,23 @@ async function doBootstrap(): Promise<void> {
       typeof window !== 'undefined' && window.crossOriginIsolated === true
     setBoot((p) => ({ ...p, step: 'isolation', isolated }))
     if (!isolated) {
-      throw new Error(
-        'crossOriginIsolated = false. Confira COOP/COEP no vite.config.ts.',
-      )
+      // DEV bypass (2026-05-18): Claude preview tool roda em Electron
+      // 41.5/Chrome 146 que não isola crossOrigin mesmo com COOP/COEP +
+      // localhost secure context. Em DEV permitimos prosseguir — DB cai
+      // em memory mode (sem OPFS persist), UI renderiza pra verificação
+      // visual. PROD mantém check duro (sem isolation = sem SAB = sem
+      // SQLite WASM = app inviável).
+      if (import.meta.env.DEV) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          '[bootstrap] crossOriginIsolated=false em DEV — prosseguindo ' +
+            'em modo degradado (memory storage, sem SAB). PROD vai falhar.',
+        )
+      } else {
+        throw new Error(
+          'crossOriginIsolated = false. Confira COOP/COEP no vite.config.ts.',
+        )
+      }
     }
 
     setBoot((p) => ({ ...p, step: 'db' }))
