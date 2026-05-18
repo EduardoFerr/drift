@@ -45,33 +45,41 @@ import {
  * Emojis não mapeados (📤 share, 🖼 image) renderizam como fallback —
  * actions-fan ainda funciona com Unicode.
  */
-function FanIcon({ icon, size = 18 }: { icon: string; size?: number }) {
+function FanIcon({
+  icon,
+  size = 18,
+  strokeWidth,
+}: {
+  icon: string
+  size?: number
+  /** Override strokeWidth — usar 2 em ActionsFan pra legibilidade sobre foto. */
+  strokeWidth?: number
+}) {
+  const sw = strokeWidth
   switch (icon) {
     case '📌':
-      return <PinIcon size={size} />
+      return <PinIcon size={size} strokeWidth={sw} />
     case '📍':
-      return <PinOffIcon size={size} />
+      return <PinOffIcon size={size} strokeWidth={sw} />
     case '🗺':
     case '🗺️':
-      return <MapIcon size={size} />
+      return <MapIcon size={size} strokeWidth={sw} />
     case '⊘':
-      return <BanIcon size={size} />
+      return <BanIcon size={size} strokeWidth={sw} />
     case '🔇':
-      return <MicOffIcon size={size} />
+      return <MicOffIcon size={size} strokeWidth={sw} />
     case '➕':
-      return <PlusIcon size={size} />
+      return <PlusIcon size={size} strokeWidth={sw} />
     case '✓':
-      return <CheckIcon size={size} />
+      return <CheckIcon size={size} strokeWidth={sw} />
     case '⚠':
-      return <WarningIcon size={size} />
+      return <WarningIcon size={size} strokeWidth={sw} />
     case '📤':
-      return <ShareIcon size={size} />
+      return <ShareIcon size={size} strokeWidth={sw} />
     case '🖼':
     case '🖼️':
-      return <ImageIcon size={size} />
+      return <ImageIcon size={size} strokeWidth={sw} />
     default:
-      // Fallback genérico — Sprint 4+ pode adicionar mais SVG conforme
-      // novos items de ActionsFan apareçam.
       return <span aria-hidden="true">{icon}</span>
   }
 }
@@ -1102,62 +1110,137 @@ function ActionsFan({
     },
   })
 
-  // V11.7 (user pedido 2026-05-17): label permanente à esquerda de cada
-  // ícone enquanto o fan está aberto. Antes precisava long-press 500ms
-  // pra ver tooltip — gesto de descoberta foi removido (redundante com
-  // label sempre visível). Hint completo (FanItem.hint) é agora acessível
-  // só via tooltip nativo do browser (`title` no botão) em desktop, ou
-  // self-explanatory via label curto em mobile.
+  // V11.8 (user feedback 2026-05-17 round 4 — design critique completa):
+  // 6 mudanças coordenadas em resposta a:
+  //   "contraste + hierarquia visual + affordance" — botões soltos
+  //   competiam com vazio, ícones finos morriam em mobile, destrutivo
+  //   tinha mesmo peso que neutro.
   //
-  // Top base: ⋮ ocupa top-4 (16px) + h-11 (44px) = bottom em 60px.
-  // Cada filho desce 48px (44 botão + 4 gap).
+  // (1) **Container único** envolve TODOS os items neutros: rounded-2xl
+  //     glass card (bg-drift-surface/85 + backdrop-blur-md + border
+  //     drift-border/60 + shadow). Cria agrupamento, aumenta legibilidade,
+  //     melhora percepção de toque.
+  //
+  // (2) **Ícones mais grossos** — strokeWidth 2.0 (era 1.5 default
+  //     Feather), size 22 (era 20). Glyph não morre em mobile.
+  //
+  // (3) **Contraste alto** — border-drift-accent/55, text-drift-text
+  //     (não muted), bg-drift-surface/90. User explicitly: "ícone mais
+  //     escuro · borda mais definida".
+  //
+  // (6) **Destrutivo isolado** — `moderar` (warning ⚠) sai do container
+  //     neutro pra render abaixo, com cor semântica drift-bury + sem
+  //     glass wrapping. Não compete visualmente com ações neutras.
+  //
+  // (+) Labels permanentes mantidas (V11.7) — agora INSIDE container
+  //     pra alinharem com a borda visual única.
+  //
+  // (-) #4 active-state-per-action e #5 reduce-visible-to-3 ficam pra
+  //     rounds separados (precisam wiring de estado por ação + decisão
+  //     UX de qual subset é 'principal').
+  //
+  // Separação: neutralItems (mostrados no container) vs destructiveItems
+  // (renderizados abaixo, sem container). Discriminação por item.key.
+  const neutralItems = items.filter((it) => it.key !== 'moderar')
+  const destructiveItems = items.filter((it) => it.key === 'moderar')
+
   return (
     <AnimatePresence>
-      {visible &&
-        items.map((item, i) => (
-          <m.div
-            key={item.key}
-            initial={{ opacity: 0, y: -8, scale: 0.85 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -8, scale: 0.85 }}
-            transition={{ duration: 0.18, delay: i * 0.04, ease: [0.22, 1, 0.36, 1] }}
-            className="absolute right-4 z-30 flex items-center gap-2"
-            style={{ top: `${60 + i * 48}px` }}
-            // BUG-LONGPRESS-FAN fix 2026-05-17 — opt-out do long-press 5s
-            // do card parent (handleCardPointerDown). Sem este attr,
-            // touch sustentado no fan dispararia toggle slim mode.
-            data-no-longpress="true"
+      {visible && (
+        <m.div
+          key="fan-container"
+          initial={{ opacity: 0, y: -8, scale: 0.92 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: -8, scale: 0.92 }}
+          transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+          className="absolute right-4 z-30 flex flex-col items-end gap-2"
+          style={{ top: `60px` }}
+          // BUG-LONGPRESS-FAN fix — opt-out do long-press 5s do card
+          // parent. Touch sustentado no fan não deve disparar slim toggle.
+          data-no-longpress="true"
+        >
+          {/* (1) Container único pros items neutros */}
+          <div
+            className="flex flex-col gap-2 rounded-2xl border border-drift-border/60 bg-drift-surface/85 p-2 backdrop-blur-md shadow-lg"
+            role="group"
+            aria-label="ações do post"
           >
-            {/* Label permanente à esquerda do ícone — glass styled, mesmo
-                stagger de entrada. pointer-events-none pra não bloquear
-                taps adjacentes; semântica é informativa, não interativa.
-                m.div parent é `absolute right-4 flex items-center gap-2`
-                → ícone (último filho do flex) fica encostado no right-4;
-                label flui à ESQUERDA naturalmente via `gap-2`. text-on-
-                image-meta (text-shadow tema-aware) garante legibilidade
-                sobre fotos claras/escuras. */}
-            <span
-              className="pointer-events-none whitespace-nowrap rounded border border-drift-accent/40 bg-drift-surface/90 px-2.5 py-1 font-mono text-[11px] uppercase tracking-meta text-drift-accent backdrop-blur-sm text-on-image-meta"
-              aria-hidden="true"
+            {neutralItems.map((item, i) => (
+              <m.div
+                key={item.key}
+                initial={{ opacity: 0, x: 8 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 8 }}
+                transition={{ duration: 0.16, delay: i * 0.035, ease: [0.22, 1, 0.36, 1] }}
+                className="flex items-center gap-2"
+              >
+                {/* (3) Label permanente — contraste forte: accent border
+                    + text-drift-text (não muted). text-on-image-meta
+                    preservado caso fan abra sobre foto. */}
+                <span
+                  className="pointer-events-none whitespace-nowrap rounded border border-drift-accent/55 bg-drift-bg/70 px-2.5 py-1 font-mono text-[11px] uppercase tracking-meta text-drift-text text-on-image-meta"
+                  aria-hidden="true"
+                >
+                  {item.label}
+                </span>
+                {/* (2) (3) Botão mais sólido: size xl (44px tap), border
+                    accent/55, text-drift-text (era muted), strokeWidth 2 */}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    if (!item.disabled) item.onClick()
+                  }}
+                  disabled={item.disabled}
+                  aria-label={item.label}
+                  title={item.hint}
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-drift-accent/55 bg-drift-surface/90 text-drift-text transition-colors hover:border-drift-accent hover:bg-drift-accent/15 hover:text-drift-accent focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <span aria-hidden="true">
+                    <FanIcon icon={item.icon} size={22} strokeWidth={2} />
+                  </span>
+                </button>
+              </m.div>
+            ))}
+          </div>
+
+          {/* (6) Destrutivo SEPARADO — fora do container neutro, cor
+              semântica drift-bury, sem glass wrapping. Hierarquia clara:
+              user vê que é categoria diferente antes mesmo de ler. */}
+          {destructiveItems.map((item) => (
+            <m.div
+              key={item.key}
+              initial={{ opacity: 0, x: 8 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 8 }}
+              transition={{ duration: 0.16, delay: 0.04 * (neutralItems.length + 1), ease: [0.22, 1, 0.36, 1] }}
+              className="flex items-center gap-2"
             >
-              {item.label}
-            </span>
-            <GlassIconButton
-              size="xl"
-              onClick={(e) => {
-                e.stopPropagation()
-                if (!item.disabled) item.onClick()
-              }}
-              disabled={item.disabled}
-              aria-label={item.label}
-              title={item.hint}
-            >
-              <span aria-hidden="true">
-                <FanIcon icon={item.icon} size={20} />
+              <span
+                className="pointer-events-none whitespace-nowrap rounded border border-drift-bury/55 bg-drift-bg/70 px-2.5 py-1 font-mono text-[11px] uppercase tracking-meta text-drift-bury text-on-image-meta"
+                aria-hidden="true"
+              >
+                {item.label}
               </span>
-            </GlassIconButton>
-          </m.div>
-        ))}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  if (!item.disabled) item.onClick()
+                }}
+                disabled={item.disabled}
+                aria-label={item.label}
+                title={item.hint}
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-drift-bury/55 bg-drift-bury/10 text-drift-bury transition-colors hover:border-drift-bury hover:bg-drift-bury/20 focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-bury disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <span aria-hidden="true">
+                  <FanIcon icon={item.icon} size={22} strokeWidth={2} />
+                </span>
+              </button>
+            </m.div>
+          ))}
+        </m.div>
+      )}
     </AnimatePresence>
   )
 }
