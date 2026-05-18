@@ -164,7 +164,7 @@ Plano Ted HIMYM 2026-05-17 (analysis registrada em commit do PR1 [c823e8f]).
 
 ## Infra / Arquitetura — adicionados 2026-05-17 (sessão noite)
 
-- [x] **i18n — spike + relatório** — fechado em [PENDING].
+- [x] **i18n — spike + relatório** — fechado em [86ff522].
   Relatório completo em `Docs/sessions/i18n-spike-2026-05-17.md`.
   Recomendação: **LinguiJS v4** (bundle ~2 KB, macros AOT, ICU
   completo, types gerados). Catalog PO files por locale em
