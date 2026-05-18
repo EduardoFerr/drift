@@ -97,7 +97,7 @@ Plano Ted HIMYM 2026-05-17 (analysis registrada em commit do PR1 [c823e8f]).
 ## Sovereignty / Power-user — UI pending
 
 - [x] **PostViewer ModalWrapper removido (dead code)** — fechado em
-  [PENDING]. `ModalWrapper` era branch pré-V8 home-view; único call
+  [59741c6]. `ModalWrapper` era branch pré-V8 home-view; único call
   site (App.tsx) passa `embedded` desde V8, então ModalWrapper jamais
   executou em prod. Removido `function ModalWrapper`, `EXIT_VARIANTS`
   constant (só usado por ele), e `Wrapper = embedded ? ... :

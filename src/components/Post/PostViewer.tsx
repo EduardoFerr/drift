@@ -1220,7 +1220,7 @@ interface WrapperProps {
   custom?: QueueExitDir
 }
 
-// ModalWrapper removido em [PENDING] (Round 12 2026-05-17): dead code
+// ModalWrapper removido em [59741c6] (Round 12 2026-05-17): dead code
 // pós-V8 home-view transition. Único call site (App.tsx PostViewer)
 // passa `embedded` → branch ModalWrapper jamais executou em produção.
 // Manter exit branches em render path por enquanto (cleanup separado
