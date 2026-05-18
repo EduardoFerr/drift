@@ -506,11 +506,18 @@ function SlimModeHint() {
         <m.div
           role="status"
           aria-live="polite"
-          initial={{ opacity: 0, y: -10 }}
+          // V12 (2026-05-18 user feedback): banner movido top-4 → bottom-6.
+          // No top colidia com os 3 action buttons (🗺/💬/⋮) do PostViewer
+          // header, que ficam em right-4 top-4. Bottom-6 é livre (navbar
+          // sai com translateY -110% em slim, então bottom não tem chrome
+          // competindo). Convergente com pattern HintToast (bottom-center).
+          // Transition agora vem de baixo (y: 10 → 0) — direção respeita
+          // origem.
+          initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -10 }}
+          exit={{ opacity: 0, y: 10 }}
           transition={{ duration: 0.25, ease: 'easeOut' }}
-          className="fixed left-1/2 top-4 z-40 -translate-x-1/2 flex items-center gap-2 rounded-full border border-drift-accent2/40 bg-drift-bg/90 px-4 py-2 backdrop-blur-sm shadow-lg"
+          className="fixed left-1/2 bottom-6 z-40 -translate-x-1/2 flex items-center gap-2 rounded-full border border-drift-accent2/40 bg-drift-bg/90 px-4 py-2 backdrop-blur-sm shadow-lg"
         >
           <span className="font-mono text-[11px] uppercase tracking-meta text-drift-accent2">
             modo slim · segure 5s pra sair
