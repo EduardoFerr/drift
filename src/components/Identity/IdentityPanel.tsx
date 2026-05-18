@@ -22,6 +22,13 @@ import {
 } from '../../lib/passkey'
 import type { DriftIdentity } from '../../types/drift'
 import { CopyIcon, CheckIcon, DownloadIcon, WarningIcon, PlusIcon, XIcon } from '../UI/Icons'
+import {
+  formatLastExposed,
+  isOverRateLimit,
+  recordExposure,
+  requirePasskeyForExport,
+  useExposureStore,
+} from '../../lib/identity-exposure'
 
 // ─── Barney security guards — manifesto §8 (nsec NUNCA persiste em claro) ──
 //
@@ -117,6 +124,14 @@ function BackupTab({ identity }: { identity: DriftIdentity }) {
   const [clipboardTtlMs, setClipboardTtlMs] = useState<number | null>(null)
   const [npubCopied, setNpubCopied] = useState(false)
   const [downloaded, setDownloaded] = useState(false)
+  // Satoshi guard 2026-05-17: rate-limit warning quando user faz > 3
+  // exposições em 10 min. Reativo via store.
+  const exposureCount = useExposureStore((s) => s.recentExposures.length)
+  const lastExposedAt = useExposureStore((s) => s.lastExposedAt)
+  // Subscribe ao store pra UI atualizar quando store muda (não usado
+  // diretamente — usExposureStore selecionado acima já reativa).
+  void exposureCount
+  void lastExposedAt
   // Track C.3 — checkbox de confirmação. UX guia: user precisa
   // explicitamente declarar que guardou. Não bloqueia (não é gate),
   // só sinaliza visualmente. Manifesto §3 — usuário detém a chave.
@@ -179,9 +194,33 @@ function BackupTab({ identity }: { identity: DriftIdentity }) {
     return () => window.clearTimeout(tick)
   }, [clipboardTtlMs])
 
+  /**
+   * Toggle reveal — quando ON, exige passkey verify primeiro (se passkey
+   * opt-in habilitado). Satoshi guard 2026-05-17.
+   */
+  async function handleToggleReveal() {
+    if (reveal) {
+      // Ocultar não exige gate.
+      setReveal(false)
+      setQrUrl(null)
+      qrRef.current = null
+      return
+    }
+    // Going from hidden → reveal: passkey gate + record.
+    const ok = await requirePasskeyForExport()
+    if (!ok) return // user cancelou ou falhou — abort silencioso
+    recordExposure('reveal')
+    setReveal(true)
+  }
+
   async function handleCopy() {
+    // Satoshi guard: passkey gate antes de copy (mesmo se já está reveal —
+    // copy é nova superfície de exposure: clipboard system).
+    const ok = await requirePasskeyForExport()
+    if (!ok) return
     try {
       await navigator.clipboard.writeText(identity.nsecBech32)
+      recordExposure('copy')
       setCopied(true)
       clipboardClearAtRef.current = Date.now() + NSEC_CLIPBOARD_TTL_MS
       setClipboardTtlMs(NSEC_CLIPBOARD_TTL_MS)
@@ -203,7 +242,10 @@ function BackupTab({ identity }: { identity: DriftIdentity }) {
   // Track C.3 — download backup como JSON file. Browser file picker
   // via blob URL + a.download. Sem upload remoto, sem servidor —
   // arquivo gerado e salvo 100% client-side (manifesto §28).
-  function handleDownload() {
+  // Satoshi guard 2026-05-17: passkey gate + record exposure.
+  async function handleDownload() {
+    const ok = await requirePasskeyForExport()
+    if (!ok) return
     const backup = buildBackup({
       npub: identity.npubBech32,
       nsec: identity.nsecBech32,
@@ -219,12 +261,49 @@ function BackupTab({ identity }: { identity: DriftIdentity }) {
     a.click()
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
+    recordExposure('download')
     setDownloaded(true)
     setTimeout(() => setDownloaded(false), 2000)
   }
 
+  // Satoshi audit chip: mostra "última exposição: X tempo atrás" pra
+  // user notar comportamento anômalo seu mesmo. Manifesto §28 — info
+  // local, nunca enviada. Null = nunca exposto = não mostrar chip.
+  const lastExposedLabel = formatLastExposed()
+  const overLimit = isOverRateLimit()
+
   return (
     <div className="space-y-3">
+      {/* Audit chip de exposição — auditoria de comportamento próprio
+          (Satoshi guard 2026-05-17). Aparece só se já houve ≥1 exposição.
+          Color escala: muted (>1h atrás) → warning (rate limit hit). */}
+      {lastExposedLabel && (
+        <div
+          role="status"
+          aria-live="polite"
+          className={`flex items-center gap-2 rounded-xl border px-3 py-2 font-mono text-[10px] uppercase tracking-meta ${
+            overLimit
+              ? 'border-drift-warning/40 bg-drift-warning/5 text-drift-warning'
+              : 'border-drift-border/30 bg-drift-surface/30 text-drift-muted/70'
+          }`}
+        >
+          <span className="shrink-0" aria-hidden="true">
+            {overLimit ? <WarningIcon size={12} /> : <CheckIcon size={12} />}
+          </span>
+          <span>
+            última exposição: {lastExposedLabel}
+            {overLimit && (
+              <>
+                {' · '}
+                <strong className="text-drift-warning">
+                  3+ nos últimos 10 min
+                </strong>
+              </>
+            )}
+          </span>
+        </div>
+      )}
+
       <div>
         <div className="mb-1.5 flex items-center justify-between px-1">
           <span className="font-mono text-[10px] uppercase tracking-meta text-drift-muted/50">
@@ -251,8 +330,12 @@ function BackupTab({ identity }: { identity: DriftIdentity }) {
             nsec privado
           </span>
           <button
-            onClick={() => setReveal((r) => !r)}
-            title={reveal ? 'ocultar automaticamente em 60s' : 'revelar — auto-oculta em 60s'}
+            onClick={() => void handleToggleReveal()}
+            title={
+              reveal
+                ? 'ocultar automaticamente em 60s'
+                : 'revelar — auto-oculta em 60s · pode pedir passkey'
+            }
             className="font-mono text-[10px] uppercase tracking-meta text-drift-muted transition-colors hover:text-drift-text focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
           >
             {reveal ? 'ocultar' : 'revelar'}

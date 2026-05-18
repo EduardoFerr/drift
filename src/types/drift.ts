@@ -426,6 +426,16 @@ export interface UserPrefs {
    * Validation: integer ≥ 1. undefined ou 0 = usar dinâmico.
    */
   report_threshold_override?: number
+  /**
+   * Timestamp ms da última exposição do nsec (reveal/copy/download/qr
+   * em IdentityPanel). Satoshi adversarial guard 2026-05-17 — user audita
+   * comportamento próprio ("eu fiz copy ontem? não!"). Manifesto §28: local
+   * only, nunca exportado.
+   *
+   * Owner: `lib/identity-exposure.ts:recordExposure`. UI: SettingsCards
+   * + IdentityPanel header.
+   */
+  last_nsec_export_at?: number
 }
 
 /**

@@ -240,6 +240,12 @@ async function doBootstrap(): Promise<void> {
     // viewMultiplier degrada graciosamente. Manifesto §24 (view-layer).
     await loadLens()
 
+    // Identity exposure tracking — Satoshi adversarial guard 2026-05-17.
+    // Carrega `last_nsec_export_at` pra UI mostrar "última exposição".
+    // Falha silenciosa OK (next boot tenta de novo).
+    const { loadExposureState } = await import('./identity-exposure')
+    await loadExposureState()
+
     setBoot((p) => ({ ...p, step: 'sync' }))
 
     // ─── Modo Tor (Fase 6.4 etapa 4) ──────────────────────────────

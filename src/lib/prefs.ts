@@ -140,6 +140,18 @@ function applyRow(target: UserPrefs, key: string, value: string): void {
         }
       }
       return
+    case 'last_nsec_export_at':
+      // Satoshi exposure tracking 2026-05-17: timestamp ms da última
+      // exposure do nsec. Lido por `lib/identity-exposure.ts` (que
+      // tem own store) — esse parse é defesa em camada caso outro
+      // consumer queira ler. Validation: integer positivo.
+      {
+        const n = Number(value)
+        if (Number.isInteger(n) && n > 0) {
+          target.last_nsec_export_at = n
+        }
+      }
+      return
     default:
       // chave desconhecida — pode ser de fase futura, ignora silenciosamente
       return
