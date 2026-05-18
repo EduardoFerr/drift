@@ -506,18 +506,23 @@ function SlimModeHint() {
         <m.div
           role="status"
           aria-live="polite"
-          // V12 (2026-05-18 user feedback): banner movido top-4 → bottom-6.
-          // No top colidia com os 3 action buttons (🗺/💬/⋮) do PostViewer
-          // header, que ficam em right-4 top-4. Bottom-6 é livre (navbar
-          // sai com translateY -110% em slim, então bottom não tem chrome
-          // competindo). Convergente com pattern HintToast (bottom-center).
-          // Transition agora vem de baixo (y: 10 → 0) — direção respeita
-          // origem.
-          initial={{ opacity: 0, y: 10 }}
+          // V13 (2026-05-18 user feedback round 2): bottom ainda 'mal
+          // posicionado' + bg 'transparente nada bom'. Nova abordagem:
+          //   - Posição: top-4 LEFT-4 (era bottom-6 center). Botões header
+          //     do PostViewer ficam em right-4 top-4 — left-4 está LIVRE.
+          //     Centered competia com layout do card; left ancora ao
+          //     header global do app, leitura clara.
+          //   - bg: drift-surface SÓLIDO (era drift-bg/90 translúcido).
+          //     Solid = visibilidade garantida em todos os 3 temas sobre
+          //     qualquer conteúdo. Border accent2 full opacity (era /40).
+          //   - Removido backdrop-blur (sólido dispensa).
+          //   - Transition: y: -10 → 0 (vem do topo, alinhado com origem
+          //     top-left).
+          initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: 10 }}
+          exit={{ opacity: 0, y: -10 }}
           transition={{ duration: 0.25, ease: 'easeOut' }}
-          className="fixed left-1/2 bottom-6 z-40 -translate-x-1/2 flex items-center gap-2 rounded-full border border-drift-accent2/40 bg-drift-bg/90 px-4 py-2 backdrop-blur-sm shadow-lg"
+          className="fixed left-4 top-4 z-40 flex items-center gap-2 rounded-full border border-drift-accent2 bg-drift-surface px-4 py-2 shadow-lg"
         >
           <span className="font-mono text-[11px] uppercase tracking-meta text-drift-accent2">
             modo slim · segure 5s pra sair

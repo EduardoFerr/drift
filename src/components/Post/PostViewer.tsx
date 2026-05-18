@@ -642,15 +642,17 @@ export function PostViewer({
             inset-0 cobre 100% do card-area. z-20 fica ABAIXO dos botões
             do header (z-30) → user pode fechar o mapa pelo mesmo botão
             mapa que abriu. Fade + scale-up sutil na entrada. */}
-        {/* V12 (HIMYM Robin+Lily 2026-05-18): map open/close vira efeito
-            sanfona/persiana — clipPath inset from top desdobra o mapa de
-            cima pra baixo, conteúdo interno (canvas) aparece com leve
-            counter-anim translateY pra dar camadas de papel se assentando.
-            Editorial + neo-brutalist soft (sem bounce, sem swoosh).
-            Reduced motion → fade cross 150ms (WCAG 2.3.3).
-              - Open: clipPath inset(0 0 100% 0)→0, 320ms expo-out custom
-              - Close: 220ms expo-in (70% do open, heurística Material)
-              - Inner translateY -16→0, delay 80ms (assenta depois) */}
+        {/* V13 (2026-05-18 user feedback "muito rapido e nada suave"):
+            durations bumpadas + easing Material emphasized (mais smooth
+            que expo-out) + stagger interno aumentado.
+              - Open: 480ms (era 320ms) — cubic-bezier(0.2, 0, 0, 1)
+                Material emphasized = curve gentle, settle suave
+              - Close: 360ms (era 220ms) — cubic-bezier(0.4, 0, 0.6, 0.2)
+                ease-in-out-quart smooth (era expo-in abrupto)
+              - Inner content: delay 140ms (era 80ms) + 360ms duration —
+                assenta com folga DEPOIS do clip terminar (~480-140=340ms
+                de visibilidade do clip antes do content fade-in)
+              - Reduced motion fallback inalterado (crossfade 200ms) */}
         <AnimatePresence>
           {showMap && (
             <m.div
@@ -666,34 +668,28 @@ export function PostViewer({
               }
               exit={
                 reducedMotion
-                  ? { opacity: 0, transition: { duration: 0.15 } }
+                  ? { opacity: 0, transition: { duration: 0.2 } }
                   : {
                       clipPath: 'inset(0 0 100% 0)',
-                      transition: { duration: 0.22, ease: [0.7, 0, 0.84, 0] },
+                      transition: { duration: 0.36, ease: [0.4, 0, 0.6, 0.2] },
                     }
               }
               transition={{
-                duration: reducedMotion ? 0.15 : 0.32,
-                ease: reducedMotion ? 'linear' : [0.16, 1, 0.3, 1],
+                duration: reducedMotion ? 0.2 : 0.48,
+                ease: reducedMotion ? 'linear' : [0.2, 0, 0, 1],
               }}
               className="absolute inset-0 z-20 overflow-hidden rounded-2xl bg-drift-bg"
-              // will-change durante anim ajuda GPU (clipPath compositing).
-              // Removido após animation completar via onAnimationComplete
-              // seria ideal, mas Framer Motion não tem hook idle simples —
-              // aceitar overhead constante (compose layer pequeno).
               style={{ willChange: 'clip-path' }}
-              // Opt-out de long-press do card parent — interagir com o
-              // mapa (pan/zoom) não deve disparar slim mode toggle.
               data-no-longpress="true"
             >
               <m.div
-                initial={reducedMotion ? { opacity: 1 } : { opacity: 0, y: -16 }}
+                initial={reducedMotion ? { opacity: 1 } : { opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, transition: { duration: 0.15 } }}
+                exit={{ opacity: 0, transition: { duration: 0.18 } }}
                 transition={{
-                  duration: reducedMotion ? 0 : 0.28,
-                  delay: reducedMotion ? 0 : 0.08,
-                  ease: [0.16, 1, 0.3, 1],
+                  duration: reducedMotion ? 0 : 0.36,
+                  delay: reducedMotion ? 0 : 0.14,
+                  ease: [0.2, 0, 0, 1],
                 }}
                 className="h-full w-full"
               >
