@@ -1102,43 +1102,13 @@ function ActionsFan({
     },
   })
 
-  // V9.19 (user pedido 2026-05-14): hold em qualquer ícone do fan
-  // por 500ms → mostra tooltip à esquerda explicando a ação. Release
-  // após tooltip aparecer NÃO dispara onClick (intencional: hold é
-  // gesto de descoberta, tap é gesto de ação). Cancel em move > 10px.
-  const [explainingKey, setExplainingKey] = useState<string | null>(null)
-  const holdTimerRef = useRef<number | null>(null)
-  const holdStartRef = useRef<{ x: number; y: number } | null>(null)
-  const holdFiredRef = useRef(false) // true quando tooltip já apareceu (cancela onClick na release)
-  const HOLD_MS = 500
-  const HOLD_SLOP = 10
-  function cancelHold() {
-    if (holdTimerRef.current !== null) {
-      window.clearTimeout(holdTimerRef.current)
-      holdTimerRef.current = null
-    }
-    holdStartRef.current = null
-    setExplainingKey(null)
-  }
-  function startHold(itemKey: string, e: React.PointerEvent) {
-    holdFiredRef.current = false
-    holdStartRef.current = { x: e.clientX, y: e.clientY }
-    holdTimerRef.current = window.setTimeout(() => {
-      holdTimerRef.current = null
-      holdFiredRef.current = true
-      setExplainingKey(itemKey)
-    }, HOLD_MS)
-  }
-  function holdMove(e: React.PointerEvent) {
-    if (!holdStartRef.current) return
-    const dx = e.clientX - holdStartRef.current.x
-    const dy = e.clientY - holdStartRef.current.y
-    if (Math.hypot(dx, dy) > HOLD_SLOP) cancelHold()
-  }
-  function holdEnd() {
-    cancelHold()
-  }
-
+  // V11.7 (user pedido 2026-05-17): label permanente à esquerda de cada
+  // ícone enquanto o fan está aberto. Antes precisava long-press 500ms
+  // pra ver tooltip — gesto de descoberta foi removido (redundante com
+  // label sempre visível). Hint completo (FanItem.hint) é agora acessível
+  // só via tooltip nativo do browser (`title` no botão) em desktop, ou
+  // self-explanatory via label curto em mobile.
+  //
   // Top base: ⋮ ocupa top-4 (16px) + h-11 (44px) = bottom em 60px.
   // Cada filho desce 48px (44 botão + 4 gap).
   return (
@@ -1151,54 +1121,36 @@ function ActionsFan({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -8, scale: 0.85 }}
             transition={{ duration: 0.18, delay: i * 0.04, ease: [0.22, 1, 0.36, 1] }}
-            className="absolute right-4 z-30"
+            className="absolute right-4 z-30 flex items-center gap-2"
             style={{ top: `${60 + i * 48}px` }}
             // BUG-LONGPRESS-FAN fix 2026-05-17 — opt-out do long-press 5s
-            // do card parent. Hold no fan já tem semantics próprio (tooltip
-            // 500ms via startHold/holdEnd); sem este attr, parent
-            // handleCardPointerDown também dispararia ModerationModal em 5s.
+            // do card parent (handleCardPointerDown). Sem este attr,
+            // touch sustentado no fan dispararia toggle slim mode.
             data-no-longpress="true"
           >
-            {/* Tooltip à esquerda do ícone — visível enquanto hold ativo
-                pra este item. Glass styled, max-w prevent overflow. */}
-            <AnimatePresence>
-              {explainingKey === item.key && (
-                <m.div
-                  initial={{ opacity: 0, x: 8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 8 }}
-                  transition={{ duration: 0.14, ease: [0.22, 1, 0.36, 1] }}
-                  className="pointer-events-none absolute right-[52px] top-1/2 -translate-y-1/2 w-[180px] rounded border border-drift-accent/60 bg-drift-surface/95 px-3 py-2 backdrop-blur-sm shadow-lg"
-                  role="tooltip"
-                >
-                  <div className="font-mono text-[12px] uppercase tracking-[2px] text-drift-accent">
-                    {item.label}
-                  </div>
-                  <div className="mt-1 font-mono text-[12px] leading-snug text-drift-muted">
-                    {item.hint}
-                  </div>
-                </m.div>
-              )}
-            </AnimatePresence>
+            {/* Label permanente à esquerda do ícone — glass styled, mesmo
+                stagger de entrada. pointer-events-none pra não bloquear
+                taps adjacentes; semântica é informativa, não interativa.
+                m.div parent é `absolute right-4 flex items-center gap-2`
+                → ícone (último filho do flex) fica encostado no right-4;
+                label flui à ESQUERDA naturalmente via `gap-2`. text-on-
+                image-meta (text-shadow tema-aware) garante legibilidade
+                sobre fotos claras/escuras. */}
+            <span
+              className="pointer-events-none whitespace-nowrap rounded border border-drift-accent/40 bg-drift-surface/90 px-2.5 py-1 font-mono text-[11px] uppercase tracking-meta text-drift-accent backdrop-blur-sm text-on-image-meta"
+              aria-hidden="true"
+            >
+              {item.label}
+            </span>
             <GlassIconButton
               size="xl"
               onClick={(e) => {
                 e.stopPropagation()
-                // Se hold já disparou tooltip, esta release não fira ação.
-                if (holdFiredRef.current) {
-                  holdFiredRef.current = false
-                  return
-                }
                 if (!item.disabled) item.onClick()
               }}
-              onPointerDown={(e) => startHold(item.key, e)}
-              onPointerMove={holdMove}
-              onPointerUp={holdEnd}
-              onPointerCancel={holdEnd}
-              onPointerLeave={holdEnd}
               disabled={item.disabled}
               aria-label={item.label}
-              title={item.label}
+              title={item.hint}
             >
               <span aria-hidden="true">
                 <FanIcon icon={item.icon} size={20} />
