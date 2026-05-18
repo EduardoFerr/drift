@@ -96,6 +96,16 @@ Plano Ted HIMYM 2026-05-17 (analysis registrada em commit do PR1 [c823e8f]).
 
 ## Sovereignty / Power-user — UI pending
 
+- [x] **PostViewer ModalWrapper removido (dead code)** — fechado em
+  [PENDING]. `ModalWrapper` era branch pré-V8 home-view; único call
+  site (App.tsx) passa `embedded` desde V8, então ModalWrapper jamais
+  executou em prod. Removido `function ModalWrapper`, `EXIT_VARIANTS`
+  constant (só usado por ele), e `Wrapper = embedded ? ... :
+  ModalWrapper` (hardcoded EmbeddedWrapper). Branches `!embedded` no
+  render path mantidas (cleanup separado se justificar). Allowlist
+  OVERLAY_LEGACY ratchet final: 1 entry (apenas ThreadView tree
+  exceção).
+
 - [x] **ComposeOverlay PreviewOverlay → FullPageCard** — fechado em
   [9454384]. PreviewOverlay (preview do post antes de publicar) usava
   `<div absolute inset-0 z-10>` + `role="dialog"` ad-hoc. Migrado pra

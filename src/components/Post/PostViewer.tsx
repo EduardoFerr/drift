@@ -483,9 +483,11 @@ export function PostViewer({
   // direção errada ao alternar swipes).
 
   // V8 embedded mode: home view, sem fixed-inset / sem role=dialog /
-  // sem backdrop. Modal mode (default) preserva retrocompat caso outra
-  // chamada ainda use PostViewer como overlay.
-  const Wrapper = embedded ? EmbeddedWrapper : ModalWrapper
+  // sem backdrop. ModalWrapper foi removido em Round 12 (dead code
+  // pós-V8). `embedded` prop fica como deprecation no-op até cleanup
+  // dedicado das branches `!embedded` em render path.
+  const Wrapper = EmbeddedWrapper
+  void embedded // silenciar unused — branches !embedded ainda existem.
 
   return (
     <Wrapper custom={custom}>
@@ -1208,53 +1210,23 @@ function ActionsFan({
   )
 }
 
-// ─── Wrappers (modal vs embedded) ────────────────────────────────────
+// ─── Wrapper (embedded mode) ─────────────────────────────────────────
 
 interface WrapperProps {
   children: React.ReactNode
-  // V10.7 — `custom` (direção da exit-action) substitui o `exitVariant`
-  // pré-computado. Wrappers decidem como aplicar — EmbeddedWrapper usa
-  // variants funções (corretas em alternância de direção), ModalWrapper
-  // computa estático (uso modal não tem AnimatePresence direcional).
-  // Optional porque PostViewerProps.custom também é optional (X/ESC
-  // close sem direção). Wrappers tratam `undefined` como fade simples.
+  // V10.7 — `custom` (direção da exit-action). Optional porque
+  // PostViewerProps.custom também é optional (X/ESC close sem direção).
+  // EmbeddedWrapper trata `undefined` como fade simples via variants.
   custom?: QueueExitDir
 }
 
-/**
- * Modal mode (default, retrocompat). PostViewer como overlay sobre o
- * resto do app — fixed inset z-50, role=dialog, animate enter/exit
- * direcional.
- */
-function ModalWrapper({ children, custom }: WrapperProps) {
-  // Round 4 Fase B (B1): tokenizado via MOTION.emphasis (320ms drift-spring).
-  // Reduced motion respeitado — duration 0 colapsa entrada para fade
-  // simples. Convergente com Lily RFC §1.2 (PostViewer 0.32 → motion-emphasis).
-  const reduced = useReducedMotion()
-  // V9.6: emphasis 320ms percebido como "saindo muito rápido" pelo
-  // user em swipe vertical (spread/bury). swap (500ms ease-out-quart)
-  // dá sensação papel-no-deck. User feedback 2026-05-09.
-  const transition = reduced ? { duration: 0 } : MOTION.swap
-  // ModalWrapper não roda dentro de AnimatePresence direcional (uso é
-  // de overlay singleton). Computa exit estático aqui — mesma snapshot
-  // do mount basta. Para o caso embedded direcional, EmbeddedWrapper
-  // usa variants pattern (V10.7).
-  const exitVariant = custom ? EXIT_VARIANTS[custom] : EXIT_VARIANTS.none
-  return (
-    <m.div
-      initial={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.96, y: 20 }}
-      animate={{ opacity: 1, scale: 1, y: 0 }}
-      exit={exitVariant}
-      transition={transition}
-      className="fixed inset-0 z-50 flex flex-col bg-drift-bg/95 backdrop-blur-sm"
-      role="dialog"
-      aria-modal="true"
-      aria-label="post"
-    >
-      {children}
-    </m.div>
-  )
-}
+// ModalWrapper removido em [PENDING] (Round 12 2026-05-17): dead code
+// pós-V8 home-view transition. Único call site (App.tsx PostViewer)
+// passa `embedded` → branch ModalWrapper jamais executou em produção.
+// Manter exit branches em render path por enquanto (cleanup separado
+// se justificar); o que ia trigger conformance role="dialog" + fixed-
+// inset-z-50 fora de allowlist sumiu junto. Allowlist OVERLAY_LEGACY
+// ratchet: 2 → 1 entry restante (ThreadView tree exceção).
 
 /**
  * V8 embedded mode: PostViewer como home view (não modal). Sem
@@ -1319,8 +1291,3 @@ function EmbeddedWrapper({ children, custom }: WrapperProps) {
   )
 }
 
-const EXIT_VARIANTS = {
-  up: { y: '-110%', opacity: 0, scale: 0.95 },
-  down: { y: '110%', opacity: 0, scale: 0.95 },
-  none: { opacity: 0 },
-} as const
