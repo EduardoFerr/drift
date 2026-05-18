@@ -1310,3 +1310,151 @@ export function PermissionsCard({ onClose }: CardProps) {
     </FullPageCard>
   )
 }
+
+// ─── SovereigntyCard ────────────────────────────────────────────
+//
+// Sovereignty / power-user: UI pra 3 endpoints customizáveis shipped em
+// [f8db723] (Marshall NEEDS-FIX A/B/C 2026-05-17). Antes só editáveis
+// via SQLite direto. Card próprio (não dentro de NetworkMode/MapView)
+// porque mistura semânticas heterogêneas (upload + tiles + moderação)
+// que dividem único princípio: "rotear seu cliente pra infra própria".
+//
+// Manifesto §17 (sem chave mestra): user pode trocar nostr.build →
+// Blossom self-hosted (não dá nostr.build poder sobre conteúdo);
+// trocar CARTO tiles → OSM próprio (não dá CARTO seu IP); ajustar
+// threshold dinâmico (não confia no default do cliente). Cada campo
+// independente — empty/0 cai no default seguro.
+//
+// UX:
+//   - Inputs livres com hint do default
+//   - Validação client-side mínima (https://, {x}{y}{z}, integer ≥1);
+//     setPref filtra mais (em prefs.ts) — defense in depth
+//   - "limpar" botão por campo restaura default
+//   - aviso §28 no header: "fica neste dispositivo. nada sai daqui."
+
+interface SovereigntyFieldProps {
+  label: string
+  hint: string
+  placeholder: string
+  value: string
+  onCommit: (v: string) => void
+  inputMode?: 'text' | 'numeric' | 'url'
+}
+
+function SovereigntyField({
+  label,
+  hint,
+  placeholder,
+  value,
+  onCommit,
+  inputMode = 'text',
+}: SovereigntyFieldProps) {
+  const [local, setLocal] = useState(value)
+  useEffect(() => {
+    setLocal(value)
+  }, [value])
+  const dirty = local !== value
+  return (
+    <div className="space-y-1.5">
+      <label className="block font-mono text-[11px] uppercase tracking-meta text-drift-muted">
+        {label}
+      </label>
+      <p className="font-mono text-[10px] text-drift-muted/40 leading-relaxed">
+        {hint}
+      </p>
+      <div className="flex gap-1.5">
+        <input
+          type="text"
+          inputMode={inputMode}
+          value={local}
+          onChange={(e) => setLocal(e.target.value)}
+          placeholder={placeholder}
+          className="flex-1 min-w-0 rounded-lg border border-drift-border/40 bg-drift-surface/30 px-3 py-2 font-mono text-[12px] text-drift-text placeholder:text-drift-muted/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
+          aria-label={label}
+        />
+        <button
+          type="button"
+          onClick={() => onCommit(local.trim())}
+          disabled={!dirty}
+          className="shrink-0 rounded-lg border border-drift-accent/40 bg-drift-accent/10 px-3 py-2 font-mono text-[11px] uppercase tracking-meta text-drift-accent transition-colors hover:bg-drift-accent/20 disabled:opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent/40"
+        >
+          salvar
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setLocal('')
+            onCommit('')
+          }}
+          disabled={value === ''}
+          className="shrink-0 rounded-lg border border-drift-border/40 bg-drift-surface/30 px-3 py-2 font-mono text-[11px] uppercase tracking-meta text-drift-muted transition-colors hover:text-drift-text disabled:opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
+          aria-label={`restaurar default de ${label}`}
+        >
+          limpar
+        </button>
+      </div>
+    </div>
+  )
+}
+
+export function SovereigntyCard({ onClose }: CardProps) {
+  const prefs = usePrefsStore()
+
+  function commitUpload(v: string) {
+    void setPref('upload_endpoint', v || undefined)
+  }
+  function commitTile(v: string) {
+    void setPref('map_tile_url_template', v || undefined)
+  }
+  function commitThreshold(v: string) {
+    const n = Number.parseInt(v, 10)
+    void setPref('report_threshold_override', Number.isFinite(n) && n >= 1 ? n : undefined)
+  }
+
+  return (
+    <FullPageCard
+      onClose={onClose}
+      title="soberania"
+      ariaLabel="endpoints customizáveis"
+    >
+      <div className="space-y-5 px-4 py-5">
+        <SectionHeader title="endpoints" />
+        <p className="px-1 font-mono text-[10px] text-drift-muted/30">
+          rota seu cliente pra infra própria. cada campo independente.
+          empty/0 cai no default. fica neste dispositivo — nada sai daqui.
+        </p>
+
+        <SovereigntyField
+          label="upload de imagens"
+          hint="default: nostr.build. troque pra Blossom self-hosted, hospedagem própria, IPFS gateway com upload. URL completa (https://)."
+          placeholder="https://blossom.exemplo.com/upload"
+          value={prefs.upload_endpoint ?? ''}
+          inputMode="url"
+          onCommit={commitUpload}
+        />
+
+        <SovereigntyField
+          label="tile server do mapa"
+          hint="default: CARTO Voyager (loga seu IP). troque pra OSM, mirror Tor, self-hosted. XYZ template com {x} {y} {z}."
+          placeholder="https://tiles.exemplo.com/{z}/{x}/{y}.png"
+          value={prefs.map_tile_url_template ?? ''}
+          inputMode="url"
+          onCommit={commitTile}
+        />
+
+        <SovereigntyField
+          label="threshold de moderação (override)"
+          hint="default: dinâmico baseado em volume da rede. integer ≥1 força threshold fixo. 0/empty = dinâmico."
+          placeholder="(dinâmico)"
+          value={
+            prefs.report_threshold_override && prefs.report_threshold_override > 0
+              ? String(prefs.report_threshold_override)
+              : ''
+          }
+          inputMode="numeric"
+          onCommit={commitThreshold}
+        />
+      </div>
+    </FullPageCard>
+  )
+}

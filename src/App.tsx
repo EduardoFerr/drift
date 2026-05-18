@@ -111,6 +111,9 @@ const DiagnosticCard = lazy(() =>
 const PermissionsCard = lazy(() =>
   import('./components/Settings/SettingsCards').then((m) => ({ default: m.PermissionsCard })),
 )
+const SovereigntyCard = lazy(() =>
+  import('./components/Settings/SettingsCards').then((m) => ({ default: m.SovereigntyCard })),
+)
 const AppearanceCard = lazy(() =>
   import('./components/Settings/AppearanceCard').then((m) => ({ default: m.AppearanceCard })),
 )
@@ -1879,6 +1882,7 @@ type SettingsTarget =
   | 'permissoes'
   | 'aparencia'
   | 'sua-lente'
+  | 'soberania'
   | 'instalar'
   | 'limpar'
 
@@ -1954,6 +1958,9 @@ function SettingsRoot({ onClose }: { onClose: () => void }) {
         break
       case 'diagnostico':
         pushLayer({ id: 'diagnostic', component: DiagnosticCard, parent: p })
+        break
+      case 'soberania':
+        pushLayer({ id: 'sovereignty', component: SovereigntyCard, parent: p })
         break
       case 'status':
         pushLayer({ id: 'status', component: StatusCardLayer, parent: p })
@@ -2098,6 +2105,12 @@ function SettingsRoot({ onClose }: { onClose: () => void }) {
           label: 'blobs (ipfs)',
           hint: 'servindo blobs a peers',
           icon: BoxIcon,
+        },
+        {
+          target: 'soberania',
+          label: 'soberania',
+          hint: 'endpoints próprios — upload, mapa, moderação',
+          icon: ServerIcon,
         },
         {
           target: 'diagnostico',

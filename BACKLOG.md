@@ -96,16 +96,15 @@ Plano Ted HIMYM 2026-05-17 (analysis registrada em commit do PR1 [c823e8f]).
 
 ## Sovereignty / Power-user — UI pending
 
-- [ ] **Settings UI pra 3 endpoints customizáveis** — após [f8db723]
-  shipped, falta UI pro user definir esses 3 valores:
-    - `upload_endpoint` (Blossom server URL https://)
-    - `map_tile_url_template` (XYZ tile template com {x}{y}{z})
-    - `report_threshold_override` (integer ≥1)
-  Decisão UX pendente: card próprio em Settings ("avançado/sovereignty"?)
-  ou seções dentro de cards existentes (NetworkMode pro upload, MapView
-  pro tile, Moderation futuro pro threshold)?
-  Bloqueio: HIMYM Lily — decidir arquitetura informacional. Hoje os
-  campos existem mas só editáveis via SQLite direto (debug).
+- [x] **Settings UI pra 3 endpoints customizáveis** — fechado em
+  [PENDING]. Decisão UX: card próprio (`SovereigntyCard`) em "sistema"
+  group (não nested em NetworkMode/MapView — mistura semânticas
+  heterogêneas que dividem único princípio §17 "rotear pra infra
+  própria"). 3 campos com inputs livres + botão salvar (dirty-only) +
+  botão limpar (restaura default). Validação client-side mínima;
+  setPref já filtra (defense in depth). Wiring em App.tsx
+  (SettingsTarget 'soberania' + lazy import + menu entry com
+  ServerIcon + "endpoints próprios — upload, mapa, moderação" hint).
 
 ---
 
