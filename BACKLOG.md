@@ -84,7 +84,7 @@ Plano Ted HIMYM 2026-05-17 (analysis registrada em commit do PR1 [c823e8f]).
   rules como hints contextuais). 12 conformance tests novos.
 
 - [x] **DAOP PR3: HintChip / HintToast / HintModal primitives** —
-  fechado em [PENDING]. 3 componentes UI consumindo GuidanceRule +
+  fechado em [d0b7ac5]. 3 componentes UI consumindo GuidanceRule +
   capabilities. HintChip (passive, DriftChip + dismiss X), HintToast
   (reactive, DriftAlert fixed-bottom + auto-dismiss 8s), HintModal
   (interactive, SlideUpOverlay + snooze). Todos respeitam appliesIf +
