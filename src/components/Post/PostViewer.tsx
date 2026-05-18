@@ -1175,7 +1175,11 @@ function ActionsFan({
           exit={{ opacity: 0, y: -8, scale: 0.92 }}
           transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
           className="absolute right-4 z-30 flex flex-col items-end gap-2"
-          style={{ top: `60px` }}
+          // User feedback 2026-05-18: ícones do header (top-4 + h-11 = bottom
+          // em 60px) ficavam COLADOS no container quando fan abria. Bump
+          // pra 72px (12px gap = rhythm do design system) cria respiro
+          // visual entre 'post controls' floating e 'menu' container.
+          style={{ top: `72px` }}
           // BUG-LONGPRESS-FAN fix — opt-out do long-press 5s do card
           // parent. Touch sustentado no fan não deve disparar slim toggle.
           data-no-longpress="true"
