@@ -44,6 +44,7 @@ import { FullPageCard } from '../UI/FullPageCard'
 import { Collapse } from '../UI/Collapse'
 import { RefreshIcon } from '../UI/Icons'
 import { SectionHeader } from '../UI/SectionHeader'
+import { SettingExplainer } from '../UI/SettingExplainer'
 
 // ─── Accordion helpers ──────────────────────────────────────────
 
@@ -149,31 +150,55 @@ export function FiltersCard({ onClose }: CardProps) {
   const prefs = usePrefsStore()
   return (
     <FullPageCard onClose={onClose} title="filtros" ariaLabel="filtros de conteúdo">
-      <div className="space-y-3 px-4 py-5">
-        <SectionHeader title="visibilidade" />
-        <p className="px-1 font-mono text-[10px] text-drift-muted/30">
-          você decide o que ver. nada sai deste dispositivo.
-        </p>
-        <div className="space-y-2 pl-3">
+      <div className="space-y-4 px-4 py-5">
+        {/* Refactor 2026-05-18: 3 toggles viraram 3 SettingExplainer cards.
+            Cada um com impacto descrito + default justificado + reversível.
+            Substitui hint micro `text-drift-muted/30` por explicação
+            always-visible. */}
+        <SettingExplainer
+          label="conteúdo adulto e violência"
+          description="Posts publicados com aviso de 'NSFW' ou 'violência' aparecem com a imagem borrada por default. Você toca pra revelar caso queira ver."
+          impact="Se você ativar este toggle, esses posts aparecem normais (sem blur) direto no feed. Útil pra quem quer ver tudo sem etapa extra; ruim pra ler o feed em público."
+          defaultExplained="Off. Quem marca conteúdo como adulto é o autor — você só decide se quer ver de cara ou após toque."
+          reversible
+        >
           <Toggle
-            label="mostrar NSFW / violência sem blur"
-            hint="posts marcados aparecem com blur até toque"
+            label="mostrar sem borrar"
+            hint="quando off, imagens marcadas viram blur até toque"
             value={prefs.show_nsfw_default}
             onChange={(v) => setPref('show_nsfw_default', v)}
           />
+        </SettingExplainer>
+
+        <SettingExplainer
+          label="spoilers de filme/livro/série"
+          description="Autores podem marcar posts como spoiler. Quando isto está ativo, esses posts ficam totalmente ocultos no feed até você decidir abrir."
+          impact="Quando ligado, você não vê spoilers acidentalmente passando pelo feed. Posts marcados aparecem como card 'spoiler' clicável."
+          defaultExplained="On. Maioria das pessoas prefere descobrir o final por conta própria."
+          reversible
+        >
           <Toggle
-            label="esconder spoilers até clicar"
-            hint="posts marcados como spoiler ficam ocultos no feed"
+            label="esconder spoilers do feed"
+            hint="quando on, posts marcados aparecem como card clicável"
             value={prefs.hide_spoilers}
             onChange={(v) => setPref('hide_spoilers', v)}
           />
+        </SettingExplainer>
+
+        <SettingExplainer
+          label="anúncios de divulgação"
+          description="Drift não tem ads pagos. Mas autores podem marcar voluntariamente seus próprios posts como 'divulgação' (lançamento de produto, etc.). Você decide se quer ver."
+          impact="Quando ligado, posts auto-marcados como divulgação ficam fora do feed. Não afeta posts não-marcados."
+          defaultExplained="On. Mantém o feed mais focado em conteúdo orgânico."
+          reversible
+        >
           <Toggle
-            label="esconder anúncios"
-            hint="posts marcados como ad não aparecem no feed"
+            label="esconder divulgações"
+            hint="quando on, posts marcados como ad não aparecem"
             value={prefs.hide_ads}
             onChange={(v) => setPref('hide_ads', v)}
           />
-        </div>
+        </SettingExplainer>
       </div>
     </FullPageCard>
   )
@@ -183,14 +208,23 @@ export function FiltersCard({ onClose }: CardProps) {
 
 export function LocationCard({ onClose }: CardProps) {
   const prefs = usePrefsStore()
+  const current = GRANULARITY_OPTIONS.find(
+    (o) => o.value === prefs.location_granularity,
+  )
   return (
     <FullPageCard onClose={onClose} title="location" ariaLabel="granularidade de location">
       <div className="space-y-3 px-4 py-5">
-        <SectionHeader title="granularidade" />
-        <p className="px-1 font-mono text-[10px] text-drift-muted/30">
-          default off. cidade pequena + opinião política = identificável.
-        </p>
-        <div className="pl-3">
+        {/* Refactor 2026-05-18: SettingExplainer primitive substitui card
+            cru. Resolve text-drift-muted/30 invisível em Velatura +
+            impacto agora always-visible (não só title-hover desktop). */}
+        <SettingExplainer
+          label="onde mostrar sua localização"
+          description="Quando você publica um post, ele pode incluir uma localização que aparece no mapa pra outros usuários. Aqui você escolhe o quanto desse dado vaza."
+          impact="Mexer aqui não muda posts antigos — só afeta o que você publicar daqui pra frente. Quanto mais preciso, mais identificável você fica em rede pequena."
+          defaultExplained="Off. Cidade pequena + opinião política = você identificado (manifesto §28)."
+          reversible
+          reference="manifesto §28 — privacidade pelo mínimo"
+        >
           <div
             className="grid grid-cols-2 gap-2 sm:grid-cols-4"
             role="radiogroup"
@@ -206,8 +240,8 @@ export function LocationCard({ onClose }: CardProps) {
                   onClick={() => void setPref('location_granularity', opt.value)}
                   className={`rounded-xl border px-3 py-3 font-mono text-[12px] uppercase tracking-meta transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40 ${
                     active
-                      ? 'border-drift-accent/50 bg-drift-accent/10 text-drift-accent'
-                      : 'border-drift-border/30 bg-drift-surface/30 text-drift-muted hover:border-drift-accent2/25 hover:text-drift-text'
+                      ? 'border-drift-accent bg-drift-accent/15 text-drift-accent'
+                      : 'border-drift-border/50 bg-drift-surface/40 text-drift-muted hover:border-drift-accent2 hover:text-drift-text'
                   }`}
                   title={opt.hint}
                 >
@@ -216,14 +250,14 @@ export function LocationCard({ onClose }: CardProps) {
               )
             })}
           </div>
-          <div className="mt-2 rounded-xl border border-drift-border/20 bg-drift-surface/20 px-4 py-3 font-mono text-[11px] leading-relaxed text-drift-muted/40">
-            <span className="text-drift-text/80">
-              {GRANULARITY_OPTIONS.find((o) => o.value === prefs.location_granularity)?.label}
-            </span>
-            {' — '}
-            {GRANULARITY_OPTIONS.find((o) => o.value === prefs.location_granularity)?.hint}
-          </div>
-        </div>
+          {current && (
+            <div className="mt-3 rounded-xl border border-drift-border/40 bg-drift-surface/40 px-4 py-3 font-mono text-[11px] leading-relaxed text-drift-body">
+              <span className="font-bold text-drift-text">{current.label}</span>
+              {' — '}
+              {current.hint}
+            </div>
+          )}
+        </SettingExplainer>
       </div>
     </FullPageCard>
   )
@@ -336,82 +370,81 @@ export function NetworkModeCard({ onClose }: CardProps) {
   return (
     <FullPageCard onClose={onClose} title="modo de rede" ariaLabel="modo de rede">
       <div className="space-y-3 px-4 py-5">
-        <SectionHeader title="transporte" />
-        <p className="px-1 font-mono text-[10px] text-drift-muted/30">
-          default clearnet. tor contorna bloqueios (exige desktop).
-        </p>
-        <div className="pl-3 space-y-3">
-              <div
-                className="grid grid-cols-3 gap-2"
-                role="radiogroup"
-                aria-label="modo de rede"
-              >
-                {NETWORK_MODE_OPTIONS.map((opt) => {
-                  const active = prefs.network_mode === opt.value
-                  const disabled = opt.requiresTauri && !tauriRuntime
-                  const hint = tauriRuntime ? opt.hintTauri : opt.hintBrowser
-                  return (
-                    <button
-                      key={opt.value}
-                      role="radio"
-                      aria-checked={active}
-                      onClick={() => {
-                        if (disabled) return
-                        void changeMode(opt.value)
-                      }}
-                      disabled={disabled}
-                      className={`rounded-xl border px-3 py-3 font-mono text-[12px] uppercase tracking-meta transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40 ${
-                        active
-                          ? 'border-drift-accent/50 bg-drift-accent/10 text-drift-accent'
-                          : 'border-drift-border/30 bg-drift-surface/30 text-drift-muted hover:border-drift-accent2/25 hover:text-drift-text'
-                      } ${disabled ? 'cursor-not-allowed opacity-25 hover:border-drift-border/30' : ''}`}
-                      title={hint}
-                    >
-                      {opt.label}
-                    </button>
-                  )
-                })}
-              </div>
-              <p className="font-mono text-[10px] text-drift-muted/25">
-                scaffold em PWA. tor real: build Tauri com --features arti.
-              </p>
+        {/* Refactor 2026-05-18: setting-explainer com warning destrutivo
+            (reload exigido), defaults justificados, impacto observável
+            por opção. Jargão técnico ('scaffold em PWA. tor real: build
+            Tauri --features arti') traduzido pra plain language. */}
+        <SettingExplainer
+          label="como o app se conecta"
+          description="O Drift se conecta a servidores Nostr (chamados relays) pra trocar posts com outras pessoas. Aqui você escolhe o caminho que esses dados tomam."
+          impact="Internet normal (clearnet) é o padrão — funciona em qualquer dispositivo. Tor esconde seu IP, ótimo pra contornar bloqueios regionais, mas exige o app desktop. Em PWA navegador, escolher Tor NÃO faz nada — seu IP continua exposto."
+          defaultExplained="Internet normal. Funciona universalmente; mudar pra Tor é decisão consciente de privacidade adicional."
+          warning="Mudar este setting REINICIA o app pra aplicar. Você vai perder qualquer ação não-publicada."
+          reversible
+          level={tauriRuntime ? 'basic' : 'advanced'}
+          reference="manifesto §15 — anti-censura por país"
+        >
+          <div className="space-y-3">
+            <div
+              className="grid grid-cols-3 gap-2"
+              role="radiogroup"
+              aria-label="modo de rede"
+            >
+              {NETWORK_MODE_OPTIONS.map((opt) => {
+                const active = prefs.network_mode === opt.value
+                const disabled = opt.requiresTauri && !tauriRuntime
+                const hint = tauriRuntime ? opt.hintTauri : opt.hintBrowser
+                return (
+                  <button
+                    key={opt.value}
+                    role="radio"
+                    aria-checked={active}
+                    onClick={() => {
+                      if (disabled) return
+                      void changeMode(opt.value)
+                    }}
+                    disabled={disabled}
+                    className={`rounded-xl border px-3 py-3 font-mono text-[12px] uppercase tracking-meta transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40 ${
+                      active
+                        ? 'border-drift-accent bg-drift-accent/15 text-drift-accent'
+                        : 'border-drift-border/50 bg-drift-surface/40 text-drift-muted hover:border-drift-accent2 hover:text-drift-text'
+                    } ${disabled ? 'cursor-not-allowed opacity-30 hover:border-drift-border/50' : ''}`}
+                    title={hint}
+                  >
+                    {opt.label}
+                  </button>
+                )
+              })}
+            </div>
 
-              {torSelectedInPwa && (
-                <Alert
-                  tone="error"
-                  title={`modo ${prefs.network_mode === 'tor' ? 'tor' : 'onion-only'} em PWA — IP vaza`}
-                >
-                  PWA browser não roteia via Tor. Conexão continua <strong>clearnet</strong>.
-                </Alert>
-              )}
-              {torConfiguredButBootError && (
-                <Alert
-                  tone="error"
-                  title="tor configurado mas boot falhou"
-                >
-                  Modo <code>{prefs.network_mode}</code> ativo mas boot não completou. Volte pra clearnet.
-                </Alert>
-              )}
-              {torDegradedReason && (
-                <Alert
-                  tone="warn"
-                  title="tor não conectou — modo degradado"
-                >
-                  {torDegradedReason.code === 'TOR_FEATURE_OFF'
-                    ? 'Build sem feature arti. '
-                    : 'Bootstrap Tor falhou. '}
-                  Tráfego em clearnet.
-                </Alert>
-              )}
-              {!onionAvailable && (
-                <Alert
-                  tone="error"
-                  title="onion-only sem relay .onion disponível"
-                >
-                  Nenhum relay habilitado tem alias .onion. App isolado.
-                </Alert>
-              )}
-        </div>
+            {torSelectedInPwa && (
+              <Alert
+                tone="error"
+                title={`modo ${prefs.network_mode === 'tor' ? 'tor' : 'onion-only'} em PWA — IP vaza`}
+              >
+                PWA browser não roteia via Tor. Conexão continua <strong>clearnet</strong>.
+              </Alert>
+            )}
+            {torConfiguredButBootError && (
+              <Alert tone="error" title="tor configurado mas boot falhou">
+                Modo <code>{prefs.network_mode}</code> ativo mas boot não completou. Volte pra clearnet.
+              </Alert>
+            )}
+            {torDegradedReason && (
+              <Alert tone="warn" title="tor não conectou — modo degradado">
+                {torDegradedReason.code === 'TOR_FEATURE_OFF'
+                  ? 'Build sem feature arti. '
+                  : 'Bootstrap Tor falhou. '}
+                Tráfego em clearnet.
+              </Alert>
+            )}
+            {!onionAvailable && (
+              <Alert tone="error" title="onion-only sem relay .onion disponível">
+                Nenhum relay habilitado tem alias .onion. App isolado.
+              </Alert>
+            )}
+          </div>
+        </SettingExplainer>
       </div>
     </FullPageCard>
   )
