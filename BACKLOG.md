@@ -195,6 +195,33 @@ Plano Ted HIMYM 2026-05-17 (analysis registrada em commit do PR1 [c823e8f]).
 
 ## BUGS — prioridade alta (correção sem polish)
 
+- [ ] **Settings/menus — friction audit + framework** — user report
+  2026-05-18: "a maior parte dos menus e configurações um usuário
+  comum não sabe do que se trata, do impacto que a configuração tem,
+  ou outras mais avançadas não dá para ele saber como configurar".
+  Audit inline em `Docs/sessions/settings-friction-audit-2026-05-18.md`
+  (Lily agent dispatch falhou por usage limit, audit feito manualmente).
+  6 padrões transversais identificados:
+    1. Hint text `text-drift-muted/30` invisível em Velatura
+    2. Jargão protocol-level (kind/NIP/OPFS/SAB) vazando pra UI
+    3. Tooltips só desktop (`title=`) — mobile não vê
+    4. Hints descrevem setting mas não IMPACTO observável
+    5. Defaults sem justificativa
+    6. Reversibilidade não comunicada
+  Gold standard existente: SuaLenteCard (label dinâmico + helper text
+  + exemplo concreto + manifesto ref + CTA teste).
+  Top 10 friction points priorizados no doc.
+  Approach proposto: primitive `<SettingExplainer>` reutilizável com
+  props {label, description, impact, defaultExplained, reversible,
+  level='basic'|'advanced'} + LOCK_VIA_TEST conformance + glossário
+  centralizado (kind/relay/NIP traduzidos).
+  Bloqueio: HIMYM dedicado quando usage limit liberar — Marshall
+  (spec primitive + LOCK), Lily (copy guidelines plain language),
+  Robin (glossário), Ted (level=advanced gate), Barney (warnings
+  destrutivos antecipados).
+  Phase 1 fix: primitive + refactor top 10 cards. Sem libs externas
+  (regra user 2026-05-17).
+
 - [ ] **Radio-group active state invisível em Velatura (light theme)** —
   user report 2026-05-18 com screenshot: LocationCard granularidade
   (OFF/PAÍS/CIDADE/GPS) — selecionando opção mas UI não indica
