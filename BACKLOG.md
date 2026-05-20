@@ -240,32 +240,27 @@ Plano Ted HIMYM 2026-05-17 (analysis registrada em commit do PR1 [c823e8f]).
   ComposeOverlay mostra warning quando upload_endpoint customizado +
   hasAnyImage. Defesa via visibilidade contra pre-poisoned device.
 
-- [ ] **Radio-group active state invisível em Velatura (light theme)** —
-  user report 2026-05-18 com screenshot: LocationCard granularidade
-  (OFF/PAÍS/CIDADE/GPS) — selecionando opção mas UI não indica
-  seleção. Causa: pattern de alphas baixos em Velatura morre.
-    - Active: `border-drift-accent/50 bg-drift-accent/10
-      text-drift-accent`
-    - Inactive: `border-drift-border/30 bg-drift-surface/30
-      text-drift-muted`
-  Em Velatura, drift-accent é rosé Morandi pálido (#a87870); /10 e
-  /30 sobre papel claro = todos parecem o mesmo.
-  Mesmo padrão presente em outros cards potencialmente: MapViewCard
-  segmented control, NetworkModeCard, FiltersCard toggles. Audit
-  necessário.
-  Fix proposto (Lily/Marshall HIMYM):
-    - Active: bumpar pra `bg-drift-accent/20` + `border-drift-accent`
-      (alpha 100% na border)
-    - OU usar inversão estilo stamp: `bg-drift-accent text-drift-bg`
-      pra active, mais discriminação
-    - Inactive: pode ficar /30 (contraste de luminance vs active
-      preenchido resolve)
-  Cross-component audit + LOCK_VIA_TEST `radio-active-contrast` que
-  valida diff de luminance/saturation entre active/inactive states
-  em todos os 3 temas (idealmente WCAG 3:1 mínimo entre estados).
-  Bloqueio: deliberação Lily (UX pattern unificado) + Marshall
-  (conformance test) + decidir se aplicar fix point-by-point ou
-  extract num primitive (`RadioGroupButton` / `SegmentedControl`).
+- [~] **Radio-group active state invisível em Velatura (parcialmente
+  fechado)** — fix point-by-point shipado nas Phase 1+2:
+  - LocationCard [45cd93f]: `border-drift-accent bg-drift-accent/15
+    text-drift-accent` (era /50 e /10). Visível em Velatura.
+  - NetworkModeCard [45cd93f]: mesmo pattern. Visível.
+  - MapViewCard: usa segmented control com pill animado layoutId,
+    pattern diferente, já era OK.
+  - FiltersCard: refatorado com SettingExplainer + Toggle, não
+    radio-group.
+
+  **Ainda aberto:**
+  - Cross-component audit completo (busca por padrão `/10` `/30`
+    `/50` em outros radio-groups ad-hoc fora de Settings)
+  - Extract primitive `<RadioGroupButton>` / `<SegmentedControl>`
+    pra prevenir regressão
+  - LOCK_VIA_TEST `radio-active-contrast` validando luminance/
+    saturation diff em todos 3 temas (WCAG 3:1 mínimo entre states)
+
+  Bloqueio: HIMYM dedicado (Lily UX pattern + Marshall conformance)
+  quando for prioridade. Não-urgente — bug visível foi resolvido nos
+  3 cards onde user reportou.
 
 - [ ] **PWA SW serve HTML stale após deploy Vercel novo** — causa raiz
   do bug user reportou 2026-05-17. Cenário: deploy gera hashes novos
