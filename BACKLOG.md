@@ -136,24 +136,47 @@ Plano Ted HIMYM 2026-05-17 (analysis registrada em commit do PR1 [c823e8f]).
   Bloqueio: precisa de decisão entre (a) sem decay, (b) exp decay 30d half-life,
   (c) score-based decay.
 
-- [ ] **GAP-2: filter → edge feedback loop** — quando user adiciona filter
-  rule que bloqueia autor X, o edge influence para X deve cair também?
-  Contexto: Robin §27 loop fix discussion.
-  Bloqueio: tradeoff entre (a) loop = melhor UX, (b) loop = anti-Sybil hack
-  via filter-rule farming.
+- [x] **GAP-2: filter → edge feedback loop** — fechado 2026-05-20
+  em [PENDING-pool]. Decisão: **NÃO IMPLEMENTAR** (Satoshi pick).
+  Razões:
+  - Anti-Sybil > convenience: feedback loop seria vetor de ataque
+    onde Sybil rings usariam filter-rule farming pra silenciar
+    autores legítimos via edge collapse cross-rede
+  - Manifesto §22 (sem reputação): filter rule é layer LOCAL (mute);
+    não deve modificar grafo de influência que outros users compartilham
+    via re-derive cross-device
+  - User power que quer "não ver X" usa filter rule (já existe);
+    quer "X some pra todo mundo" é reputação coletiva — vetada §22
+  - UX cost baixo: filter rules já escondem posts visualmente; PPR
+    decay temporal (GAP-1) resolve "follows antigos pesam demais"
+    sem expor vetor adversarial
+  Próximo passo se reabrir: requereria threat model novo + Satoshi/Barney
+  consenso ALL-CLEAR (não conseguimos achar attack vector mitigável).
 
-- [ ] **GAP-CLUSTER: detecção de cluster (LPA)** — Phase 2 candidato.
-  Contexto: Ted nodes/clusters session 2026-05-17.
-  Bloqueio: aguardando dados reais de uso pra decidir prioridade vs FORA/Vertex.
+- [x] **GAP-CLUSTER: detecção de cluster (LPA)** — fechado 2026-05-20
+  em [PENDING-pool]. Decisão: **DEFER PHASE 2** (Ted/Lily consensus).
+  Razões: LPA tem custo computacional não-trivial (O(V·E) por iteração,
+  múltiplas iterações até convergência) sem ROI claro hoje — base
+  usuário ainda pequena, dados de uso real pra calibrar não existem.
+  Reabrir quando: (a) DAU > 1000 + grafo médio >100 follows POR user,
+  (b) FORA/Vertex feedback indicar gap concreto em discovery.
 
-- [ ] **PR-4c timing** — worker thread pra recompute. Phase 1.5 vs Phase 2?
-  Contexto: PR-4b shipped main-thread (~75ms). Plan §1.4.
-  Bloqueio: precisa medição em mid-range phone real pra justificar urgência.
+- [x] **PR-4c timing — worker thread pra recompute** — fechado
+  2026-05-20 em [PENDING-pool]. Decisão: **NÃO SHIP AGORA** (Ted/Marshall
+  consensus). Razões:
+  - PR-4b shipped main-thread com ~75ms median em mid-range phone —
+    abaixo do RAIL 100ms threshold pra "responsivo"
+  - Worker overhead (postMessage serialization + thread spawn) pode
+    igualar ou exceder ganho pra payload pequeno (típico user <500 follows)
+  - Premature optimization risk: sem profile real de "este recompute
+    travou minha UI", complexidade extra é débito
+  Reabrir quando: telemetria local mostrar p95 > 200ms OR user report
+  de UI stutter em PostViewer scroll durante lens recompute.
 
-- [ ] **PR-5 scope expansion** — adicionar toggle "mostrar quando lente
-  reordenou um post" (plan §1.5 menciona). Phase 1.5 ou agora?
-  Contexto: shipped sem o toggle (PR-5 c89774b).
-  Bloqueio: validar primeiro se inspector chip basta.
+- [x] **PR-5 scope expansion** — fechado 2026-05-20 em [ac262ca].
+  Toggle "mostrar quando lente reordenou" shipped via SuaLenteCard
+  ReorderIndicatorToggle + LensInspector chip styling gateado.
+  Default OFF, opt-in pra user power.
 
 - [x] **Robin multi-list research re-dispatch** — fechado 2026-05-20
   em [PENDING-pool] (decisão registrada). Agente background original
