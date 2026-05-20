@@ -10,7 +10,7 @@
  * direto, fácil de pular.
  */
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 // `m` é o primitive leve do framer-motion (LazyMotion). Features via main.tsx.
 import { m, AnimatePresence } from 'framer-motion'
 import { setPref, usePrefsStore } from '../../lib/prefs'
@@ -76,6 +76,19 @@ export function OnboardingOverlay({ onClose, onOpenIdentity }: OnboardingOverlay
   function skip() {
     void finish()
   }
+
+  // Barney+Robin fix 2026-05-18: se TODAS as regras foram filtradas via
+  // appliesIf (user já fez tudo: backup + post + drift + follow), o
+  // overlay renderizava VAZIO (currentRule=undefined → title/body
+  // ausentes), trancando UI atrás de backdropDismissible=false. Auto-
+  // finish + null render escapa do limbo.
+  useEffect(() => {
+    if (applicableRules.length === 0) {
+      void finish()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  if (applicableRules.length === 0) return null
 
   return (
     <SlideUpOverlay
