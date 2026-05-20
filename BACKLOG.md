@@ -197,7 +197,7 @@ Plano Ted HIMYM 2026-05-17 (analysis registrada em commit do PR1 [c823e8f]).
 
 - [ ] **Satoshi findings — race + CSV validation (LOW × LOW/MED)** —
   audit 2026-05-19 (Docs/sessions retroativo). Top vuln #1 (upload_
-  endpoint badge invisível) shipado em [PENDING-fix]. Restantes:
+  endpoint badge invisível) shipado em [2e9fa75]. Restantes:
   - `lib/capabilities.ts:parseDismissedBag` aceita CSV sem validação;
     se rule ID futuro tiver vírgula, parsing quebra silencioso. Não
     é exploit hoje (rules atuais sem vírgula no ID). Marshall edge.
