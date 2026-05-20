@@ -140,36 +140,47 @@ describe('SettingExplainer — Phase 6 menu detalhado (4 flags granulares)', () 
     expect(stripped).toMatch(/level === 'advanced'/) // pra badge
   })
 
-  it('UserPrefs schema tem 4 flags menu_detail_show_*', () => {
+  it('UserPrefs schema tem 5 flags menu_detail_show_*', () => {
     const driftTypes = readFileSync('src/types/drift.ts', 'utf8')
     expect(driftTypes).toMatch(/menu_detail_show_details:\s*boolean/)
     expect(driftTypes).toMatch(/menu_detail_show_manifesto:\s*boolean/)
     expect(driftTypes).toMatch(/menu_detail_show_how_it_works:\s*boolean/)
     expect(driftTypes).toMatch(/menu_detail_show_algorithm:\s*boolean/)
-    // Defaults: details ON, outros OFF
+    expect(driftTypes).toMatch(/menu_detail_show_action_labels:\s*boolean/)
+    // Defaults: details + action_labels ON (discoverability),
+    // outros OFF (jargão técnico opt-in)
     expect(driftTypes).toMatch(/menu_detail_show_details:\s*true/)
     expect(driftTypes).toMatch(/menu_detail_show_manifesto:\s*false/)
     expect(driftTypes).toMatch(/menu_detail_show_how_it_works:\s*false/)
     expect(driftTypes).toMatch(/menu_detail_show_algorithm:\s*false/)
+    expect(driftTypes).toMatch(/menu_detail_show_action_labels:\s*true/)
   })
 
-  it('prefs.ts deserializa todos 4 menu_detail flags', () => {
+  it('prefs.ts deserializa todos 5 menu_detail flags', () => {
     const prefsSrc = readFileSync('src/lib/prefs.ts', 'utf8')
     expect(prefsSrc).toMatch(/case 'menu_detail_show_details'/)
     expect(prefsSrc).toMatch(/case 'menu_detail_show_manifesto'/)
     expect(prefsSrc).toMatch(/case 'menu_detail_show_how_it_works'/)
     expect(prefsSrc).toMatch(/case 'menu_detail_show_algorithm'/)
+    expect(prefsSrc).toMatch(/case 'menu_detail_show_action_labels'/)
   })
 
-  it('SettingsCards.tsx tem MenuDetailCard exportado', () => {
+  it('SettingsCards.tsx tem MenuDetailCard exportado com 5 explainers', () => {
     expect(CARDS_SRC).toMatch(/export\s+function\s+MenuDetailCard/)
-    // 4 SettingExplainer dentro do MenuDetailCard
     const cardMatch = CARDS_SRC.match(
       /export\s+function\s+MenuDetailCard[\s\S]*?(?=\nexport\s+function|$)/,
     )
     expect(cardMatch).not.toBeNull()
     const explainers = (cardMatch![0].match(/<SettingExplainer/g) ?? []).length
-    expect(explainers).toBe(4)
+    expect(explainers).toBe(5)
+  })
+
+  it('PostViewer.tsx ActionsFan consome menu_detail_show_action_labels', () => {
+    const postViewerSrc = readFileSync(
+      'src/components/Post/PostViewer.tsx',
+      'utf8',
+    )
+    expect(postViewerSrc).toMatch(/menu_detail_show_action_labels/)
   })
 
   it("App.tsx NÃO tem mais AdvancedToggle (Phase 6 substitui por menu-detalhado entry)", () => {

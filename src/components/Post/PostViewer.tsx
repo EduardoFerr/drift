@@ -1204,6 +1204,11 @@ function ActionsFan({
       onOpenModeration,
     },
   })
+  // Phase 6.1 (2026-05-20): labels textuais à esquerda dos ícones
+  // gateadas via Menu Detalhado. Default ON (preserva comportamento
+  // atual / discoverability pra novice). User opta-out pra view limpa
+  // só com ícones (power user que já decorou o significado).
+  const showLabels = usePrefsStore((s) => s.menu_detail_show_action_labels)
 
   // V11.8 (user feedback 2026-05-17 round 4 — design critique completa):
   // 6 mudanças coordenadas em resposta a:
@@ -1286,12 +1291,14 @@ function ActionsFan({
                 transition={{ duration: 0.16, delay: i * 0.035, ease: [0.22, 1, 0.36, 1] }}
                 className="flex items-center justify-end gap-3 rounded-lg px-1 py-0.5"
               >
-                <span
-                  className="pointer-events-none whitespace-nowrap font-mono text-[11px] font-medium uppercase tracking-meta text-drift-text"
-                  aria-hidden="true"
-                >
-                  {item.label}
-                </span>
+                {showLabels && (
+                  <span
+                    className="pointer-events-none whitespace-nowrap font-mono text-[11px] font-medium uppercase tracking-meta text-drift-text"
+                    aria-hidden="true"
+                  >
+                    {item.label}
+                  </span>
+                )}
                 {/* Inner button SEM border/bg — só hover effect. Container
                     é o chrome. */}
                 <button
@@ -1323,12 +1330,14 @@ function ActionsFan({
                 transition={{ duration: 0.16, delay: 0.035 * (neutralItems.length + i), ease: [0.22, 1, 0.36, 1] }}
                 className="mt-1.5 flex items-center justify-end gap-3 border-t border-drift-bury/30 px-1 pt-1.5 pb-0.5"
               >
-                <span
-                  className="pointer-events-none whitespace-nowrap font-mono text-[11px] font-medium uppercase tracking-meta text-drift-bury"
-                  aria-hidden="true"
-                >
-                  {item.label}
-                </span>
+                {showLabels && (
+                  <span
+                    className="pointer-events-none whitespace-nowrap font-mono text-[11px] font-medium uppercase tracking-meta text-drift-bury"
+                    aria-hidden="true"
+                  >
+                    {item.label}
+                  </span>
+                )}
                 <button
                   type="button"
                   onClick={(e) => {

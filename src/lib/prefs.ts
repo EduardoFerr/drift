@@ -120,6 +120,9 @@ function applyRow(target: UserPrefs, key: string, value: string): void {
     case 'menu_detail_show_algorithm':
       target.menu_detail_show_algorithm = value === '1'
       return
+    case 'menu_detail_show_action_labels':
+      target.menu_detail_show_action_labels = value === '1'
+      return
     case 'upload_endpoint':
       // Sovereignty (Marshall NEEDS-FIX A): URL https:// pra Blossom
       // server. Empty = unset (cai no default constante). Validation

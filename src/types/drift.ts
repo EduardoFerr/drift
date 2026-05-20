@@ -418,6 +418,10 @@ export interface UserPrefs {
   /** Detalhes de algoritmo (PageRank, threshold dinâmico, etc).
    *  Default OFF — só pra quem quer entender o sistema profundamente. */
   menu_detail_show_algorithm: boolean
+  /** Labels textuais à esquerda dos ícones no ActionsFan (menu '...').
+   *  Quando off, só ícones aparecem (modo limpo).
+   *  Default ON — labels ajudam discoverability pra novice user. */
+  menu_detail_show_action_labels: boolean
   /**
    * Sovereignty schema bump 2026-05-17 (Marshall conformance NEEDS-FIX A).
    * Endpoint HTTP de upload de blobs (Blossom server). Quando undefined,
@@ -502,6 +506,7 @@ export const DEFAULT_USER_PREFS: UserPrefs = {
   menu_detail_show_manifesto: false,
   menu_detail_show_how_it_works: false,
   menu_detail_show_algorithm: false,
+  menu_detail_show_action_labels: true,
 }
 
 // ─── Trust Lens (Phase 1 — manifesto §24 view-layer carve-out) ────

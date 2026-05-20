@@ -1647,6 +1647,22 @@ export function MenuDetailCard({ onClose }: CardProps) {
               onChange={(v) => setPref('menu_detail_show_algorithm', v)}
             />
           </SettingExplainer>
+
+          <SettingExplainer
+            accordionId="menu-detail-action-labels"
+            label="texto ao lado dos ícones (menu ⋮)"
+            description="Quando você abre o menu de ações de um post (⋮ no canto superior), aparece uma lista vertical de ícones (compartilhar, mapa, fixar, seguir, etc.) com um texto à esquerda explicando cada um."
+            impact="Quando on (default), labels aparecem à esquerda dos ícones — ajuda quem ainda está aprendendo o que cada ícone faz. Quando off, só ícones aparecem (view mais limpa, útil pra quem já decorou)."
+            defaultExplained="On por default — discoverability vence economia visual pra novice user."
+            reversible
+          >
+            <Toggle
+              label="mostrar texto dos ícones"
+              hint="labels à esquerda de cada ação no menu ⋮"
+              value={prefs.menu_detail_show_action_labels}
+              onChange={(v) => setPref('menu_detail_show_action_labels', v)}
+            />
+          </SettingExplainer>
         </AccordionGroup>
       </div>
     </FullPageCard>
