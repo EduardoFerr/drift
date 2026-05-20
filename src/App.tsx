@@ -1915,18 +1915,25 @@ function AdvancedToggle() {
       type="button"
       onClick={() => void setPref('show_advanced_settings', !showAdvanced)}
       aria-pressed={showAdvanced}
-      className={`flex w-full items-center justify-between gap-3 rounded-2xl border px-5 py-3 text-left font-mono text-[12px] uppercase tracking-meta transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40 ${
+      className={`flex w-full items-center justify-between gap-2 rounded-2xl border px-4 py-3 text-left font-mono text-[11px] uppercase tracking-meta transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40 ${
         showAdvanced
           ? 'border-drift-accent2/60 bg-drift-accent2/10 text-drift-accent2'
           : 'border-drift-border/40 bg-drift-surface/40 text-drift-muted hover:text-drift-text'
       }`}
     >
-      <span className="flex items-center gap-2">
-        <span aria-hidden="true">{showAdvanced ? '◉' : '○'}</span>
-        mostrar opções avançadas
+      <span className="flex min-w-0 items-center gap-2 whitespace-nowrap">
+        <span aria-hidden="true" className="shrink-0">{showAdvanced ? '◉' : '○'}</span>
+        <span className="truncate">mostrar opções avançadas</span>
       </span>
-      <span className="font-mono text-[10px] text-drift-muted/70 normal-case tracking-normal">
-        {showAdvanced ? 'on' : 'off — só básico'}
+      {/* Badge curto que não quebra: 'on' / 'off' apenas */}
+      <span
+        className={`shrink-0 rounded px-2 py-0.5 font-mono text-[10px] uppercase tracking-meta ${
+          showAdvanced
+            ? 'bg-drift-accent2/20 text-drift-accent2'
+            : 'bg-drift-surface text-drift-muted'
+        }`}
+      >
+        {showAdvanced ? 'on' : 'off'}
       </span>
     </button>
   )

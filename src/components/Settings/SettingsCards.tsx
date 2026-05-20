@@ -384,7 +384,6 @@ export function NetworkModeCard({ onClose }: CardProps) {
           defaultExplained="Internet normal. Funciona universalmente; mudar pra Tor é decisão consciente de privacidade adicional."
           warning="Mudar este setting REINICIA o app pra aplicar. Você vai perder qualquer ação não-publicada."
           reversible
-          level={tauriRuntime ? 'basic' : 'advanced'}
           reference="manifesto §15 — anti-censura por país"
         >
           <div className="space-y-3">
