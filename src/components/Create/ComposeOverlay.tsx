@@ -51,6 +51,8 @@ import { Image } from '../UI/Image'
 import { FullPageCard } from '../UI/FullPageCard'
 import { DriftButton } from '../UI/DriftButton'
 import { SubpostLayout } from '../Post/SubpostLayout'
+import { usePrefsStore } from '../../lib/prefs'
+import { WarningIcon } from '../UI/Icons'
 
 export interface ComposeOverlayProps {
   publishing: boolean
@@ -80,6 +82,21 @@ interface DraftSubpost {
   blobMeta: BlobMeta | null
   uploading: boolean
   uploadError: string | null
+}
+
+/**
+ * Extrai host de URL com fallback seguro. Satoshi audit 2026-05-19:
+ * usado pra exibir badge 'upload via X' quando upload_endpoint
+ * customizado — torna tampering DETECTÁVEL antes do user publicar
+ * foto sensível pra servidor adversário.
+ */
+function safeHost(url: string | undefined): string | null {
+  if (!url) return null
+  try {
+    return new URL(url).host
+  } catch {
+    return null
+  }
 }
 
 function newDraft(): DraftSubpost {
@@ -132,6 +149,17 @@ export function ComposeOverlay({
   )
   const [currentIdx, setCurrentIdx] = useState(0)
   const [showPreview, setShowPreview] = useState(false)
+  // Satoshi audit 2026-05-19: upload_endpoint customizado é invisível
+  // no compose flow. Adversário com 5min de acesso ao device pode setar
+  // endpoint malicioso em Settings > Soberania; user manda foto pro
+  // servidor adversário sem perceber. Badge visible-when-custom torna
+  // tampering DETECTÁVEL (defesa via visibilidade, manifesto §28).
+  const customUploadEndpoint = usePrefsStore((s) => s.upload_endpoint)
+  const hasCustomUpload = !!customUploadEndpoint
+  const customUploadHost = hasCustomUpload
+    ? safeHost(customUploadEndpoint)
+    : null
+  const hasAnyImage = drafts.some((d) => d.imageUrl !== null)
 
   // Clamp idx — pode acontecer ao remover subpost.
   const safeIdx = Math.max(0, Math.min(currentIdx, drafts.length - 1))
@@ -287,6 +315,32 @@ export function ComposeOverlay({
       escDismissible={!publishing}
     >
       <div className="flex h-full flex-col">
+        {/* Satoshi audit 2026-05-19: badge warning quando upload_endpoint
+            customizado E user tem foto pra publicar. Defesa via
+            visibilidade — adversário não consegue mais setar endpoint
+            malicioso silenciosamente. Não bloqueia publicação (user
+            consciente que setou pode prosseguir); só TORNA EVIDENTE. */}
+        {hasCustomUpload && hasAnyImage && customUploadHost && (
+          <div
+            role="alert"
+            className="flex shrink-0 items-start gap-2 border-b border-drift-warning/50 bg-drift-warning/15 px-4 py-3 text-drift-warning"
+          >
+            <span aria-hidden="true" className="mt-0.5 shrink-0">
+              <WarningIcon size={14} strokeWidth={2} />
+            </span>
+            <p className="font-mono text-[11px] leading-relaxed">
+              <span className="font-bold uppercase tracking-meta">
+                upload customizado:{' '}
+              </span>
+              imagens vão pra{' '}
+              <code className="font-mono text-drift-text">
+                {customUploadHost}
+              </code>
+              {' '}(setado em Soberania). Se você não configurou isso, alguém
+              alterou — desative em Soberania &gt; endpoint de upload &gt; limpar.
+            </p>
+          </div>
+        )}
         {/* csub dots row (mockup .cr-tabs) — numbered circles per subpost
             + dashed add button. Scroll-x se muitos subposts (defensive
             anti-overflow em mobile). */}
