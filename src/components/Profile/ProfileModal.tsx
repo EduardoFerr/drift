@@ -169,7 +169,7 @@ export function ProfileModal({ identity, onClose }: ProfileModalProps) {
                   <div className="font-mono text-[12px] text-drift-accent2">
                     {metadata.nip05}
                   </div>
-                  <p className="mt-0.5 font-mono text-[10px] text-drift-muted/30">
+                  <p className="mt-0.5 font-mono text-[10px] text-drift-muted/60">
                     claim não verificado pelo Drift — outros clientes podem checar
                   </p>
                 </div>
@@ -246,7 +246,7 @@ export function ProfileModal({ identity, onClose }: ProfileModalProps) {
                 <Row label="max subposts" value={String(userWeight.maxSubposts)} />
               </div>
             </div>
-            <p className="px-1 font-mono text-[10px] leading-relaxed text-drift-muted/30">
+            <p className="px-1 font-mono text-[10px] leading-relaxed text-drift-muted/60">
               peso é função pura de antiquidade + spreads recebidos (§22).
               qualquer cliente drift calcula o mesmo.
             </p>
@@ -264,7 +264,7 @@ export function ProfileModal({ identity, onClose }: ProfileModalProps) {
           </div>
         </Collapse>
 
-        <p className="px-2 pt-2 font-mono text-[10px] leading-relaxed text-drift-muted/30">
+        <p className="px-2 pt-2 font-mono text-[10px] leading-relaxed text-drift-muted/60">
           §22 — score determinístico. esses números vêm de eventos públicos;
           qualquer cliente drift calcula os mesmos.
         </p>

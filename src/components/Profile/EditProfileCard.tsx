@@ -221,7 +221,7 @@ export function EditProfileCard({ currentMetadata, onClose }: EditProfileCardPro
             >
               ↻ resetar perfil (voltar ao anônimo)
             </button>
-            <p className="mt-2 px-1 font-mono text-[10px] leading-relaxed text-drift-muted/30">
+            <p className="mt-2 px-1 font-mono text-[10px] leading-relaxed text-drift-muted/60">
               publica kind 0 vazio. clientes que respeitam LWW consideram esse como autoritativo.
             </p>
           </div>
@@ -248,7 +248,7 @@ function Field({
         <span className="font-mono text-[10px] uppercase tracking-meta text-drift-muted/50">
           {label}
         </span>
-        <span className="font-mono text-[10px] text-drift-muted/30">{hint}</span>
+        <span className="font-mono text-[10px] text-drift-muted/60">{hint}</span>
       </div>
       {children}
       {error && (

@@ -159,7 +159,7 @@ export function RelaySettings({ onClose }: RelaySettingsProps) {
         />
         <Collapse open={openSection === 0}>
           <div className="space-y-3">
-            <p className="px-1 font-mono text-[10px] text-drift-muted/30">
+            <p className="px-1 font-mono text-[10px] text-drift-muted/60">
               relays intercambiáveis. remover um não tira você da rede.
             </p>
 
@@ -289,7 +289,7 @@ export function RelaySettings({ onClose }: RelaySettingsProps) {
         />
         <Collapse open={openSection === 2}>
           <div className="space-y-3">
-            <p className="px-1 font-mono text-[10px] text-drift-muted/30">
+            <p className="px-1 font-mono text-[10px] text-drift-muted/60">
               descobrir relays de outro user ou publicar a sua lista.
             </p>
             <div className="space-y-2 pl-3">

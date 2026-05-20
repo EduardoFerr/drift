@@ -245,7 +245,7 @@ function AboutCardLayer({ onClose }: { onClose: () => void }) {
         />
         <Collapse open={openSection === 0}>
           <div className="space-y-3">
-            <p className="px-1 font-mono text-[10px] text-drift-muted/30">
+            <p className="px-1 font-mono text-[10px] text-drift-muted/60">
               drift é descentralizado sobre nostr. 34 princípios públicos definem o que o cliente pode e não pode fazer.
             </p>
             <div className="space-y-2 pl-3">
@@ -276,7 +276,7 @@ function AboutCardLayer({ onClose }: { onClose: () => void }) {
           onToggle={() => toggle(1)}
         />
         <Collapse open={openSection === 1}>
-          <p className="px-1 font-mono text-[10px] leading-relaxed text-drift-muted/30">
+          <p className="px-1 font-mono text-[10px] leading-relaxed text-drift-muted/60">
             eventos imutáveis assinados (kinds 9078–9081). score determinístico. identidade portável via nsec1. PWA + tauri opcional.
           </p>
         </Collapse>
@@ -289,7 +289,7 @@ function AboutCardLayer({ onClose }: { onClose: () => void }) {
         />
         <Collapse open={openSection === 2}>
           <div className="space-y-3">
-            <p className="px-1 font-mono text-[10px] leading-relaxed text-drift-muted/30">
+            <p className="px-1 font-mono text-[10px] leading-relaxed text-drift-muted/60">
               se você dispensou o aviso de nova versão, pode aplicar a atualização aqui. fixes de segurança e novas features ficam pendentes até reload do service worker (manifesto §17 — sem update silencioso).
             </p>
             <div className="pl-3">
@@ -306,7 +306,7 @@ function AboutCardLayer({ onClose }: { onClose: () => void }) {
         />
         <Collapse open={openSection === 3}>
           <div className="space-y-3">
-            <p className="px-1 font-mono text-[10px] leading-relaxed text-drift-muted/30">
+            <p className="px-1 font-mono text-[10px] leading-relaxed text-drift-muted/60">
               se algum painel ficou preso em 'erro ao carregar', limpa todos os caches do service worker e recarrega. mais agressivo que atualizar versão.
             </p>
             <div className="pl-3">
@@ -2287,7 +2287,7 @@ function SettingsRoot({ onClose }: { onClose: () => void }) {
           )
         })}
 
-        <p className="px-2 pt-2 font-mono text-[10px] leading-relaxed text-drift-muted/30">
+        <p className="px-2 pt-2 font-mono text-[10px] leading-relaxed text-drift-muted/60">
           algumas alterações podem exigir reinicialização do app.
         </p>
       </div>
@@ -2742,7 +2742,7 @@ function DiagnosticPanel({ boot }: { boot: BootState }) {
   const relaysTotal = boot.relays?.length ?? '?'
   return (
     <div className="space-y-3">
-      <p className="px-1 font-mono text-[10px] text-drift-muted/30">
+      <p className="px-1 font-mono text-[10px] text-drift-muted/60">
         estado em tempo real. use os botões se UI parecer stale.
       </p>
 

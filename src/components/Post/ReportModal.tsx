@@ -91,7 +91,7 @@ export function ReportModal({ post, pending, onSubmit, onClose }: ReportModalPro
         {!confirmStep && (
           <>
             <SectionHeader title="motivo" />
-            <p className="px-1 font-mono text-[10px] text-drift-muted/30">
+            <p className="px-1 font-mono text-[10px] text-drift-muted/60">
               reports são públicos e assinados. ao atingir threshold, post some do feed default.
             </p>
 

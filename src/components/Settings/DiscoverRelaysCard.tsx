@@ -303,7 +303,7 @@ function RelayDetailModal({
         </div>
 
         <SectionHeader title="NIP-11" />
-        <p className="px-1 font-mono text-[10px] text-drift-muted/30">
+        <p className="px-1 font-mono text-[10px] text-drift-muted/60">
           metadata declarada pelo relay (atualizada a cada 24h).
         </p>
 
@@ -323,7 +323,7 @@ function RelayDetailModal({
         {entry.onion && (
           <>
             <SectionHeader title="onion mirror" />
-            <p className="px-1 font-mono text-[10px] text-drift-muted/30">
+            <p className="px-1 font-mono text-[10px] text-drift-muted/60">
               acessível via Tor (precisa `network_mode=tor` no Drift).
             </p>
             <div className="rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3 font-mono text-[10px] text-drift-muted/60 break-all">

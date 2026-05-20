@@ -44,7 +44,7 @@ export function AppearanceCard({ onClose }: CardProps) {
     <FullPageCard onClose={onClose} title="aparência" ariaLabel="aparência — temas">
       <div className="space-y-3 px-4 py-5">
         <SectionHeader title="tema visual" />
-        <p className="px-1 font-mono text-[10px] leading-relaxed text-drift-muted/30">
+        <p className="px-1 font-mono text-[10px] leading-relaxed text-drift-muted/60">
           decisão local — não vai pra rede, não muda como outros usuários veem você.
         </p>
 
