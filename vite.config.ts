@@ -111,7 +111,40 @@ export default defineConfig(async (): Promise<UserConfig> => ({
         ],
         // Defesa: SQLite WASM ainda é grande (~860KB). Mantém limite generoso.
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+        // HIMYM 2026-05-20 (Ted/Barney/Robin convergência): SW root fix
+        // PARTE NÃO-POLÍTICA — limpa precache obsoleto + NetworkFirst pra
+        // navigation. Mantém `registerType: 'prompt'` intocado (§17
+        // preservado). Resolve "user vê HTML stale após deploy Vercel
+        // novo" sem flippar autoUpdate.
+        //
+        // `cleanupOutdatedCaches: true` — quando SW ativa (após user
+        // clicar "atualizar" no prompt), apaga precache antigo. Antes:
+        // entry chunks com hash antigo ficavam no Cache Storage
+        // indefinidamente. Adversário/bug poderia servir versão antiga
+        // mesmo após user "atualizar". Agora SW novo = precache limpo.
+        cleanupOutdatedCaches: true,
+        // `navigateFallback` + `navigateFallbackDenylist`: SW responde
+        // a navigation requests com NetworkFirst (tenta fresh, fallback
+        // cache). Sem isso, precache stale do index.html servia chunks
+        // antigos via cache. Com NetworkFirst, sempre tenta novo —
+        // só usa cache se OFFLINE.
+        navigateFallback: '/index.html',
+        navigateFallbackDenylist: [/^\/api\//, /^\/_/],
         runtimeCaching: [
+          {
+            // Navigation requests (HTML): NetworkFirst — sempre tenta
+            // fresh do server. Cache só usado offline ou se network
+            // demora >3s. Resolve o bug 'HTML stale aponta pra chunks
+            // antigos que sumiram após deploy'.
+            urlPattern: ({ request }: { request: Request }) =>
+              request.mode === 'navigate',
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'pages',
+              networkTimeoutSeconds: 3,
+              expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 },
+            },
+          },
           {
             // Lazy chunks do mapa + Track B (helia/libp2p): cacheia ao
             // primeiro uso, mantém indefinidamente.

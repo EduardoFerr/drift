@@ -263,26 +263,29 @@ Plano Ted HIMYM 2026-05-17 (analysis registrada em commit do PR1 [c823e8f]).
   quando for prioridade. Não-urgente — bug visível foi resolvido nos
   3 cards onde user reportou.
 
-- [ ] **PWA SW serve HTML stale após deploy Vercel novo** — causa raiz
-  do bug user reportou 2026-05-17. Cenário: deploy gera hashes novos
-  (`assets/passkey-Xxxxx.js`); SW antigo do user continua servindo
-  `index.html` cacheado que referencia hashes antigos; Vercel SPA
-  fallback devolve NOVO `index.html` (text/html) na request do JS
-  antigo → "Expected JavaScript module but server responded with MIME
-  type text/html". Bootstrap fail em `identity` (passkey é lazy chunk
-  da etapa 3).
-  Recuperação imediata shipada em [2f453a8]: ambos botões do
-  error screen + novo "↻ forçar atualização" desregistram SW + limpam
-  Cache API antes do reload.
-  Fix de causa raiz pendente: SW config (vite.config.ts workbox)
-  precisa (a) `cleanupOutdatedCaches: true`, (b) NetworkFirst pra
-  navigation requests, (c) revisar `registerType: 'prompt'` vs
-  manifesto §17 (autoUpdate é "chave mestra disfarçada"). Decisão
-  política: aceitar que user precisa clicar "atualizar" no prompt e
-  documentar workaround quando ignora — ou flexibilizar §17 interp
-  pra silent SW update?
-  Bloqueio: deliberação HIMYM (Ted SW config + Barney threat-model
-  silent update vs §17 + Lily UX prompt flow).
+- [~] **PWA SW serve HTML stale após deploy Vercel novo** — fix em 2
+  partes:
+  - **Parte NÃO-política (fechada em [PENDING-fix])**: Workbox config
+    ganha `cleanupOutdatedCaches: true` + `navigateFallback: '/index.
+    html'` + NetworkFirst pra navigation requests (timeout 3s). Quando
+    SW novo ativa, precache antigo é limpo (sem chunks órfãos). HTML
+    sempre tenta fresh do server, cache só usado offline. `register-
+    Type: 'prompt'` intocado — user continua clicando "atualizar"
+    explícito (§17 preservado). HIMYM convergência: Ted/Barney/Robin
+    aprovaram, Lily neutral, Satoshi positivo (stale precache era
+    attack surface mínima).
+  - **Parte política (ainda aberta)**: decisão `registerType: 'prompt'`
+    vs `'autoUpdate'`. Hoje user clica "atualizar" no banner; com
+    autoUpdate, SW troca silenciosamente. Trade-off:
+    - prompt = §17 forte (user consent), mas pode ignorar prompt e
+      ficar em versão antiga indefinidamente
+    - autoUpdate = sempre fresh, mas "chave mestra disfarçada" — quem
+      controla deploy pode pushar JS arbitrário sem user perceber
+    Bloqueio: decisão sua. Status quo (prompt) continua funcional
+    porque a parte não-política reduz drasticamente o impacto de
+    stale precache.
+  - Recuperação imediata (botões "forçar atualização" no error
+    screen) continua disponível em [2f453a8].
 
 
 
