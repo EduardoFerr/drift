@@ -209,32 +209,36 @@ Plano Ted HIMYM 2026-05-17 (analysis registrada em commit do PR1 [c823e8f]).
   - Bloqueio: NÃO urgente. Phase futura quando lidando com PR3
     hint engine (que vai depender de dismissed bag).
 
-- [ ] **Settings/menus — friction audit + framework** — user report
-  2026-05-18: "a maior parte dos menus e configurações um usuário
-  comum não sabe do que se trata, do impacto que a configuração tem,
-  ou outras mais avançadas não dá para ele saber como configurar".
-  Audit inline em `Docs/sessions/settings-friction-audit-2026-05-18.md`
-  (Lily agent dispatch falhou por usage limit, audit feito manualmente).
-  6 padrões transversais identificados:
-    1. Hint text `text-drift-muted/30` invisível em Velatura
-    2. Jargão protocol-level (kind/NIP/OPFS/SAB) vazando pra UI
-    3. Tooltips só desktop (`title=`) — mobile não vê
-    4. Hints descrevem setting mas não IMPACTO observável
-    5. Defaults sem justificativa
-    6. Reversibilidade não comunicada
-  Gold standard existente: SuaLenteCard (label dinâmico + helper text
-  + exemplo concreto + manifesto ref + CTA teste).
-  Top 10 friction points priorizados no doc.
-  Approach proposto: primitive `<SettingExplainer>` reutilizável com
-  props {label, description, impact, defaultExplained, reversible,
-  level='basic'|'advanced'} + LOCK_VIA_TEST conformance + glossário
-  centralizado (kind/relay/NIP traduzidos).
-  Bloqueio: HIMYM dedicado quando usage limit liberar — Marshall
-  (spec primitive + LOCK), Lily (copy guidelines plain language),
-  Robin (glossário), Ted (level=advanced gate), Barney (warnings
-  destrutivos antecipados).
-  Phase 1 fix: primitive + refactor top 10 cards. Sem libs externas
-  (regra user 2026-05-17).
+- [x] **Settings/menus — friction audit + framework completo** —
+  audit em `Docs/sessions/settings-friction-audit-2026-05-18.md`.
+  Shipado em 5 commits (Phase 1+2+3+5+6):
+  - [45cd93f] Phase 1: SettingExplainer primitive + 3 cards
+  - [0350ac8] Phase 2: refactor restantes 6 cards (allowlist zerado)
+  - [e27a3f4] Phase 3: level=advanced gate + AdvancedToggle (depois
+    substituído na Phase 6)
+  - [8468518] Phase 4: AccordionGroup primitive + 4 cards
+  - [ca96ed8] Phase 6: Menu Detalhado com 4 flags granulares
+    (substitui binário advanced) + MenuDetailCard
+  - [343a736] Phase 6.1: 5ª flag (labels ActionsFan)
+  Resultado: 24 conformance tests + 9 cards refatorados. Gold standard
+  pattern SuaLenteCard replicado em todos via primitive.
+
+- [x] **AccordionGroup primitive (Ted HIMYM)** — shipado em [8468518].
+  React Context com accordionId semântico; reusa Collapse +
+  ChevronDownIcon. SettingExplainer ganha branch in-group vs standalone.
+  4 cards Settings multi-explainer integrados (Filters/Diag/Sov/Peers).
+
+- [x] **SuaLenteCard polish (Lily HIMYM)** — shipado em [b597301]. P0
+  track fill + P1 label demote + P2 dots clicáveis + P3 collapse
+  "como funciona" + P4 remove inner card.
+
+- [x] **Bootstrap first-load UI freeze (Barney+Robin HIMYM)** —
+  Hipótese #1 [3a0332f] auto-finish quando rules vazio +
+  Hipótese #2 [2b344d0] HomeEmpty skeleton durante !feedLoaded.
+
+- [x] **Upload endpoint badge (Satoshi audit)** — shipado em [2e9fa75].
+  ComposeOverlay mostra warning quando upload_endpoint customizado +
+  hasAnyImage. Defesa via visibilidade contra pre-poisoned device.
 
 - [ ] **Radio-group active state invisível em Velatura (light theme)** —
   user report 2026-05-18 com screenshot: LocationCard granularidade
