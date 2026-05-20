@@ -123,40 +123,61 @@ describe('Settings cards refatorados — usam o primitive', () => {
   })
 })
 
-describe('SettingExplainer — Phase 3 advanced gate', () => {
-  it('checa user_prefs.show_advanced_settings via usePrefsStore', () => {
-    expect(PRIMITIVE_SRC).toMatch(
-      /usePrefsStore.*show_advanced_settings/s,
-    )
+describe('SettingExplainer — Phase 6 menu detalhado (4 flags granulares)', () => {
+  it('consome 2 flags via usePrefsStore: show_details + show_manifesto', () => {
+    expect(PRIMITIVE_SRC).toMatch(/menu_detail_show_details/)
+    expect(PRIMITIVE_SRC).toMatch(/menu_detail_show_manifesto/)
   })
 
-  it("retorna null quando level='advanced' && !showAdvanced", () => {
+  it('NÃO tem mais level=advanced gating (Phase 6 pivot removeu)', () => {
     const stripped = PRIMITIVE_SRC.replace(/\/\*[\s\S]*?\*\//g, '').replace(
       /^\s*\/\/.*$/gm,
       '',
     )
-    // Check that there's a guard clause
-    expect(stripped).toMatch(/level === 'advanced'/)
-    expect(stripped).toMatch(/!showAdvanced/)
-    expect(stripped).toMatch(/return null/)
+    // Guard 'if (level === advanced && !showAdvanced) return null' removido
+    expect(stripped).not.toMatch(/level === 'advanced'.*return null/s)
+    // level prop ainda existe como visual badge (não gating)
+    expect(stripped).toMatch(/level === 'advanced'/) // pra badge
   })
 
-  it('UserPrefs schema tem show_advanced_settings boolean', () => {
+  it('UserPrefs schema tem 4 flags menu_detail_show_*', () => {
     const driftTypes = readFileSync('src/types/drift.ts', 'utf8')
-    expect(driftTypes).toMatch(/show_advanced_settings:\s*boolean/)
-    // Default false (novice user padrão)
-    expect(driftTypes).toMatch(/show_advanced_settings:\s*false/)
+    expect(driftTypes).toMatch(/menu_detail_show_details:\s*boolean/)
+    expect(driftTypes).toMatch(/menu_detail_show_manifesto:\s*boolean/)
+    expect(driftTypes).toMatch(/menu_detail_show_how_it_works:\s*boolean/)
+    expect(driftTypes).toMatch(/menu_detail_show_algorithm:\s*boolean/)
+    // Defaults: details ON, outros OFF
+    expect(driftTypes).toMatch(/menu_detail_show_details:\s*true/)
+    expect(driftTypes).toMatch(/menu_detail_show_manifesto:\s*false/)
+    expect(driftTypes).toMatch(/menu_detail_show_how_it_works:\s*false/)
+    expect(driftTypes).toMatch(/menu_detail_show_algorithm:\s*false/)
   })
 
-  it('prefs.ts deserializa show_advanced_settings', () => {
+  it('prefs.ts deserializa todos 4 menu_detail flags', () => {
     const prefsSrc = readFileSync('src/lib/prefs.ts', 'utf8')
-    expect(prefsSrc).toMatch(/case 'show_advanced_settings'/)
+    expect(prefsSrc).toMatch(/case 'menu_detail_show_details'/)
+    expect(prefsSrc).toMatch(/case 'menu_detail_show_manifesto'/)
+    expect(prefsSrc).toMatch(/case 'menu_detail_show_how_it_works'/)
+    expect(prefsSrc).toMatch(/case 'menu_detail_show_algorithm'/)
   })
 
-  it('App.tsx tem AdvancedToggle component no topo de SettingsRoot', () => {
+  it('SettingsCards.tsx tem MenuDetailCard exportado', () => {
+    expect(CARDS_SRC).toMatch(/export\s+function\s+MenuDetailCard/)
+    // 4 SettingExplainer dentro do MenuDetailCard
+    const cardMatch = CARDS_SRC.match(
+      /export\s+function\s+MenuDetailCard[\s\S]*?(?=\nexport\s+function|$)/,
+    )
+    expect(cardMatch).not.toBeNull()
+    const explainers = (cardMatch![0].match(/<SettingExplainer/g) ?? []).length
+    expect(explainers).toBe(4)
+  })
+
+  it("App.tsx NÃO tem mais AdvancedToggle (Phase 6 substitui por menu-detalhado entry)", () => {
     const appSrc = readFileSync('src/App.tsx', 'utf8')
-    expect(appSrc).toMatch(/function AdvancedToggle/)
-    expect(appSrc).toMatch(/<AdvancedToggle\s*\/>/)
+    expect(appSrc).not.toMatch(/function AdvancedToggle/)
+    expect(appSrc).not.toMatch(/<AdvancedToggle\s*\/>/)
+    // Em vez disso tem entry 'menu-detalhado' no SettingsTarget
+    expect(appSrc).toMatch(/'menu-detalhado'/)
   })
 })
 

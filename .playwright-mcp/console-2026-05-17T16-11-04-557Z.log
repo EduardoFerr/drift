@@ -1,0 +1,112 @@
+[  139819ms] [INFO] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold @ https://localhost:5173/node_modules/.vite/deps/chunk-RPCDYKBN.js?v=3a4f2608:21550
+[  139973ms] [LOG] [db] criando worker SQLite… @ https://localhost:5173/src/lib/db.ts:19
+[  140146ms] [INFO] Banner not shown: beforeinstallpromptevent.preventDefault() called. The page must call beforeinstallpromptevent.prompt() to show the banner. @ https://localhost:5173/:0
+[  140588ms] [LOG] [db.worker] chamando sqlite3InitModule… @ https://localhost:5173/src/lib/db.ts:32
+[  140722ms] [LOG] [db.worker] módulo carregado · versão 3.52.0 @ https://localhost:5173/src/lib/db.ts:32
+[  140722ms] [LOG] [db.worker] OPFS disponível: true @ https://localhost:5173/src/lib/db.ts:32
+[  140722ms] [LOG] [db.worker] abrindo /drift.db via OpfsDb (persistente)… @ https://localhost:5173/src/lib/db.ts:32
+[  140764ms] [LOG] [db.worker] banco aberto (modo: opfs) · executando schema… @ https://localhost:5173/src/lib/db.ts:32
+[  143024ms] [LOG] [db.worker] schema aplicado com sucesso @ https://localhost:5173/src/lib/db.ts:32
+[  143033ms] [LOG] [db.worker] migração add_content_warning_to_posts já estava aplicada (skip) @ https://localhost:5173/src/lib/db.ts:32
+[  143041ms] [LOG] [db.worker] migração add_reason_to_reports já estava aplicada (skip) @ https://localhost:5173/src/lib/db.ts:32
+[  143078ms] [LOG] [db.worker] migração add_imported_to_identities já estava aplicada (skip) @ https://localhost:5173/src/lib/db.ts:32
+[  143088ms] [LOG] [db.worker] migração add_last_err_to_relays_user já estava aplicada (skip) @ https://localhost:5173/src/lib/db.ts:32
+[  143123ms] [LOG] [db.worker] migração add_raw_event_to_posts já estava aplicada (skip) @ https://localhost:5173/src/lib/db.ts:32
+[  143129ms] [LOG] [db.worker] migração add_raw_event_to_spreads já estava aplicada (skip) @ https://localhost:5173/src/lib/db.ts:32
+[  143139ms] [LOG] [db.worker] migração add_raw_event_to_buries já estava aplicada (skip) @ https://localhost:5173/src/lib/db.ts:32
+[  143144ms] [LOG] [db.worker] migração add_location_to_spreads já estava aplicada (skip) @ https://localhost:5173/src/lib/db.ts:32
+[  143150ms] [LOG] [db.worker] migração add_content_warning_to_comments já estava aplicada (skip) @ https://localhost:5173/src/lib/db.ts:32
+[  143155ms] [LOG] [db.worker] migração add_consecutive_fails_to_relays_user já estava aplicada (skip) @ https://localhost:5173/src/lib/db.ts:32
+[  143160ms] [LOG] [db.worker] migração add_demoted_until_to_relays_user já estava aplicada (skip) @ https://localhost:5173/src/lib/db.ts:32
+[  143165ms] [LOG] [db.worker] migração add_last_err_at_to_relays_user já estava aplicada (skip) @ https://localhost:5173/src/lib/db.ts:32
+[  143170ms] [LOG] [db.worker] migração add_kind_to_reports já estava aplicada (skip) @ https://localhost:5173/src/lib/db.ts:32
+[  143176ms] [LOG] [db.worker] migração identity → identities concluída (ou já feita) @ https://localhost:5173/src/lib/db.ts:32
+[  143181ms] [LOG] [db.worker] schema_v=0 < 6 — rebuild de domínio (posts.id UUID → event.id hex) @ https://localhost:5173/src/lib/db.ts:32
+[  143181ms] [LOG] [db.worker] reconstruindo schema de domínio (preserva identity + user_prefs)… @ https://localhost:5173/src/lib/db.ts:32
+[  147265ms] [LOG] [db.worker] schema de domínio reconstruído com sucesso @ https://localhost:5173/src/lib/db.ts:32
+[  147266ms] [LOG] [db.worker] schema_v=0 < 7 — criando peers_known (Fase 6.2) @ https://localhost:5173/src/lib/db.ts:32
+[  147286ms] [LOG] [db.worker] schema_v=0 < 8 — criando comments (Track C.1) @ https://localhost:5173/src/lib/db.ts:32
+[  148173ms] [INFO] [webrtc] signaling booted (mock) — peerId: 07edfbdd @ https://localhost:5173/src/lib/transport/webrtc/boot.ts:76
+[  154794ms] [ERROR] An SSL certificate error occurred when fetching the script. @ :0
+[  154796ms] [WARNING] [UpdatePrompt] SW register failed: SecurityError: Failed to register a ServiceWorker for scope ('https://localhost:5173/') with script ('https://localhost:5173/dev-sw.js?dev-sw'): An SSL certificate error occurred when fetching the script. @ https://localhost:5173/src/components/UI/UpdatePrompt.tsx:43
+[  154798ms] [WARNING] [UpdatePrompt] SW register failed: SecurityError: Failed to register a ServiceWorker for scope ('https://localhost:5173/') with script ('https://localhost:5173/dev-sw.js?dev-sw'): An SSL certificate error occurred when fetching the script. @ https://localhost:5173/src/components/UI/UpdatePrompt.tsx:43
+[  169376ms] [ERROR] WebSocket connection to 'wss://relay.nostr.band/' failed: Error in connection establishment: net::ERR_CONNECTION_TIMED_OUT @ https://localhost:5173/node_modules/.vite/deps/nostr-tools_pool.js?v=fd9bd3a5:287
+[  178897ms] [ERROR] WebSocket is already in CLOSING or CLOSED state. @ https://localhost:5173/node_modules/.vite/deps/nostr-tools_pool.js?v=fd9bd3a5:386
+[  178898ms] [ERROR] WebSocket is already in CLOSING or CLOSED state. @ https://localhost:5173/node_modules/.vite/deps/nostr-tools_pool.js?v=fd9bd3a5:386
+[  179302ms] [INFO] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold @ https://localhost:5173/node_modules/.vite/deps/chunk-RPCDYKBN.js?v=3a4f2608:21550
+[  179363ms] [LOG] [db] criando worker SQLite… @ https://localhost:5173/src/lib/db.ts:19
+[  179461ms] [INFO] Banner not shown: beforeinstallpromptevent.preventDefault() called. The page must call beforeinstallpromptevent.prompt() to show the banner. @ https://localhost:5173/:0
+[  179813ms] [LOG] [db.worker] chamando sqlite3InitModule… @ https://localhost:5173/src/lib/db.ts:32
+[  179930ms] [LOG] [db.worker] módulo carregado · versão 3.52.0 @ https://localhost:5173/src/lib/db.ts:32
+[  179930ms] [LOG] [db.worker] OPFS disponível: true @ https://localhost:5173/src/lib/db.ts:32
+[  179930ms] [LOG] [db.worker] abrindo /drift.db via OpfsDb (persistente)… @ https://localhost:5173/src/lib/db.ts:32
+[  181794ms] [LOG] [db.worker] banco aberto (modo: opfs) · executando schema… @ https://localhost:5173/src/lib/db.ts:32
+[  182265ms] [LOG] [db.worker] schema aplicado com sucesso @ https://localhost:5173/src/lib/db.ts:32
+[  182278ms] [LOG] [db.worker] migração add_content_warning_to_posts já estava aplicada (skip) @ https://localhost:5173/src/lib/db.ts:32
+[  182299ms] [LOG] [db.worker] migração add_reason_to_reports já estava aplicada (skip) @ https://localhost:5173/src/lib/db.ts:32
+[  182310ms] [LOG] [db.worker] migração add_imported_to_identities já estava aplicada (skip) @ https://localhost:5173/src/lib/db.ts:32
+[  182321ms] [LOG] [db.worker] migração add_last_err_to_relays_user já estava aplicada (skip) @ https://localhost:5173/src/lib/db.ts:32
+[  182333ms] [LOG] [db.worker] migração add_raw_event_to_posts já estava aplicada (skip) @ https://localhost:5173/src/lib/db.ts:32
+[  182344ms] [LOG] [db.worker] migração add_raw_event_to_spreads já estava aplicada (skip) @ https://localhost:5173/src/lib/db.ts:32
+[  182355ms] [LOG] [db.worker] migração add_raw_event_to_buries já estava aplicada (skip) @ https://localhost:5173/src/lib/db.ts:32
+[  182366ms] [LOG] [db.worker] migração add_location_to_spreads já estava aplicada (skip) @ https://localhost:5173/src/lib/db.ts:32
+[  182378ms] [LOG] [db.worker] migração add_content_warning_to_comments já estava aplicada (skip) @ https://localhost:5173/src/lib/db.ts:32
+[  182389ms] [LOG] [db.worker] migração add_consecutive_fails_to_relays_user já estava aplicada (skip) @ https://localhost:5173/src/lib/db.ts:32
+[  182401ms] [LOG] [db.worker] migração add_demoted_until_to_relays_user já estava aplicada (skip) @ https://localhost:5173/src/lib/db.ts:32
+[  182414ms] [LOG] [db.worker] migração add_last_err_at_to_relays_user já estava aplicada (skip) @ https://localhost:5173/src/lib/db.ts:32
+[  182426ms] [LOG] [db.worker] migração add_kind_to_reports já estava aplicada (skip) @ https://localhost:5173/src/lib/db.ts:32
+[  182505ms] [LOG] [db.worker] migração identity → identities concluída (ou já feita) @ https://localhost:5173/src/lib/db.ts:32
+[  182768ms] [ERROR] An SSL certificate error occurred when fetching the script. @ :0
+[  182769ms] [WARNING] [UpdatePrompt] SW register failed: SecurityError: Failed to register a ServiceWorker for scope ('https://localhost:5173/') with script ('https://localhost:5173/dev-sw.js?dev-sw'): An SSL certificate error occurred when fetching the script. @ https://localhost:5173/src/components/UI/UpdatePrompt.tsx:43
+[  182770ms] [WARNING] [UpdatePrompt] SW register failed: SecurityError: Failed to register a ServiceWorker for scope ('https://localhost:5173/') with script ('https://localhost:5173/dev-sw.js?dev-sw'): An SSL certificate error occurred when fetching the script. @ https://localhost:5173/src/components/UI/UpdatePrompt.tsx:43
+[  182829ms] [INFO] [webrtc] signaling booted (mock) — peerId: aeee0612 @ https://localhost:5173/src/lib/transport/webrtc/boot.ts:76
+[  183342ms] [ERROR] WebSocket connection to 'wss://relay.damus.io/' failed: Error during WebSocket handshake: Unexpected response code: 503 @ https://localhost:5173/node_modules/.vite/deps/nostr-tools_pool.js?v=fd9bd3a5:287
+[  203868ms] [ERROR] WebSocket connection to 'wss://relay.nostr.band/' failed: Error in connection establishment: net::ERR_CONNECTION_TIMED_OUT @ https://localhost:5173/node_modules/.vite/deps/nostr-tools_pool.js?v=fd9bd3a5:287
+[  217691ms] Error: rate-limited: you are noting too much
+    at AbstractRelay._onmessage (https://localhost:5173/node_modules/.vite/deps/nostr-tools_pool.js?v=fd9bd3a5:541:25)
+[  219902ms] [WARNING] [Image] fetch via blobs falhou, fallback pra src direto: BlobError: nenhuma rota retornou bytes válidos (dweb.link: signal is aborted without reason; w3s.link: signal is aborted without reason; ipfs.io: signal is aborted without reason)
+    at fetchBlob (https://localhost:5173/src/lib/blobs.ts:120:9)
+    at async fetchBlobUrl (https://localhost:5173/src/lib/blobs.ts:129:17)
+    at async https://localhost:5173/src/components/UI/Image.tsx:59:21 @ https://localhost:5173/src/components/UI/Image.tsx:61
+[  219936ms] [WARNING] [Image] fetch via blobs falhou, fallback pra src direto: BlobError: nenhuma rota retornou bytes válidos (dweb.link: signal is aborted without reason; w3s.link: signal is aborted without reason; ipfs.io: signal is aborted without reason)
+    at fetchBlob (https://localhost:5173/src/lib/blobs.ts:120:9)
+    at async fetchBlobUrl (https://localhost:5173/src/lib/blobs.ts:129:17)
+    at async https://localhost:5173/src/components/UI/Image.tsx:59:21 @ https://localhost:5173/src/components/UI/Image.tsx:61
+[  221340ms] Error: rate-limited: you are noting too much
+    at AbstractRelay._onmessage (https://localhost:5173/node_modules/.vite/deps/nostr-tools_pool.js?v=fd9bd3a5:541:25)
+[  222756ms] [WARNING] [Image] fetch via blobs falhou, fallback pra src direto: BlobError: nenhuma rota retornou bytes válidos (dweb.link: signal is aborted without reason; w3s.link: signal is aborted without reason; ipfs.io: signal is aborted without reason)
+    at fetchBlob (https://localhost:5173/src/lib/blobs.ts:120:9)
+    at async fetchBlobUrl (https://localhost:5173/src/lib/blobs.ts:129:17)
+    at async https://localhost:5173/src/components/UI/Image.tsx:59:21 @ https://localhost:5173/src/components/UI/Image.tsx:61
+[  223990ms] Error: rate-limited: you are noting too much
+    at AbstractRelay._onmessage (https://localhost:5173/node_modules/.vite/deps/nostr-tools_pool.js?v=fd9bd3a5:541:25)
+[  224398ms] [WARNING] [Image] fetch via blobs falhou, fallback pra src direto: BlobError: meta sem url nem cid
+    at fetchBlob (https://localhost:5173/src/lib/blobs.ts:86:11)
+    at fetchBlobUrl (https://localhost:5173/src/lib/blobs.ts:129:23)
+    at https://localhost:5173/src/components/UI/Image.tsx:59:27 @ https://localhost:5173/src/components/UI/Image.tsx:61
+[  224399ms] [WARNING] [Image] fetch via blobs falhou, fallback pra src direto: BlobError: meta sem url nem cid
+    at fetchBlob (https://localhost:5173/src/lib/blobs.ts:86:11)
+    at fetchBlobUrl (https://localhost:5173/src/lib/blobs.ts:129:23)
+    at https://localhost:5173/src/components/UI/Image.tsx:59:27 @ https://localhost:5173/src/components/UI/Image.tsx:61
+[  224909ms] [WARNING] [Image] fetch via blobs falhou, fallback pra src direto: BlobError: nenhuma rota retornou bytes válidos (dweb.link: signal is aborted without reason; w3s.link: signal is aborted without reason; ipfs.io: signal is aborted without reason)
+    at fetchBlob (https://localhost:5173/src/lib/blobs.ts:120:9)
+    at async fetchBlobUrl (https://localhost:5173/src/lib/blobs.ts:129:17)
+    at async https://localhost:5173/src/components/UI/Image.tsx:59:21 @ https://localhost:5173/src/components/UI/Image.tsx:61
+[  224910ms] [ERROR] WebSocket connection to 'wss://relay.nostr.band/' failed: Error in connection establishment: net::ERR_CONNECTION_TIMED_OUT @ https://localhost:5173/node_modules/.vite/deps/nostr-tools_pool.js?v=fd9bd3a5:287
+[  232147ms] [WARNING] [spread] post 4493795e… não confirmou em 30s — descartando optimistic @ https://localhost:5173/src/App.tsx:929
+[  233918ms] [WARNING] [spread] post 080972b9… não confirmou em 30s — descartando optimistic @ https://localhost:5173/src/App.tsx:929
+[  233918ms] [WARNING] [spread] post 080972b9… não confirmou em 30s — descartando optimistic @ https://localhost:5173/src/App.tsx:929
+[  236119ms] [WARNING] [spread] post afd43749… não confirmou em 30s — descartando optimistic @ https://localhost:5173/src/App.tsx:929
+[  241174ms] [WARNING] [spread] post b960d61f… não confirmou em 30s — descartando optimistic @ https://localhost:5173/src/App.tsx:929
+[  241175ms] [WARNING] [spread] post b960d61f… não confirmou em 30s — descartando optimistic @ https://localhost:5173/src/App.tsx:929
+[  245982ms] [ERROR] WebSocket connection to 'wss://relay.nostr.band/' failed: Error in connection establishment: net::ERR_CONNECTION_TIMED_OUT @ https://localhost:5173/node_modules/.vite/deps/nostr-tools_pool.js?v=fd9bd3a5:287
+[  246031ms] [WARNING] [spread] post 9896bf0f… não confirmou em 30s — descartando optimistic @ https://localhost:5173/src/App.tsx:929
+[  247453ms] [WARNING] [spread] post b6c0b44a… não confirmou em 30s — descartando optimistic @ https://localhost:5173/src/App.tsx:929
+[  251101ms] [WARNING] [spread] post 142aabae… não confirmou em 30s — descartando optimistic @ https://localhost:5173/src/App.tsx:929
+[  253622ms] [WARNING] [spread] post 5d73eeba… não confirmou em 30s — descartando optimistic @ https://localhost:5173/src/App.tsx:929
+[  253623ms] [WARNING] [spread] post 5d73eeba… não confirmou em 30s — descartando optimistic @ https://localhost:5173/src/App.tsx:929
+[  267038ms] [ERROR] WebSocket connection to 'wss://relay.nostr.band/' failed: Error in connection establishment: net::ERR_CONNECTION_TIMED_OUT @ https://localhost:5173/node_modules/.vite/deps/nostr-tools_pool.js?v=fd9bd3a5:287
+[  288095ms] [ERROR] WebSocket connection to 'wss://relay.nostr.band/' failed: Error in connection establishment: net::ERR_CONNECTION_TIMED_OUT @ https://localhost:5173/node_modules/.vite/deps/nostr-tools_pool.js?v=fd9bd3a5:287
+[  309141ms] [ERROR] WebSocket connection to 'wss://relay.nostr.band/' failed: Error in connection establishment: net::ERR_CONNECTION_TIMED_OUT @ https://localhost:5173/node_modules/.vite/deps/nostr-tools_pool.js?v=fd9bd3a5:287
+[  330175ms] [ERROR] WebSocket connection to 'wss://relay.nostr.band/' failed: Error in connection establishment: net::ERR_CONNECTION_TIMED_OUT @ https://localhost:5173/node_modules/.vite/deps/nostr-tools_pool.js?v=fd9bd3a5:287
+[ 1115804ms] [ERROR] WebSocket is already in CLOSING or CLOSED state. @ https://localhost:5173/node_modules/.vite/deps/nostr-tools_pool.js?v=fd9bd3a5:386

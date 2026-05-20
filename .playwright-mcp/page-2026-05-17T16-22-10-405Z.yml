@@ -1,0 +1,66 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - heading "drift" [level=1] [ref=e6]:
+        - text: dri
+        - emphasis [ref=e7]: ft
+      - generic [ref=e8]:
+        - generic [ref=e9]:
+          - button "abrir perfil" [ref=e10] [cursor=pointer]:
+            - img [ref=e11]
+          - 'button "rede: clearnet — abrir modo de rede" [ref=e14] [cursor=pointer]':
+            - img [ref=e15]
+          - 'button "gps: desativado — abrir granularidade de gps" [ref=e18] [cursor=pointer]':
+            - img [ref=e19]
+          - button "469 ev — abrir painel de status" [ref=e73] [cursor=pointer]:
+            - generic [ref=e24]: ●
+            - generic [ref=e25]: 469 ev
+        - generic [ref=e26]:
+          - text: deriva
+          - generic [ref=e27]: "0.005"
+    - generic [ref=e30]:
+      - button "global" [pressed] [ref=e31] [cursor=pointer]:
+        - generic [ref=e32]: global
+      - button "seguindo" [ref=e33] [cursor=pointer]:
+        - generic [ref=e34]: seguindo
+      - button "em alta" [ref=e35] [cursor=pointer]:
+        - generic [ref=e36]: em alta
+  - main [ref=e55]:
+    - generic [ref=e107]:
+      - button "abrir ações" [ref=e108] [cursor=pointer]:
+        - generic [ref=e109]: ⋮
+      - button "abrir comentários" [ref=e110] [cursor=pointer]:
+        - generic [ref=e111]: 💬
+      - generic [ref=e118]:
+        - generic [ref=e119]:
+          - generic [ref=e120]: DERIVA
+          - heading "P2P 21:11" [level=2] [ref=e121]
+          - generic [ref=e122]:
+            - generic "6 drifts" [ref=e123]: ↑ 6
+            - generic "1 subposts" [ref=e124]: ▣ 1
+            - generic "há 16H" [ref=e125]: ⏱ 16H
+        - generic: P2P
+  - dialog "criar novo post" [ref=e77]:
+    - banner [ref=e78]:
+      - heading "novo drift" [level=2] [ref=e79]
+      - button "cancelar" [ref=e80] [cursor=pointer]
+    - generic [ref=e82]:
+      - generic [ref=e83]:
+        - button "ir pro subpost 1" [ref=e84] [cursor=pointer]: "1"
+        - generic [ref=e85]: 1/1
+      - generic [ref=e86]:
+        - button [ref=e129] [cursor=pointer]: remover
+        - generic [ref=e90]:
+          - textbox "legenda (opcional)…" [ref=e130]
+          - generic [ref=e92]:
+            - generic "0 de 250 caracteres usados" [ref=e93]: 0 / 250
+            - button "◐ prévia" [ref=e94] [cursor=pointer]
+        - generic [ref=e95]:
+          - generic "manifesto §27 — autor declara, leitor filtra" [ref=e96]: marcar conteúdo (opcional)
+          - generic [ref=e97]:
+            - button "nsfw" [ref=e98] [cursor=pointer]
+            - button "violence" [ref=e99] [cursor=pointer]
+            - button "spoiler" [ref=e100] [cursor=pointer]
+            - button "ad" [ref=e101] [cursor=pointer]
+        - note "sugestão de aviso de conteúdo" [ref=e131]: post com imagem sem aviso. considere marcar acima (NSFW, violência, spoiler, ad) — ajuda quem filtra.
+    - button "publicar ↑" [ref=e104] [cursor=pointer]

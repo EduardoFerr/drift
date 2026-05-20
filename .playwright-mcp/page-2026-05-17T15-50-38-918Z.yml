@@ -1,0 +1,86 @@
+- generic [ref=e34]:
+  - banner [ref=e35]:
+    - generic [ref=e36]:
+      - heading "drift" [level=1] [ref=e37]:
+        - text: dri
+        - emphasis [ref=e38]: ft
+      - generic [ref=e39]:
+        - generic [ref=e40]:
+          - button "abrir perfil" [ref=e41] [cursor=pointer]:
+            - img [ref=e42]
+          - 'button "rede: clearnet — abrir modo de rede" [ref=e45] [cursor=pointer]':
+            - img [ref=e46]
+          - 'button "gps: desativado — abrir granularidade de gps" [ref=e49] [cursor=pointer]':
+            - img [ref=e50]
+          - button "461 ev — abrir painel de status" [ref=e54] [cursor=pointer]:
+            - generic [ref=e55]: ●
+            - generic [ref=e56]: 461 ev
+        - generic [ref=e57]:
+          - text: deriva
+          - generic [ref=e58]: "0.005"
+    - generic [ref=e60]:
+      - generic [ref=e61]:
+        - button "global" [pressed] [ref=e62] [cursor=pointer]:
+          - generic [ref=e63]: global
+        - button "seguindo" [ref=e65] [cursor=pointer]:
+          - generic [ref=e66]: seguindo
+        - button "trending" [ref=e68] [cursor=pointer]:
+          - generic [ref=e69]: trending
+      - button "atualizar feed" [ref=e71] [cursor=pointer]:
+        - img [ref=e73]
+        - generic [ref=e78]: "19"
+  - dialog "instalar Drift" [ref=e79]:
+    - generic [ref=e81]:
+      - generic [ref=e82]:
+        - generic [ref=e83]: 📥
+        - generic [ref=e84]:
+          - heading "instalar Drift" [level=2] [ref=e85]
+          - paragraph [ref=e86]: Safari iOS não tem botão de instalar — segue o passo a passo abaixo.
+        - button "fechar" [ref=e87] [cursor=pointer]: ✕
+      - list [ref=e88]:
+        - listitem [ref=e89]:
+          - text: Toque no botão
+          - strong [ref=e90]: Compartilhar
+          - text: (quadrado com seta) na barra do Safari
+        - listitem [ref=e91]:
+          - text: Role e toque em
+          - strong [ref=e92]: “Adicionar à Tela de Início”
+        - listitem [ref=e93]: Confirme em “Adicionar”
+        - listitem [ref=e94]: Drift aparece na tela inicial — abre fullscreen, sem barra do Safari
+      - button "não mostrar de novo" [ref=e95] [cursor=pointer]
+  - dialog "onboarding do drift" [ref=e96]:
+    - generic [ref=e97]:
+      - generic [ref=e104]:
+        - heading "bem-vindo ao drift" [level=2] [ref=e105]
+        - generic [ref=e106]:
+          - paragraph [ref=e107]: Drift é uma rede social descentralizada onde o conteúdo deriva pelo comportamento humano — não por algoritmo.
+          - paragraph [ref=e108]: Sem servidor central, sem feed personalizado, sem bolha. Posts imutáveis, identidade portável.
+          - paragraph [ref=e109]: Sem censura — nem pelo fundador.
+      - generic [ref=e110]:
+        - button "pular" [active] [ref=e111] [cursor=pointer]
+        - button "próximo →" [ref=e113] [cursor=pointer]
+  - main [ref=e114]:
+    - generic [ref=e134]:
+      - button "abrir ações" [ref=e135] [cursor=pointer]:
+        - generic [ref=e136]: ⋮
+      - button "abrir comentários" [ref=e137] [cursor=pointer]:
+        - generic [ref=e138]: 💬
+      - generic [ref=e145]:
+        - generic [ref=e146]:
+          - generic [ref=e147]: DERIVA
+          - heading "P2P 21:11" [level=2] [ref=e148]
+          - generic [ref=e149]:
+            - generic "5 drifts" [ref=e153]: ↑ 5
+            - generic "1 subposts" [ref=e151]: ▣ 1
+            - generic "há 15H" [ref=e152]: ⏱ 15H
+        - generic: P2P
+  - navigation "navegação principal" [ref=e117]:
+    - generic [ref=e118]:
+      - button "abrir mapa de propagação" [ref=e120] [cursor=pointer]:
+        - img [ref=e122]
+        - generic [ref=e124]: mapa
+      - button "criar post" [ref=e125] [cursor=pointer]:
+        - img [ref=e126]
+      - button "abrir config" [ref=e128] [cursor=pointer]:
+        - img [ref=e130]
+        - generic [ref=e131]: config

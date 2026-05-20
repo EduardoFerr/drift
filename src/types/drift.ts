@@ -396,14 +396,28 @@ export interface UserPrefs {
    */
   lens_nudge_dismissed: boolean
   /**
-   * Settings friction Phase 3 (2026-05-18): toggle "mostrar opções
-   * avançadas" em SettingsRoot. Default false — novice user vê só o
-   * essencial. Power user liga e vê tudo.
+   * Settings friction Phase 6 (2026-05-19 user pivot): substitui o
+   * binário `show_advanced_settings` por 4 flags granulares. User
+   * controla por categoria QUE TIPO DE DETALHE vê em cada setting.
    *
-   * Settings com `<SettingExplainer level='advanced'>` retornam null
-   * quando false. Manifesto §28: pref local-only, zero export.
+   * Menu items SEMPRE visíveis (sem level='advanced' gate) — Satoshi
+   * audit já fez upload_endpoint visible-warning no ComposeOverlay,
+   * então esconder cards de menu não é mais defesa relevante.
+   *
+   * Manifesto §28: todas prefs local-only, zero export.
    */
-  show_advanced_settings: boolean
+  /** Impacto / Default / Reversível meta rows em SettingExplainer.
+   *  Default ON — info essencial pro novice user entender mudanças. */
+  menu_detail_show_details: boolean
+  /** Manifesto §X link no rodapé de SettingExplainer.
+   *  Default OFF — jargão pra power user que quer fundo normativo. */
+  menu_detail_show_manifesto: boolean
+  /** Seções "como funciona" (SuaLenteCard expandido por default
+   *  quando true). Default OFF. */
+  menu_detail_show_how_it_works: boolean
+  /** Detalhes de algoritmo (PageRank, threshold dinâmico, etc).
+   *  Default OFF — só pra quem quer entender o sistema profundamente. */
+  menu_detail_show_algorithm: boolean
   /**
    * Sovereignty schema bump 2026-05-17 (Marshall conformance NEEDS-FIX A).
    * Endpoint HTTP de upload de blobs (Blossom server). Quando undefined,
@@ -484,7 +498,10 @@ export const DEFAULT_USER_PREFS: UserPrefs = {
   theme_id: 'cinder',
   discover_nudge_dismissed: false,
   lens_nudge_dismissed: false,
-  show_advanced_settings: false,
+  menu_detail_show_details: true,
+  menu_detail_show_manifesto: false,
+  menu_detail_show_how_it_works: false,
+  menu_detail_show_algorithm: false,
 }
 
 // ─── Trust Lens (Phase 1 — manifesto §24 view-layer carve-out) ────

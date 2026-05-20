@@ -1560,3 +1560,95 @@ export function SovereigntyCard({ onClose }: CardProps) {
     </FullPageCard>
   )
 }
+
+// ─── MenuDetailCard ────────────────────────────────────────────────
+//
+// Phase 6 (2026-05-19 user pivot): substitui binário 'show_advanced_
+// settings' por 4 flags granulares. User decide POR CATEGORIA que tipo
+// de detalhe vê em todas as settings explainers do app.
+
+export function MenuDetailCard({ onClose }: CardProps) {
+  const prefs = usePrefsStore()
+  return (
+    <FullPageCard
+      onClose={onClose}
+      title="menu detalhado"
+      ariaLabel="quanto detalhe mostrar nas configurações"
+    >
+      <div className="space-y-3 px-4 py-5">
+        <p className="font-mono text-[12px] leading-relaxed text-drift-body">
+          Cada setting do Drift pode mostrar mais ou menos contexto.
+          Aqui você decide POR CATEGORIA que tipos de detalhe quer ver
+          em todas as outras configurações. Mexer aqui não muda
+          comportamento — só o que aparece na tela.
+        </p>
+
+        <AccordionGroup defaultOpen="first">
+          <SettingExplainer
+            accordionId="menu-detail-details"
+            label="detalhes (impacto / default / reversível)"
+            description="Cada setting pode mostrar 3 linhas extras: o IMPACTO observável quando você muda, o DEFAULT (e por que é o que é) e se a mudança é REVERSÍVEL."
+            impact="Quando on, settings explicam mais. Quando off, você vê só descrição + controle (visual mais limpo, útil pra quem já conhece o app)."
+            defaultExplained="On por default — info essencial pra entender o que cada setting faz antes de mudar."
+            reversible
+          >
+            <Toggle
+              label="mostrar detalhes"
+              hint="impacto + default + reversível em cada setting"
+              value={prefs.menu_detail_show_details}
+              onChange={(v) => setPref('menu_detail_show_details', v)}
+            />
+          </SettingExplainer>
+
+          <SettingExplainer
+            accordionId="menu-detail-manifesto"
+            label="referências do manifesto"
+            description="Algumas settings linkam pro manifesto do Drift (§17, §28, etc.) — explicação política/normativa do POR QUÊ aquela funcionalidade existe."
+            impact="Quando on, link 'Referência: manifesto §X' aparece no rodapé das settings que têm. Quando off, settings ficam livres de jargão normativo."
+            defaultExplained="Off por default — jargão pra quem quer fundo histórico/político. Curiosos podem ligar."
+            reversible
+          >
+            <Toggle
+              label="mostrar referências"
+              hint="links pro manifesto quando uma setting tem um"
+              value={prefs.menu_detail_show_manifesto}
+              onChange={(v) => setPref('menu_detail_show_manifesto', v)}
+            />
+          </SettingExplainer>
+
+          <SettingExplainer
+            accordionId="menu-detail-how-it-works"
+            label="como funciona"
+            description="Sections de 'como funciona' em settings complexas (Sua Lente, Trust Lens). Explica o sistema por trás, não só o controle visível."
+            impact="Quando on, accordion 'como funciona' fica EXPANDIDO por default. Quando off, fica colapsado — user expande manualmente se quiser."
+            defaultExplained="Off por default — maioria dos users não precisa do internals; expandem quando curiosos."
+            reversible
+          >
+            <Toggle
+              label="expandir 'como funciona'"
+              hint="abre as seções de explicação por default"
+              value={prefs.menu_detail_show_how_it_works}
+              onChange={(v) => setPref('menu_detail_show_how_it_works', v)}
+            />
+          </SettingExplainer>
+
+          <SettingExplainer
+            accordionId="menu-detail-algorithm"
+            label="detalhes de algoritmo"
+            description="Parágrafos que mencionam algoritmos por nome (Personalized PageRank, thresholds dinâmicos, decay temporal, etc.) — info técnica pra entender o cálculo."
+            impact="Quando on, settings com explicação algorítmica mostram o nome + parâmetros. Quando off, dizem só o efeito ('prioriza quem você segue' em vez de 'PageRank com α=0.85')."
+            defaultExplained="Off por default — só entusiastas/devs precisam dos nomes. Quem quer entender O QUE muda já tem 'detalhes' (impacto)."
+            reversible
+          >
+            <Toggle
+              label="mostrar nomes de algoritmos"
+              hint="PageRank, thresholds, decays — info técnica"
+              value={prefs.menu_detail_show_algorithm}
+              onChange={(v) => setPref('menu_detail_show_algorithm', v)}
+            />
+          </SettingExplainer>
+        </AccordionGroup>
+      </div>
+    </FullPageCard>
+  )
+}

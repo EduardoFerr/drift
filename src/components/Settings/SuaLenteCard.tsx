@@ -19,6 +19,7 @@
 import { useEffect, useState } from 'react'
 import { setLensStrength, useLensStore } from '../../lib/trust-lens'
 import { db } from '../../lib/db'
+import { usePrefsStore } from '../../lib/prefs'
 import { FullPageCard } from '../UI/FullPageCard'
 import { DriftButton } from '../UI/DriftButton'
 import { EyeIcon } from '../UI/Icons'
@@ -221,7 +222,16 @@ export function SuaLenteCard({ onClose }: CardProps) {
  * entender expande; novice ignora.
  */
 function ComoFuncionaCollapse() {
-  const [open, setOpen] = useState(false)
+  // Phase 6 (2026-05-20): expansão default vem da flag user pref —
+  // menu_detail_show_how_it_works. Quando true, abre automaticamente.
+  const defaultOpen = usePrefsStore((s) => s.menu_detail_show_how_it_works)
+  const showAlgorithm = usePrefsStore((s) => s.menu_detail_show_algorithm)
+  const showManifesto = usePrefsStore((s) => s.menu_detail_show_manifesto)
+  const [open, setOpen] = useState(defaultOpen)
+  // Reage a mudança da pref pós-mount (user toggle no Menu Detalhado).
+  useEffect(() => {
+    setOpen(defaultOpen)
+  }, [defaultOpen])
   return (
     <div className="border-t border-drift-border/30 pt-3">
       <button
@@ -239,20 +249,28 @@ function ComoFuncionaCollapse() {
             <span className="text-drift-accent2">Grafo:</span> usa quem
             você acompanha + posts que você deu drift.
           </p>
-          <p>
-            <span className="text-drift-accent2">Cálculo:</span>{' '}
-            influência local de cada autor sobre o seu feed (algoritmo
-            Personalized PageRank).
-          </p>
+          {/* Parágrafo de algoritmo gateado por menu_detail_show_algorithm
+              (Phase 6). Default off — só entusiastas precisam do nome. */}
+          {showAlgorithm && (
+            <p>
+              <span className="text-drift-accent2">Cálculo:</span>{' '}
+              influência local de cada autor sobre o seu feed (algoritmo
+              Personalized PageRank).
+            </p>
+          )}
           <p>
             <span className="text-drift-accent2">Local:</span> tudo no
             seu dispositivo. Não vaza, não é compartilhada, não fica em
             cache na nuvem.
           </p>
-          <p className="pt-1 text-drift-muted">
-            Manifesto §24 — visualização local, não ranking canônico.
-            Você pode desligar a qualquer momento e o feed volta ao normal.
-          </p>
+          {/* Manifesto §24 gateado por menu_detail_show_manifesto
+              (Phase 6). Default off — jargão normativo. */}
+          {showManifesto && (
+            <p className="pt-1 text-drift-muted">
+              Manifesto §24 — visualização local, não ranking canônico.
+              Você pode desligar a qualquer momento e o feed volta ao normal.
+            </p>
+          )}
         </div>
       )}
     </div>

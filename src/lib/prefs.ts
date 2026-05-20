@@ -108,8 +108,17 @@ function applyRow(target: UserPrefs, key: string, value: string): void {
     case 'lens_nudge_dismissed':
       target.lens_nudge_dismissed = value === '1'
       return
-    case 'show_advanced_settings':
-      target.show_advanced_settings = value === '1'
+    case 'menu_detail_show_details':
+      target.menu_detail_show_details = value === '1'
+      return
+    case 'menu_detail_show_manifesto':
+      target.menu_detail_show_manifesto = value === '1'
+      return
+    case 'menu_detail_show_how_it_works':
+      target.menu_detail_show_how_it_works = value === '1'
+      return
+    case 'menu_detail_show_algorithm':
+      target.menu_detail_show_algorithm = value === '1'
       return
     case 'upload_endpoint':
       // Sovereignty (Marshall NEEDS-FIX A): URL https:// pra Blossom

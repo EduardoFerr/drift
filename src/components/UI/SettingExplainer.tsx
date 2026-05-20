@@ -129,17 +129,15 @@ export function SettingExplainer({
   className = '',
   accordionId,
 }: SettingExplainerProps) {
-  // Phase 3 (2026-05-18): level='advanced' gate. Novice user (default
-  // show_advanced_settings=false) só vê basic settings. Power user
-  // liga toggle no topo de SettingsRoot pra revelar tudo.
-  const showAdvanced = usePrefsStore((s) => s.show_advanced_settings)
-  // Phase 4 (Ted 2026-05-18): AccordionGroup integration. ID = explícito
-  // accordionId ou fallback slugify(label). Auto-registra no contexto;
-  // se NÃO há AccordionGroup parent (ctx null), render standalone
-  // sempre-expanded (back-compat com 30+ usos atuais).
+  // Phase 6 (2026-05-19): replaces binary advanced gate por 4 flags
+  // granulares. User controla por categoria QUE TIPO DE DETALHE vê.
+  // `level='advanced'` ainda funciona como marker visual (badge) mas
+  // NÃO esconde mais o setting.
+  const showDetails = usePrefsStore((s) => s.menu_detail_show_details)
+  const showManifesto = usePrefsStore((s) => s.menu_detail_show_manifesto)
+  // Phase 4 (Ted 2026-05-18): AccordionGroup integration.
   const id = accordionId ?? slugify(label)
   const member = useAccordionMember(id)
-  if (level === 'advanced' && !showAdvanced) return null
 
   const headerId = `setting-${id}-header`
   const panelId = `setting-${id}-panel`
@@ -151,6 +149,8 @@ export function SettingExplainer({
       reversible={reversible}
       warning={warning}
       reference={reference}
+      showDetails={showDetails}
+      showManifesto={showManifesto}
     >
       {children}
     </ExplainerBody>
@@ -243,6 +243,10 @@ interface ExplainerBodyProps {
   warning?: string
   reference?: string
   children: ReactNode
+  /** Flag user pref menu_detail_show_details — controla render do dl meta. */
+  showDetails: boolean
+  /** Flag user pref menu_detail_show_manifesto — controla render da reference. */
+  showManifesto: boolean
 }
 
 function ExplainerBody({
@@ -253,6 +257,8 @@ function ExplainerBody({
   warning,
   reference,
   children,
+  showDetails,
+  showManifesto,
 }: ExplainerBodyProps) {
   return (
     <>
@@ -277,36 +283,40 @@ function ExplainerBody({
       {/* Controle interativo */}
       <div className="mb-3">{children}</div>
 
-      {/* Meta info — impact + default + reversibility */}
-      <dl className="space-y-1.5 font-mono text-[11px] leading-relaxed text-drift-body/85">
-        {impact && (
-          <MetaRow icon={<InfoIcon size={12} strokeWidth={2} />} label="Impacto">
-            {impact}
+      {/* Meta info — impacto/default/reversível gateado por
+          menu_detail_show_details (Phase 6). Default ON pra novice. */}
+      {showDetails && (
+        <dl className="space-y-1.5 font-mono text-[11px] leading-relaxed text-drift-body/85">
+          {impact && (
+            <MetaRow icon={<InfoIcon size={12} strokeWidth={2} />} label="Impacto">
+              {impact}
+            </MetaRow>
+          )}
+          {defaultExplained && (
+            <MetaRow icon={<InfoIcon size={12} strokeWidth={2} />} label="Default">
+              {defaultExplained}
+            </MetaRow>
+          )}
+          <MetaRow
+            icon={
+              reversible ? (
+                <CheckIcon size={12} strokeWidth={2} />
+              ) : (
+                <BanIcon size={12} strokeWidth={2} />
+              )
+            }
+            label={reversible ? 'Reversível' : 'Irreversível'}
+          >
+            {reversible
+              ? 'Pode desfazer mudando de volta a qualquer momento.'
+              : 'Esta ação NÃO pode ser desfeita.'}
           </MetaRow>
-        )}
-        {defaultExplained && (
-          <MetaRow icon={<InfoIcon size={12} strokeWidth={2} />} label="Default">
-            {defaultExplained}
-          </MetaRow>
-        )}
-        <MetaRow
-          icon={
-            reversible ? (
-              <CheckIcon size={12} strokeWidth={2} />
-            ) : (
-              <BanIcon size={12} strokeWidth={2} />
-            )
-          }
-          label={reversible ? 'Reversível' : 'Irreversível'}
-        >
-          {reversible
-            ? 'Pode desfazer mudando de volta a qualquer momento.'
-            : 'Esta ação NÃO pode ser desfeita.'}
-        </MetaRow>
-      </dl>
+        </dl>
+      )}
 
-      {/* Reference link opcional */}
-      {reference && (
+      {/* Reference manifesto — gateado por menu_detail_show_manifesto
+          (Phase 6). Default OFF — jargão pra power user. */}
+      {reference && showManifesto && (
         <p className="mt-3 border-t border-drift-border/40 pt-2 font-mono text-[10px] text-drift-muted">
           Referência: <span className="text-drift-accent2">{reference}</span>
         </p>

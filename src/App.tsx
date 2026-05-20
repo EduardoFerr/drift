@@ -27,7 +27,7 @@ import {
   useBootStore,
   type BootState,
 } from './lib/bootstrap'
-import { getPrefs, setPref, usePrefsStore } from './lib/prefs'
+import { getPrefs, usePrefsStore } from './lib/prefs'
 import { useUserWeight } from './hooks/useUserWeight'
 import { useInstallPrompt } from './hooks/useInstallPrompt'
 import { exitSlim, useViewModeStore } from './lib/view-mode'
@@ -113,6 +113,9 @@ const PermissionsCard = lazy(() =>
 )
 const SovereigntyCard = lazy(() =>
   import('./components/Settings/SettingsCards').then((m) => ({ default: m.SovereigntyCard })),
+)
+const MenuDetailCard = lazy(() =>
+  import('./components/Settings/SettingsCards').then((m) => ({ default: m.MenuDetailCard })),
 )
 const AppearanceCard = lazy(() =>
   import('./components/Settings/AppearanceCard').then((m) => ({ default: m.AppearanceCard })),
@@ -1895,56 +1898,13 @@ type SettingsTarget =
   | 'aparencia'
   | 'sua-lente'
   | 'soberania'
+  | 'menu-detalhado'
   | 'instalar'
   | 'limpar'
-
-/**
- * AdvancedToggle — toggle "mostrar opções avançadas" no topo de
- * SettingsRoot. Phase 3 settings friction (2026-05-18).
- *
- * Default off — novice user vê só basic settings (settings com
- * `<SettingExplainer level='advanced'>` retornam null). Liga = vê tudo.
- *
- * Visualmente discreto — não compete com header. Persistido em
- * `user_prefs.show_advanced_settings` (manifesto §28 local-only).
- */
-function AdvancedToggle() {
-  const showAdvanced = usePrefsStore((s) => s.show_advanced_settings)
-  return (
-    <button
-      type="button"
-      onClick={() => void setPref('show_advanced_settings', !showAdvanced)}
-      aria-pressed={showAdvanced}
-      className={`flex w-full items-center justify-between gap-2 rounded-2xl border px-4 py-3 text-left font-mono text-[11px] uppercase tracking-meta transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40 ${
-        showAdvanced
-          ? 'border-drift-accent2/60 bg-drift-accent2/10 text-drift-accent2'
-          : 'border-drift-border/40 bg-drift-surface/40 text-drift-muted hover:text-drift-text'
-      }`}
-    >
-      <span className="flex min-w-0 items-center gap-2 whitespace-nowrap">
-        <span aria-hidden="true" className="shrink-0">{showAdvanced ? '◉' : '○'}</span>
-        <span className="truncate">mostrar opções avançadas</span>
-      </span>
-      {/* Badge curto que não quebra: 'on' / 'off' apenas */}
-      <span
-        className={`shrink-0 rounded px-2 py-0.5 font-mono text-[10px] uppercase tracking-meta ${
-          showAdvanced
-            ? 'bg-drift-accent2/20 text-drift-accent2'
-            : 'bg-drift-surface text-drift-muted'
-        }`}
-      >
-        {showAdvanced ? 'on' : 'off'}
-      </span>
-    </button>
-  )
-}
 
 function SettingsRoot({ onClose }: { onClose: () => void }) {
   const installPromptLocal = useInstallPrompt()
   const identity = useBootStore((s) => s.identity)
-  // Phase 5 (2026-05-19): filtra menu items level='advanced' quando
-  // toggle off. Pareado com gating no SettingExplainer (Phase 3).
-  const showAdvancedFilter = usePrefsStore((s) => s.show_advanced_settings)
   const [expanded, setExpanded] = useState<number | null>(0)
   function toggleSection(i: number) {
     setExpanded((prev) => (prev === i ? null : i))
@@ -2018,6 +1978,9 @@ function SettingsRoot({ onClose }: { onClose: () => void }) {
       case 'soberania':
         pushLayer({ id: 'sovereignty', component: SovereigntyCard, parent: p })
         break
+      case 'menu-detalhado':
+        pushLayer({ id: 'menu-detail', component: MenuDetailCard, parent: p })
+        break
       case 'status':
         pushLayer({ id: 'status', component: StatusCardLayer, parent: p })
         break
@@ -2052,16 +2015,6 @@ function SettingsRoot({ onClose }: { onClose: () => void }) {
       danger?: boolean
       hint: string
       icon: (props: { size?: number; className?: string }) => ReactElement
-      /**
-       * Phase 5 (2026-05-19 Satoshi follow-up): cards com TODOS os
-       * SettingExplainers level='advanced' viram menu item invisível
-       * quando show_advanced_settings=false. Antes: card aparecia no
-       * menu, abria vazio. User confuso.
-       *
-       * 'advanced' = esconde menu item quando toggle off.
-       * undefined = sempre visível (cards basic ou mixed).
-       */
-      level?: 'advanced'
     }[]
   }
 
@@ -2142,6 +2095,12 @@ function SettingsRoot({ onClose }: { onClose: () => void }) {
           hint: 'pinned, blocked, muted',
           icon: ListIcon,
         },
+        {
+          target: 'menu-detalhado',
+          label: 'menu detalhado',
+          hint: 'detalhes, manifesto, como funciona, algoritmo',
+          icon: SlidersIcon,
+        },
       ],
     },
     {
@@ -2171,21 +2130,18 @@ function SettingsRoot({ onClose }: { onClose: () => void }) {
           label: 'blobs (ipfs)',
           hint: 'servindo blobs a peers',
           icon: BoxIcon,
-          level: 'advanced',
         },
         {
           target: 'soberania',
           label: 'soberania',
           hint: 'endpoints próprios — upload, mapa, moderação',
           icon: ServerIcon,
-          level: 'advanced',
         },
         {
           target: 'diagnostico',
           label: 'redefinir cache',
           hint: 'reconstrói banco local',
           icon: RefreshIcon,
-          level: 'advanced',
         },
         {
           target: 'sobre',
@@ -2221,20 +2177,9 @@ function SettingsRoot({ onClose }: { onClose: () => void }) {
     },
   ]
 
-  // Phase 5 (2026-05-19 Satoshi follow-up): filtra menu items por level.
-  // Quando show_advanced_settings=false, items com level='advanced' somem
-  // do menu. Grupos que ficam vazios (todos items eram advanced) também
-  // somem. User vê diferença REAL no menu principal — não só dentro dos
-  // cards. Resolve confusion 'qual a diferença? não vejo nada'.
-  const visibleGroups = groups
-    .map((group) => ({
-      ...group,
-      items: group.items.filter(
-        (item) => item.level !== 'advanced' || showAdvancedFilter,
-      ),
-    }))
-    .filter((group) => group.items.length > 0)
-
+  // Phase 6 (2026-05-19 user pivot): toggle binário removido. User
+  // controla DENSIDADE DE INFO via 4 flags granulares em 'menu
+  // detalhado' (CONTEÚDO group). Menu items TODOS visíveis sempre.
   return (
     <FullPageCard
       onClose={onClose}
@@ -2242,15 +2187,7 @@ function SettingsRoot({ onClose }: { onClose: () => void }) {
       ariaLabel="configurações"
     >
       <div className="space-y-3 px-4 py-5">
-        {/* Phase 3 (2026-05-18): toggle 'mostrar opções avançadas' no
-            topo. Default false — novice user vê só basic settings.
-            <SettingExplainer level='advanced'> retornam null quando
-            off. Power user liga aqui e vê tudo. Persistido em
-            user_prefs.show_advanced_settings (local-only §28).
-            Phase 5: também filtra menu items inteiros (Diag, Sov,
-            Blobs) pra diferença ser visível no menu principal. */}
-        <AdvancedToggle />
-        {visibleGroups.map((group, gi) => {
+        {groups.map((group, gi) => {
           const isOpen = expanded === gi
           const GroupIcon = group.groupIcon
           return (
