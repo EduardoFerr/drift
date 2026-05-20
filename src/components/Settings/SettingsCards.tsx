@@ -43,6 +43,7 @@ import type {
 import { FullPageCard } from '../UI/FullPageCard'
 import { RefreshIcon } from '../UI/Icons'
 import { SettingExplainer } from '../UI/SettingExplainer'
+import { AccordionGroup } from '../UI/AccordionGroup'
 // Collapse + SectionHeader removidos (refactor 2026-05-18): após todos
 // os cards adotarem SettingExplainer, accordion não é mais usado.
 
@@ -149,12 +150,14 @@ export function FiltersCard({ onClose }: CardProps) {
   const prefs = usePrefsStore()
   return (
     <FullPageCard onClose={onClose} title="filtros" ariaLabel="filtros de conteúdo">
-      <div className="space-y-4 px-4 py-5">
-        {/* Refactor 2026-05-18: 3 toggles viraram 3 SettingExplainer cards.
-            Cada um com impacto descrito + default justificado + reversível.
-            Substitui hint micro `text-drift-muted/30` por explicação
-            always-visible. */}
+      <div className="space-y-3 px-4 py-5">
+        {/* Phase 4 Ted 2026-05-18: AccordionGroup 1-aberto-por-vez,
+            consistente com SettingsRoot. defaultOpen='first' = NSFW
+            abre por default (mais comum). User clica outros pra
+            expandir, primeiro fecha. */}
+        <AccordionGroup defaultOpen="first">
         <SettingExplainer
+          accordionId="filters-nsfw"
           label="conteúdo adulto e violência"
           description="Posts publicados com aviso de 'NSFW' ou 'violência' aparecem com a imagem borrada por default. Você toca pra revelar caso queira ver."
           impact="Se você ativar este toggle, esses posts aparecem normais (sem blur) direto no feed. Útil pra quem quer ver tudo sem etapa extra; ruim pra ler o feed em público."
@@ -170,6 +173,7 @@ export function FiltersCard({ onClose }: CardProps) {
         </SettingExplainer>
 
         <SettingExplainer
+          accordionId="filters-spoilers"
           label="spoilers de filme/livro/série"
           description="Autores podem marcar posts como spoiler. Quando isto está ativo, esses posts ficam totalmente ocultos no feed até você decidir abrir."
           impact="Quando ligado, você não vê spoilers acidentalmente passando pelo feed. Posts marcados aparecem como card 'spoiler' clicável."
@@ -185,6 +189,7 @@ export function FiltersCard({ onClose }: CardProps) {
         </SettingExplainer>
 
         <SettingExplainer
+          accordionId="filters-ads"
           label="anúncios de divulgação"
           description="Drift não tem ads pagos. Mas autores podem marcar voluntariamente seus próprios posts como 'divulgação' (lançamento de produto, etc.). Você decide se quer ver."
           impact="Quando ligado, posts auto-marcados como divulgação ficam fora do feed. Não afeta posts não-marcados."
@@ -198,6 +203,7 @@ export function FiltersCard({ onClose }: CardProps) {
             onChange={(v) => setPref('hide_ads', v)}
           />
         </SettingExplainer>
+        </AccordionGroup>
       </div>
     </FullPageCard>
   )
@@ -864,10 +870,11 @@ export function PeersCard({ onClose }: CardProps) {
 
   return (
     <FullPageCard onClose={onClose} title="peers P2P" ariaLabel="conexao peer-to-peer">
-      <div className="space-y-4 px-4 py-5">
-
+      <div className="space-y-3 px-4 py-5">
+        <AccordionGroup defaultOpen="first">
         {/* ── 1. Meu QR / Link ──────────────────────────────────── */}
         <SettingExplainer
+          accordionId="peers-qr"
           label="meu QR / link de perfil"
           description="Seu QR e link compartilham sua identidade pública (npub) com outros usuários do Drift. Quem escaneia ou abre o link consegue te seguir."
           impact="Compartilhar não revela seu nsec (chave privada). Só revela sua identidade pública — a mesma que aparece quando você posta. Útil pra conectar offline (impressão, mostrar tela) ou via apps que aceitam links (chat, email)."
@@ -920,6 +927,7 @@ export function PeersCard({ onClose }: CardProps) {
 
         {/* ── 2. Conectar (scan + paste) ─────────────────────────── */}
         <SettingExplainer
+          accordionId="peers-connect"
           label="conectar com outro usuário"
           description="Escaneie o QR de alguém ou cole a npub/nprofile pra estabelecer conexão P2P direta. Bypassa relays — fala direto com o peer."
           impact="Conexão direta significa que seu IP fica visível pro peer (não tem proxy/relay no meio). Bom pra trocar posts/eventos rápido com peers conhecidos. Ruim pra conectar com desconhecidos — expõe sua localização de rede."
@@ -986,6 +994,7 @@ export function PeersCard({ onClose }: CardProps) {
 
         {/* ── 3. Bundle offline ──────────────────────────────────── */}
         <SettingExplainer
+          accordionId="peers-bundle"
           label="bundle offline (sneakernet)"
           description="Exporta seus posts (kind 9078), drifts (9079), sinks (9080) e reports (9081) num arquivo .json. Você passa pra outra pessoa via USB, airdrop, email ou qualquer canal — ela importa e os eventos materializam no banco local dela."
           impact="Os eventos são re-distribuídos via canal não-Nostr (offline ou bloqueado). Útil em regiões com internet censurada (manifesto §15). Quem recebe vê seus posts como se viessem dos relays normais (são imutáveis e assinados). Eventos antigos não são re-publicados se a outra pessoa já os tem."
@@ -1041,6 +1050,7 @@ export function PeersCard({ onClose }: CardProps) {
 
         {/* ── 4. Auto-discovery (NIP-02) ─────────────────────────── */}
         <SettingExplainer
+          accordionId="peers-auto"
           label="auto-conectar com quem você segue"
           description="Quando ligado, o app tenta abrir conexões P2P diretas com cada pessoa que você segue. Acelera sync de posts deles."
           impact="Acelera o feed (posts deles chegam direto, sem passar por relay). Custa banda contínua (mantém N conexões abertas). E expõe seu IP pra TODOS que você segue — eles podem ver de onde você se conecta."
@@ -1057,6 +1067,7 @@ export function PeersCard({ onClose }: CardProps) {
             onChange={(v) => void setPref('p2p_auto_follows', v)}
           />
         </SettingExplainer>
+        </AccordionGroup>
       </div>
     </FullPageCard>
   )
@@ -1131,8 +1142,10 @@ export function DiagnosticCard({ onClose }: CardProps) {
       ariaLabel="diagnóstico — redefinir cache"
       escDismissible={!rebuilding}
     >
-      <div className="space-y-4 px-4 py-5">
+      <div className="space-y-3 px-4 py-5">
+        <AccordionGroup defaultOpen="first">
         <SettingExplainer
+          accordionId="diag-fetch-history"
           label="buscar histórico antigo"
           description="O app só sincroniza posts dos últimos 7 dias por default ao iniciar. Se você usa o mesmo nsec há mais tempo, posts antigos podem estar fora dessa janela. Este botão força uma busca completa."
           impact="O app consulta todos os relays atuais buscando QUALQUER post seu (kind 9078) sem limite de data. Pode demorar minutos em rede lenta. Posts encontrados materializam no SQLite local."
@@ -1157,6 +1170,7 @@ export function DiagnosticCard({ onClose }: CardProps) {
         </SettingExplainer>
 
         <SettingExplainer
+          accordionId="diag-rebuild"
           label="redefinir cache local"
           description="Apaga todos os posts, drifts (kind 9079), sinks (kind 9080) e reports do banco local. Identidade (nsec) e preferências ficam intactas. O app re-sincroniza tudo dos relays na próxima vez que abrir."
           impact="Útil quando o app fica em estado estranho após atualização ou banco corrompeu. Você não perde nada permanentemente — os relays guardam os eventos imutáveis. Pode levar alguns segundos pra re-sincronizar."
@@ -1179,6 +1193,7 @@ export function DiagnosticCard({ onClose }: CardProps) {
             )}
           </button>
         </SettingExplainer>
+        </AccordionGroup>
       </div>
     </FullPageCard>
   )
@@ -1476,8 +1491,10 @@ export function SovereigntyCard({ onClose }: CardProps) {
       title="soberania"
       ariaLabel="endpoints customizáveis"
     >
-      <div className="space-y-5 px-4 py-5">
+      <div className="space-y-3 px-4 py-5">
+        <AccordionGroup defaultOpen="first">
         <SettingExplainer
+          accordionId="sov-upload"
           label="onde upload de imagens vai parar"
           description="Quando você anexa foto a um post, o arquivo é enviado pra um servidor externo (não é Nostr — Nostr só guarda o link). Aqui você escolhe qual servidor recebe."
           impact="O default (nostr.build) é gratuito mas conhece seu IP e o conteúdo. Trocar pra Blossom self-hosted, hospedagem própria ou IPFS gateway tira esse conhecimento da nostr.build. URL completa (https://) ou vazio pra usar o default."
@@ -1497,6 +1514,7 @@ export function SovereigntyCard({ onClose }: CardProps) {
         </SettingExplainer>
 
         <SettingExplainer
+          accordionId="sov-tile"
           label="tile server do mapa"
           description="O mapa de spread mostra de onde os posts vieram usando tiles (imagens quadradas) servidas por um provedor externo. Esse provedor sabe quando e onde você consultou o mapa."
           impact="Default CARTO loga seu IP a cada tile carregado — útil pra análise deles. Trocar pra OSM público, mirror Tor ou self-hosted tira esse rastreio. URL precisa template XYZ com {x}, {y}, {z}."
@@ -1515,6 +1533,7 @@ export function SovereigntyCard({ onClose }: CardProps) {
         </SettingExplainer>
 
         <SettingExplainer
+          accordionId="sov-threshold"
           label="quantos reports pra esconder um post"
           description="Quando muitos usuários reportam o mesmo post, o app esconde ele do feed local (não apaga — só esconde). Esse número é dinâmico por padrão (ajusta com volume da rede). Você pode forçar um valor fixo."
           impact="Threshold baixo (ex: 3) = mais posts somem do feed cedo (sensível a abusos coordenados). Threshold alto (ex: 50) = posts ficam por mais tempo (resiste a campanha de reports). Empty/0 = volta pro algoritmo dinâmico."
@@ -1536,6 +1555,7 @@ export function SovereigntyCard({ onClose }: CardProps) {
             onCommit={commitThreshold}
           />
         </SettingExplainer>
+        </AccordionGroup>
       </div>
     </FullPageCard>
   )
