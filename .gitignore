@@ -93,3 +93,12 @@ sbom.json
 # Lighthouse report HTMLs baixados pra análise local (artifacts já vivem
 # no CI; arquivo local é descartável e gera ruído em git status)
 lhr-*.html
+
+# Playwright MCP artifacts — page snapshots + console logs gerados
+# por ferramenta de debug. Não são código fonte; geram ruído em git.
+.playwright-mcp/
+
+# Screenshots ad-hoc na raiz (capturas de tela pra debug/iteração)
+drift-*.jpeg
+drift-*.jpg
+drift-*.png
