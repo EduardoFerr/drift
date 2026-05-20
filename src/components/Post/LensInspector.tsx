@@ -26,6 +26,7 @@ import { useEffect, useState } from 'react'
 import { db } from '../../lib/db'
 import { useFollowsStore } from '../../lib/follows'
 import { useLensStore, getPprForAuthor } from '../../lib/trust-lens'
+import { usePrefsStore } from '../../lib/prefs'
 import { SlideUpOverlay } from '../UI/SlideUpOverlay'
 import { ModalHeader } from '../UI/ModalHeader'
 import { EyeIcon } from '../UI/Icons'
@@ -51,6 +52,13 @@ function shortAlias(npub: string): string {
 export function LensInspector({ postId, authorPub }: InspectorProps) {
   const strength = useLensStore((s) => s.strength)
   const following = useFollowsStore((s) => s.following)
+  // PR-5 (2026-05-20): opt-in indicator visual. Default OFF — chip
+  // existente já comunica "lente atuou aqui" para quem investiga.
+  // Quando ON, adiciona glyph ↕ + estilo filled (mais visível). User
+  // power que quer ver explicitamente cada reorder ativa.
+  const showReorderIndicator = usePrefsStore(
+    (s) => s.lens_show_reorder_indicator,
+  )
   const [open, setOpen] = useState(false)
   const [data, setData] = useState<InspectorData | null>(null)
 
@@ -103,14 +111,26 @@ export function LensInspector({ postId, authorPub }: InspectorProps) {
           e.stopPropagation()
           setOpen(true)
         }}
-        className="absolute bottom-4 right-4 z-30 inline-flex h-11 min-w-[44px] items-center justify-center gap-1 rounded-full border border-drift-accent2/40 bg-drift-surface/85 px-3 text-drift-accent2 backdrop-blur-sm transition-colors hover:border-drift-accent2 hover:bg-drift-surface/95 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/50"
-        aria-label="por que este post está aqui"
-        title="por que este post está aqui"
+        className={`absolute bottom-4 right-4 z-30 inline-flex h-11 min-w-[44px] items-center justify-center gap-1 rounded-full px-3 backdrop-blur-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/50 ${
+          showReorderIndicator
+            ? 'border border-drift-accent2 bg-drift-accent2/15 text-drift-accent2 hover:bg-drift-accent2/25'
+            : 'border border-drift-accent2/40 bg-drift-surface/85 text-drift-accent2 hover:border-drift-accent2 hover:bg-drift-surface/95'
+        }`}
+        aria-label={
+          showReorderIndicator
+            ? 'este post foi reordenado pela lente — toque pra entender'
+            : 'por que este post está aqui'
+        }
+        title={
+          showReorderIndicator
+            ? 'reordenado pela lente'
+            : 'por que este post está aqui'
+        }
         data-no-longpress="true"
       >
         <EyeIcon size={14} />
         <span className="font-mono text-[10px] uppercase tracking-meta">
-          lente
+          {showReorderIndicator ? 'lente ↕' : 'lente'}
         </span>
       </button>
 

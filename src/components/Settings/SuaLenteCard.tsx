@@ -19,7 +19,7 @@
 import { useEffect, useState } from 'react'
 import { setLensStrength, useLensStore } from '../../lib/trust-lens'
 import { db } from '../../lib/db'
-import { usePrefsStore } from '../../lib/prefs'
+import { usePrefsStore, setPref } from '../../lib/prefs'
 import { FullPageCard } from '../UI/FullPageCard'
 import { DriftButton } from '../UI/DriftButton'
 import { EyeIcon } from '../UI/Icons'
@@ -192,6 +192,11 @@ export function SuaLenteCard({ onClose }: CardProps) {
           </p>
         </div>
 
+        {/* PR-5 (2026-05-20): toggle opt-in pra indicador visual de
+            reorder. Default OFF — chip "lente" já cobre quem quer
+            investigar. Apenas exposto quando lente ativa (isActive). */}
+        {isActive && <ReorderIndicatorToggle />}
+
         {/* CTA "ver feed agora" — só aparece quando lens ativa */}
         {isActive && (
           <div className="flex justify-end">
@@ -213,6 +218,40 @@ export function SuaLenteCard({ onClose }: CardProps) {
         <ComoFuncionaCollapse />
       </div>
     </FullPageCard>
+  )
+}
+
+/**
+ * Sub-toggle "mostrar quando a lente reordenou" — PR-5 (2026-05-20).
+ *
+ * Default OFF. Quando ON, o LensInspector chip muda de estilo (filled
+ * + glyph ↕) pra marcar explicitamente posts afetados pelo reorder.
+ * Útil pra user power validar comportamento da lente; novice user
+ * prefere o chip discreto default.
+ */
+function ReorderIndicatorToggle() {
+  const enabled = usePrefsStore((s) => s.lens_show_reorder_indicator)
+  return (
+    <label className="flex cursor-pointer items-start justify-between gap-3 border-t border-drift-border/30 pt-3">
+      <div className="space-y-0.5">
+        <span className="block font-mono text-[12px] text-drift-text">
+          mostrar quando a lente reordenou
+        </span>
+        <span className="block font-mono text-[10px] leading-relaxed text-drift-muted">
+          chip "lente" fica mais visível em posts afetados pelo reorder.
+          opt-in.
+        </span>
+      </div>
+      <input
+        type="checkbox"
+        checked={enabled}
+        onChange={(e) => {
+          void setPref('lens_show_reorder_indicator', e.target.checked)
+        }}
+        aria-label="mostrar indicador quando a lente reordenou posts"
+        className="mt-1 h-4 w-4 cursor-pointer accent-drift-accent2"
+      />
+    </label>
   )
 }
 

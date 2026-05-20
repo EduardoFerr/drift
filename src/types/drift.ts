@@ -396,6 +396,18 @@ export interface UserPrefs {
    */
   lens_nudge_dismissed: boolean
   /**
+   * Trust Lens PR-5 (shipped 2026-05-20) — toggle opt-in pra exibir
+   * indicador visual quando a lente reordenou um post. Default OFF
+   * (lente já é discreta; chip "lente" no LensInspector cobre o caso
+   * para quem quer investigar). Toggle ON adiciona badge "↕" mais
+   * visível, ajudando user power que QUER ver explicitamente quais
+   * posts a lente afetou.
+   *
+   * Manifesto §24: indicador é VIEW-LAYER, não interfere com score
+   * canônico. Manifesto §28: local-only, zero export.
+   */
+  lens_show_reorder_indicator: boolean
+  /**
    * Settings friction Phase 6 (2026-05-19 user pivot): substitui o
    * binário `show_advanced_settings` por 4 flags granulares. User
    * controla por categoria QUE TIPO DE DETALHE vê em cada setting.
@@ -502,6 +514,7 @@ export const DEFAULT_USER_PREFS: UserPrefs = {
   theme_id: 'cinder',
   discover_nudge_dismissed: false,
   lens_nudge_dismissed: false,
+  lens_show_reorder_indicator: false,
   menu_detail_show_details: true,
   menu_detail_show_manifesto: false,
   menu_detail_show_how_it_works: false,

@@ -1619,7 +1619,7 @@ export function MenuDetailCard({ onClose }: CardProps) {
           <SettingExplainer
             accordionId="menu-detail-how-it-works"
             label="como funciona"
-            description="Sections de 'como funciona' em settings complexas (Sua Lente, Trust Lens). Explica o sistema por trás, não só o controle visível."
+            description="Sections de 'como funciona' em settings complexas (ex: Sua Lente). Explica o sistema por trás, não só o controle visível."
             impact="Quando on, accordion 'como funciona' fica EXPANDIDO por default. Quando off, fica colapsado — user expande manualmente se quiser."
             defaultExplained="Off por default — maioria dos users não precisa do internals; expandem quando curiosos."
             reversible
