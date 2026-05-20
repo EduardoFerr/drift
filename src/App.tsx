@@ -1337,13 +1337,10 @@ function App() {
               <AnimatePresence mode="wait" custom={exitDir}>
                 <PostViewer
                   key={currentPost.id}
-                  embedded
                   custom={exitDir}
                   post={currentPost}
                   isMine={currentPost.authorPub === boot.identity?.npub}
                   pendingAction={pending[currentPost.id] ?? null}
-                  myAction={myActions[currentPost.id] ?? null}
-                  capturingLocation={gpsCapturing.has(currentPost.id)}
                   queue={{
                     index: currentIdx,
                     total: posts.length,
@@ -1361,7 +1358,7 @@ function App() {
                     advanceHome('down')
                   }}
                   onClose={() => {
-                    /* embedded — no-op */
+                    /* home view — não há "fechar" (modal removido em V8) */
                   }}
                 />
               </AnimatePresence>

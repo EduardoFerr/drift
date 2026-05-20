@@ -102,7 +102,6 @@ import { pinPost, unpinPost } from '../../lib/cache'
 import { block, mute } from '../../lib/moderation-local'
 import { follow, unfollow, useFollowsStore } from '../../lib/follows'
 import { db } from '../../lib/db'
-import { timeAgo } from '../../lib/format'
 import { SwipeHandler } from './SwipeHandler'
 import { SubpostCarousel } from './SubpostCarousel'
 // V9.26 — ThreadView lazy. Comments view só monta quando user
@@ -125,7 +124,6 @@ const SpreadMap = lazy(() =>
 import { GlassIconButton } from '../UI/GlassIconButton'
 import { SlideUpOverlay } from '../UI/SlideUpOverlay'
 import { ModalHeader } from '../UI/ModalHeader'
-import { DriftChip } from '../UI/DriftChip'
 import { LensInspector } from './LensInspector'
 // V10.7 — `computeInitialFromExit` removido daqui (lógica inline em
 // EmbeddedWrapper.variants.initial). Função pura preservada em
@@ -155,12 +153,6 @@ export interface PostViewerProps {
    * manifesto §23, Mudança de opinião). User PODE clicar na ação oposta
    * pra reverter; clicar na mesma é no-op silencioso (App.tsx).
    */
-  myAction?: 'spread' | 'bury' | null
-  /**
-   * Captura GPS em curso pra spread/bury deste post. getCurrentLocation
-   * pode levar até 8s — UX precisa indicar que não travou.
-   */
-  capturingLocation?: boolean
   /** Direção de saída (Tinder-like). Recebida via `custom` do AnimatePresence parent. */
   custom?: QueueExitDir
   /** Metadados de fila — opcional pra abrir um post avulso fora de fila. */
@@ -171,20 +163,6 @@ export interface PostViewerProps {
    * sem isso, user via texto sem caminho de saída.
    */
   onOpenLocationSettings?: () => void
-  /**
-   * V8 paradigm shift: quando true, PostViewer renderiza como **home view**
-   * (não modal). Diferenças:
-   *   - Sem `fixed inset-0 z-50` — usa `relative h-full w-full`
-   *   - Sem backdrop bg/blur (parent já provê)
-   *   - Header bulky de buttons hidden (pin/follow/mute/block/report) —
-   *     migram pra menu 3-dots futuro
-   *   - Footer com ↑/↓ buttons hidden — swipe é o único input
-   *   - X close button hidden — não há "fechar" o home
-   *   - Card stack shadow cards ficam visíveis (parent renderiza)
-   *
-   * Default false mantém retrocompat (modal viewer fora desta sessão).
-   */
-  embedded?: boolean
   onSpread: () => void
   onBury: () => void
   onClose: () => void
@@ -194,12 +172,9 @@ export function PostViewer({
   post,
   isMine,
   pendingAction,
-  myAction = null,
-  capturingLocation = false,
   custom,
   queue,
   onOpenLocationSettings,
-  embedded = false,
   onSpread,
   onBury,
   onClose,
@@ -296,19 +271,11 @@ export function PostViewer({
   const isFollowing = useFollowsStore((s) => s.following.has(post.authorPub))
   const total = post.subposts.length
 
-  // Optimistic UI (manifesto §10 + arquitetura §2.4): contador soma +1
-  // imediato quando user clica espalhar/enterrar. Quando o evento real
-  // chega via subscribe e atualiza post.spreads/buries, `pendingAction`
-  // é limpo pelo useEffect em App.tsx e o display volta ao real
-  // (já incluindo o evento confirmado, sem flicker).
-  const displaySpreads = post.spreads + (pendingAction === 'spread' ? 1 : 0)
-  const displayBuries = post.buries + (pendingAction === 'bury' ? 1 : 0)
-
-  // Estado visual efetivo: pending (em vôo) > myAction (confirmada).
-  // "Última ação vale" — botão destacado mostra o que conta no score.
-  const effectiveAction: 'spread' | 'bury' | null = pendingAction ?? myAction
-  const spreadActive = effectiveAction === 'spread'
-  const buryActive = effectiveAction === 'bury'
+  // [cleanup 2026-05-20] Removidas variáveis displaySpreads/displayBuries
+  // /spreadActive/buryActive — eram usadas apenas pelo footer/header
+  // pré-V8 (branch !embedded) já deletado. ActionsFan/SubpostCarousel
+  // consomem post.spreads/buries direto. effectiveAction reduzido se
+  // necessidade reaparecer.
 
   // Carrega estado de pin
   useEffect(() => {
@@ -499,126 +466,16 @@ export function PostViewer({
 
   // V8 embedded mode: home view, sem fixed-inset / sem role=dialog /
   // sem backdrop. ModalWrapper foi removido em Round 12 (dead code
-  // pós-V8). `embedded` prop fica como deprecation no-op até cleanup
-  // dedicado das branches `!embedded` em render path.
+  // pós-V8); branches `!embedded` deletadas em [cleanup 2026-05-20]
+  // junto com a `embedded` prop em si (sempre era true).
   const Wrapper = EmbeddedWrapper
-  void embedded // silenciar unused — branches !embedded ainda existem.
 
   return (
     <Wrapper custom={custom}>
-      {/* Header bulky com pin/follow/mute/block/report — só em modal mode.
-          Em embedded (V8), o header global do app + a tag row dentro do
-          card já entregam contexto; ações secundárias migram pra menu
-          3-dots futuro. */}
-      {!embedded && (
-      <div className="flex items-center justify-between border-b border-drift-border px-4 py-3 text-fluid-xs text-drift-muted">
-        <span className="font-mono">
-          <span className="font-display font-bold uppercase tracking-wider text-drift-text">
-            {isMine ? 'você' : 'anon'}…{post.authorPub.slice(-8)}
-          </span>
-          {' · '}
-          {timeAgo(post.createdAt)}
-          {post.contentWarning && (
-            <DriftChip
-              variant="warning"
-              size="xs"
-              active
-              icon="⚠"
-              className="ml-2"
-              ariaLabel={`aviso de conteúdo: ${post.contentWarning}`}
-            >
-              {post.contentWarning}
-            </DriftChip>
-          )}
-        </span>
-        <div className="flex items-center gap-3 font-mono">
-          <span title={`drifts ${displaySpreads} · sinks ${displayBuries}`}>
-            <span className="uppercase tracking-widest text-drift-muted">DERIVA</span>{' '}
-            <span className="font-medium text-drift-text">{post.score.toFixed(3)}</span>
-          </span>
-          <button
-            onClick={handleTogglePin}
-            disabled={pinned === null}
-            className={`inline-flex h-11 min-w-[44px] items-center justify-center rounded border px-2 ${
-              pinned
-                ? 'border-drift-warning text-drift-warning'
-                : 'border-drift-border hover:border-drift-warning hover:text-drift-warning'
-            } disabled:opacity-40`}
-            title={
-              pinned
-                ? 'fixado — protegido de eviction (manifesto §16)'
-                : 'fixar — protege de eviction local + marca pra re-broadcast'
-            }
-            aria-label={pinned ? 'Desfixar' : 'Fixar'}
-          >
-            {pinned ? <PinIcon size={16} /> : <PinOffIcon size={16} />}
-          </button>
-          <button
-            onClick={() => setShowMap((v) => !v)}
-            className={`inline-flex h-11 min-w-[44px] items-center justify-center rounded border px-2 ${
-              showMap
-                ? 'border-drift-accent text-drift-accent'
-                : 'border-drift-border hover:border-drift-accent hover:text-drift-accent'
-            }`}
-            title="mapa de deriva"
-            aria-label="Abrir mapa"
-          >
-            <MapIcon size={18} />
-          </button>
-          {!isMine && (
-            <>
-              <button
-                onClick={handleFollowToggle}
-                className={`inline-flex h-11 min-w-[44px] items-center justify-center rounded border px-2 ${
-                  isFollowing
-                    ? 'border-drift-accent text-drift-accent'
-                    : 'border-drift-border hover:border-drift-accent hover:text-drift-accent'
-                }`}
-                title={
-                  isFollowing
-                    ? 'deixar de seguir — publica kind 3 atualizado'
-                    : 'seguir — alimenta a aba "seguindo" do feed (NIP-02)'
-                }
-                aria-label={isFollowing ? 'Deixar de seguir' : 'Seguir'}
-              >
-                {isFollowing ? <CheckIcon size={16} /> : <PlusIcon size={16} />}
-              </button>
-              <button
-                onClick={handleMute}
-                className="inline-flex h-11 min-w-[44px] items-center justify-center rounded border border-drift-border px-2 hover:border-drift-warning hover:text-drift-warning"
-                title="silenciar autor — só esconde posts dele do meu feed (manifesto §24)"
-                aria-label="Silenciar"
-              >
-                <MicOffIcon size={16} />
-              </button>
-              <button
-                onClick={handleBlock}
-                className="inline-flex h-11 min-w-[44px] items-center justify-center rounded border border-drift-border px-2 hover:border-drift-danger hover:text-drift-danger"
-                title="bloquear autor — esconde posts e interações dele (manifesto §24)"
-                aria-label="Bloquear"
-              >
-                <BanIcon size={16} />
-              </button>
-              <button
-                onClick={() => setShowReport(true)}
-                className="inline-flex h-11 min-w-[44px] items-center justify-center rounded border border-drift-border px-2 hover:border-drift-danger hover:text-drift-danger"
-                title="denunciar — manifesto §26"
-                aria-label="Denunciar"
-              >
-                <WarningIcon size={16} />
-              </button>
-            </>
-          )}
-          <button
-            onClick={onClose}
-            className="inline-flex h-11 min-w-[44px] items-center justify-center rounded border border-drift-border px-2 hover:border-drift-accent hover:text-drift-accent"
-            aria-label="Fechar"
-          >
-            <XIcon size={16} />
-          </button>
-        </div>
-      </div>
-      )}
+      {/* Header bulky pré-V8 (modal mode com pin/follow/mute/block/report)
+          removido em [PostViewer cleanup 2026-05-20] — branch !embedded
+          era dead code desde V8 (todos call sites passam embedded=true).
+          Ações secundárias migraram pro ActionsFan (menu ⋮). */}
 
       {/* Mapa de spread render removido daqui (V12 2026-05-18) — antes
           era strip horizontal de 240px ABOVE conteúdo (50/50 split). Agora
@@ -740,9 +597,10 @@ export function PostViewer({
         {/* V11 — botões do header (⋮ ações + 💬 comments + 🗺 mapa).
             Absolute top-right do card area, z-30 pra ficar acima do
             SwipeHandler. onClick stopPropagation pra evitar conflito
-            com swipe gesture. */}
-        {embedded && (
-          <>
+            com swipe gesture.
+            [PostViewer cleanup 2026-05-20] — wrap `{embedded && ...}`
+            removido; embedded sempre true, render incondicional. */}
+        <>
             <GlassIconButton
               onClick={(e) => {
                 e.stopPropagation()
@@ -857,8 +715,7 @@ export function PostViewer({
             {/* Trust Lens inspector chip — bottom-right do card.
                 Aparece só quando lens strength > 0 E post foi tocado. */}
             <LensInspector postId={post.id} authorPub={post.authorPub} />
-          </>
-        )}
+        </>
         {queue && queue.next && (
           <>
             {/* Shadow stack (Tinder-style fila). Round 4 Fase A: usa
@@ -934,96 +791,10 @@ export function PostViewer({
         </SwipeHandler>
       </div>
 
-      {/* Footer com ações + dicas — V3.1 paleta v0.7.
-          V8: hidden em embedded mode (swipe é o único input no home view). */}
-      {!embedded && (
-      <div className="flex items-center justify-between border-t border-drift-border px-4 py-3 font-mono text-[12px] text-drift-muted">
-        <div className="flex gap-3">
-          <span className="text-drift-spread">↑ {displaySpreads}</span>
-          <span className="text-drift-bury">↓ {displayBuries}</span>
-          {total > 1 && (
-            <span className="text-drift-text">
-              {subpostIdx + 1} / {total}
-            </span>
-          )}
-          {queue && queue.total > 1 && (
-            <span
-              className="text-drift-muted"
-              title="posição na fila — ↑/↓ avança automaticamente"
-            >
-              fila {queue.index + 1}/{queue.total}
-            </span>
-          )}
-        </div>
-        <div className="hidden gap-3 sm:flex">
-          {queue?.next ? (
-            <span title="próximo da fila">
-              próximo: anon…{queue.next.authorPub.slice(-6)}
-            </span>
-          ) : (
-            <span>↑ DRIFT · ↓ SINK{total > 1 && ' · ← → navega'}</span>
-          )}
-        </div>
-        <div className="flex gap-2">
-          {/* Track C.4.2 — comments trigger (modal mode) */}
-          <button
-            onClick={() => setShowThread(true)}
-            className="inline-flex h-11 min-w-[44px] items-center justify-center gap-1 rounded border border-drift-border px-2 text-drift-muted hover:border-drift-accent2 hover:text-drift-accent2"
-            title="abrir comentários"
-            aria-label={`Comentários${commentCount > 0 ? ` (${commentCount})` : ''}`}
-          >
-            <span aria-hidden="true">
-              <MessageCircleIcon size={18} strokeWidth={2} />
-            </span>
-            {commentCount > 0 && (
-              <span className="text-[12px] leading-none font-mono tabular-nums">
-                {commentCount}
-              </span>
-            )}
-          </button>
-          <button
-            onClick={onSpread}
-            disabled={pendingAction !== null}
-            className={`inline-flex h-11 min-w-[44px] items-center justify-center rounded border px-2 disabled:opacity-40 ${
-              spreadActive
-                ? 'border-drift-spread bg-drift-spread/15 text-drift-spread'
-                : 'border-drift-spread/40 text-drift-spread hover:bg-drift-spread/10'
-            }`}
-            title={
-              capturingLocation && pendingAction === 'spread'
-                ? 'capturando localização (até 8s)'
-                : myAction === 'spread'
-                ? 'você driftou — ↓ pra mudar de opinião'
-                : undefined
-            }
-            aria-pressed={spreadActive}
-          >
-            {pendingAction === 'spread'
-              ? capturingLocation
-                ? '📍'
-                : '…'
-              : '↑'}
-          </button>
-          <button
-            onClick={onBury}
-            disabled={pendingAction !== null}
-            className={`inline-flex h-11 min-w-[44px] items-center justify-center rounded border px-2 disabled:opacity-40 ${
-              buryActive
-                ? 'border-drift-bury bg-drift-bury/15 text-drift-bury'
-                : 'border-drift-bury/40 text-drift-bury hover:bg-drift-bury/10'
-            }`}
-            title={
-              myAction === 'bury'
-                ? 'você sinkou — ↑ pra mudar de opinião'
-                : undefined
-            }
-            aria-pressed={buryActive}
-          >
-            {pendingAction === 'bury' ? '…' : '↓'}
-          </button>
-        </div>
-      </div>
-      )}
+      {/* Footer pré-V8 (modal mode com botões ↑/↓ + comments + counts)
+          removido em [PostViewer cleanup 2026-05-20] — branch !embedded
+          era dead code desde V8 (swipe é único input no home view;
+          ActionsFan cobre comments + ações secundárias). */}
 
       <AnimatePresence>
         {showReport && (
