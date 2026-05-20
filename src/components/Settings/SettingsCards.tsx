@@ -41,18 +41,17 @@ import type {
   NetworkMode,
 } from '../../types/drift'
 import { FullPageCard } from '../UI/FullPageCard'
-import { Collapse } from '../UI/Collapse'
 import { RefreshIcon } from '../UI/Icons'
-import { SectionHeader } from '../UI/SectionHeader'
 import { SettingExplainer } from '../UI/SettingExplainer'
+// Collapse + SectionHeader removidos (refactor 2026-05-18): após todos
+// os cards adotarem SettingExplainer, accordion não é mais usado.
 
-// ─── Accordion helpers ──────────────────────────────────────────
-
-function useAccordion(initial: number | null = 0) {
-  const [open, setOpen] = useState<number | null>(initial)
-  const toggle = (i: number) => setOpen((prev) => (prev === i ? null : i))
-  return { open, toggle }
-}
+// ─── Helpers ────────────────────────────────────────────────────
+//
+// useAccordion removido (refactor 2026-05-18): após todos os cards
+// adotarem SettingExplainer, accordion não é mais usado. Cards são
+// always-visible com hierarquia clara via SettingExplainer's anatomy
+// (label + description + impact + meta).
 
 function Toggle({
   label,
@@ -275,43 +274,47 @@ export function MapViewCard({ onClose }: CardProps) {
   return (
     <FullPageCard onClose={onClose} title="mapa de spread" ariaLabel="enquadramento do mapa">
       <div className="space-y-3 px-4 py-5">
-        <SectionHeader title="enquadramento" />
-        <p className="px-1 font-mono text-[11px] leading-relaxed text-drift-muted/60">
-          fechado foca na região com atividade. aberto mostra o globo.
-        </p>
-        <div
-          className="relative inline-flex w-full rounded-2xl border border-drift-border/40 bg-drift-surface/50 p-1"
-          role="radiogroup"
-          aria-label="enquadramento"
+        <SettingExplainer
+          label="enquadramento padrão do mapa"
+          description="Quando você abre o mapa de um post pra ver de onde ele veio, ele pode começar focado na região onde aconteceu, ou mostrando o globo inteiro."
+          impact="'Fechado' mostra a região com atividade primeiro — mais útil pra entender o contexto local. 'Aberto' mostra o globo inteiro — mais útil pra ver distribuição global. Você pode dar zoom in/out depois nos dois casos."
+          defaultExplained="Fechado. Maioria dos posts tem atividade local; abrir já fechado economiza o zoom-in inicial."
+          reversible
         >
-          {/* Pill animada — desliza entre opções */}
-          <m.span
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-y-1 left-1 rounded-xl bg-drift-accent2/20 border border-drift-accent2/40"
-            style={{ width: `calc(${100 / MAP_VIEW_OPTIONS.length}% - 4px)` }}
-            animate={{ x: `${activeIndex * 100}%` }}
-            transition={{ type: 'spring', stiffness: 380, damping: 28, mass: 0.6 }}
-          />
-          {MAP_VIEW_OPTIONS.map((opt) => {
-            const active = prefs.map_view === opt.value
-            return (
-              <button
-                key={opt.value}
-                role="radio"
-                aria-checked={active}
-                onClick={() => void setPref('map_view', opt.value)}
-                className={`relative z-10 flex-1 rounded-xl px-3 py-3 font-mono text-[12px] uppercase tracking-meta transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40 ${
-                  active
-                    ? 'text-drift-accent2'
-                    : 'text-drift-muted hover:text-drift-text'
-                }`}
-                title={opt.hint}
-              >
-                {opt.label}
-              </button>
-            )
-          })}
-        </div>
+          <div
+            className="relative inline-flex w-full rounded-2xl border border-drift-border/40 bg-drift-surface/50 p-1"
+            role="radiogroup"
+            aria-label="enquadramento"
+          >
+            {/* Pill animada — desliza entre opções */}
+            <m.span
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-y-1 left-1 rounded-xl bg-drift-accent2/20 border border-drift-accent2/40"
+              style={{ width: `calc(${100 / MAP_VIEW_OPTIONS.length}% - 4px)` }}
+              animate={{ x: `${activeIndex * 100}%` }}
+              transition={{ type: 'spring', stiffness: 380, damping: 28, mass: 0.6 }}
+            />
+            {MAP_VIEW_OPTIONS.map((opt) => {
+              const active = prefs.map_view === opt.value
+              return (
+                <button
+                  key={opt.value}
+                  role="radio"
+                  aria-checked={active}
+                  onClick={() => void setPref('map_view', opt.value)}
+                  className={`relative z-10 flex-1 rounded-xl px-3 py-3 font-mono text-[12px] uppercase tracking-meta transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40 ${
+                    active
+                      ? 'text-drift-accent2'
+                      : 'text-drift-muted hover:text-drift-text'
+                  }`}
+                  title={opt.hint}
+                >
+                  {opt.label}
+                </button>
+              )
+            })}
+          </div>
+        </SettingExplainer>
       </div>
     </FullPageCard>
   )
@@ -574,22 +577,25 @@ export function BlobsCard({ onClose }: CardProps) {
       ariaLabel="status helia ipfs"
     >
       <div className="space-y-3 px-4 py-5">
-        <SectionHeader title="distribuição" />
-        <p className="px-1 font-mono text-[10px] text-drift-muted/30">
-          imagens via IPFS com fallback HTTP. sua cópia serve blobs a outros.
-        </p>
-
-        <div className="space-y-2 pl-3">
+        <SettingExplainer
+          label="distribuir imagens via IPFS"
+          description="Quando ligado, seu dispositivo participa de uma rede P2P (IPFS via Helia) servindo cópias de imagens que você baixou pra outros usuários. Reduz dependência de servidor central."
+          impact="Custo: banda extra (uns MB/min enquanto rede ativa), uso de RAM moderado, conexões libp2p mantidas abertas. Benefício: melhor disponibilidade quando servidor central cai, manifesto §16 (disponibilidade distribuída). Ligar mostra estatísticas (peers, blobs servidos). Desligar termina conexões mas não apaga blobs já baixados."
+          defaultExplained="Desligado. IPFS consome recursos contínuos — ligue se você quer participar ativamente da rede ou se notou imagens lentas via HTTP."
+          reversible
+          level="advanced"
+          reference="manifesto §16 — disponibilidade distribuída"
+        >
           <Toggle
-            label="usar IPFS"
-            hint="distribuir via libp2p — banda extra, melhor disponibilidade"
+            label="ligar IPFS"
+            hint="quando on, sua banda ajuda a distribuir imagens da rede"
             value={useIpfs}
             onChange={(v) => void handleToggleIpfs(v)}
           />
 
           {!useIpfs && (
-            <div className="rounded-xl border border-drift-border/20 bg-drift-surface/20 px-4 py-3 font-mono text-[11px] text-drift-muted/40">
-              IPFS desativado. Imagens servidas via HTTP.
+            <div className="mt-3 rounded-xl border border-drift-border/40 bg-drift-surface/40 px-4 py-3 font-mono text-[11px] text-drift-body">
+              IPFS desligado. Imagens carregam normalmente via HTTP (servidor central).
             </div>
           )}
 
@@ -650,7 +656,7 @@ export function BlobsCard({ onClose }: CardProps) {
               </div>
             </div>
           )}
-        </div>
+        </SettingExplainer>
       </div>
     </FullPageCard>
   )
@@ -690,7 +696,8 @@ function Row({
  *  4. Auto-discovery — toggle p2p_auto_follows (NIP-02)
  */
 export function PeersCard({ onClose }: CardProps) {
-  const acc = useAccordion(0)
+  // useAccordion removido (refactor 2026-05-18): 4 SettingExplainer cards
+  // always-visible. Power-user card; scroll é aceitável.
   const identity = useBootStore((s) => s.identity)
   const prefs = usePrefsStore()
   const [qrUrl, setQrUrl] = useState<string | null>(null)
@@ -858,12 +865,18 @@ export function PeersCard({ onClose }: CardProps) {
 
   return (
     <FullPageCard onClose={onClose} title="peers P2P" ariaLabel="conexao peer-to-peer">
-      <div className="space-y-3 px-4 py-5">
+      <div className="space-y-4 px-4 py-5">
 
         {/* ── 1. Meu QR / Link ──────────────────────────────────── */}
-        <SectionHeader title="meu qr" expanded={acc.open === 0} onToggle={() => acc.toggle(0)} />
-        <Collapse open={acc.open === 0}>
-          <div className="space-y-2 pl-3">
+        <SettingExplainer
+          label="meu QR / link de perfil"
+          description="Seu QR e link compartilham sua identidade pública (npub) com outros usuários do Drift. Quem escaneia ou abre o link consegue te seguir."
+          impact="Compartilhar não revela seu nsec (chave privada). Só revela sua identidade pública — a mesma que aparece quando você posta. Útil pra conectar offline (impressão, mostrar tela) ou via apps que aceitam links (chat, email)."
+          defaultExplained="Sempre disponível. QR e link são gerados localmente da sua npub — sem servidor central."
+          reversible
+          reference="manifesto §3 — identidade portável"
+        >
+          <div className="space-y-2">
             <div className="rounded-xl border border-drift-border/30 bg-drift-surface/30 p-5">
               {qrUrl ? (
                 <div className="flex flex-col items-center gap-3">
@@ -904,16 +917,20 @@ export function PeersCard({ onClose }: CardProps) {
               {copied ? '✓ copiado' : typeof navigator.share === 'function' ? '↗ compartilhar link' : '⎘ copiar link'}
             </button>
           </div>
-        </Collapse>
+        </SettingExplainer>
 
         {/* ── 2. Conectar (scan + paste) ─────────────────────────── */}
-        <SectionHeader title="conectar" expanded={acc.open === 1} onToggle={() => acc.toggle(1)} />
-        <Collapse open={acc.open === 1}>
-          <>
-            <p className="px-1 font-mono text-[10px] text-drift-muted/30">
-              escaneie o QR de outro usuario ou cole o link.
-            </p>
-            <div className="space-y-2 pl-3">
+        <SettingExplainer
+          label="conectar com outro usuário"
+          description="Escaneie o QR de alguém ou cole a npub/nprofile pra estabelecer conexão P2P direta. Bypassa relays — fala direto com o peer."
+          impact="Conexão direta significa que seu IP fica visível pro peer (não tem proxy/relay no meio). Bom pra trocar posts/eventos rápido com peers conhecidos. Ruim pra conectar com desconhecidos — expõe sua localização de rede."
+          defaultExplained="Manual — você decide com quem conectar. P2P direto é opt-in (manifesto §15 anti-censura por país, §28 privacidade)."
+          warning="Conexão direta expõe seu IP pro peer escolhido. Não use com desconhecidos."
+          reversible
+          level="advanced"
+          reference="manifesto §15, §28"
+        >
+          <div className="space-y-2">
               <div id={scanDivId} className="hidden" />
               <div className="flex gap-2">
                 <label className="flex flex-1 cursor-pointer items-center justify-center rounded-xl border border-drift-accent2/25 bg-drift-surface/30 px-3 py-3 font-mono text-[12px] uppercase tracking-meta text-drift-accent2 transition-colors hover:bg-drift-accent2/10 focus-within:ring-2 focus-within:ring-drift-accent2/40">
@@ -953,9 +970,6 @@ export function PeersCard({ onClose }: CardProps) {
                 placeholder="npub1… ou nprofile1…"
                 className="w-full rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3 font-mono text-[12px] text-drift-text placeholder:text-drift-muted/70 focus:border-drift-accent2/40 focus:outline-none focus:ring-1 focus:ring-drift-accent2/20"
               />
-              <p className="px-1 font-mono text-[10px] text-drift-warning/40">
-                conexão direta — seu IP será visível para este peer
-              </p>
               <button
                 onClick={() => void handleConnect()}
                 disabled={connecting || !peerInput.trim()}
@@ -968,18 +982,20 @@ export function PeersCard({ onClose }: CardProps) {
                   {connectError}
                 </div>
               )}
-            </div>
-          </>
-        </Collapse>
+          </div>
+        </SettingExplainer>
 
         {/* ── 3. Bundle offline ──────────────────────────────────── */}
-        <SectionHeader title="bundle offline" expanded={acc.open === 2} onToggle={() => acc.toggle(2)} />
-        <Collapse open={acc.open === 2}>
-          <>
-            <p className="px-1 font-mono text-[10px] text-drift-muted/30">
-              exporte pra .json e passe via USB, airdrop, email.
-            </p>
-            <div className="space-y-2 pl-3">
+        <SettingExplainer
+          label="bundle offline (sneakernet)"
+          description="Exporta seus posts (kind 9078), drifts (9079), sinks (9080) e reports (9081) num arquivo .json. Você passa pra outra pessoa via USB, airdrop, email ou qualquer canal — ela importa e os eventos materializam no banco local dela."
+          impact="Os eventos são re-distribuídos via canal não-Nostr (offline ou bloqueado). Útil em regiões com internet censurada (manifesto §15). Quem recebe vê seus posts como se viessem dos relays normais (são imutáveis e assinados). Eventos antigos não são re-publicados se a outra pessoa já os tem."
+          defaultExplained="Manual. Sneakernet (passar via mídia física) é fallback pra anti-censura, não fluxo principal."
+          reversible
+          level="advanced"
+          reference="manifesto §15, §16 — disponibilidade distribuída"
+        >
+          <div className="space-y-2">
               <div className="flex gap-2">
                 <button
                   onClick={() => void handleExport()}
@@ -1021,22 +1037,27 @@ export function PeersCard({ onClose }: CardProps) {
                   {importResult}
                 </div>
               )}
-            </div>
-          </>
-        </Collapse>
+          </div>
+        </SettingExplainer>
 
         {/* ── 4. Auto-discovery (NIP-02) ─────────────────────────── */}
-        <SectionHeader title="auto-discovery" expanded={acc.open === 3} onToggle={() => acc.toggle(3)} />
-        <Collapse open={acc.open === 3}>
-          <div className="pl-3">
-            <Toggle
-              label="conectar com quem voce segue"
-              hint="quem voce segue pode ver seu IP. default OFF."
-              value={prefs.p2p_auto_follows}
-              onChange={(v) => void setPref('p2p_auto_follows', v)}
-            />
-          </div>
-        </Collapse>
+        <SettingExplainer
+          label="auto-conectar com quem você segue"
+          description="Quando ligado, o app tenta abrir conexões P2P diretas com cada pessoa que você segue. Acelera sync de posts deles."
+          impact="Acelera o feed (posts deles chegam direto, sem passar por relay). Custa banda contínua (mantém N conexões abertas). E expõe seu IP pra TODOS que você segue — eles podem ver de onde você se conecta."
+          defaultExplained="Desligado. Manifesto §28: privacidade pelo mínimo. Auto-conectar viola isso por default — só ligue se confia em todos que segue."
+          warning="Quem você segue passa a ver seu IP. Não ligue se segue contas anônimas/desconhecidas."
+          reversible
+          level="advanced"
+          reference="manifesto §28 — privacidade pelo mínimo"
+        >
+          <Toggle
+            label="ligar auto-discovery via NIP-02"
+            hint="conecta P2P direto com cada pessoa que você segue"
+            value={prefs.p2p_auto_follows}
+            onChange={(v) => void setPref('p2p_auto_follows', v)}
+          />
+        </SettingExplainer>
       </div>
     </FullPageCard>
   )
@@ -1045,7 +1066,9 @@ export function PeersCard({ onClose }: CardProps) {
 // ─── DiagnosticCard ──────────────────────────────────────────────
 
 export function DiagnosticCard({ onClose }: CardProps) {
-  const acc = useAccordion(0)
+  // useAccordion removido (refactor 2026-05-18): SettingExplainer cards
+  // já têm hierarquia visual própria + always-visible meta. Accordion
+  // era pra reduzir clutter; primitive resolve com layout claro.
   const [rebuilding, setRebuilding] = useState(false)
   const npub = useBootStore((s) => s.identity?.npub) ?? null
   const rebuildsInProgress = useSyncStore((s) => s.rebuildsInProgress)
@@ -1109,54 +1132,54 @@ export function DiagnosticCard({ onClose }: CardProps) {
       ariaLabel="diagnóstico — redefinir cache"
       escDismissible={!rebuilding}
     >
-      <div className="space-y-3 px-4 py-5">
-        <SectionHeader title="histórico" expanded={acc.open === 0} onToggle={() => acc.toggle(0)} />
-        <Collapse open={acc.open === 0}>
-          <>
-            <p className="px-1 font-mono text-[10px] text-drift-muted/30">
-              faltando posts antigos? force a busca completa do seu nsec.
-            </p>
-            <div className="pl-3">
-              <button
-                onClick={handleFetchHistory}
-                disabled={historyRebuilding || !npub}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-drift-accent2 px-4 py-3 font-mono text-[12px] uppercase tracking-meta font-medium text-drift-bg transition-colors hover:bg-drift-accent2/85 disabled:cursor-not-allowed disabled:opacity-25 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
-              >
-                {historyRebuilding ? (
-                  'reconstruindo…'
-                ) : (
-                  <>
-                    <RefreshIcon size={14} /> buscar histórico
-                  </>
-                )}
-              </button>
-            </div>
-          </>
-        </Collapse>
+      <div className="space-y-4 px-4 py-5">
+        <SettingExplainer
+          label="buscar histórico antigo"
+          description="O app só sincroniza posts dos últimos 7 dias por default ao iniciar. Se você usa o mesmo nsec há mais tempo, posts antigos podem estar fora dessa janela. Este botão força uma busca completa."
+          impact="O app consulta todos os relays atuais buscando QUALQUER post seu (kind 9078) sem limite de data. Pode demorar minutos em rede lenta. Posts encontrados materializam no SQLite local."
+          defaultExplained="Não roda automático — só quando você pede. A janela inicial de 7 dias cobre 90% dos casos sem custo de banda."
+          reversible
+          level="advanced"
+          reference="manifesto §3 — identidade portável"
+        >
+          <button
+            onClick={handleFetchHistory}
+            disabled={historyRebuilding || !npub}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-drift-accent2 px-4 py-3 font-mono text-[12px] uppercase tracking-meta font-medium text-drift-bg transition-colors hover:bg-drift-accent2/85 disabled:cursor-not-allowed disabled:opacity-25 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
+          >
+            {historyRebuilding ? (
+              'reconstruindo…'
+            ) : (
+              <>
+                <RefreshIcon size={14} /> buscar histórico
+              </>
+            )}
+          </button>
+        </SettingExplainer>
 
-        <SectionHeader title="redefinir cache" expanded={acc.open === 1} onToggle={() => acc.toggle(1)} />
-        <Collapse open={acc.open === 1}>
-          <>
-            <p className="px-1 font-mono text-[10px] text-drift-muted/30">
-              identidade e preferências preservadas. posts re-sincronizam.
-            </p>
-            <div className="pl-3">
-              <button
-                onClick={handleRebuild}
-                disabled={rebuilding}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-drift-warning/20 bg-drift-warning/5 px-4 py-3 font-mono text-[12px] uppercase tracking-meta text-drift-warning transition-colors hover:bg-drift-warning/10 disabled:cursor-not-allowed disabled:opacity-25 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-warning/30"
-              >
-                {rebuilding ? (
-                  'reconstruindo…'
-                ) : (
-                  <>
-                    <RefreshIcon size={14} /> redefinir cache local
-                  </>
-                )}
-              </button>
-            </div>
-          </>
-        </Collapse>
+        <SettingExplainer
+          label="redefinir cache local"
+          description="Apaga todos os posts, drifts (kind 9079), sinks (kind 9080) e reports do banco local. Identidade (nsec) e preferências ficam intactas. O app re-sincroniza tudo dos relays na próxima vez que abrir."
+          impact="Útil quando o app fica em estado estranho após atualização ou banco corrompeu. Você não perde nada permanentemente — os relays guardam os eventos imutáveis. Pode levar alguns segundos pra re-sincronizar."
+          defaultExplained="Action manual — só roda quando você pede. Cache normal não precisa de redefinição."
+          warning="Mudança no banco local. Identidade preservada, mas o app vai recarregar e re-sincronizar do zero."
+          reversible
+          level="advanced"
+        >
+          <button
+            onClick={handleRebuild}
+            disabled={rebuilding}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-drift-warning/40 bg-drift-warning/10 px-4 py-3 font-mono text-[12px] uppercase tracking-meta text-drift-warning transition-colors hover:bg-drift-warning/20 disabled:cursor-not-allowed disabled:opacity-25 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-warning/40"
+          >
+            {rebuilding ? (
+              'reconstruindo…'
+            ) : (
+              <>
+                <RefreshIcon size={14} /> redefinir cache local
+              </>
+            )}
+          </button>
+        </SettingExplainer>
       </div>
     </FullPageCard>
   )
@@ -1293,52 +1316,56 @@ export function PermissionsCard({ onClose }: CardProps) {
   return (
     <FullPageCard onClose={onClose} title="permissões" ariaLabel="permissões do navegador">
       <div className="space-y-3 px-4 py-5">
-        <SectionHeader title="navegador" />
-        <p className="px-1 font-mono text-[10px] text-drift-muted/30">
-          nenhuma é obrigatória. se bloqueou, libere no navegador.
-        </p>
+        <SettingExplainer
+          label="o que o app pode acessar"
+          description="O navegador controla acesso a GPS, câmera e microfone. O Drift NÃO usa nada disso automaticamente — só quando você opta por uma feature específica (ex: anexar localização no post)."
+          impact="Conceder permissão NÃO ativa nada — só dá ao app o direito de pedir se você usar a feature relacionada. Negar bloqueia a feature inteira (ex: posts sem location). Você pode revogar a qualquer momento nas configurações do navegador."
+          defaultExplained="Tudo em 'não solicitado'. Drift só pede quando você ativa a feature correspondente (manifesto §28 — privacidade pelo mínimo)."
+          reversible
+          reference="manifesto §28 — privacidade pelo mínimo"
+        >
+          <div className="space-y-2">
+            {PERM_ITEMS.map((item) => {
+              const s = perms[item.key]
+              const { text, color } = stateLabel(s)
+              const canRequest = s === 'prompt'
+              const isRequesting = requesting === item.key
 
-        <div className="space-y-2 pl-3">
-          {PERM_ITEMS.map((item) => {
-            const s = perms[item.key]
-            const { text, color } = stateLabel(s)
-            const canRequest = s === 'prompt'
-            const isRequesting = requesting === item.key
+              return (
+                <div
+                  key={item.key}
+                  className="flex items-center justify-between gap-3.5 rounded-xl border border-drift-border/40 bg-drift-surface/40 px-4 py-3.5"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="font-mono text-[13px] text-drift-text">{item.label}</div>
+                    <div className="mt-0.5 font-mono text-[11px] text-drift-body/85">
+                      {item.hint}
+                    </div>
+                    <div className={`mt-1 font-mono text-[10px] font-medium ${color}`}>
+                      {text}
+                    </div>
+                  </div>
 
-            return (
-              <div
-                key={item.key}
-                className="flex items-center justify-between gap-3.5 rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3.5"
-              >
-                <div className="flex-1 min-w-0">
-                  <div className="font-mono text-[13px] text-drift-text">{item.label}</div>
-                  <div className="mt-0.5 font-mono text-[10px] text-drift-muted/40">
-                    {item.hint}
-                  </div>
-                  <div className={`mt-1 font-mono text-[10px] font-medium ${color}`}>
-                    {text}
-                  </div>
+                  {canRequest && (
+                    <button
+                      onClick={() => void handleRequest(item)}
+                      disabled={isRequesting}
+                      className="shrink-0 rounded-lg bg-drift-accent2 px-3.5 py-1.5 font-mono text-[11px] uppercase tracking-meta font-medium text-drift-bg transition-colors hover:bg-drift-accent2/85 disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
+                    >
+                      {isRequesting ? '…' : 'solicitar'}
+                    </button>
+                  )}
+
+                  {s === 'denied' && (
+                    <span className="shrink-0 font-mono text-[10px] text-drift-muted">
+                      libere no navegador
+                    </span>
+                  )}
                 </div>
-
-                {canRequest && (
-                  <button
-                    onClick={() => void handleRequest(item)}
-                    disabled={isRequesting}
-                    className="shrink-0 rounded-lg bg-drift-accent2 px-3.5 py-1.5 font-mono text-[11px] uppercase tracking-meta font-medium text-drift-bg transition-colors hover:bg-drift-accent2/85 disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
-                  >
-                    {isRequesting ? '…' : 'solicitar'}
-                  </button>
-                )}
-
-                {s === 'denied' && (
-                  <span className="shrink-0 font-mono text-[10px] text-drift-muted/30">
-                    libere no navegador
-                  </span>
-                )}
-              </div>
-            )
-          })}
-        </div>
+              )
+            })}
+          </div>
+        </SettingExplainer>
       </div>
     </FullPageCard>
   )
@@ -1451,42 +1478,65 @@ export function SovereigntyCard({ onClose }: CardProps) {
       ariaLabel="endpoints customizáveis"
     >
       <div className="space-y-5 px-4 py-5">
-        <SectionHeader title="endpoints" />
-        <p className="px-1 font-mono text-[10px] text-drift-muted/30">
-          rota seu cliente pra infra própria. cada campo independente.
-          empty/0 cai no default. fica neste dispositivo — nada sai daqui.
-        </p>
+        <SettingExplainer
+          label="onde upload de imagens vai parar"
+          description="Quando você anexa foto a um post, o arquivo é enviado pra um servidor externo (não é Nostr — Nostr só guarda o link). Aqui você escolhe qual servidor recebe."
+          impact="O default (nostr.build) é gratuito mas conhece seu IP e o conteúdo. Trocar pra Blossom self-hosted, hospedagem própria ou IPFS gateway tira esse conhecimento da nostr.build. URL completa (https://) ou vazio pra usar o default."
+          defaultExplained="nostr.build — gratuito, sem cadastro, aceita usuários anônimos. Bom enough pra MVP, troque se quer mais isolamento."
+          reversible
+          level="advanced"
+          reference="manifesto §17 — sem chave mestra"
+        >
+          <SovereigntyField
+            label="endpoint de upload"
+            hint="URL completa do servidor que aceita upload"
+            placeholder="https://blossom.exemplo.com/upload"
+            value={prefs.upload_endpoint ?? ''}
+            inputMode="url"
+            onCommit={commitUpload}
+          />
+        </SettingExplainer>
 
-        <SovereigntyField
-          label="upload de imagens"
-          hint="default: nostr.build. troque pra Blossom self-hosted, hospedagem própria, IPFS gateway com upload. URL completa (https://)."
-          placeholder="https://blossom.exemplo.com/upload"
-          value={prefs.upload_endpoint ?? ''}
-          inputMode="url"
-          onCommit={commitUpload}
-        />
-
-        <SovereigntyField
+        <SettingExplainer
           label="tile server do mapa"
-          hint="default: CARTO Voyager (loga seu IP). troque pra OSM, mirror Tor, self-hosted. XYZ template com {x} {y} {z}."
-          placeholder="https://tiles.exemplo.com/{z}/{x}/{y}.png"
-          value={prefs.map_tile_url_template ?? ''}
-          inputMode="url"
-          onCommit={commitTile}
-        />
+          description="O mapa de spread mostra de onde os posts vieram usando tiles (imagens quadradas) servidas por um provedor externo. Esse provedor sabe quando e onde você consultou o mapa."
+          impact="Default CARTO loga seu IP a cada tile carregado — útil pra análise deles. Trocar pra OSM público, mirror Tor ou self-hosted tira esse rastreio. URL precisa template XYZ com {x}, {y}, {z}."
+          defaultExplained="CARTO Voyager — gratuito, sem cadastro, tiles bonitos. Privacy custo: cada pan/zoom vai pra eles."
+          reversible
+          level="advanced"
+        >
+          <SovereigntyField
+            label="tile template XYZ"
+            hint="URL com {x}/{y}/{z} placeholders"
+            placeholder="https://tiles.exemplo.com/{z}/{x}/{y}.png"
+            value={prefs.map_tile_url_template ?? ''}
+            inputMode="url"
+            onCommit={commitTile}
+          />
+        </SettingExplainer>
 
-        <SovereigntyField
-          label="threshold de moderação (override)"
-          hint="default: dinâmico baseado em volume da rede. integer ≥1 força threshold fixo. 0/empty = dinâmico."
-          placeholder="(dinâmico)"
-          value={
-            prefs.report_threshold_override && prefs.report_threshold_override > 0
-              ? String(prefs.report_threshold_override)
-              : ''
-          }
-          inputMode="numeric"
-          onCommit={commitThreshold}
-        />
+        <SettingExplainer
+          label="quantos reports pra esconder um post"
+          description="Quando muitos usuários reportam o mesmo post, o app esconde ele do feed local (não apaga — só esconde). Esse número é dinâmico por padrão (ajusta com volume da rede). Você pode forçar um valor fixo."
+          impact="Threshold baixo (ex: 3) = mais posts somem do feed cedo (sensível a abusos coordenados). Threshold alto (ex: 50) = posts ficam por mais tempo (resiste a campanha de reports). Empty/0 = volta pro algoritmo dinâmico."
+          defaultExplained="Dinâmico — calculado com base em volume médio de reports na rede + threshold mínimo configurado em config/constants. Funciona bem na maioria dos casos."
+          reversible
+          level="advanced"
+          reference="manifesto §26 — moderação comunitária"
+        >
+          <SovereigntyField
+            label="threshold fixo"
+            hint="integer ≥ 1 OU vazio pra dinâmico"
+            placeholder="(dinâmico)"
+            value={
+              prefs.report_threshold_override && prefs.report_threshold_override > 0
+                ? String(prefs.report_threshold_override)
+                : ''
+            }
+            inputMode="numeric"
+            onCommit={commitThreshold}
+          />
+        </SettingExplainer>
       </div>
     </FullPageCard>
   )

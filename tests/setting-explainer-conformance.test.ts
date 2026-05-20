@@ -24,23 +24,23 @@ const PRIMITIVE_FILE = 'src/components/UI/SettingExplainer.tsx'
 const PRIMITIVE_SRC = readFileSync(PRIMITIVE_FILE, 'utf8')
 const CARDS_SRC = readFileSync('src/components/Settings/SettingsCards.tsx', 'utf8')
 
-// Cards refatorados (devem usar o primitive)
+// Cards refatorados — TODOS os 9 cards Settings agora usam o primitive
+// (Phase 2 completou em 2026-05-18). PENDING_REFACTOR_ALLOWLIST agora
+// vazia — qualquer card NOVO ou regressão é falha imediata (enforce
+// duro). Adicionar à allowlist exige justificativa no PR review.
 const REFACTORED_CARDS = [
   'FiltersCard',
   'LocationCard',
   'NetworkModeCard',
-] as const
-
-// Cards ainda NÃO refatorados — phase 2+ remove cada um do allowlist
-// (ratchet). Adicionar a essa lista exige justificativa no PR.
-const PENDING_REFACTOR_ALLOWLIST = new Set([
   'MapViewCard',
   'BlobsCard',
   'PeersCard',
   'DiagnosticCard',
   'PermissionsCard',
   'SovereigntyCard',
-])
+] as const
+
+const PENDING_REFACTOR_ALLOWLIST = new Set<string>([])
 
 describe('SettingExplainer — primitive API', () => {
   it('exporta componente + tipo SettingLevel', () => {
@@ -135,10 +135,11 @@ describe('Settings cards — ratchet pendente', () => {
     }
   })
 
-  it('PENDING_REFACTOR_ALLOWLIST documenta cards ainda non-refactored', () => {
-    // Snapshot pra rastreio de progresso. Quando lista chegar a 0,
-    // virar enforce duro (todo Settings card precisa SettingExplainer).
-    expect(PENDING_REFACTOR_ALLOWLIST.size).toBeGreaterThan(0)
-    expect(PENDING_REFACTOR_ALLOWLIST.size).toBeLessThanOrEqual(6)
+  it('PENDING_REFACTOR_ALLOWLIST vazia — enforce duro (Phase 2 completa)', () => {
+    // Phase 2 completou em 2026-05-18 — todos os 9 cards refatorados.
+    // Lista agora vazia = enforce duro: card NOVO sem SettingExplainer
+    // falha CI imediatamente. Adicionar à allowlist exige justificativa
+    // no PR review.
+    expect(PENDING_REFACTOR_ALLOWLIST.size).toBe(0)
   })
 })
