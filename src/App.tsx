@@ -70,6 +70,8 @@ const DiscoverNudgeBanner = lazy(() =>
 import { dialog } from './lib/dialog'
 import { pushLayer, popLayer, hasLayer } from './lib/layer-stack'
 import { NavBar } from './components/UI/NavBar'
+import { HintChip } from './components/UI/HintChip'
+import { getHintRule } from './lib/guidance'
 import { FullPageCard } from './components/UI/FullPageCard'
 import { SlideUpOverlay } from './components/UI/SlideUpOverlay'
 import { ModalHeader } from './components/UI/ModalHeader'
@@ -1769,6 +1771,22 @@ function EndOfFeed({
           checar agora, ou volte pro topo pra reler o feed atual —
           manifesto §6 (verdade por eventos).
         </p>
+        {/* DAOP Phase 2 PR3 (2026-05-20) — hint contextual ambient.
+            HintChip auto-gates via capabilities (hasFirstPost &&
+            !hasBackup) e some quando user faz backup OU dispensa. */}
+        {(() => {
+          const backupRule = getHintRule('backup-after-post')
+          if (!backupRule) return null
+          return (
+            <HintChip
+              rule={backupRule}
+              label="⚠ faça backup do nsec"
+              onActivate={() =>
+                pushLayer({ id: 'identity', component: IdentityPanel })
+              }
+            />
+          )
+        })()}
         <div className="flex w-full max-w-xs flex-col gap-2">
           <button
             onClick={() => void handleRefresh()}

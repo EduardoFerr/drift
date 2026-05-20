@@ -213,11 +213,70 @@ export const ONBOARDING_RULES: readonly GuidanceRule[] = [
 ] as const
 
 /**
+ * Hints contextuais (Phase 2 PR3 — 2026-05-20).
+ *
+ * Diferença vs ONBOARDING_RULES: hints NÃO viram steps da overlay
+ * inicial. Renderizam ambient via HintChip/HintToast/HintModal em pontos
+ * estratégicos da UI onde a capability gap é relevante (post-action,
+ * not pre-action).
+ *
+ * Filosofia (Ted/Lily): nag <-> contextual. Onboarding cobre quem nunca
+ * usou. Hints cobrem quem usou parcialmente — adquiriu uma capability
+ * (ex.: primeiro post) sem adquirir a complementar (backup).
+ *
+ * Conservative roll-out: começa com 1 hint. Mais hints só após
+ * telemetria local (capabilities_dismissed count) sugerir que user não
+ * está achando-os intrusivos.
+ *
+ * Cada hint TEM dismiss explícito (HintChip × button) que persiste em
+ * `capabilities_dismissed` bag — uma vez dispensado, nunca volta.
+ */
+export const HINT_RULES: readonly GuidanceRule[] = [
+  {
+    id: 'backup-after-post',
+    title: 'faça backup do nsec',
+    body: ({ onOpenIdentity }) => (
+      <>
+        <p>
+          Você já publicou. Se perder este dispositivo sem backup do{' '}
+          <code className="text-drift-accent">nsec1…</code>, perde a
+          identidade — e ninguém (nem o fundador) consegue recuperar.
+        </p>
+        <p className="text-drift-muted">
+          Backup leva ~30 segundos. Manifesto §3 (dispositivo é
+          descartável; identidade não).
+        </p>
+        <DriftButton
+          variant="ghost"
+          size="md"
+          onClick={onOpenIdentity}
+          className="mt-1"
+        >
+          fazer backup agora →
+        </DriftButton>
+      </>
+    ),
+    // Trigger forte: user já tem skin in the game (1+ post) mas nenhum
+    // export de nsec registrado. Antes do primeiro post, onboarding step
+    // 'identity' já cobre — duplicar nag seria intrusivo. hasBackup é
+    // proxy razoável (reveal/copy/download log; Satoshi guard [b76245b]).
+    appliesIf: (caps) => caps.hasFirstPost && !caps.hasBackup,
+  },
+] as const
+
+/**
  * Lookup helper — usado por tests + capability checks.
  * Returns rule por id ou undefined.
  */
 export function getOnboardingRule(id: string): GuidanceRule | undefined {
   return ONBOARDING_RULES.find((r) => r.id === id)
+}
+
+/**
+ * Lookup helper para hints contextuais (PR3). Returns rule ou undefined.
+ */
+export function getHintRule(id: string): GuidanceRule | undefined {
+  return HINT_RULES.find((r) => r.id === id)
 }
 
 /**
