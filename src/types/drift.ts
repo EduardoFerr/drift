@@ -408,6 +408,21 @@ export interface UserPrefs {
    */
   lens_show_reorder_indicator: boolean
   /**
+   * Trust Lens GAP-1 (shipped 2026-05-20) — toggle opt-in pra aplicar
+   * decay temporal exponencial (half-life 30d) sobre `influence` no
+   * walk PPR. Default OFF (preserva math canônico bit-exact pra users
+   * existentes).
+   *
+   * Quando ON, edges antigos pesam menos no walk — reflectir "rede
+   * atual" do user. Útil pra quem tem grafo de follows antigo +
+   * comportamento atual divergente.
+   *
+   * Manifesto §24: aplicado APENAS no walk-time, NÃO altera
+   * `lens_edges.influence` no SQLite (writer continua bit-exact).
+   * Manifesto §28: local-only, zero export.
+   */
+  lens_ppr_decay_enabled: boolean
+  /**
    * Settings friction Phase 6 (2026-05-19 user pivot): substitui o
    * binário `show_advanced_settings` por 4 flags granulares. User
    * controla por categoria QUE TIPO DE DETALHE vê em cada setting.
@@ -515,6 +530,7 @@ export const DEFAULT_USER_PREFS: UserPrefs = {
   discover_nudge_dismissed: false,
   lens_nudge_dismissed: false,
   lens_show_reorder_indicator: false,
+  lens_ppr_decay_enabled: false,
   menu_detail_show_details: true,
   menu_detail_show_manifesto: false,
   menu_detail_show_how_it_works: false,

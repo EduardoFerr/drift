@@ -32,12 +32,14 @@ import { db } from './db'
 import {
   computePpr,
   viewMultiplier,
+  temporalDecay,
   type AdjacencyList,
 } from './trust/ppr'
 import { createPprRng } from './trust/rng'
 import { computeInfluence, sanitizeComponents } from './trust/edges'
 import { parsePredicate, evaluatePredicate } from './trust/predicate'
-import { PPR_PARAMS } from './trust/constants'
+import { PPR_PARAMS, PPR_DECAY } from './trust/constants'
+import { usePrefsStore } from './prefs'
 import type {
   LensEdgeComponentsV1,
   LensFilterRule,
@@ -302,18 +304,34 @@ export async function upsertLensEdge(
  */
 export async function recomputeLens(source: string): Promise<number> {
   if (!source) return 0
-  // Build adjacency list from lens_edges
-  const rows = await db.exec<{ source_npub: string; target_npub: string; influence: number }>(
-    `SELECT source_npub, target_npub, influence FROM lens_edges
+  // Build adjacency list from lens_edges.
+  // GAP-1 (2026-05-20): quando `lens_ppr_decay_enabled` true, aplica
+  // decay temporal exponencial em `influence` baseado em
+  // `updated_at` do edge. Walker recebe influência decaída; SQLite
+  // (lens_edges.influence) permanece bit-exact — só o walk vê o ajuste.
+  const rows = await db.exec<{
+    source_npub: string
+    target_npub: string
+    influence: number
+    updated_at: number
+  }>(
+    `SELECT source_npub, target_npub, influence, updated_at FROM lens_edges
      WHERE source_npub = ? OR target_npub IN (
        SELECT target_npub FROM lens_edges WHERE source_npub = ?
      )`,
     [source, source],
   )
+  const decayEnabled = usePrefsStore.getState().lens_ppr_decay_enabled
+  const recomputeNow = Date.now()
   const graph: AdjacencyList = new Map()
   for (const row of rows) {
     const list = graph.get(row.source_npub) ?? []
-    list.push({ target: row.target_npub, influence: row.influence })
+    let influence = row.influence
+    if (decayEnabled && row.updated_at > 0) {
+      const ageMs = recomputeNow - row.updated_at
+      influence *= temporalDecay(ageMs, PPR_DECAY.HALF_LIFE_MS)
+    }
+    list.push({ target: row.target_npub, influence })
     graph.set(row.source_npub, list)
   }
 

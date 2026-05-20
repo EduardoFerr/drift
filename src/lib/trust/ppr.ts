@@ -139,6 +139,38 @@ export function computePpr(params: {
   return ppr
 }
 
+// ─── Pure: temporal decay (GAP-1 — shipped 2026-05-20) ──────────────
+
+/**
+ * Coeficiente exponencial de decay temporal pra edges antigos.
+ *
+ * Solve GAP-1 (Barney WoT audit Stage 3): follows muito antigos
+ * pesam tanto quanto recentes no PPR walk, distorcendo a "rede atual"
+ * do user. Aplicar decay reduz influência de relações dormantes sem
+ * apagar histórico.
+ *
+ * Half-life default = 30 dias (Lily polish: ~1 mês casa com o ciclo
+ * típico de atenção em redes social). Após 30d sem atividade, edge
+ * vale 50%; após 60d, 25%; etc.
+ *
+ *   decay(age_ms, half_life_ms) = 2^(-age / half_life)
+ *                               = exp(-ln(2) · age / half_life)
+ *
+ * Range: (0, 1]. age ≤ 0 → 1.0 (futuro/now). age → ∞ → 0+.
+ *
+ * **NÃO aplicado direto em `computeInfluence`** — manteria
+ * bit-exactness do edge writer. Caller (recomputeLens) multiplica
+ * influence × decay() apenas quando flag `lens_ppr_decay_enabled` true.
+ *
+ * Pure — testável sem clock; caller passa `now` explicitamente.
+ */
+export function temporalDecay(ageMs: number, halfLifeMs: number): number {
+  if (!Number.isFinite(ageMs) || !Number.isFinite(halfLifeMs)) return 1
+  if (halfLifeMs <= 0) return 1
+  if (ageMs <= 0) return 1
+  return Math.exp(-Math.LN2 * ageMs / halfLifeMs)
+}
+
 // ─── Pure: log-transform normalization ────────────────────────────
 
 /**

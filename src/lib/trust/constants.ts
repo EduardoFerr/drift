@@ -55,6 +55,23 @@ export const PPR_PARAMS = {
 } as const
 
 /**
+ * Decay temporal GAP-1 (shipped 2026-05-20). Aplicado opcionalmente em
+ * `recomputeLens` quando user habilita `lens_ppr_decay_enabled`.
+ *
+ * Half-life 30 dias (~1 mês casa com o ciclo típico de atenção em redes
+ * sociais — Lily polish). Após 30d sem atividade no edge, influence
+ * vale 50%; após 60d, 25%; etc. Aplicação é multiplicativa, NÃO altera
+ * `lens_edges.influence` (preserva bit-exactness do writer).
+ *
+ * Gating: default OFF — preserva math canônico bit-exact pra users
+ * existentes. User power que prefere reflectir "rede atual" liga manual.
+ */
+export const PPR_DECAY = {
+  /** 30 dias em ms. */
+  HALF_LIFE_MS: 30 * 24 * 60 * 60 * 1000,
+} as const
+
+/**
  * Edge weight formula coefficients (sigmoid input).
  *
  *   influence = sigmoid(

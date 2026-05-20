@@ -25,6 +25,7 @@ import {
   diversityCoeff,
   applyDiversity,
   viewMultiplier,
+  temporalDecay,
   type AdjacencyList,
   type PprEdge,
 } from '../src/lib/trust/ppr'
@@ -366,6 +367,51 @@ describe('Trust Lens math invariants — PR-3 (ppr + multiplier)', () => {
     // No path
     const noPath = makeGraph([['npub_a', 'npub_b', 0.5]])
     expect(disjointPaths('npub_a', 'npub_target', noPath)).toBe(0)
+  })
+})
+
+// ─── GAP-1 tests (temporal decay — shipped 2026-05-20) ────────────
+
+describe('Trust Lens — temporal decay (GAP-1)', () => {
+  const DAY_MS = 24 * 60 * 60 * 1000
+  const HALF_LIFE = 30 * DAY_MS
+
+  it('#22 decay(0, h) = 1.0 (now/future activity preservada)', () => {
+    expect(temporalDecay(0, HALF_LIFE)).toBe(1)
+    expect(temporalDecay(-1000, HALF_LIFE)).toBe(1) // clock skew → 1
+  })
+
+  it('#23 decay(half_life, half_life) ≈ 0.5 bit-exact dentro de 1e-12', () => {
+    expect(temporalDecay(HALF_LIFE, HALF_LIFE)).toBeCloseTo(0.5, 12)
+  })
+
+  it('#24 decay(2·half_life, h) ≈ 0.25 (1/4 após 2 half-lives)', () => {
+    expect(temporalDecay(2 * HALF_LIFE, HALF_LIFE)).toBeCloseTo(0.25, 12)
+  })
+
+  it('#25 decay é monotonic decrescente em age', () => {
+    const ages = [0, DAY_MS, 7 * DAY_MS, 30 * DAY_MS, 90 * DAY_MS, 365 * DAY_MS]
+    let prev = Infinity
+    for (const age of ages) {
+      const d = temporalDecay(age, HALF_LIFE)
+      expect(d).toBeLessThanOrEqual(prev)
+      expect(d).toBeGreaterThan(0)
+      prev = d
+    }
+  })
+
+  it('#26 decay tolera halfLife inválido (≤0 → 1, NaN → 1)', () => {
+    expect(temporalDecay(1000, 0)).toBe(1)
+    expect(temporalDecay(1000, -1)).toBe(1)
+    expect(temporalDecay(1000, NaN)).toBe(1)
+    expect(temporalDecay(NaN, HALF_LIFE)).toBe(1)
+  })
+
+  it('#27 decay(1y, 30d) > 0 (sem underflow — preserva sempre algum sinal)', () => {
+    const oneYear = 365 * DAY_MS
+    const d = temporalDecay(oneYear, HALF_LIFE)
+    expect(d).toBeGreaterThan(0)
+    expect(d).toBeLessThan(0.001) // após 12+ half-lives, < 2^-12
   })
 })
 

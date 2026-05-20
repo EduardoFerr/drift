@@ -111,6 +111,9 @@ function applyRow(target: UserPrefs, key: string, value: string): void {
     case 'lens_show_reorder_indicator':
       target.lens_show_reorder_indicator = value === '1'
       return
+    case 'lens_ppr_decay_enabled':
+      target.lens_ppr_decay_enabled = value === '1'
+      return
     case 'menu_detail_show_details':
       target.menu_detail_show_details = value === '1'
       return

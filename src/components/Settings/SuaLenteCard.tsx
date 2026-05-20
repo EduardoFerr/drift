@@ -196,6 +196,7 @@ export function SuaLenteCard({ onClose }: CardProps) {
             reorder. Default OFF — chip "lente" já cobre quem quer
             investigar. Apenas exposto quando lente ativa (isActive). */}
         {isActive && <ReorderIndicatorToggle />}
+        {isActive && <PprDecayToggle />}
 
         {/* CTA "ver feed agora" — só aparece quando lens ativa */}
         {isActive && (
@@ -249,6 +250,42 @@ function ReorderIndicatorToggle() {
           void setPref('lens_show_reorder_indicator', e.target.checked)
         }}
         aria-label="mostrar indicador quando a lente reordenou posts"
+        className="mt-1 h-4 w-4 cursor-pointer accent-drift-accent2"
+      />
+    </label>
+  )
+}
+
+/**
+ * Sub-toggle "decay temporal nos follows antigos" — GAP-1 (2026-05-20).
+ *
+ * Default OFF (preserva math canônico bit-exact). Quando ON, edges
+ * antigos pesam menos no walk PPR — útil pra user com grafo de follows
+ * antigo + comportamento atual divergente. Half-life fixa em 30 dias.
+ *
+ * Aplicado APENAS no walk-time — `lens_edges.influence` no SQLite
+ * permanece bit-exact (writer não muda).
+ */
+function PprDecayToggle() {
+  const enabled = usePrefsStore((s) => s.lens_ppr_decay_enabled)
+  return (
+    <label className="flex cursor-pointer items-start justify-between gap-3 border-t border-drift-border/30 pt-3">
+      <div className="space-y-0.5">
+        <span className="block font-mono text-[12px] text-drift-text">
+          esquecer follows antigos
+        </span>
+        <span className="block font-mono text-[10px] leading-relaxed text-drift-muted">
+          follows + drifts sem atividade ≥ 30 dias pesam menos. half-life
+          30d. opt-in.
+        </span>
+      </div>
+      <input
+        type="checkbox"
+        checked={enabled}
+        onChange={(e) => {
+          void setPref('lens_ppr_decay_enabled', e.target.checked)
+        }}
+        aria-label="aplicar decay temporal a follows antigos"
         className="mt-1 h-4 w-4 cursor-pointer accent-drift-accent2"
       />
     </label>
