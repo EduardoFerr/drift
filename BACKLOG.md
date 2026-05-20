@@ -265,7 +265,7 @@ Plano Ted HIMYM 2026-05-17 (analysis registrada em commit do PR1 [c823e8f]).
 
 - [~] **PWA SW serve HTML stale após deploy Vercel novo** — fix em 2
   partes:
-  - **Parte NÃO-política (fechada em [PENDING-fix])**: Workbox config
+  - **Parte NÃO-política (fechada em [9e05c8f])**: Workbox config
     ganha `cleanupOutdatedCaches: true` + `navigateFallback: '/index.
     html'` + NetworkFirst pra navigation requests (timeout 3s). Quando
     SW novo ativa, precache antigo é limpo (sem chunks órfãos). HTML
