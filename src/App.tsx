@@ -1942,6 +1942,9 @@ function AdvancedToggle() {
 function SettingsRoot({ onClose }: { onClose: () => void }) {
   const installPromptLocal = useInstallPrompt()
   const identity = useBootStore((s) => s.identity)
+  // Phase 5 (2026-05-19): filtra menu items level='advanced' quando
+  // toggle off. Pareado com gating no SettingExplainer (Phase 3).
+  const showAdvancedFilter = usePrefsStore((s) => s.show_advanced_settings)
   const [expanded, setExpanded] = useState<number | null>(0)
   function toggleSection(i: number) {
     setExpanded((prev) => (prev === i ? null : i))
@@ -2049,6 +2052,16 @@ function SettingsRoot({ onClose }: { onClose: () => void }) {
       danger?: boolean
       hint: string
       icon: (props: { size?: number; className?: string }) => ReactElement
+      /**
+       * Phase 5 (2026-05-19 Satoshi follow-up): cards com TODOS os
+       * SettingExplainers level='advanced' viram menu item invisível
+       * quando show_advanced_settings=false. Antes: card aparecia no
+       * menu, abria vazio. User confuso.
+       *
+       * 'advanced' = esconde menu item quando toggle off.
+       * undefined = sempre visível (cards basic ou mixed).
+       */
+      level?: 'advanced'
     }[]
   }
 
@@ -2158,18 +2171,21 @@ function SettingsRoot({ onClose }: { onClose: () => void }) {
           label: 'blobs (ipfs)',
           hint: 'servindo blobs a peers',
           icon: BoxIcon,
+          level: 'advanced',
         },
         {
           target: 'soberania',
           label: 'soberania',
           hint: 'endpoints próprios — upload, mapa, moderação',
           icon: ServerIcon,
+          level: 'advanced',
         },
         {
           target: 'diagnostico',
           label: 'redefinir cache',
           hint: 'reconstrói banco local',
           icon: RefreshIcon,
+          level: 'advanced',
         },
         {
           target: 'sobre',
@@ -2205,6 +2221,20 @@ function SettingsRoot({ onClose }: { onClose: () => void }) {
     },
   ]
 
+  // Phase 5 (2026-05-19 Satoshi follow-up): filtra menu items por level.
+  // Quando show_advanced_settings=false, items com level='advanced' somem
+  // do menu. Grupos que ficam vazios (todos items eram advanced) também
+  // somem. User vê diferença REAL no menu principal — não só dentro dos
+  // cards. Resolve confusion 'qual a diferença? não vejo nada'.
+  const visibleGroups = groups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter(
+        (item) => item.level !== 'advanced' || showAdvancedFilter,
+      ),
+    }))
+    .filter((group) => group.items.length > 0)
+
   return (
     <FullPageCard
       onClose={onClose}
@@ -2216,9 +2246,11 @@ function SettingsRoot({ onClose }: { onClose: () => void }) {
             topo. Default false — novice user vê só basic settings.
             <SettingExplainer level='advanced'> retornam null quando
             off. Power user liga aqui e vê tudo. Persistido em
-            user_prefs.show_advanced_settings (local-only §28). */}
+            user_prefs.show_advanced_settings (local-only §28).
+            Phase 5: também filtra menu items inteiros (Diag, Sov,
+            Blobs) pra diferença ser visível no menu principal. */}
         <AdvancedToggle />
-        {groups.map((group, gi) => {
+        {visibleGroups.map((group, gi) => {
           const isOpen = expanded === gi
           const GroupIcon = group.groupIcon
           return (
