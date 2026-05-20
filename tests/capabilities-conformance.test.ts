@@ -113,3 +113,41 @@ describe('bootstrap.ts — wire loadCapabilities', () => {
     expect(BOOTSTRAP_SRC).toMatch(/loadCapabilities\s*\(/)
   })
 })
+
+describe('Satoshi audit fixes (2026-05-19)', () => {
+  it('#2 — RULE_ID_PATTERN valida shape do bag (defesa contra CSV envenenado)', () => {
+    expect(CAPS_SRC).toMatch(/RULE_ID_PATTERN\s*=\s*\/\^/)
+    // Aceita a-z + 0-9 + hífen (slug format)
+    expect(CAPS_SRC).toMatch(/\[a-z0-9\]\[a-z0-9-\]\*/)
+  })
+
+  it('#2 — parseDismissedBag filtra entries malformadas', () => {
+    expect(CAPS_SRC).toMatch(/RULE_ID_PATTERN\.test\(s\)/)
+  })
+
+  it('#2 — serializeDismissedBag também filtra (defense in depth)', () => {
+    expect(CAPS_SRC).toMatch(/RULE_ID_PATTERN\.test\(id\)/)
+  })
+
+  it('#3 — persistDismissedIds lê SQLite source-of-truth (não caps store)', () => {
+    // Persistência defensiva — funciona mesmo quando store=null durante
+    // race no boot. Lê bag direto do SQLite antes de merge+write.
+    expect(CAPS_SRC).toMatch(/async function persistDismissedIds/)
+    // Lê via db.get
+    expect(CAPS_SRC).toMatch(/db\.get[\s\S]*?DISMISSED_PREF_KEY/)
+  })
+
+  it('#3 — dismissRule/dismissRules delegam ao persistDismissedIds', () => {
+    const stripped = CAPS_SRC.replace(/\/\*[\s\S]*?\*\//g, '').replace(
+      /^\s*\/\/.*$/gm,
+      '',
+    )
+    // Funções públicas viraram thin wrappers
+    expect(stripped).toMatch(/dismissRule[\s\S]*?persistDismissedIds/)
+    expect(stripped).toMatch(/dismissRules[\s\S]*?persistDismissedIds/)
+    // Race-fix: NÃO mais 'if (!current) return' silencioso
+    expect(stripped).not.toMatch(
+      /export async function dismissRule[\s\S]*?if \(!current\) return/,
+    )
+  })
+})

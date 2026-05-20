@@ -195,19 +195,20 @@ Plano Ted HIMYM 2026-05-17 (analysis registrada em commit do PR1 [c823e8f]).
 
 ## BUGS — prioridade alta (correção sem polish)
 
-- [ ] **Satoshi findings — race + CSV validation (LOW × LOW/MED)** —
-  audit 2026-05-19 (Docs/sessions retroativo). Top vuln #1 (upload_
-  endpoint badge invisível) shipado em [2e9fa75]. Restantes:
-  - `lib/capabilities.ts:parseDismissedBag` aceita CSV sem validação;
-    se rule ID futuro tiver vírgula, parsing quebra silencioso. Não
-    é exploit hoje (rules atuais sem vírgula no ID). Marshall edge.
-  - `OnboardingOverlay.finish() → dismissRules()` durante caps=null
-    race: `dismissRules` faz early return silencioso quando caps
-    ainda não loaded. Bag NÃO é gravada nesse caso. Cosmético hoje;
-    afeta telemetria futura de "user X dispensou rule Y" com miss
-    aleatório por race.
-  - Bloqueio: NÃO urgente. Phase futura quando lidando com PR3
-    hint engine (que vai depender de dismissed bag).
+- [x] **Satoshi findings — CSV validation + race fix** — fechado em
+  [PENDING-fix]. Top vuln #1 (upload_endpoint badge) ficou em [2e9fa75];
+  restantes #2 + #3 fechados aqui:
+  - **#2 `parseDismissedBag`**: RULE_ID_PATTERN `/^[a-z0-9][a-z0-9-]*$/`
+    valida shape em parse + serialize (defense in depth). IDs
+    malformados (espaços, vírgulas, chars especiais) silenciosamente
+    descartados — bag sempre íntegro.
+  - **#3 `dismissRule/dismissRules`**: refatorados pra
+    `persistDismissedIds` helper que lê SOURCE OF TRUTH (SQLite via
+    `db.get`), não confia no store. Funciona mesmo durante race no
+    boot (caps=null). Store atualizado best-effort se loaded.
+  - 5 testes novos em capabilities-conformance (RULE_ID_PATTERN
+    presence + parse/serialize filter + persist behavior +
+    delegation + race tolerance).
 
 - [x] **Settings/menus — friction audit + framework completo** —
   audit em `Docs/sessions/settings-friction-audit-2026-05-18.md`.

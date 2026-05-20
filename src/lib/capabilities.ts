@@ -70,19 +70,30 @@ const DISMISSED_PREF_KEY = 'capabilities_dismissed'
  * Parse do bag dismissed do SQLite. CSV de IDs separados por vírgula
  * (formato compacto, evita JSON overhead pra ~10 entries esperadas).
  * Whitespace tolerado.
+ *
+ * Satoshi #2 (2026-05-19): validação de shape — IDs devem ser apenas
+ * a-z + dígitos + hífen (slug format). Items malformados são
+ * silenciosamente ignorados (não quebra parsing). Defesa contra:
+ *  - Adversário escrevendo CSV envenenado direto no SQLite
+ *  - Bug futuro que insira whitespace/chars especiais no bag
+ *  - Rule IDs com vírgula no future (atualmente nenhuma tem)
  */
+const RULE_ID_PATTERN = /^[a-z0-9][a-z0-9-]*$/i
+
 function parseDismissedBag(value: string | undefined): Set<string> {
   if (!value) return new Set()
   return new Set(
     value
       .split(',')
       .map((s) => s.trim())
-      .filter((s) => s.length > 0),
+      .filter((s) => s.length > 0 && RULE_ID_PATTERN.test(s)),
   )
 }
 
 function serializeDismissedBag(ids: Set<string>): string {
-  return [...ids].join(',')
+  // Defensivo: filtra na escrita também — se algum caller passar ID
+  // malformado, não escreve no SQLite (evita corromper o bag).
+  return [...ids].filter((id) => RULE_ID_PATTERN.test(id)).join(',')
 }
 
 /**
@@ -159,40 +170,66 @@ export async function loadCapabilities(npub: string | null): Promise<Capabilitie
 }
 
 /**
- * Marca uma regra como dispensada pelo user. Persiste em user_prefs +
- * atualiza store. Idempotente — re-dismiss da mesma rule é no-op.
+ * Persistência defensiva do dismissed bag — funciona mesmo quando caps
+ * ainda não loaded (race no boot). Satoshi #3 (2026-05-19):
+ * dismissRules/dismissRule retornavam silentemente quando caps=null,
+ * causando perda do dismiss em race conditions (ex.: user clica "Pular"
+ * no onboarding antes de loadCapabilities resolver).
+ *
+ * Fix: lê o bag atual diretamente do SQLite quando store não loaded,
+ * faz merge + escrita. Store é atualizado depois SE estiver loaded.
+ * Próximo loadCapabilities pega o bag atualizado mesmo se store stale.
  */
-export async function dismissRule(ruleId: string): Promise<void> {
-  const current = useCapabilitiesStore.getState().caps
-  if (!current) return // não loaded ainda — silencioso
-  if (current.dismissedRuleIds.has(ruleId)) return
-  const nextDismissed = new Set(current.dismissedRuleIds)
-  nextDismissed.add(ruleId)
-  const nextCaps: Capabilities = { ...current, dismissedRuleIds: nextDismissed }
-  useCapabilitiesStore.setState({ caps: nextCaps })
+async function persistDismissedIds(newIds: string[]): Promise<void> {
+  // Filtra IDs inválidos antecipadamente — Satoshi #2 defesa.
+  const validIds = newIds.filter((id) => RULE_ID_PATTERN.test(id))
+  if (validIds.length === 0) return
+
+  // Read current bag from SOURCE OF TRUTH (SQLite), não confia no store.
+  // Em race, store pode estar null OR estar atrás do SQLite.
+  const row = await db.get<{ value: string }>(
+    `SELECT value FROM user_prefs WHERE key = ?`,
+    [DISMISSED_PREF_KEY],
+  )
+  const existing = parseDismissedBag(row?.value)
+  for (const id of validIds) existing.add(id)
+
+  // Escreve merged bag.
   await db.run(
     `INSERT INTO user_prefs (key, value) VALUES (?, ?)
      ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
-    [DISMISSED_PREF_KEY, serializeDismissedBag(nextDismissed)],
+    [DISMISSED_PREF_KEY, serializeDismissedBag(existing)],
   )
+
+  // Atualiza store SE loaded (best-effort — race tolerado).
+  const current = useCapabilitiesStore.getState().caps
+  if (current) {
+    useCapabilitiesStore.setState({
+      caps: { ...current, dismissedRuleIds: existing },
+    })
+  }
+}
+
+/**
+ * Marca uma regra como dispensada pelo user. Persiste em user_prefs +
+ * atualiza store. Idempotente — re-dismiss da mesma rule é no-op.
+ *
+ * Resiliente a race (Satoshi #3): funciona mesmo se caps ainda não
+ * loaded — lê bag direto do SQLite, faz merge, escreve.
+ */
+export async function dismissRule(ruleId: string): Promise<void> {
+  await persistDismissedIds([ruleId])
 }
 
 /**
  * Marca múltiplas regras dispensadas (uso: "pular todo onboarding").
  * Batch otimizado — 1 db.run em vez de N.
+ *
+ * Resiliente a race (Satoshi #3): funciona mesmo se caps ainda não
+ * loaded — lê bag direto do SQLite, faz merge, escreve.
  */
 export async function dismissRules(ruleIds: string[]): Promise<void> {
-  const current = useCapabilitiesStore.getState().caps
-  if (!current) return
-  const nextDismissed = new Set(current.dismissedRuleIds)
-  for (const id of ruleIds) nextDismissed.add(id)
-  const nextCaps: Capabilities = { ...current, dismissedRuleIds: nextDismissed }
-  useCapabilitiesStore.setState({ caps: nextCaps })
-  await db.run(
-    `INSERT INTO user_prefs (key, value) VALUES (?, ?)
-     ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
-    [DISMISSED_PREF_KEY, serializeDismissedBag(nextDismissed)],
-  )
+  await persistDismissedIds(ruleIds)
 }
 
 /**
