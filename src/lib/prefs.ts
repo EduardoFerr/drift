@@ -108,6 +108,9 @@ function applyRow(target: UserPrefs, key: string, value: string): void {
     case 'lens_nudge_dismissed':
       target.lens_nudge_dismissed = value === '1'
       return
+    case 'show_advanced_settings':
+      target.show_advanced_settings = value === '1'
+      return
     case 'upload_endpoint':
       // Sovereignty (Marshall NEEDS-FIX A): URL https:// pra Blossom
       // server. Empty = unset (cai no default constante). Validation

@@ -123,6 +123,43 @@ describe('Settings cards refatorados — usam o primitive', () => {
   })
 })
 
+describe('SettingExplainer — Phase 3 advanced gate', () => {
+  it('checa user_prefs.show_advanced_settings via usePrefsStore', () => {
+    expect(PRIMITIVE_SRC).toMatch(
+      /usePrefsStore.*show_advanced_settings/s,
+    )
+  })
+
+  it("retorna null quando level='advanced' && !showAdvanced", () => {
+    const stripped = PRIMITIVE_SRC.replace(/\/\*[\s\S]*?\*\//g, '').replace(
+      /^\s*\/\/.*$/gm,
+      '',
+    )
+    // Check that there's a guard clause
+    expect(stripped).toMatch(/level === 'advanced'/)
+    expect(stripped).toMatch(/!showAdvanced/)
+    expect(stripped).toMatch(/return null/)
+  })
+
+  it('UserPrefs schema tem show_advanced_settings boolean', () => {
+    const driftTypes = readFileSync('src/types/drift.ts', 'utf8')
+    expect(driftTypes).toMatch(/show_advanced_settings:\s*boolean/)
+    // Default false (novice user padrão)
+    expect(driftTypes).toMatch(/show_advanced_settings:\s*false/)
+  })
+
+  it('prefs.ts deserializa show_advanced_settings', () => {
+    const prefsSrc = readFileSync('src/lib/prefs.ts', 'utf8')
+    expect(prefsSrc).toMatch(/case 'show_advanced_settings'/)
+  })
+
+  it('App.tsx tem AdvancedToggle component no topo de SettingsRoot', () => {
+    const appSrc = readFileSync('src/App.tsx', 'utf8')
+    expect(appSrc).toMatch(/function AdvancedToggle/)
+    expect(appSrc).toMatch(/<AdvancedToggle\s*\/>/)
+  })
+})
+
 describe('Settings cards — ratchet pendente', () => {
   // Allowlist temporária — cada refactor futuro remove 1 entry. Test
   // documenta progresso e força que cards refatorados saiam do bag.

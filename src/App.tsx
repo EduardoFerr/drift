@@ -27,7 +27,7 @@ import {
   useBootStore,
   type BootState,
 } from './lib/bootstrap'
-import { getPrefs, usePrefsStore } from './lib/prefs'
+import { getPrefs, setPref, usePrefsStore } from './lib/prefs'
 import { useUserWeight } from './hooks/useUserWeight'
 import { useInstallPrompt } from './hooks/useInstallPrompt'
 import { exitSlim, useViewModeStore } from './lib/view-mode'
@@ -1898,6 +1898,40 @@ type SettingsTarget =
   | 'instalar'
   | 'limpar'
 
+/**
+ * AdvancedToggle — toggle "mostrar opções avançadas" no topo de
+ * SettingsRoot. Phase 3 settings friction (2026-05-18).
+ *
+ * Default off — novice user vê só basic settings (settings com
+ * `<SettingExplainer level='advanced'>` retornam null). Liga = vê tudo.
+ *
+ * Visualmente discreto — não compete com header. Persistido em
+ * `user_prefs.show_advanced_settings` (manifesto §28 local-only).
+ */
+function AdvancedToggle() {
+  const showAdvanced = usePrefsStore((s) => s.show_advanced_settings)
+  return (
+    <button
+      type="button"
+      onClick={() => void setPref('show_advanced_settings', !showAdvanced)}
+      aria-pressed={showAdvanced}
+      className={`flex w-full items-center justify-between gap-3 rounded-2xl border px-5 py-3 text-left font-mono text-[12px] uppercase tracking-meta transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40 ${
+        showAdvanced
+          ? 'border-drift-accent2/60 bg-drift-accent2/10 text-drift-accent2'
+          : 'border-drift-border/40 bg-drift-surface/40 text-drift-muted hover:text-drift-text'
+      }`}
+    >
+      <span className="flex items-center gap-2">
+        <span aria-hidden="true">{showAdvanced ? '◉' : '○'}</span>
+        mostrar opções avançadas
+      </span>
+      <span className="font-mono text-[10px] text-drift-muted/70 normal-case tracking-normal">
+        {showAdvanced ? 'on' : 'off — só básico'}
+      </span>
+    </button>
+  )
+}
+
 function SettingsRoot({ onClose }: { onClose: () => void }) {
   const installPromptLocal = useInstallPrompt()
   const identity = useBootStore((s) => s.identity)
@@ -2171,6 +2205,12 @@ function SettingsRoot({ onClose }: { onClose: () => void }) {
       ariaLabel="configurações"
     >
       <div className="space-y-3 px-4 py-5">
+        {/* Phase 3 (2026-05-18): toggle 'mostrar opções avançadas' no
+            topo. Default false — novice user vê só basic settings.
+            <SettingExplainer level='advanced'> retornam null quando
+            off. Power user liga aqui e vê tudo. Persistido em
+            user_prefs.show_advanced_settings (local-only §28). */}
+        <AdvancedToggle />
         {groups.map((group, gi) => {
           const isOpen = expanded === gi
           const GroupIcon = group.groupIcon

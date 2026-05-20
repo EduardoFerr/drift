@@ -396,6 +396,15 @@ export interface UserPrefs {
    */
   lens_nudge_dismissed: boolean
   /**
+   * Settings friction Phase 3 (2026-05-18): toggle "mostrar opções
+   * avançadas" em SettingsRoot. Default false — novice user vê só o
+   * essencial. Power user liga e vê tudo.
+   *
+   * Settings com `<SettingExplainer level='advanced'>` retornam null
+   * quando false. Manifesto §28: pref local-only, zero export.
+   */
+  show_advanced_settings: boolean
+  /**
    * Sovereignty schema bump 2026-05-17 (Marshall conformance NEEDS-FIX A).
    * Endpoint HTTP de upload de blobs (Blossom server). Quando undefined,
    * usa default constante (nostr.build). User power pode trocar pra
@@ -475,6 +484,7 @@ export const DEFAULT_USER_PREFS: UserPrefs = {
   theme_id: 'cinder',
   discover_nudge_dismissed: false,
   lens_nudge_dismissed: false,
+  show_advanced_settings: false,
 }
 
 // ─── Trust Lens (Phase 1 — manifesto §24 view-layer carve-out) ────

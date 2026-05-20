@@ -52,6 +52,7 @@
 
 import type { ReactNode } from 'react'
 import { WarningIcon, CheckIcon, BanIcon, InfoIcon } from './Icons'
+import { usePrefsStore } from '../../lib/prefs'
 
 export type SettingLevel = 'basic' | 'advanced'
 
@@ -115,6 +116,11 @@ export function SettingExplainer({
   children,
   className = '',
 }: SettingExplainerProps) {
+  // Phase 3 (2026-05-18): level='advanced' gate. Novice user (default
+  // show_advanced_settings=false) só vê basic settings. Power user
+  // liga toggle no topo de SettingsRoot pra revelar tudo.
+  const showAdvanced = usePrefsStore((s) => s.show_advanced_settings)
+  if (level === 'advanced' && !showAdvanced) return null
   return (
     <section
       className={`rounded-2xl border border-drift-border bg-drift-surface/40 px-4 py-4 ${className}`}
