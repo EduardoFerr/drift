@@ -1292,7 +1292,19 @@ function App() {
         }`}
       >
         {posts.length === 0 ? (
-          <HomeEmpty tab={useFeedStore.getState().tab} />
+          // Barney+Robin Hyp #2 fix 2026-05-20: durante first-load, posts=[]
+          // E feedLoaded=false simultaneamente. Sem este branch, mostrava
+          // "nenhum post" mesmo carregando — UX parecia bugada ('app travou
+          // sem mostrar nada'). DriftSkeleton card-shaped comunica
+          // "carregando" enquanto sync inicial roda. Feed vazio REAL
+          // (sem posts após boot ready) cai no HomeEmpty.
+          !feedLoaded ? (
+            <div className="h-full">
+              <DriftSkeleton variant="card" />
+            </div>
+          ) : (
+            <HomeEmpty tab={useFeedStore.getState().tab} />
+          )
         ) : atEnd ? (
           <EndOfFeed
             tab={feedTab}
