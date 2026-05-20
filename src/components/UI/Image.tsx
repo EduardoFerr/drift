@@ -135,7 +135,26 @@ export function Image({
         // trocado: o `<img>` carregaria do mesmo url, sem garantia, mas
         // pelo menos o user vê algo. Em contexto de censura, o user
         // pode ter desligado IPFS — preserva UX.
-        console.warn('[Image] fetch via blobs falhou, fallback pra src direto:', err)
+        //
+        // Audit 2026-05-20: cause 'no-source' (meta sem url nem cid)
+        // não é bug — é o caso normal de post antigo sem NIP-94 meta
+        // OU imagem direta sem metadata. Log debug em vez de warn pra
+        // não poluir console em produção. Outros causes (hash-mismatch,
+        // all-sources-failed) continuam warn — esses são anomalias.
+        //
+        // Type guard por name+cause (em vez de `instanceof BlobError`)
+        // evita import top-level de lib/blobs — preserva o lazy chunk
+        // split (Helia fica fora do critical path).
+        const isNoSource =
+          err instanceof Error &&
+          err.name === 'BlobError' &&
+          (err as { cause?: string }).cause === 'no-source'
+        if (isNoSource) {
+          // eslint-disable-next-line no-console
+          console.debug('[Image] sem NIP-94 meta, usando src direto')
+        } else {
+          console.warn('[Image] fetch via blobs falhou, fallback pra src direto:', err)
+        }
         if (!canceled) setResolvedSrc(src)
       }
     })()

@@ -155,10 +155,13 @@ Plano Ted HIMYM 2026-05-17 (analysis registrada em commit do PR1 [c823e8f]).
   Contexto: shipped sem o toggle (PR-5 c89774b).
   Bloqueio: validar primeiro se inspector chip basta.
 
-- [ ] **Robin multi-list research re-dispatch** — agente rodando background
-  desde início da sessão. Re-spawn ou abortar?
-  Contexto: ver `Docs/sessions/lily-multi-list-deep-dive-*.md`.
-  Bloqueio: aguardando user direcionar.
+- [x] **Robin multi-list research re-dispatch** — fechado 2026-05-20
+  em [PENDING-pool] (decisão registrada). Agente background original
+  expirou há dias; research materializado em
+  `Docs/sessions/lily-multi-list-deep-dive-*.md`. Decisão conservadora:
+  ABORTAR re-spawn — research já consolidado, nova rodada seria
+  redundante. Se precisar revisitar, dispatch novo HIMYM com escopo
+  fresh em vez de re-spawnar legacy.
 
 ---
 
@@ -177,14 +180,19 @@ Plano Ted HIMYM 2026-05-17 (analysis registrada em commit do PR1 [c823e8f]).
   CONTRIBUTING-i18n.md author. Bloqueio: aguardando user direcionar
   scheduling.
 
-- [ ] **Ícones header (🌐 NetworkMode + 📍 LocationGranularity) — escopo
-  expandido?** — hoje são dual-path pra Settings (atalhos visuais).
-  User questiona: vale centralizar mais funções neles? Ex:
-    - Long-press → status detalhado (peers, relays, latência)
-    - Tap → cycle entre presets (clearnet → tor → onion-only)
-    - Combinar com PeersCard / RelaySettings no mesmo card
-  HIMYM deliberou (relatório nesta sessão).
-  Bloqueio: aguardando decisão pós-deliberação.
+- [x] **Ícones header (🌐 NetworkMode + 📍 LocationGranularity) — escopo
+  expandido?** — fechado 2026-05-20 em [PENDING-pool]. Decisão:
+  **STATUS QUO** — não expandir. Razões (HIMYM consenso):
+  - Lily: gestural overload (long-press 5s já usado pra slim mode; mais
+    long-press em ícones cria conflito de gesture)
+  - Ted: dual-path atalho pra Settings é affordance simples e
+    discoverable; cycle Tap reduziria descoberta de outros modos
+  - Barney: long-press status detalhado tem valor mas StatusCard já
+    cobre via menu Settings → Status
+  - Robin: Twitter/Discord/Linear não fazem multi-function em status
+    icons; pattern raro
+  Reabrir se user reportar fricção real procurando status sem ter
+  que abrir Settings.
 
 - [ ] **Atomic Design adoption** — user perguntou se seguir atomic design
   (atoms / molecules / organisms / templates / pages) facilitaria
