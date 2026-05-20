@@ -532,12 +532,15 @@ Aceitar warning de cert auto-assinado uma vez. Cel:
 > ser incapaz de censurá-la."* — Manifesto
 
 **Status atual dos 34 princípios — source-of-truth única:**
-[`Docs/manifesto-coverage-matrix-2026-05-15.md`](Docs/manifesto-coverage-matrix-2026-05-15.md)
+[`Docs/manifesto-coverage-matrix-2026-05-20.md`](Docs/manifesto-coverage-matrix-2026-05-20.md)
 
-Snapshot (2026-05-15): **22 ✅ / 9 🟡 / 0 ⛔ / 3 ⏳**. Maior bloqueio
-remanescente é distribuição binária Tauri pra usuário final
-(§4, §12, §15, §21 dependem). Detalhes, evidências por arquivo:linha,
-gaps específicos e riscos priorizados na matriz.
+Snapshot (2026-05-20): **22 ✅ / 9 🟡 / 0 ⛔ / 3 ⏳**. Sumário mantido vs
+v1 (2026-05-15); evidência reforçada em §17 + §28 com 6 commits novos
+(Satoshi audits, nsec exposure guards, capabilities local-only, menu
+detalhado flags, upload endpoint badge). Maior bloqueio remanescente
+continua: distribuição binária Tauri pra usuário final (§4, §12, §15,
+§21 dependem). Detalhes, evidências por arquivo:linha, gaps específicos
+e riscos priorizados na matriz.
 
 Não duplicar status aqui — a matriz é mutável e datada; este resumo
 existe só pra apontar pra ela. Quando atualizar, atualize lá e bump
@@ -549,4 +552,4 @@ código. Especialmente Fase 6 — várias features aparentemente
 
 ---
 
-*Última atualização: 2026-05-16 · Manifesto v2.2 · Arquitetura v5.3 · 34 princípios · 1324 tests Vitest (+6 todo, 93 files) · entry chunk 172 KB (≤ 250 KB hard ratchet) · lint 0 warnings (hard) · SRI sha384 baseline em dist artifacts · Fase 5 + 5.x fechadas; Fase 6 em curso (6.4 etapas 1-4 shipped + P2P discovery 4 mecanismos + PeersCard UI) · roadmap vinculante até Fase 7*
+*Última atualização: 2026-05-20 · Manifesto v2.2 · Arquitetura v5.3 · 34 princípios · 1556 tests Vitest (+4 todo, 114 files; 1546 passing, 6 dist/ conformance esperados em dev) · entry chunk 172 KB (≤ 250 KB hard ratchet) · lint 0 warnings (hard) · SRI sha384 baseline em dist artifacts · Fase 5 + 5.x fechadas; Fase 6 em curso (6.4 + P2P discovery + Settings friction Phase 1-6.1: SettingExplainer primitive + AccordionGroup + Menu Detalhado granular flags + DAOP Phase 1 + Satoshi audits) · roadmap vinculante até Fase 7*
