@@ -44,6 +44,7 @@ import { FullPageCard } from '../UI/FullPageCard'
 import { RefreshIcon } from '../UI/Icons'
 import { SettingExplainer } from '../UI/SettingExplainer'
 import { AccordionGroup } from '../UI/AccordionGroup'
+import { RadioGroupButton } from '../UI/RadioGroupButton'
 // Collapse + SectionHeader removidos (refactor 2026-05-18): após todos
 // os cards adotarem SettingExplainer, accordion não é mais usado.
 
@@ -230,31 +231,13 @@ export function LocationCard({ onClose }: CardProps) {
           reversible
           reference="manifesto §28 — privacidade pelo mínimo"
         >
-          <div
-            className="grid grid-cols-2 gap-2 sm:grid-cols-4"
-            role="radiogroup"
-            aria-label="granularidade"
-          >
-            {GRANULARITY_OPTIONS.map((opt) => {
-              const active = prefs.location_granularity === opt.value
-              return (
-                <button
-                  key={opt.value}
-                  role="radio"
-                  aria-checked={active}
-                  onClick={() => void setPref('location_granularity', opt.value)}
-                  className={`rounded-xl border px-3 py-3 font-mono text-[12px] uppercase tracking-meta transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40 ${
-                    active
-                      ? 'border-drift-accent bg-drift-accent/15 text-drift-accent'
-                      : 'border-drift-border/50 bg-drift-surface/40 text-drift-muted hover:border-drift-accent2 hover:text-drift-text'
-                  }`}
-                  title={opt.hint}
-                >
-                  {opt.label}
-                </button>
-              )
-            })}
-          </div>
+          <RadioGroupButton<LocationGranularity>
+            ariaLabel="granularidade"
+            columns={4}
+            value={prefs.location_granularity}
+            onChange={(v) => void setPref('location_granularity', v)}
+            options={GRANULARITY_OPTIONS}
+          />
           {current && (
             <div className="mt-3 rounded-xl border border-drift-border/40 bg-drift-surface/40 px-4 py-3 font-mono text-[11px] leading-relaxed text-drift-body">
               <span className="font-bold text-drift-text">{current.label}</span>
@@ -393,37 +376,18 @@ export function NetworkModeCard({ onClose }: CardProps) {
           reference="manifesto §15 — anti-censura por país"
         >
           <div className="space-y-3">
-            <div
-              className="grid grid-cols-3 gap-2"
-              role="radiogroup"
-              aria-label="modo de rede"
-            >
-              {NETWORK_MODE_OPTIONS.map((opt) => {
-                const active = prefs.network_mode === opt.value
-                const disabled = opt.requiresTauri && !tauriRuntime
-                const hint = tauriRuntime ? opt.hintTauri : opt.hintBrowser
-                return (
-                  <button
-                    key={opt.value}
-                    role="radio"
-                    aria-checked={active}
-                    onClick={() => {
-                      if (disabled) return
-                      void changeMode(opt.value)
-                    }}
-                    disabled={disabled}
-                    className={`rounded-xl border px-3 py-3 font-mono text-[12px] uppercase tracking-meta transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40 ${
-                      active
-                        ? 'border-drift-accent bg-drift-accent/15 text-drift-accent'
-                        : 'border-drift-border/50 bg-drift-surface/40 text-drift-muted hover:border-drift-accent2 hover:text-drift-text'
-                    } ${disabled ? 'cursor-not-allowed opacity-30 hover:border-drift-border/50' : ''}`}
-                    title={hint}
-                  >
-                    {opt.label}
-                  </button>
-                )
-              })}
-            </div>
+            <RadioGroupButton<NetworkMode>
+              ariaLabel="modo de rede"
+              columns={3}
+              value={prefs.network_mode}
+              onChange={(v) => void changeMode(v)}
+              options={NETWORK_MODE_OPTIONS.map((opt) => ({
+                value: opt.value,
+                label: opt.label,
+                hint: tauriRuntime ? opt.hintTauri : opt.hintBrowser,
+                disabled: opt.requiresTauri && !tauriRuntime,
+              }))}
+            />
 
             {torSelectedInPwa && (
               <Alert
