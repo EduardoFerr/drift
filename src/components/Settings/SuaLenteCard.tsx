@@ -20,7 +20,6 @@ import { useEffect, useState } from 'react'
 import { setLensStrength, useLensStore } from '../../lib/trust-lens'
 import { db } from '../../lib/db'
 import { FullPageCard } from '../UI/FullPageCard'
-import { SectionHeader } from '../UI/SectionHeader'
 import { DriftButton } from '../UI/DriftButton'
 import { EyeIcon } from '../UI/Icons'
 
@@ -104,80 +103,95 @@ export function SuaLenteCard({ onClose }: CardProps) {
       title="sua lente"
       ariaLabel="sua lente — reordenamento local do feed"
     >
+      {/* Lily audit 2026-05-18 fixes coordenados:
+          P0: track slider com fill linear-gradient (não default browser-cinza)
+          P1: label dinâmico demoted de heading uppercase pra dado sentence-case
+              text-[18px] semibold (resposta, não seção)
+          P2: tick dots no track + remoção de "desligado/meio/máximo" textuais
+          P3: "como funciona" colapsado por default (accordion via SectionHeader)
+          P4: inner card aninhado removido (espaço respira) */}
       <div className="space-y-5 px-4 py-5">
-        <SectionHeader title="intensidade" />
-
-        <p className="px-1 font-mono text-[11px] leading-relaxed text-drift-muted/70">
-          A Lente reordena seu feed localmente, no momento da visualização.
-          Não muda o feed dos outros, não é compartilhada e não afeta o
-          score canônico dos posts.
+        <p className="font-mono text-[12px] leading-relaxed text-drift-body">
+          A Lente reordena seu feed <strong>localmente</strong>, no
+          momento da visualização. Não muda o feed dos outros, não é
+          compartilhada e não afeta o score canônico dos posts.
         </p>
 
-        <div className="rounded-2xl border border-drift-border/40 bg-drift-surface/40 px-5 py-5">
-          {/* Label primário descritivo (Lily) — fala o que muda, não
-              adjetivo abstrato. Quebra em 2 linhas em mobile pra labels
-              mais longos sem squash visual. */}
-          <div className="flex items-start justify-between gap-3">
-            <span className="font-display text-[14px] font-bold uppercase leading-snug tracking-tag text-drift-text">
+        {/* Slider region — sem inner card aninhado. divider-y como
+            agrupamento visual leve. */}
+        <div className="space-y-3 border-y border-drift-border/30 py-5">
+          {/* P1: dado é a estrela. Sentence-case display 18px semibold,
+              não uppercase heading. Olho vai direto pra resposta. */}
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="font-display text-[18px] font-semibold leading-snug text-drift-text">
               {labelFor(local)}
             </span>
-            <span className="shrink-0 font-mono text-[12px] tabular-nums text-drift-muted/70">
+            <span className="shrink-0 font-mono text-[13px] tabular-nums text-drift-muted">
               {pct}%
             </span>
           </div>
 
-          <input
-            type="range"
-            min={0}
-            max={100}
-            step={1}
-            value={pct}
-            onChange={onSliderChange}
-            aria-label="intensidade da lente"
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={pct}
-            aria-valuetext={labelFor(local)}
-            className="mt-4 h-11 w-full cursor-pointer appearance-none bg-transparent accent-drift-accent2 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
-          />
-
-          <div className="mt-2 flex justify-between font-mono text-[10px] uppercase tracking-meta text-drift-muted/50">
-            <button
-              type="button"
-              onClick={() => commitStrength(0)}
-              className="hover:text-drift-accent2"
-              title="desliga a lente — feed canônico"
-            >
-              desligado
-            </button>
-            <button
-              type="button"
-              onClick={() => commitStrength(0.5)}
-              className="hover:text-drift-accent2"
-              title="meio-termo — sua rede tem peso, mas fora dela ainda aparece"
-            >
-              meio
-            </button>
-            <button
-              type="button"
-              onClick={() => commitStrength(1)}
-              className="hover:text-drift-accent2"
-              title="máximo — quase só sua rede"
-            >
-              máximo
-            </button>
+          {/* P0: slider com track preenchido. CSS custom via inline style
+              + appearance-none. linear-gradient narra visualmente o valor
+              independente do número (Apple Settings pattern). */}
+          <div className="relative">
+            <input
+              type="range"
+              min={0}
+              max={100}
+              step={1}
+              value={pct}
+              onChange={onSliderChange}
+              aria-label="intensidade da lente"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={pct}
+              aria-valuetext={labelFor(local)}
+              className="lens-slider h-11 w-full cursor-pointer appearance-none rounded-full bg-transparent focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
+              style={{
+                // Custom track via background-image gradient. Vendor-
+                // prefixed thumb stays via accent-color CSS prop.
+                background: `linear-gradient(to right, var(--drift-accent2) 0%, var(--drift-accent2) ${pct}%, var(--drift-surface) ${pct}%, var(--drift-surface) 100%)`,
+                accentColor: 'var(--drift-accent2)',
+              }}
+            />
           </div>
 
-          <p className="mt-4 font-mono text-[11px] leading-relaxed text-drift-muted/70">
+          {/* P2: dots clicáveis alinhados aos snap stops (0/50/100), sem
+              labels textuais. Tooltip carrega o nome. */}
+          <div className="relative -mt-2 flex justify-between px-1">
+            {SNAP_STOPS.map((stop) => {
+              const stopPct = stop * 100
+              const isAtStop = Math.abs(local - stop) < SNAP_THRESHOLD
+              return (
+                <button
+                  key={stop}
+                  type="button"
+                  onClick={() => commitStrength(stop)}
+                  className={`flex h-3 w-3 items-center justify-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40 ${
+                    isAtStop
+                      ? 'bg-drift-accent2'
+                      : 'bg-drift-border hover:bg-drift-accent2/60'
+                  }`}
+                  title={
+                    stop === 0
+                      ? 'desligado — feed canônico'
+                      : stop === 0.5
+                      ? 'meio — sua rede pesa, fora dela ainda aparece'
+                      : 'máximo — quase só sua rede'
+                  }
+                  aria-label={`ajustar pra ${stopPct}%`}
+                />
+              )
+            })}
+          </div>
+
+          <p className="font-mono text-[11px] leading-relaxed text-drift-body/85">
             {helperText(local)}
           </p>
         </div>
 
-        {/* CTA "ver feed agora" — fecha o card pra user testar o efeito
-            imediato no PostViewer. Lily approach a 2026-05-17:
-            "experimente AGORA" reduz distância entre slider e resultado.
-            Só aparece quando lens ativa (strength > 0) — sem isso, CTA
-            seria no-op. */}
+        {/* CTA "ver feed agora" — só aparece quando lens ativa */}
         {isActive && (
           <div className="flex justify-end">
             <DriftButton
@@ -192,27 +206,55 @@ export function SuaLenteCard({ onClose }: CardProps) {
           </div>
         )}
 
-        <SectionHeader title="como funciona" />
-        <div className="space-y-3 px-1 font-mono text-[11px] leading-relaxed text-drift-muted/70">
+        {/* P3: "como funciona" colapsado por default. User que quer
+            entender PageRank/NIP-02 expande. Wall-of-text não compete
+            mais com slider. */}
+        <ComoFuncionaCollapse />
+      </div>
+    </FullPageCard>
+  )
+}
+
+/**
+ * Sub-card colapsável "como funciona" — info densa (PageRank, NIP-02,
+ * manifesto §24) escondida atrás de disclosure. User power que quer
+ * entender expande; novice ignora.
+ */
+function ComoFuncionaCollapse() {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="border-t border-drift-border/30 pt-3">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex w-full items-center justify-between gap-2 py-1 font-mono text-[11px] uppercase tracking-meta text-drift-muted hover:text-drift-accent2 focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2/40"
+      >
+        <span>como funciona</span>
+        <span aria-hidden="true">{open ? '−' : '+'}</span>
+      </button>
+      {open && (
+        <div className="mt-3 space-y-2 font-mono text-[11px] leading-relaxed text-drift-body/85">
           <p>
             <span className="text-drift-accent2">Grafo:</span> usa quem
-            você acompanha (NIP-02) + posts que você deu drift.
+            você acompanha + posts que você deu drift.
           </p>
           <p>
-            <span className="text-drift-accent2">Cálculo:</span> influência
-            local de cada autor sobre o seu feed (Personalized PageRank).
+            <span className="text-drift-accent2">Cálculo:</span>{' '}
+            influência local de cada autor sobre o seu feed (algoritmo
+            Personalized PageRank).
           </p>
           <p>
             <span className="text-drift-accent2">Local:</span> tudo no
             seu dispositivo. Não vaza, não é compartilhada, não fica em
             cache na nuvem.
           </p>
-          <p className="pt-1 text-drift-muted/40">
+          <p className="pt-1 text-drift-muted">
             Manifesto §24 — visualização local, não ranking canônico.
             Você pode desligar a qualquer momento e o feed volta ao normal.
           </p>
         </div>
-      </div>
-    </FullPageCard>
+      )}
+    </div>
   )
 }
