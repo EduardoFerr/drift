@@ -196,7 +196,7 @@ Plano Ted HIMYM 2026-05-17 (analysis registrada em commit do PR1 [c823e8f]).
 ## BUGS — prioridade alta (correção sem polish)
 
 - [x] **Satoshi findings — CSV validation + race fix** — fechado em
-  [PENDING-fix]. Top vuln #1 (upload_endpoint badge) ficou em [2e9fa75];
+  [7eb0549]. Top vuln #1 (upload_endpoint badge) ficou em [2e9fa75];
   restantes #2 + #3 fechados aqui:
   - **#2 `parseDismissedBag`**: RULE_ID_PATTERN `/^[a-z0-9][a-z0-9-]*$/`
     valida shape em parse + serialize (defense in depth). IDs
