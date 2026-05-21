@@ -101,6 +101,50 @@ describe('SpreadMap network mode — UI ModeToggle', () => {
   })
 })
 
+describe('SpreadMap K=1 doxx defense (Satoshi devsec C 2026-05-21)', () => {
+  it('hook exporta isUserSoloSpreader pure helper', () => {
+    expect(HOOK).toMatch(/export function isUserSoloSpreader\b/)
+  })
+
+  it('helper retorna false quando activeNpub null (anônimo)', () => {
+    // Pattern check: precisa de early return pra !activeNpub
+    expect(HOOK).toMatch(/if\s*\(\s*!activeNpub\s*\|\|\s*!data\s*\)\s*return false/)
+  })
+
+  it('helper checa totalSpreads === 1 + firstSpread.spreaderPub', () => {
+    expect(HOOK).toMatch(/data\.totalSpreads\s*!==\s*1/)
+    expect(HOOK).toMatch(/data\.firstSpread\?\.spreaderPub\s*===\s*activeNpub/)
+  })
+
+  it('SpreadMap renderiza SoloSpreaderWarning quando trigger ativo', () => {
+    expect(MAP).toMatch(/import\s*\{[^}]*isUserSoloSpreader[^}]*\}/)
+    expect(MAP).toMatch(/function SoloSpreaderWarning/)
+    expect(MAP).toMatch(/showK1Warning\s*=\s*isUserSoloSpreader/)
+  })
+
+  it('Warning é dismissable via session state (useState, não persisted)', () => {
+    expect(MAP).toMatch(/k1WarningDismissed.*useState\(false\)|useState<.*>\(false\)/)
+    expect(MAP).toMatch(/setK1WarningDismissed\(true\)/)
+  })
+
+  it('Warning aparece APENAS em PostModeMap (não global/network)', () => {
+    // GlobalModeMap não chama SoloSpreaderWarning nem usa
+    // isUserSoloSpreader — só PostModeMap (modo onde K=1 faz sentido)
+    const globalMatch = MAP.match(/function GlobalModeMap[\s\S]*?(?=\nfunction )/m)
+    expect(globalMatch).not.toBeNull()
+    expect(globalMatch![0]).not.toMatch(/SoloSpreaderWarning|isUserSoloSpreader/)
+  })
+
+  it('threat-model-maps.md existe + cobre 5 vetores', () => {
+    const doc = readFileSync('Docs/threat-model-maps.md', 'utf8')
+    expect(doc).toMatch(/K=1.*doxx|K=1-DOXX/i)
+    expect(doc).toMatch(/Location disclosure|LD/i)
+    expect(doc).toMatch(/Relay correlation|RC/i)
+    expect(doc).toMatch(/Follow-graph leak/i)
+    expect(doc).toMatch(/Trust coloration/i)
+  })
+})
+
 describe('SpreadMap DRY — loadMapDeps shared (B refactor 2026-05-21)', () => {
   const DEPS = readFileSync('src/components/Feed/useMapDeps.ts', 'utf8')
 

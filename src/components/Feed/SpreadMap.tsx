@@ -16,8 +16,8 @@
  * Nunca infere via IP.
  */
 
-import { useEffect, useRef } from 'react'
-import { useSpreadMap, type SpreadMapMode } from '../../hooks/useSpreadMap'
+import { useEffect, useRef, useState } from 'react'
+import { useSpreadMap, isUserSoloSpreader, type SpreadMapMode } from '../../hooks/useSpreadMap'
 import { useBootStore } from '../../lib/bootstrap'
 import { useFollowsStore } from '../../lib/follows'
 import { loadMapDeps } from './useMapDeps'
@@ -222,6 +222,12 @@ function PostModeMap({ data, className, mode, onModeChange }: ModeMapProps) {
   // anônimo em vez do default CARTO (que loga IP). Marshall NEEDS-FIX B.
   const tileTemplate = usePrefsStore((s) => s.map_tile_url_template)
   const containerRef = useRef<HTMLDivElement>(null)
+  // Satoshi devsec C 2026-05-21: K=1 doxx warning. Quando user é o
+  // ÚNICO com GPS no mapa deste post, location é identificável via
+  // community knowledge. Dismissal session-only (per-mapa-instance).
+  const activeNpub = useBootStore((s) => s.identity?.npub ?? null)
+  const [k1WarningDismissed, setK1WarningDismissed] = useState(false)
+  const showK1Warning = isUserSoloSpreader(data, activeNpub) && !k1WarningDismissed
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -324,13 +330,61 @@ function PostModeMap({ data, className, mode, onModeChange }: ModeMapProps) {
   }, [data, mapView])
 
   return (
-    <MapShell
-      containerRef={containerRef}
-      className={className}
-      mode={mode}
-      onModeChange={onModeChange}
-      stats={`${data.totalSpreads} drifts · ${data.countries.length} ${data.countries.length === 1 ? 'país' : 'países'}`}
-    />
+    <div className="relative h-full w-full">
+      <MapShell
+        containerRef={containerRef}
+        className={className}
+        mode={mode}
+        onModeChange={onModeChange}
+        stats={`${data.totalSpreads} drifts · ${data.countries.length} ${data.countries.length === 1 ? 'país' : 'países'}`}
+      />
+      {showK1Warning && (
+        <SoloSpreaderWarning onDismiss={() => setK1WarningDismissed(true)} />
+      )}
+    </div>
+  )
+}
+
+/**
+ * SoloSpreaderWarning — overlay warning quando user é o único spreader
+ * com GPS visível no mapa (K=1 doxx risk).
+ *
+ * Satoshi devsec C 2026-05-21. Documentado em
+ * `Docs/threat-model-maps.md` §K=1-DOXX.
+ *
+ * Posicionamento: top-3 right-3 (ModeToggle ocupa top-3 left-3, sem
+ * overlap). Dismissable via × button. Session-only (rebornece em outro
+ * post K=1; pattern educa naturalmente).
+ *
+ * Manifesto §28: warning não vaza dado novo (mapa já é observável);
+ * apenas informa o user sobre o que JÁ está exposto.
+ */
+function SoloSpreaderWarning({ onDismiss }: { onDismiss: () => void }) {
+  return (
+    <div
+      role="alert"
+      aria-live="polite"
+      className="pointer-events-auto absolute right-3 top-3 z-20 flex max-w-xs items-start gap-2 rounded-xl border border-drift-warning/40 bg-drift-bg/95 p-3 backdrop-blur-sm"
+    >
+      <span aria-hidden="true" className="text-sm leading-none">📍</span>
+      <div className="flex-1 font-mono text-[11px] leading-relaxed text-drift-text">
+        <p className="font-semibold text-drift-warning">
+          você é o único com GPS aqui
+        </p>
+        <p className="mt-1 text-drift-muted">
+          sua localização é identificável neste mapa. considere desligar
+          GPS pra próximos drifts em <em>ajustes → localização</em>.
+        </p>
+      </div>
+      <button
+        type="button"
+        onClick={onDismiss}
+        aria-label="fechar aviso de K=1"
+        className="shrink-0 px-1 font-mono text-[12px] text-drift-muted hover:text-drift-text focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2"
+      >
+        ×
+      </button>
+    </div>
   )
 }
 

@@ -261,6 +261,28 @@ async function buildGlobalData(currentPostId: string | null): Promise<SpreadMapD
   }
 }
 
+// ─── K=1 doxx detection helper (Satoshi devsec C 2026-05-21) ────────
+//
+// Detecta cenário "user é o único com GPS no mapa deste post" — vetor
+// K=1 doxx documentado em `Docs/threat-model-maps.md`. Mapa de post
+// controverso com pin único em cidade pequena → identifies user via
+// community knowledge.
+//
+// Pure function (manifesto §7). Comparação por npub direto (não por
+// coords arredondadas) evita false positive em zonas densas onde
+// múltiplos spreaders compartilham coords após bucket.
+//
+// Trigger UI: mode='post' apenas (global/network agregam por design).
+// Dismissal: session-only (UI decide). Helper retorna apenas o boolean.
+export function isUserSoloSpreader(
+  data: SpreadMapData | null,
+  activeNpub: string | null,
+): boolean {
+  if (!activeNpub || !data) return false
+  if (data.totalSpreads !== 1) return false
+  return data.firstSpread?.spreaderPub === activeNpub
+}
+
 // ─── Network mode (Satoshi+Ted 2026-05-21) ──────────────────────────
 //
 // Mesma agregação do global, FILTRADA por `spreader_pub IN (follows do

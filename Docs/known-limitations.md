@@ -205,6 +205,37 @@ audits só por feio. Defer documentado > silence.
 
 ---
 
+## Mapas
+
+### 7. K-anonymity ausente em SpreadMap (K=1 doxx residual)
+
+- **Issue:** mapa de post mostra pin único quando user é o ÚNICO com
+  GPS no spread. Em cidade pequena, community knowledge identifica o
+  spreader (ex: "era só Pedro naquela favela que viu este post").
+- **Risk:** HIGH em small towns (pop <50k). Manifesto §28 vaza
+  empiricamente — opt-in default OFF é mitigação parcial mas user
+  pode habilitar GPS sem entender o risk.
+- **Mitigation atual (parcial, shipada 2026-05-21):**
+  - Helper puro `isUserSoloSpreader(data, activeNpub): boolean` em
+    `src/hooks/useSpreadMap.ts`
+  - Component `SoloSpreaderWarning` overlay top-right do mapa em
+    modo `post`. Copy: "📍 você é o único com GPS aqui — sua
+    localização é identificável..."
+  - Trigger automático quando `data.totalSpreads === 1 &&
+    firstSpread.spreaderPub === activeNpub`
+  - Dismissal session-only (rebornece em outro post K=1)
+  - Educa user organicamente — não esconde o pin do mapa (manifesto
+    §17: cliente não decide unilateralmente)
+- **Fix completo (Phase 2):** K-anonymity engine. Opções:
+  - **Suppression:** mapa não renderiza se K < 3 → trade-off coverage
+  - **Aggregation:** bucket regional 50km quando K < 3 → trade-off
+    fidelidade
+- **Reopener:** DAU > 1000 + telemetria empírica de K distribuição
+  OR user report concreto de doxx em small-town community.
+- **Doc canônico:** `Docs/threat-model-maps.md` §K=1-DOXX.
+
+---
+
 ## Distribuição
 
 ### 7. Tauri binary distribution não shipped
