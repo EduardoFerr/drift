@@ -81,6 +81,10 @@ arquitetura**, não estes arquivos. Eles são contexto auxiliar.
 - `text-responsivity-audit-2026-05-08.md`
 - `ted-ux-spike-deployed-2026-05-08.md`
 
+### Queue / Feed architecture
+- `ted-tinder-queue-architecture-2026-05-20.md` — Ted research sobre
+  card stack queue patterns (Tinder), aplicado ao Drift feed
+
 ### Misc
 - `15-e2e-testbed-scoping-2026-05-08.md`
 - `auto-mode-detection-algorithm-2026-05-08.md`

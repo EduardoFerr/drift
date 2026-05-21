@@ -141,6 +141,18 @@ Plano Ted HIMYM 2026-05-17 (analysis registrada em commit do PR1 [c823e8f]).
   `created_at` em lens_edges (schema bump deferred pra Phase 2 quando
   telemetria mostrar attack real). Item separado no backlog abaixo.
 
+- [ ] **Refactor `useFeedStore` para cursor + threshold N/2 refill**
+  Trigger: Ted research 2026-05-20 sobre queue management Tinder
+  (`Docs/sessions/ted-tinder-queue-architecture-2026-05-20.md`).
+  Hoje queue carrega tudo upfront ou recarrega no EndOfFeed. Tinder
+  pattern: deck N=30, refill atomic batch quando consumed > N/2,
+  feed_snapshot_ts pra invalidação suave (30min), cap RAM 50 forward
+  + 10 rewind. Ganhos: hide latency, defesa OOM mobile low-end,
+  preserva determinismo de ordem (snapshot at-tab-open).
+  Manter: §24 sem reorder mid-deck, §28 sem rewind persisted (RAM only).
+  Bloqueio: nenhum técnico — defer até fricção real ou sprint perf
+  dedicada.
+
 - [ ] **Lens edges: column `created_at` imutável (Sybil-refresh defense)**
   Trigger: Satoshi audit pair-review 2026-05-20. Hoje `lens_edges.updated_at`
   é refresh-on-write — atacante "renova edges" antigos zerando o decay
