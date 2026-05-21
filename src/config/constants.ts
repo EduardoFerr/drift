@@ -97,3 +97,22 @@ export const SCORE_RECALC_DEBOUNCE_MS = 100
 export const MS_PER_DAY = 24 * 60 * 60 * 1000
 export const MS_PER_DAY_30 = 30 * MS_PER_DAY
 export const MS_PER_WEEK = 7 * MS_PER_DAY
+
+/**
+ * Half-life pra time-window decay nos reports (Gap A insider brigada
+ * partial mitigation — Barney devsec 2026-05-21).
+ *
+ * Trade-off escolhido: 48h.
+ * - Brigada 1h (5 reports coordenados): decay ~1.0 — NÃO defende ataque
+ *   flash (esperado; precisa GAP-CLUSTER pra fechar; ver
+ *   known-limitations §5c)
+ * - Brigada 24h (5 reports espalhados): peso efetivo ~8.5 (perda 15%)
+ *   — força atacante a operar em janelas mais longas → mais detectável
+ * - Consenso lento legítimo 5d (5 reports): peso efetivo ~4 — exige
+ *   ~2-3× mais reports pra atingir threshold em comunidades small;
+ *   trade-off aceito
+ *
+ * Gating: `UserPrefs.report_decay_enabled` default OFF. Padrão segue
+ * `lens_ppr_decay_enabled` — opt-in até telemetria validar.
+ */
+export const REPORT_DECAY_HALF_LIFE_MS = 48 * 60 * 60 * 1000

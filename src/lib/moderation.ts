@@ -45,7 +45,7 @@
 import { db } from './db'
 import { invalidateFeed } from './feed'
 import type { ReportReason } from '../types/drift'
-import { MS_PER_DAY_30 } from '../config/constants'
+import { MS_PER_DAY_30, REPORT_DECAY_HALF_LIFE_MS } from '../config/constants'
 
 // ─── Tipos ───────────────────────────────────────────────────────────
 
@@ -70,6 +70,39 @@ export function getReportWeight(reporterWeight: number): number {
   if (reporterWeight < 50) return 1.0
   if (reporterWeight < 75) return 1.5
   return 2.0
+}
+
+/**
+ * Aplica time-window decay sobre o peso bruto de um report (Gap A
+ * insider brigada partial mitigation — Barney devsec 2026-05-21).
+ *
+ * Fórmula: `reportWeight × 2^(-max(0, ageMs) / halfLifeMs)`
+ *
+ * Pure function — testável sem db, sem clock implícito. Range output:
+ * `(0, reportWeight]` (decay nunca aumenta o peso).
+ *
+ * Edge cases:
+ * - `ageMs < 0` (clock skew futuro) → trata como 0 → decay = 1.0 (full)
+ * - `halfLifeMs <= 0` (semantics OFF / defensive) → retorna reportWeight
+ * - `ageMs` muito grande (1+ ano) → resultado ~0; report continua
+ *   contabilizado mas insignificante. OK pra MVP.
+ *
+ * **NÃO aplicado por default** em `aggregateReports` — caller passa
+ * `opts.decayHalfLifeMs` quando `UserPrefs.report_decay_enabled = true`.
+ * Backward compat: sem opts = comportamento bit-exact pré-Gap-A.
+ *
+ * Trade-off documentado em `known-limitations.md` §5c: defende brigada
+ * slow-burn 24-72h mas NÃO ataque flash <1h.
+ */
+export function calculateEffectiveReportWeight(
+  reportWeight: number,
+  ageMs: number,
+  halfLifeMs: number,
+): number {
+  if (!Number.isFinite(halfLifeMs) || halfLifeMs <= 0) return reportWeight
+  const safeAge = Math.max(0, ageMs)
+  if (!Number.isFinite(safeAge)) return reportWeight
+  return reportWeight * Math.pow(2, -safeAge / halfLifeMs)
 }
 
 /**
@@ -127,25 +160,43 @@ export async function countActiveUsers(now: number): Promise<number> {
  */
 export async function aggregateReports(
   postId: string,
+  opts?: { now?: number; decayHalfLifeMs?: number },
 ): Promise<{ totalWeight: number; byReason: Record<ReportReason, number> }> {
-  const rows = await db.exec<{
-    reason: ReportReason
-    weight: number
-  }>(
-    `SELECT reason, weight FROM reports WHERE post_id = ?`,
-    [postId],
-  )
+  // Backward compat: sem opts ou halfLife=0 ⇒ comportamento bit-exact
+  // pré-Gap-A (sem decay, SELECT sem created_at). Pref `report_decay_enabled`
+  // default OFF preserva isso pra todos users existentes.
+  const decayEnabled =
+    typeof opts?.decayHalfLifeMs === 'number' && opts.decayHalfLifeMs > 0
+  const rows = decayEnabled
+    ? await db.exec<{ reason: ReportReason; weight: number; created_at: number }>(
+        `SELECT reason, weight, created_at FROM reports WHERE post_id = ?`,
+        [postId],
+      )
+    : await db.exec<{ reason: ReportReason; weight: number; created_at?: number }>(
+        `SELECT reason, weight FROM reports WHERE post_id = ?`,
+        [postId],
+      )
   const byReason: Record<ReportReason, number> = {
     illegal: 0,
     spam: 0,
     harassment: 0,
   }
   let totalWeight = 0
+  const nowMs = opts?.now ?? Date.now()
   for (const row of rows) {
-    if (row.reason in byReason) {
-      byReason[row.reason] += row.weight
-      totalWeight += row.weight
+    if (!(row.reason in byReason)) continue
+    let effective = row.weight
+    if (decayEnabled && typeof row.created_at === 'number') {
+      // reports.created_at é unix seconds (NIP-01). Converte pra ms.
+      const ageMs = nowMs - row.created_at * 1000
+      effective = calculateEffectiveReportWeight(
+        row.weight,
+        ageMs,
+        opts!.decayHalfLifeMs!,
+      )
     }
+    byReason[row.reason] += effective
+    totalWeight += effective
   }
   return { totalWeight, byReason }
 }
@@ -168,15 +219,24 @@ export async function aggregateReports(
  * @param now - Agora (ms) — passado pra teste/determinismo
  */
 export async function maybeModerate(postId: string, now: number): Promise<void> {
-  const { totalWeight, byReason } = await aggregateReports(postId)
-
-  const activeUsers = await countActiveUsers(now)
   // Sovereignty (Marshall NEEDS-FIX C 2026-05-17): user pode override
   // o threshold dinâmico via UserPrefs. Útil pra comunidades fechadas
   // que querem moderação mais/menos agressiva. Lazy require pra evitar
   // dep cycle (prefs → db → events → moderation).
   const { getPrefs } = await import('./prefs')
-  const override = getPrefs().report_threshold_override
+  const prefs = getPrefs()
+  const override = prefs.report_threshold_override
+  // Gap A 2026-05-21 (Barney devsec): quando opt-in `report_decay_enabled`
+  // true, aggregateReports aplica decay 48h half-life em cada report.
+  // Reports antigos pesam menos no threshold (defesa parcial vs brigada
+  // slow-burn). Pref default OFF preserva backward compat bit-exact.
+  // Layer separado do `report_threshold_override` (sovereignty independente).
+  const aggregateOpts = prefs.report_decay_enabled
+    ? { now, decayHalfLifeMs: REPORT_DECAY_HALF_LIFE_MS }
+    : undefined
+  const { totalWeight, byReason } = await aggregateReports(postId, aggregateOpts)
+
+  const activeUsers = await countActiveUsers(now)
 
   // Verifica cada categoria contra seu threshold próprio. Se qualquer
   // uma passar, modera. 'illegal' tem threshold mais agressivo.

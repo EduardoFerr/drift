@@ -423,6 +423,25 @@ export interface UserPrefs {
    */
   lens_ppr_decay_enabled: boolean
   /**
+   * Time-window decay nos reports (Gap A insider brigada partial
+   * mitigation — Barney devsec 2026-05-21). Default OFF.
+   *
+   * Quando ON, `aggregateReports` aplica decay exponencial half-life 48h
+   * sobre o peso de cada report (`getReportWeight(reporter_weight) ×
+   * 2^(-age/48h)`). Reports antigos pesam menos no threshold dinâmico
+   * de moderação (§26).
+   *
+   * Trade-off documentado em `known-limitations.md` §5c: defende brigada
+   * slow-burn 24-72h mas NÃO ataque flash <1h (precisa GAP-CLUSTER
+   * Phase 2). Consenso legítimo lento (>120h) também sofre — aceito até
+   * GAP-CLUSTER chegar pra diferenciar.
+   *
+   * Manifesto §22 OK: decay é função de TEMPO, não reputação subjetiva.
+   * Manifesto §17 OK: uniforme, sem override do fundador.
+   * Local-only por contrato (cada cliente recomputa).
+   */
+  report_decay_enabled: boolean
+  /**
    * Settings friction Phase 6 (2026-05-19 user pivot): substitui o
    * binário `show_advanced_settings` por 4 flags granulares. User
    * controla por categoria QUE TIPO DE DETALHE vê em cada setting.
@@ -531,6 +550,7 @@ export const DEFAULT_USER_PREFS: UserPrefs = {
   lens_nudge_dismissed: false,
   lens_show_reorder_indicator: false,
   lens_ppr_decay_enabled: false,
+  report_decay_enabled: false,
   menu_detail_show_details: true,
   menu_detail_show_manifesto: false,
   menu_detail_show_how_it_works: false,

@@ -105,30 +105,31 @@ audits só por feio. Defer documentado > silence.
   spreads recíprocos em ring), OR weight tier 🌱→⭐ permanente em
   identidades óbvias.
 
-### 5c. Brigada de moderadores insider (5+ veteranos coordenados)
+### 5c. Brigada de moderadores insider — PARCIALMENTE FECHADO
 
-- **Issue:** `getReportThreshold` escala com base ativa (0.1%). Em
-  comunidade média (~10k users → threshold 10 pts), 5 identidades
-  veteranas (weight ≥75, 2.0 pts cada) coordenadas podem atingir
-  threshold e derrubar post legítimo sem Sybil farming.
-- **Risk:** MEDIUM. Requer **collusion** real de identidades estabelecidas
-  (não Sybil simples). Vetor existe se comunidade tem conflito político
-  + faction organizada.
-- **Mitigation atual:**
-  - `report_threshold_override` em UserPrefs permite power user
-    customizar (mas é local, não comunitário)
-  - Reports são públicos (kind 9081) — auditoria post-hoc identifica
-    brigada
-  - Manifesto §17 garante que post **NUNCA é apagado** dos relays —
-    cliente alternativo exibe mesmo após score=-999
-- **Fix correto:** harder problem — defesa contra collusion organizada
-  esbarra em §22 (sem reputação subjetiva). Possibilidades:
-  - Time-window decay nos reports (5 reports em 1h vs 1 report/dia)
-  - Diversity bonus nos reporters (clusters de coordinators
-    detectáveis via Trust Lens GAP-CLUSTER quando shipar)
-  - Default-on threshold higher pra reports com cluster overlap
-- **Reopener:** Caso documentado de brigada coordenada, OR shipping
-  de GAP-CLUSTER detection (Phase 2).
+- **Status:** PARCIALMENTE FECHADO 2026-05-21 (Barney devsec
+  time-window decay).
+- **Issue original:** 5 veteranos (weight≥75, 2pts cada) coordenados
+  atingem threshold em comunidade média (~10k users → threshold 10pts)
+  sem precisar Sybil farming.
+- **Mitigation parcial shipada:**
+  - Função pura `calculateEffectiveReportWeight(reportWeight, ageMs,
+    halfLifeMs)` em `moderation.ts`
+  - Pref `UserPrefs.report_decay_enabled` (default OFF — opt-in até
+    telemetria validar). Quando ON, `aggregateReports` aplica decay
+    48h half-life sobre cada report
+  - `maybeModerate` lê pref + passa opts → reports antigos pesam menos
+  - 8 conformance tests novos em `tests/moderation.test.ts`
+- **Surface residual (documentada nos próprios tests):**
+  - **Brigada flash <1h:** decay 48h não pega (5 reports/1h = peso
+    ~9.93/10.0). Test "brigada flash 1h" documenta como esperado.
+  - **Consenso lento >120h:** legítimo sofre (5 reports/120h = peso
+    ~5.47, exige ~2× mais reports pra moderar). Trade-off aceito.
+- **Fix completo requer:** GAP-CLUSTER (cluster detection nos
+  reporters) — Phase 2. Trust Lens diversity bonus combinado com decay
+  fecha o gap em ambas direções.
+- **Reopener:** Caso documentado de brigada coordenada real OR shipping
+  de GAP-CLUSTER detection.
 
 ---
 

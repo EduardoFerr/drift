@@ -170,17 +170,16 @@ Plano Ted HIMYM 2026-05-17 (analysis registrada em commit do PR1 [c823e8f]).
   residual: grace window 1-write em rows pré-migration; refactor DRY
   dos 2 writers duplicados defer.
 
-- [ ] **POC: time-window decay nos reports (Gap A insider mitigation)**
-  Trigger: Satoshi devsec audit 2026-05-20 (`known-limitations.md` §5c).
-  Brigada de 5+ veteranos coordenados atinge threshold sem Sybil.
-  Mitigation candidato (esbarra em §22 — sem reputação subjetiva):
-  - Time-window decay: `effective_weight = report_weight × decay(age_report,
-    half_life=24h)` — reports espalhados pesam menos que rajada de 5/h
-  - Diversity bonus: reports vindos de clusters distintos pesam mais
-    (requer GAP-CLUSTER que defer Phase 2)
-  Bloqueio: precisa pair-review Barney+Satoshi+Marshall pra validar
-  que time-decay sozinho não vira "moderação atrasada" frustrante.
-  Caso documentado de brigada real → re-trigger imediato.
+- [x] **Time-window decay nos reports (Gap A insider mitigation PARCIAL)**
+  Fechado 2026-05-21 (Barney devsec implementation). Half-life 48h
+  escolhido como sweet spot entre defender brigada slow-burn (24-72h)
+  e preservar consenso lento legítimo. Opt-in via
+  `UserPrefs.report_decay_enabled` (default OFF). Função pura
+  `calculateEffectiveReportWeight` + 8 tests em moderation.test.ts.
+  **Surface residual documentada:** brigada flash <1h (test específico
+  confirma decay 48h ~não pega) + consenso >120h (perda ~45%). Fix
+  completo requer GAP-CLUSTER cluster detection. Ver
+  known-limitations.md §5c.
 
 - [ ] **Refactor `useFeedStore` para cursor + threshold N/2 refill**
   Trigger: Ted research 2026-05-20 sobre queue management Tinder
