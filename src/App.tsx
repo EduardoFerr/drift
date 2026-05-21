@@ -1,7 +1,7 @@
 ﻿import { lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 import { AnimatePresence, m } from 'framer-motion'
-import { OPTIMISTIC_TIMEOUT_MS, CLIENT_VERSION } from './config/constants'
+import { OPTIMISTIC_TIMEOUT_MS, CLIENT_VERSION, FEED_SNAPSHOT_STALE_MS } from './config/constants'
 import { db } from './lib/db'
 import {
   getCurrentLocation,
@@ -1705,6 +1705,43 @@ function formatScore(score: number): string {
 
 // ─── HomeEmpty (V8) ──────────────────────────────────────────────────
 
+/**
+ * FeedSnapshotAgeBadge — mostra "atualizado há X" no EndOfFeed quando
+ * snapshot está stale (>FEED_SNAPSHOT_STALE_MS). Lily Tinder-audit
+ * 2026-05-21 (Item 3). Manifesto §28: local-only, zero export.
+ *
+ * Re-renderiza por minuto via tick interno pra mostrar age crescente
+ * sem precisar re-fetch global. Cleanup em unmount.
+ */
+function FeedSnapshotAgeBadge() {
+  const snapshotTs = useFeedStore((s) => s.snapshotTs)
+  const [, force] = useState(0)
+  useEffect(() => {
+    if (snapshotTs === null) return
+    const interval = setInterval(() => force((n) => n + 1), 60_000)
+    return () => clearInterval(interval)
+  }, [snapshotTs])
+  if (snapshotTs === null) return null
+  const ageMs = Date.now() - snapshotTs
+  if (ageMs < FEED_SNAPSHOT_STALE_MS) return null
+  const ageMin = Math.floor(ageMs / 60_000)
+  const label =
+    ageMin < 60
+      ? `${ageMin} min`
+      : ageMin < 1440
+      ? `${Math.floor(ageMin / 60)}h ${ageMin % 60}min`
+      : `${Math.floor(ageMin / 1440)}d`
+  return (
+    <div
+      className="font-mono text-[10px] uppercase tracking-meta text-drift-warning/70"
+      title="snapshot do feed; toque ↻ atualizar pra refresh"
+      aria-live="polite"
+    >
+      ⏱ feed atualizado há {label}
+    </div>
+  )
+}
+
 function HomeEmpty({ tab }: { tab: 'global' | 'following' | 'trending' }) {
   const msg =
     tab === 'following'
@@ -1798,6 +1835,10 @@ function EndOfFeed({
           checar agora, ou volte pro topo pra reler o feed atual —
           manifesto §6 (verdade por eventos).
         </p>
+        {/* Lily Tinder-audit 2026-05-21 (Item 3): mostra age do snapshot
+            quando >10min. Resolve user feedback 2026-05-08 ("atualizar
+            vs voltar ao topo são diferentes") tornando age visível. */}
+        <FeedSnapshotAgeBadge />
         {/* DAOP Phase 2 PR3 (2026-05-20) — hint contextual ambient.
             HintChip auto-gates via capabilities (hasFirstPost &&
             !hasBackup) e some quando user faz backup OU dispensa. */}

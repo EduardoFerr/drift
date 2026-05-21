@@ -96,6 +96,9 @@ arquitetura**, não estes arquivos. Eles são contexto auxiliar.
 - `ted-promessas-vs-impl-sprint-plan-2026-05-20.md` — Ted audit
   "promessa vs implementação" + design lentes pluggable + Sprint N+1
   plano zero-débito (~8d full-focus)
+- `lily-tinder-audit-2026-05-21.md` — Lily audit Ted Tinder doc vs
+  código; 2 fixes shipados (queue cap + snapshot age UI), 1 item
+  documentado pra futuro (N/2 refill quando feed crescer)
 
 ### Misc
 - `15-e2e-testbed-scoping-2026-05-08.md`

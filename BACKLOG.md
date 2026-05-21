@@ -181,17 +181,19 @@ Plano Ted HIMYM 2026-05-17 (analysis registrada em commit do PR1 [c823e8f]).
   completo requer GAP-CLUSTER cluster detection. Ver
   known-limitations.md §5c.
 
-- [ ] **Refactor `useFeedStore` para cursor + threshold N/2 refill**
-  Trigger: Ted research 2026-05-20 sobre queue management Tinder
-  (`Docs/sessions/ted-tinder-queue-architecture-2026-05-20.md`).
-  Hoje queue carrega tudo upfront ou recarrega no EndOfFeed. Tinder
-  pattern: deck N=30, refill atomic batch quando consumed > N/2,
-  feed_snapshot_ts pra invalidação suave (30min), cap RAM 50 forward
-  + 10 rewind. Ganhos: hide latency, defesa OOM mobile low-end,
-  preserva determinismo de ordem (snapshot at-tab-open).
-  Manter: §24 sem reorder mid-deck, §28 sem rewind persisted (RAM only).
-  Bloqueio: nenhum técnico — defer até fricção real ou sprint perf
-  dedicada.
+- [~] **Tinder queue patterns — parcialmente shipado (Lily audit 2026-05-21)**
+  Ver `Docs/sessions/lily-tinder-audit-2026-05-21.md`.
+  - [x] Item 2 (Zustand queue cap FEED_QUEUE_CAP=100) — shipado
+  - [x] Item 3 (snapshotTs + FeedSnapshotAgeBadge UI) — shipado
+  - [x] Item 3 batch atômico — já era feito (✅ pré-existente)
+  - [ ] **Item 1: Threshold N/2 refill (deferred)** — 8h plano:
+    `useFeedStore` cursor explícito + `ensureQueueDepth(currentIdx)`
+    dispara fetch batch quando `cursor > posts.length -
+    FEED_REFILL_THRESHOLD(25)`. LOCK_VIA_TEST `feed-refill.test.ts`.
+    Reabrir quando: logs mostrarem feed >100 posts/user frequente OR
+    user report de "spinner ao chegar no fim".
+  - [ ] Item 4 rewind RAM (defer — feature paga Tinder, fora MVP)
+  - [ ] Item 5 cold start parcial (defer — SQLite WASM rápido já cobre)
 
 - [ ] **Lens edges: column `created_at` imutável (Sybil-refresh defense)**
   Trigger: Satoshi audit pair-review 2026-05-20. Hoje `lens_edges.updated_at`

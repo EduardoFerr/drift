@@ -99,6 +99,32 @@ export const MS_PER_DAY_30 = 30 * MS_PER_DAY
 export const MS_PER_WEEK = 7 * MS_PER_DAY
 
 /**
+ * Feed queue caps (Lily Tinder-audit 2026-05-21).
+ *
+ * Defesa em camadas vs SQLite eviction (cache.ts MAX_POSTS_CACHE=10k):
+ * Zustand `useFeedStore.posts` array recebe cap explícito pra proteger
+ * mobile low-end + tornar comportamento previsível. Truncamento mantém
+ * os primeiros N (mais relevantes — feed já é ordenado por score DESC).
+ *
+ * `FEED_INITIAL_LIMIT`: tamanho do batch inicial query SQLite.
+ * `FEED_QUEUE_CAP`: cap máximo do array Zustand pós-truncate. Maior que
+ *   INITIAL_LIMIT pra acomodar próximo refill (Tinder pattern N/2,
+ *   ainda não shipado — vide BACKLOG "Refactor useFeedStore para cursor").
+ * Invariante: `FEED_QUEUE_CAP >= FEED_INITIAL_LIMIT`.
+ */
+export const FEED_INITIAL_LIMIT = 50
+export const FEED_QUEUE_CAP = 100
+
+/**
+ * Snapshot age threshold pra UI badge "feed desatualizado".
+ * Lily Tinder-audit 2026-05-21 — user feedback 2026-05-08 sinalizou
+ * que "atualizar vs voltar ao topo" parecia mesmo efeito. Expor age
+ * via badge resolve ambiguidade. Threshold conservador (10min): mais
+ * que isso = vale puxar refresh.
+ */
+export const FEED_SNAPSHOT_STALE_MS = 10 * 60 * 1000
+
+/**
  * Half-life pra time-window decay nos reports (Gap A insider brigada
  * partial mitigation — Barney devsec 2026-05-21).
  *

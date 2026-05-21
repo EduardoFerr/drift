@@ -20,6 +20,7 @@ import { hiddenReason } from './moderation-local'
 import { useFollowsStore } from './follows'
 import { normalizeLayout } from '../types/drift'
 import { parseImetaTag as parseImetaTagSync, type BlobMeta } from './nip94'
+import { FEED_INITIAL_LIMIT, FEED_QUEUE_CAP } from '../config/constants'
 import type {
   Post,
   Subpost,
@@ -164,10 +165,20 @@ export async function getMyAction(
 interface FeedStore {
   posts: Post[]
   loaded: boolean
-  /** Limite atual da query — 50 default, pode crescer com paginação */
+  /** Limite atual da query — FEED_INITIAL_LIMIT default, pode crescer
+   *  com paginação (Tinder N/2 refill — vide BACKLOG). */
   limit: number
   /** Tab ativa do feed. Default 'global'. */
   tab: FeedTab
+  /**
+   * Timestamp ms da última `refreshFeed()` completa. Usado por UI pra
+   * mostrar badge "atualizado há X" (Lily Tinder-audit 2026-05-21,
+   * Item 3). `null` antes do primeiro refresh.
+   *
+   * Manifesto §28 OK: local-only, zero export. Apenas indicador visual
+   * pro user — não persistido, não compartilhado.
+   */
+  snapshotTs: number | null
   /**
    * Contador de POSTs novos recebidos via subscribe desde a última vez
    * que o user "marcou como visto" (refresh manual ou tab change).
@@ -184,8 +195,9 @@ interface FeedStore {
 export const useFeedStore = create<FeedStore>(() => ({
   posts: [],
   loaded: false,
-  limit: 50,
+  limit: FEED_INITIAL_LIMIT,
   tab: 'global',
+  snapshotTs: null,
   unseenByTab: { global: 0, following: 0, trending: 0 },
 }))
 
@@ -278,8 +290,19 @@ export async function refreshFeed(): Promise<void> {
   refreshInFlight = true
   try {
     const { limit, tab } = useFeedStore.getState()
-    const posts = await getFeedByTab(tab, limit)
-    useFeedStore.setState({ posts, loaded: true })
+    const rawPosts = await getFeedByTab(tab, limit)
+    // Lily Tinder-audit 2026-05-21 (Item 2): cap defensivo Zustand vs OOM
+    // mobile low-end. SQLite já tem MAX_POSTS_CACHE (cache.ts) — este é
+    // defesa em camada no array da store. Posts vêm ordenados por score
+    // DESC, então truncar slice(0, CAP) preserva os mais relevantes.
+    const posts = rawPosts.length > FEED_QUEUE_CAP
+      ? rawPosts.slice(0, FEED_QUEUE_CAP)
+      : rawPosts
+    useFeedStore.setState({
+      posts,
+      loaded: true,
+      snapshotTs: Date.now(), // Lily Item 3 — UI badge "atualizado há X"
+    })
   } catch (err) {
     console.error('[feed] refresh failed:', err)
   } finally {
