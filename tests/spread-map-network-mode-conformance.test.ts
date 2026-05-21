@@ -101,6 +101,28 @@ describe('SpreadMap network mode — UI ModeToggle', () => {
   })
 })
 
+describe('SpreadMap DRY — loadMapDeps shared (B refactor 2026-05-21)', () => {
+  const DEPS = readFileSync('src/components/Feed/useMapDeps.ts', 'utf8')
+
+  it('useMapDeps.ts exporta loadMapDeps async', () => {
+    expect(DEPS).toMatch(/export async function loadMapDeps\(\)/)
+  })
+
+  it('loadMapDeps faz Promise.all dos 3 imports (maplibre + deck + layers)', () => {
+    expect(DEPS).toMatch(/import\(['"]maplibre-gl['"]\)/)
+    expect(DEPS).toMatch(/import\(['"]@deck\.gl\/mapbox['"]\)/)
+    expect(DEPS).toMatch(/import\(['"]\.\/spreadMapLayers['"]\)/)
+  })
+
+  it('SpreadMap PostMode + GlobalMode chamam loadMapDeps (sem duplicar imports)', () => {
+    const loadDepsCalls = MAP.match(/await loadMapDeps\(\)/g) ?? []
+    // PostModeMap + GlobalModeMap = 2 call sites mínimo
+    expect(loadDepsCalls.length).toBeGreaterThanOrEqual(2)
+    // SpreadMap NÃO pode mais importar maplibre-gl direto (ficou em useMapDeps)
+    expect(MAP).not.toMatch(/import\(['"]maplibre-gl['"]\)/)
+  })
+})
+
 describe('SpreadMap network mode — empty states', () => {
   it('network + anônimo: placeholder "modo rede desativado"', () => {
     expect(MAP).toMatch(/modo rede desativado/)

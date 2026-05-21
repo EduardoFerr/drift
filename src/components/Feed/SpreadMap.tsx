@@ -20,6 +20,7 @@ import { useEffect, useRef } from 'react'
 import { useSpreadMap, type SpreadMapMode } from '../../hooks/useSpreadMap'
 import { useBootStore } from '../../lib/bootstrap'
 import { useFollowsStore } from '../../lib/follows'
+import { loadMapDeps } from './useMapDeps'
 import { usePrefsStore } from '../../lib/prefs'
 import type { PropagationArc, SpreadMapData } from '../../types/drift'
 
@@ -95,26 +96,9 @@ declare namespace maplibregl {
   interface RasterLayer { id: string; type: 'raster'; source: string }
 }
 
-interface MaplibreStatic {
-  Map: new (opts: {
-    container: HTMLElement
-    style: maplibregl.StyleSpecification
-    center: [number, number]
-    zoom: number
-    attributionControl: boolean | object
-    dragRotate: boolean
-  }) => MaplibreMap
-}
-
-interface MaplibreMap {
-  addControl(ctrl: unknown): void
-  remove(): void
-  fitBounds(
-    bounds: [[number, number], [number, number]],
-    options?: { padding?: number; maxZoom?: number; duration?: number },
-  ): void
-  once(event: string, callback: () => void): void
-}
+// MaplibreStatic + MaplibreMap removidos (DRY refactor B 2026-05-21) —
+// loadMapDeps centraliza esses tipos. Tipos restantes (LayerCtor,
+// OverlayInstance) ainda usados localmente pra cache de constructors.
 
 type LayerCtor = new (props: Record<string, unknown>) => unknown
 type OverlayInstance = { setProps: (p: { layers: unknown[] }) => void }
@@ -246,22 +230,12 @@ function PostModeMap({ data, className, mode, onModeChange }: ModeMapProps) {
 
     void (async () => {
       try {
-        // Ted bundle audit 2026-05-15 §1.8 — wrapper `./spreadMapLayers` força
-        // tree-shake estático de `ContourLayer`/`SolidPolygonLayer`/earcut
-        // (~25 KB raw + chunk dedup). Barrel destructure dinâmico mantinha tudo.
-        const [maplibreModule, deckMapbox, layersWrapper] = await Promise.all([
-          import('maplibre-gl'),
-          import('@deck.gl/mapbox'),
-          import('./spreadMapLayers'),
-        ])
+        // DRY 2026-05-21 (Satoshi tech lead B): imports shared via
+        // loadMapDeps. Ted bundle audit §1.8 preserve (tree-shake estático).
+        const { maplibregl, MapboxOverlay, layers } = await loadMapDeps()
         if (cancelled) return
 
-        const maplibregl = maplibreModule.default as unknown as MaplibreStatic
-        const { MapboxOverlay } = deckMapbox as unknown as {
-          MapboxOverlay: new (props: { layers: unknown[] }) => unknown
-        }
-        const ScatterplotLayer = layersWrapper.ScatterplotLayer as unknown as LayerCtor
-        const HeatmapLayer = layersWrapper.HeatmapLayer as unknown as LayerCtor
+        const { ScatterplotLayer, HeatmapLayer } = layers
 
         const centerPoint = data.origin ?? data.destinations[0]?.point ?? null
         const center: [number, number] = centerPoint
@@ -377,7 +351,7 @@ function GlobalModeMap({ data, className, mode, onModeChange }: ModeMapProps) {
     let mapCleanup: (() => void) | null = null
     let overlay: OverlayInstance | null = null
 
-    // Layer constructors — cached after async import
+    // Layer constructors — cached after async import (DRY via loadMapDeps)
     let LineLayer: LayerCtor
     let ScatterplotLayer: LayerCtor
 
@@ -391,20 +365,12 @@ function GlobalModeMap({ data, className, mode, onModeChange }: ModeMapProps) {
 
     void (async () => {
       try {
-        // Ted bundle audit 2026-05-15 §1.8 — wrapper estático (vide PostModeMap).
-        const [maplibreModule, deckMapbox, layersWrapper] = await Promise.all([
-          import('maplibre-gl'),
-          import('@deck.gl/mapbox'),
-          import('./spreadMapLayers'),
-        ])
+        // DRY 2026-05-21 (Satoshi tech lead B): imports shared via loadMapDeps.
+        const { maplibregl, MapboxOverlay, layers } = await loadMapDeps()
         if (cancelled) return
 
-        const maplibregl = maplibreModule.default as unknown as MaplibreStatic
-        const { MapboxOverlay } = deckMapbox as unknown as {
-          MapboxOverlay: new (props: { layers: unknown[] }) => OverlayInstance
-        }
-        LineLayer = layersWrapper.LineLayer as unknown as LayerCtor
-        ScatterplotLayer = layersWrapper.ScatterplotLayer as unknown as LayerCtor
+        LineLayer = layers.LineLayer
+        ScatterplotLayer = layers.ScatterplotLayer
 
         const centerPt = data.destinations[0]?.point ?? null
         const center: [number, number] = centerPt ? [centerPt.lng, centerPt.lat] : [0, 20]
