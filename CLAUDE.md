@@ -8,8 +8,19 @@ consulte:
   compromissos). **Cada princípio aqui vai ser entregue.** Não é
   aspiração; é compromisso público. Quando arquitetura conflita com
   manifesto, manifesto vence.
+- **`Docs/manifesto-coverage-matrix-2026-05-20.md`** — STATUS atual dos
+  34 princípios (source-of-truth mutável; resumo no rodapé deste arquivo).
 - **`Docs/drift-arquitetura-v4.md`** — fonte da verdade arquitetural
 - **`Docs/drift-fluxograma-v4.html`** — fluxos visuais
+- **`Docs/design-system.md`** §1 glossário canônico LOCK_VIA_TEST + §5
+  primitives registry (RadioGroupButton, AccordionGroup, HintChip,
+  SettingExplainer, etc.)
+- **`Docs/known-limitations.md`** — limitações conhecidas + condições
+  de reabertura
+- **`Docs/sessions/README.md`** — índice temático das ~50 sessões
+  HIMYM/Satoshi acumuladas
+- **`BACKLOG.md`** — decisões session-scoped (pendências + closures
+  com hash anexo)
 
 ## Método de desenvolvimento — personas LLM (Ted/Marshall/Barney/Lily/Robin)
 

@@ -149,9 +149,16 @@ export function Image({
           err instanceof Error &&
           err.name === 'BlobError' &&
           (err as { cause?: string }).cause === 'no-source'
+        // Barney audit 2026-05-20: console.debug em prod abre observabilidade
+        // adversarial via DevTools (atacante correlaciona "image sem-meta" com
+        // padrão de consumo). Gate em import.meta.env.DEV mantém o sinal
+        // local pra developer sem expor em produção. Outros causes (warn)
+        // continuam — anomalia real precisa visibilidade pra debugging do user.
         if (isNoSource) {
-          // eslint-disable-next-line no-console
-          console.debug('[Image] sem NIP-94 meta, usando src direto')
+          if (import.meta.env.DEV) {
+            // eslint-disable-next-line no-console
+            console.debug('[Image] sem NIP-94 meta, usando src direto')
+          }
         } else {
           console.warn('[Image] fetch via blobs falhou, fallback pra src direto:', err)
         }

@@ -275,8 +275,43 @@ Cada track é shippable independente (test gate por track).
 
 ---
 
+## 8. Primitives Registry (UI atoms+molecules)
+
+Single source of truth pros componentes reusáveis em `src/components/UI/`.
+Adicionar novo primitive aqui ao shipping. LOCK_VIA_TEST quando aplicável
+trava classnames / a11y shape contra regressão de theme/contrast.
+
+| Primitive | Arquivo | LOCK_VIA_TEST | Shipped | Uso típico |
+|---|---|---|---|---|
+| `DriftButton` | `UI/DriftButton.tsx` | `design-system-primitives-conformance` | V1 | Botão primário/ghost/danger |
+| `DriftChip` | `UI/DriftChip.tsx` | (mesmo) | V1 | Tag, badge, label compacto |
+| `DriftCard` | `UI/DriftCard.tsx` | (mesmo) | V1 | Container card (3 variants) |
+| `Toggle` | `UI/Toggle.tsx` | — | V1 | Switch boolean controlled |
+| `DriftAlert` | `UI/DriftAlert.tsx` | `drift-alert-conformance` | 2026-05-15 | Alerta com tone |
+| `DriftSkeleton` | `UI/DriftSkeleton.tsx` | — | V1 | Loading placeholder |
+| `SlideUpOverlay` | `UI/SlideUpOverlay.tsx` | — | 2026-05-08 | Bottom sheet + focus trap |
+| `ModalHeader` | `UI/ModalHeader.tsx` | — | 2026-05-08 | Header padrão de overlays |
+| `FullPageCard` | `UI/FullPageCard.tsx` | — | 2026-05-12 | Card fullscreen com close |
+| `DotsIndicator` | `UI/DotsIndicator.tsx` | — | 2026-05-08 | Pílula de dots p/ subposts |
+| `GlassIconButton` | `UI/GlassIconButton.tsx` | `glass-icon-button` | 2026-05-15 | Botão ⋮ glass effect |
+| `HintChip` | `UI/HintChip.tsx` | `hint-primitives-conformance` | 2026-05-17 | Hint ambient (DAOP PR3) |
+| `HintToast` | `UI/HintToast.tsx` | (mesmo) | 2026-05-17 | Hint floating auto-dismiss |
+| `HintModal` | `UI/HintModal.tsx` | (mesmo) | 2026-05-17 | Hint overlay interruptivo |
+| `SettingExplainer` | `UI/SettingExplainer.tsx` | `setting-explainer-conformance` | 2026-05-18 | Wrapper canônico settings |
+| `AccordionGroup` | `UI/AccordionGroup.tsx` | `accordion-group-conformance` | 2026-05-19 | 1-aberto-por-vez collapse |
+| `RadioGroupButton` | `UI/RadioGroupButton.tsx` | `radio-group-button-conformance` | 2026-05-20 | Radio em forma de botões; Velatura-safe |
+
+**Regra de extração:** se mesmo pattern aparece em ≥2 callsites com
+≥10 LoC duplicadas, considere primitive. LOCK_VIA_TEST trava
+classnames críticos (especialmente active/error states que podem
+regredir em theme switches).
+
+---
+
 ## Histórico
 
 - **2026-05-04**: criado em V1, baseado em mockup `drift.html`. Paleta
   v0.7 chartreuse + mint substitui purple v0.6. Documentação de
   vocabulary split (UI vs protocol).
+- **2026-05-20**: §8 Primitives Registry adicionado pós pair-review
+  Robin+Lily — primitives discoverable sem grep no source.
