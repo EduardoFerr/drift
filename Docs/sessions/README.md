@@ -99,6 +99,10 @@ arquitetura**, não estes arquivos. Eles são contexto auxiliar.
 - `lily-tinder-audit-2026-05-21.md` — Lily audit Ted Tinder doc vs
   código; 2 fixes shipados (queue cap + snapshot age UI), 1 item
   documentado pra futuro (N/2 refill quando feed crescer)
+- `content-hash-dedup-deliberation-2026-05-21.md` — Satoshi+Ted dual
+  dispatch sobre proposta user "hash content pra evitar spam".
+  Decisão: NO-GO atual (Satoshi flagou defesa teatro + Ted Opção B
+  arquitetural pronta se reabrir)
 
 ### Misc
 - `15-e2e-testbed-scoping-2026-05-08.md`

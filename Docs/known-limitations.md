@@ -133,6 +133,44 @@ audits só por feio. Defer documentado > silence.
 
 ---
 
+## Anti-spam
+
+### 6. Content-hash dedup — pesquisado, NO-GO atual
+
+- **Issue:** sem mecanismo de "mesmo content = sinaliza dup". User
+  poderia argumentar: "spam é copy-paste em flood; hashear content
+  como NIP-94 faz com imagens seria defesa natural."
+- **Status:** **NO-GO atual** após deliberação Satoshi + Ted
+  (2026-05-21). Decisão registrada em
+  `Docs/sessions/content-hash-dedup-deliberation-2026-05-21.md`.
+- **Razões NO-GO:**
+  - **Evasão custo zero:** atacante muda 1 char (espaço, emoji,
+    homoglyph cirílico) → hash diferente. Não eleva tax.
+  - **Redundante:** Sybil novo já tem `weight=0` → spread vale 0 →
+    posts invisíveis no feed canônico. Defesa atual paga o custo.
+  - **Falsos positivos:** cenário breaking news (32 pessoas postando
+    "Grêmio 3x2") penaliza 31 por acaso.
+  - **§17 risco:** UI agrupando clones esconde post legítimo de quem
+    postou depois → quase-censura.
+  - **Slope:** hash → fingerprinting → similarity matching → filtro
+    centralizado.
+- **Defesas atuais que já funcionam:**
+  - `weight=0` pra Sybil novo (invisibilidade automática)
+  - max 1 subpost pra `weight<20` (tax em volume)
+  - Threshold dinâmico de moderação (tax em coordenação)
+- **Plano arquitetural pronto (Ted Opção B)** se reabrir: coluna
+  `posts.content_hash`, função pura `hashPostContent(subposts)` em
+  `lib/protocol.ts`, opt-in via `UserPrefs.dedup_enabled` default OFF,
+  penalty em `calculateScore`, never-hide-own-post (Satoshi mitigation).
+- **Reopener:**
+  - Evidência concreta de spam que NÃO foi resolvido por `weight=0`
+    (ex: identidades veteranas farmadas postando flood coordenado)
+  - OR designs futuros de moderação precisarem de hash como primitivo
+    (ex: agrupar reports por content-hash em vez de post-id)
+  - Suspicion geral NÃO basta — exige attack pattern documentado.
+
+---
+
 ## DAOP / Capabilities
 
 ### 5. dismissRule sem rate limit

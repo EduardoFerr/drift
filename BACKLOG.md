@@ -181,6 +181,24 @@ Plano Ted HIMYM 2026-05-17 (analysis registrada em commit do PR1 [c823e8f]).
   completo requer GAP-CLUSTER cluster detection. Ver
   known-limitations.md §5c.
 
+- [~] **Content-hash dedup como anti-spam — NO-GO atual (pesquisado 2026-05-21)**
+  User proposta: SHA-256(content) como identificador pra dedup
+  (mesmo conceito do NIP-94 imagens). Satoshi + Ted deliberaram em
+  paralelo. Decisão final user: option A (NO-GO + documentação).
+  Razões NO-GO: evasão custo zero (1 char muda hash), redundante com
+  weight=0 (Sybil novo já invisível), falsos positivos em breaking
+  news, slope perigosa rumo a filtro centralizado.
+  Plano Ted Opção B (view-layer puro) pronto se reabrir:
+  - Coluna `posts.content_hash TEXT` + index
+  - `hashPostContent(subposts)` pure: NFC + trim + whitespace collapse
+    (NÃO lowercase) + JSON canonical + SHA-256
+  - Opt-in via `UserPrefs.dedup_enabled` default false
+  - Penalty em `calculateScore` (factor 0.5 default)
+  - Satoshi mitigations: never hide own post, threshold >5/1h
+  Full deliberação: `Docs/sessions/content-hash-dedup-deliberation-2026-05-21.md`
+  Reabrir requer evidência concreta de spam NÃO resolvido por
+  weight=0, não suspicion geral.
+
 - [~] **Tinder queue patterns — parcialmente shipado (Lily audit 2026-05-21)**
   Ver `Docs/sessions/lily-tinder-audit-2026-05-21.md`.
   - [x] Item 2 (Zustand queue cap FEED_QUEUE_CAP=100) — shipado
