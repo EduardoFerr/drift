@@ -217,12 +217,25 @@ Plano Ted HIMYM 2026-05-17 (analysis registrada em commit do PR1 [c823e8f]).
   Reabrir se user reportar fricção real procurando status sem ter
   que abrir Settings.
 
-- [ ] **Atomic Design adoption** — user perguntou se seguir atomic design
-  (atoms / molecules / organisms / templates / pages) facilitaria
-  construções como StatusIndicators + tooltips + tab groups. HIMYM
-  deliberou (relatório nesta sessão).
-  Bloqueio: aguardando decisão de scope (refactor grande vs grandfather
-  existente + aplicar só em novos components).
+- [x] **Atomic Design adoption** — fechado 2026-05-20 em [PENDING-pool].
+  Decisão: **GRANDFATHER + GUIDELINE FORWARD** (Ted/Lily pick).
+  - **NÃO refatorar** estrutura atual (src/components/{UI,Settings,
+    Post,Profile,Identity,Create} por domínio). Custo (touching ~80
+    arquivos, churn de imports, conformance refresh) >> benefício.
+  - **Aplicar guideline em novos primitives**: arquivos novos em
+    `src/components/UI/` continuam sendo "atoms" implícitos
+    (DriftButton, Toggle, DriftChip, RadioGroupButton, HintChip,
+    SettingExplainer, AccordionGroup). Composições novas ("molecules")
+    co-locadas no domínio (Settings/SuaLenteCard usa atoms de UI).
+    "Organisms" = cards do dominio (PostViewer, ProfileModal, etc.).
+  - **Manifesto §17 alignment**: estrutura por domínio reflete o
+    modelo mental do user-developer (busco config → vou em Settings;
+    busco card de post → vou em Post). Atomic-Design por níveis
+    abstratos seria optimização pra design-systems puristas, não pra
+    contributors externos.
+  - **Reabrir se**: design-system extraction virar produto separado
+    (lib publicada), OR contributors externos reportarem fricção
+    procurando componentes na estrutura por domínio.
 
 ## BUGS — prioridade alta (correção sem polish)
 
