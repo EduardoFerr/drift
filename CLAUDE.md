@@ -8,6 +8,10 @@ consulte:
   compromissos). **Cada princípio aqui vai ser entregue.** Não é
   aspiração; é compromisso público. Quando arquitetura conflita com
   manifesto, manifesto vence.
+- **`Docs/algoritmos.md`** — explicação didática dos 7 algoritmos
+  centrais (score, weight, threshold, edge influence, PPR, view
+  multiplier, temporal decay) com fórmulas + simulações numéricas
+  validadas + cenários integrados fim-a-fim.
 - **`Docs/manifesto-coverage-matrix-2026-05-20.md`** — STATUS atual dos
   34 princípios (source-of-truth mutável; resumo no rodapé deste arquivo).
 - **`Docs/drift-arquitetura-v4.md`** — fonte da verdade arquitetural
