@@ -182,6 +182,8 @@ import {
 const SpreadMap = lazy(() =>
   import('./components/Feed/SpreadMap').then((m) => ({ default: m.SpreadMap })),
 )
+// Type-only re-export pra type ser tree-shaken sem trigger lazy chunk
+import type { SpreadMapMode } from './hooks/useSpreadMap'
 import type {
   DriftIdentity,
   LocationGranularity,
@@ -1912,7 +1914,7 @@ function MapOverlay({
   onClose: () => void
 }) {
   const events = useSyncStore((s) => s.eventsReceived)
-  const [mapMode, setMapMode] = useState<'post' | 'global'>('post')
+  const [mapMode, setMapMode] = useState<SpreadMapMode>('post')
 
   const headerRight = (
     <div className="flex items-center gap-3">

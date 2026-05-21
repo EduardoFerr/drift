@@ -11,6 +11,12 @@
  *   um post e D espalha. Resultado: árvore A→{B,C}, B→{D,F}, D→{H,I,J}.
  *   LIMIT 2000 spreads pra não travar mapa com dados enormes.
  *
+ * mode='network' (Satoshi+Ted 2026-05-21): mesma agregação do global,
+ *   FILTRADA por follows do user ativo. Mostra "spreads de quem eu
+ *   sigo, geograficamente". Empty state quando user não segue ninguém
+ *   ou está anônimo. Manifesto §24 view-layer carve-out — não afeta
+ *   score canônico, é só lente visual local.
+ *
  * Manifesto §28 (Privacidade pelo Mínimo): só usa location que o autor
  * escolheu publicar. Nunca infere via IP.
  */
@@ -18,7 +24,11 @@
 import { useEffect, useState } from 'react'
 import { db } from '../lib/db'
 import { seedFromSpreaders } from '../lib/seeder'
+import { useFollowsStore } from '../lib/follows'
+import { useBootStore } from '../lib/bootstrap'
 import type { GeoPoint, PropagationArc, SpreadMapData, SpreadRecord } from '../types/drift'
+
+export type SpreadMapMode = 'post' | 'global' | 'network'
 
 interface PostRow {
   location: string | null
@@ -35,7 +45,7 @@ interface SpreadRow {
 
 export function useSpreadMap(
   postId: string | null,
-  mode: 'post' | 'global' = 'post',
+  mode: SpreadMapMode = 'post',
   /** Em modo `global`, post sendo visualizado no overlay. Arcos/dots
    *  cujo `post_id` bate são taggeados `isCurrent: true` na data de
    *  retorno — UI destaca visualmente. Quando ausente, nenhum arco
@@ -52,8 +62,18 @@ export function useSpreadMap(
     error: string | null
   }>({ data: null, loading: false, error: null })
 
+  // Network mode: precisa do npub ativo + lista de follows.
+  // Subscribe via stores garante re-fetch quando follows mudam.
+  const activeNpub = useBootStore((s) => s.identity?.npub ?? null)
+  const followsVersion = useFollowsStore((s) => s.following.size)
+
   useEffect(() => {
     if (mode === 'post' && !postId) {
+      setState({ data: null, loading: false, error: null })
+      return
+    }
+    // Network mode requer npub ativo — anônimo retorna empty
+    if (mode === 'network' && !activeNpub) {
       setState({ data: null, loading: false, error: null })
       return
     }
@@ -63,10 +83,14 @@ export function useSpreadMap(
 
     ;(async () => {
       try {
-        const data =
-          mode === 'global'
-            ? await buildGlobalData(currentPostId ?? null)
-            : await buildPostData(postId!)
+        let data: SpreadMapData
+        if (mode === 'global') {
+          data = await buildGlobalData(currentPostId ?? null)
+        } else if (mode === 'network') {
+          data = await buildNetworkData(activeNpub!, currentPostId ?? null)
+        } else {
+          data = await buildPostData(postId!)
+        }
 
         if (!cancelled) {
           setState({ data, loading: false, error: null })
@@ -86,7 +110,9 @@ export function useSpreadMap(
     })()
 
     return () => { cancelled = true }
-  }, [postId, mode, currentPostId])
+    // followsVersion entra na dep array pra trigger re-fetch quando user
+    // segue/deixa de seguir alguém (network mode reflete state atual)
+  }, [postId, mode, currentPostId, activeNpub, followsVersion])
 
   return state
 }
@@ -198,6 +224,81 @@ async function buildGlobalData(currentPostId: string | null): Promise<SpreadMapD
      ORDER BY s.created_at ASC
      LIMIT 2000`,
     [],
+  )
+
+  const { normalize } = makeNormalizer(rows.map((r) => r.spread_at))
+
+  const allArcs: PropagationArc[] = []
+  const allDests: SpreadMapData['destinations'] = []
+  const allCountries = new Set<string>()
+
+  for (const row of rows) {
+    const fromLoc = parseLocation(row.from_loc)
+    const toLoc   = parseLocation(row.to_loc)
+    if (!fromLoc || !toLoc) continue
+
+    const t = normalize(row.spread_at)
+    const isCurrent = currentPostId !== null && row.post_id === currentPostId
+    allArcs.push({
+      from: [fromLoc.lng, fromLoc.lat],
+      to: [toLoc.lng, toLoc.lat],
+      t,
+      isCurrent,
+    })
+    allDests.push({ point: toLoc, createdAt: row.spread_at, t, isCurrent })
+    allCountries.add(regionKey(fromLoc))
+    allCountries.add(regionKey(toLoc))
+  }
+
+  return {
+    origin: null,
+    destinations: allDests,
+    arcs: allArcs,
+    totalSpreads: allDests.length,
+    countries: Array.from(allCountries),
+    firstSpread: null,
+    latestSpread: null,
+  }
+}
+
+// ─── Network mode (Satoshi+Ted 2026-05-21) ──────────────────────────
+//
+// Mesma agregação do global, FILTRADA por `spreader_pub IN (follows do
+// active user)`. Manifesto §24 view-layer carve-out — não toca em
+// posts.score, é só uma lente visual local-only.
+//
+// Schema NIP-02: tabela `follows` tem (follower_pub, followed_pub) PK
+// composite — verificar invariante #15 (source SEMPRE = active identity).
+//
+// Edge cases:
+//   - Anônimo (sem activeNpub) — caller (hook) já retorna empty antes
+//     de chegar aqui
+//   - User sem follows — query retorna 0 rows, SpreadMapData vazio →
+//     Placeholder UI mostra "sua rede está vazia"
+//
+// LOCK_VIA_TEST scope: query SOMENTE faz JOIN contra `posts` + `follows`
+// (não toca em lens_edges, posts.score, reports). Mantém escopo limitado
+// pra evitar power creep em ranking. Conformance pattern:
+//   spreader_pub IN (SELECT following_pub FROM follows WHERE follower_pub = ?)
+async function buildNetworkData(
+  activeNpub: string,
+  currentPostId: string | null,
+): Promise<SpreadMapData> {
+  const rows = await db.exec<VirtualArcRow>(
+    `SELECT s.post_id    AS post_id,
+            p.location   AS from_loc,
+            s.location   AS to_loc,
+            s.created_at AS spread_at
+     FROM spreads s
+     JOIN posts p ON s.post_id = p.id
+     WHERE s.location IS NOT NULL
+       AND p.location  IS NOT NULL
+       AND s.spreader_pub IN (
+         SELECT following_pub FROM follows WHERE follower_pub = ?
+       )
+     ORDER BY s.created_at ASC
+     LIMIT 2000`,
+    [activeNpub],
   )
 
   const { normalize } = makeNormalizer(rows.map((r) => r.spread_at))

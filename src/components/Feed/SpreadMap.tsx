@@ -17,15 +17,17 @@
  */
 
 import { useEffect, useRef } from 'react'
-import { useSpreadMap } from '../../hooks/useSpreadMap'
+import { useSpreadMap, type SpreadMapMode } from '../../hooks/useSpreadMap'
+import { useBootStore } from '../../lib/bootstrap'
+import { useFollowsStore } from '../../lib/follows'
 import { usePrefsStore } from '../../lib/prefs'
 import type { PropagationArc, SpreadMapData } from '../../types/drift'
 
 export interface SpreadMapProps {
   postId: string | null
   className?: string
-  mode?: 'post' | 'global'
-  onModeChange?: (mode: 'post' | 'global') => void
+  mode?: SpreadMapMode
+  onModeChange?: (mode: SpreadMapMode) => void
   onOpenLocationSettings?: () => void
   /**
    * Em modo `global`, post atualmente em foco no overlay. Arcos/dots
@@ -129,6 +131,8 @@ export function SpreadMap({
 }: SpreadMapProps) {
   const { data, loading, error } = useSpreadMap(postId, mode, currentPostId)
   const granularity = usePrefsStore((s) => s.location_granularity)
+  const activeNpub = useBootStore((s) => s.identity?.npub ?? null)
+  const followsCount = useFollowsStore((s) => s.following.size)
 
   const hasGeometry = !!data && (!!data.origin || data.destinations.length > 0)
 
@@ -137,6 +141,27 @@ export function SpreadMap({
   }
   if (error) {
     return <Placeholder className={className} title="erro no mapa" body={error} />
+  }
+  // Network mode empty states (Satoshi+Ted 2026-05-21)
+  if (mode === 'network') {
+    if (!activeNpub) {
+      return (
+        <Placeholder
+          className={className}
+          title="modo rede desativado"
+          body="Você precisa estar identificado pra ver sua rede no mapa. Sua identidade é local e privada (manifesto §3)."
+        />
+      )
+    }
+    if (followsCount === 0) {
+      return (
+        <Placeholder
+          className={className}
+          title="sua rede está vazia"
+          body="Você ainda não segue ninguém. Explore o feed global, abra posts que te interessam e siga autores — depois eles aparecem aqui."
+        />
+      )
+    }
   }
   if (!hasGeometry) {
     if (granularity === 'off' && mode === 'post') {
@@ -149,20 +174,25 @@ export function SpreadMap({
         />
       )
     }
-    return (
-      <Placeholder
-        className={className}
-        title={mode === 'global' ? 'sem dados de localização globais' : 'sem dados de localização'}
-        body={
-          mode === 'global'
-            ? 'Nenhum spread com tag location ainda. Quando alguém com GPS ativo driftar, a rede aparece aqui.'
-            : 'Drifts deste post ainda não têm tag location. Quando alguém com GPS ativo driftar, aparece aqui.'
-        }
-      />
-    )
+    const title =
+      mode === 'global'
+        ? 'sem dados de localização globais'
+        : mode === 'network'
+        ? 'sua rede sem GPS por enquanto'
+        : 'sem dados de localização'
+    const body =
+      mode === 'global'
+        ? 'Nenhum spread com tag location ainda. Quando alguém com GPS ativo driftar, a rede aparece aqui.'
+        : mode === 'network'
+        ? 'Ninguém que você segue driftou com GPS ativo ainda. Quando isso acontecer, aparece aqui.'
+        : 'Drifts deste post ainda não têm tag location. Quando alguém com GPS ativo driftar, aparece aqui.'
+    return <Placeholder className={className} title={title} body={body} />
   }
 
-  if (mode === 'global') {
+  if (mode === 'global' || mode === 'network') {
+    // Network mode reusa GlobalModeMap (mesma estrutura de arcos/dots
+    // animados — só a query upstream difere). Toggle no MapShell mostra
+    // qual mode tá ativo.
     return (
       <GlobalModeMap
         data={data}
@@ -188,8 +218,8 @@ export function SpreadMap({
 interface ModeMapProps {
   data: SpreadMapData
   className: string
-  mode: 'post' | 'global'
-  onModeChange?: (m: 'post' | 'global') => void
+  mode: SpreadMapMode
+  onModeChange?: (m: SpreadMapMode) => void
 }
 
 interface PointLayerProps { position: [number, number] }
@@ -527,20 +557,15 @@ function MapShell({
 }: {
   containerRef: React.RefObject<HTMLDivElement>
   className: string
-  mode: 'post' | 'global'
-  onModeChange?: (m: 'post' | 'global') => void
+  mode: SpreadMapMode
+  onModeChange?: (m: SpreadMapMode) => void
   stats: string
 }) {
   return (
     <div className={`relative overflow-hidden rounded-2xl border border-drift-border/40 ${className}`}>
       <div ref={containerRef} className="h-full w-full" />
 
-      {onModeChange && (
-        <div className="pointer-events-auto absolute left-3 top-3 flex overflow-hidden rounded-xl border border-drift-border/40 bg-drift-bg/90 backdrop-blur-sm">
-          <ModeBtn active={mode === 'post'} onClick={() => onModeChange('post')}>post</ModeBtn>
-          <ModeBtn active={mode === 'global'} onClick={() => onModeChange('global')}>global</ModeBtn>
-        </div>
-      )}
+      {onModeChange && <ModeToggle mode={mode} onModeChange={onModeChange} />}
 
       {/* WCAG: bg sobre tile dinâmico (mapa). Marshall regra de 2 camadas
           — alpha mínimo /95 + text sem alpha. Tile pode ser claro ou
@@ -556,22 +581,74 @@ function MapShell({
   )
 }
 
+// ─── ModeToggle (Satoshi+Ted 2026-05-21) ──────────────────────────────
+//
+// 3 botões: [post | global | network]. Network requer identidade ativa
+// + follows (UI inicialmente o renderiza; clicar e cair em empty state
+// é UX intencional — user descobre por que está disabled, não por
+// botão sumindo).
+//
+// A11y: role=tablist implícito via flex row; cada botão tem aria-pressed
+// (já no ModeBtn).
+function ModeToggle({
+  mode,
+  onModeChange,
+}: {
+  mode: SpreadMapMode
+  onModeChange: (m: SpreadMapMode) => void
+}) {
+  const activeNpub = useBootStore((s) => s.identity?.npub ?? null)
+  const networkDisabled = !activeNpub
+  return (
+    <div
+      role="tablist"
+      aria-label="modo do mapa"
+      className="pointer-events-auto absolute left-3 top-3 flex overflow-hidden rounded-xl border border-drift-border/40 bg-drift-bg/90 backdrop-blur-sm"
+    >
+      <ModeBtn active={mode === 'post'} onClick={() => onModeChange('post')}>
+        post
+      </ModeBtn>
+      <ModeBtn active={mode === 'global'} onClick={() => onModeChange('global')}>
+        global
+      </ModeBtn>
+      <ModeBtn
+        active={mode === 'network'}
+        onClick={() => onModeChange('network')}
+        disabled={networkDisabled}
+        title={networkDisabled ? 'identifique-se pra ver sua rede' : 'spreads de quem você segue'}
+      >
+        network
+      </ModeBtn>
+    </div>
+  )
+}
+
 // ─── ModeBtn ──────────────────────────────────────────────────────────
 
 function ModeBtn({
   active,
   onClick,
   children,
+  disabled = false,
+  title,
 }: {
   active: boolean
   onClick: () => void
   children: React.ReactNode
+  disabled?: boolean
+  title?: string
 }) {
   return (
     <button
       onClick={onClick}
+      disabled={disabled}
+      title={title}
+      aria-pressed={active}
+      role="tab"
       className={`px-3.5 py-2 font-mono text-[11px] uppercase tracking-meta transition-colors ${
-        active
+        disabled
+          ? 'cursor-not-allowed text-drift-muted/30'
+          : active
           ? 'bg-drift-accent2 text-drift-bg'
           : 'text-drift-muted/70 hover:text-drift-text'
       }`}
