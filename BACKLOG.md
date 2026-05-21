@@ -26,7 +26,7 @@ Resumo (~8d full-focus + buffer):
 |---|---|:---:|---|
 | 0.1 | §16 IPFS pin automático (viral threshold) | 2d | `viral-ipfs-pin.test.ts` |
 | 0.2 | §15 Doc "instalar em país censurado" | 1.5d | — |
-| 0.3 | Lentes pluggable SPIKE (LensRegistry + design) | 2d | `lens-plugin-conformance.test.ts` |
+| 0.3 | Lentes pluggable SPIKE (LensRegistry + LensExpression set-theory composition + design §6) | 2.5d | `lens-plugin-conformance.test.ts` + `lens-composition-determinism.test.ts` |
 | 0.4 | §25 Conformance "zero scan automático" | 0.5d | `no-scan-automatico.test.ts` |
 | 0.5 | §20 Random walk spec | 0.5d | — |
 | 1.6 | CI grep "PhotoDNA NUNCA imported" | 0.5d | — |

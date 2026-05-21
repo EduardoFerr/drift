@@ -346,6 +346,170 @@ produz mesmo array pre/pós refactor (bit-exact migration).
 
 ---
 
+## §6 — Composição de lentes (Set Theory)
+
+> **Adicionado 2026-05-21** após user brief: "Além da lente padrão,
+> deve-se poder plugar lentes de outros, e fazer interseção, união...
+> etc igual teoria de conjuntos."
+
+User não está limitado a 1 lente ativa. Pode **compor lentes** usando
+operações de teoria de conjuntos sobre o resultado de cada lente
+(`LensResult.posts`).
+
+### Operações canônicas
+
+Cada lente roda `reorder()` produzindo `LensResult.posts: readonly Post[]`.
+Composição opera sobre essas listas como conjuntos ordenados:
+
+| Operação | Símbolo | Semântica | Resultado |
+|---|:---:|---|---|
+| **União** | `A ∪ B` | "Mostre se aparece em A OU B" | Conjunto union; ordem usa `score` médio entre lentes |
+| **Interseção** | `A ∩ B` | "Mostre só se aparece em A E B" | Conjunto intersection; ordem usa max-rank |
+| **Diferença** | `A − B` | "Mostre os de A, exceto os de B" | Subtract; útil pra "minha lente menos a do amigo" |
+| **Diferença simétrica** | `A △ B` | "Mostre só os de A OU B, mas NÃO os de ambos" | XOR; explora divergência |
+| **Complemento** | `¬A` (em U) | "Inverter A no universo U" | Pega tudo fora de A; útil pra debug |
+
+### Modelo: `LensExpression` composição declarativa
+
+```typescript
+// src/lib/lens/composition.ts
+
+export type LensExpression =
+  | { kind: 'lens'; id: string; config?: LensConfig }    // folha
+  | { kind: 'union'; left: LensExpression; right: LensExpression }
+  | { kind: 'intersection'; left: LensExpression; right: LensExpression }
+  | { kind: 'difference'; left: LensExpression; right: LensExpression }
+  | { kind: 'symmetric'; left: LensExpression; right: LensExpression }
+  | { kind: 'complement'; inner: LensExpression }
+```
+
+Composição é **árvore**, não cadeia — permite paralelismo + caching.
+Profundidade max recomendada: 4 níveis (após isso, custo de compute
+> ganho cognitivo).
+
+### Resolução
+
+```typescript
+export function evaluateLensExpression(
+  expr: LensExpression,
+  universe: readonly Post[],
+  ctx: LensContext,
+): LensResult {
+  switch (expr.kind) {
+    case 'lens': {
+      const lens = lensRegistry.get(expr.id)
+      const params = expr.config?.params ?? {}
+      return lens.reorder(universe, { ...ctx, params })
+    }
+    case 'union': {
+      const a = evaluateLensExpression(expr.left, universe, ctx)
+      const b = evaluateLensExpression(expr.right, universe, ctx)
+      return composeUnion(a, b)
+    }
+    case 'intersection': {
+      const a = evaluateLensExpression(expr.left, universe, ctx)
+      const b = evaluateLensExpression(expr.right, universe, ctx)
+      return composeIntersection(a, b)
+    }
+    // ... difference, symmetric, complement
+  }
+}
+```
+
+### Ordering rules (manifesto §7 determinismo)
+
+**Crítico:** composição precisa ser **determinística cross-device**.
+Mesma expressão + mesmo universe + mesmo state → mesmo array de saída
+(ordem inclusive).
+
+Regras:
+
+1. **Union (A ∪ B):** para cada post, score = `(rankA + rankB) / 2`
+   onde `rankX = posição em X` (ou `Infinity` se ausente). Tie-break:
+   ordem em A.
+2. **Intersection (A ∩ B):** subset. Ordem: max-rank entre A e B
+   (post bem-rankeado em ambas sobe).
+3. **Difference (A − B):** filter pure. Ordem preservada de A.
+4. **Symmetric (A △ B):** = `(A ∪ B) − (A ∩ B)`. Ordem: ranking médio.
+5. **Complement (¬A em U):** = `U − A`. Ordem: por `Post.id` lexico
+   (sem ranking; mostra "tudo que A esconde").
+
+### Shareable expressions
+
+`LensExpression` é JSON-serializable → mesma infra de sharing do
+`LensConfig`:
+
+```jsonc
+{
+  "kind": "intersection",
+  "left": {
+    "kind": "lens",
+    "id": "ppr-trust",
+    "config": { "type": "ppr-trust", "version": 1,
+                "params": { "strength": 0.75 } }
+  },
+  "right": {
+    "kind": "lens",
+    "id": "image-first",
+    "config": { "type": "image-first", "version": 1, "params": {} }
+  }
+}
+```
+
+Sharing: JSON / URL fragment / QR / NIP-XX event 9095. Mesma receita
++ mesmo state SQLite local em 2 clientes = mesma ordem (§7).
+
+### Exemplos de composições úteis
+
+| Expressão | Significado prático |
+|---|---|
+| `ppr-trust(0.75)` | "Lente do João" (a default dele) |
+| `ppr-trust(0.75) ∪ image-first` | "Minha lente PLUS posts com imagem" |
+| `ppr-trust ∩ chronological` | "Quem eu sigo, em ordem cronológica" |
+| `meu-feed − amigo.json` | "O que eu vejo, MENOS o que meu amigo vê" |
+| `lente-comunidade-X △ lente-comunidade-Y` | "Onde X e Y divergem" |
+| `¬amigo.json` | "Tudo que meu amigo NÃO veria" (debug / curiosidade) |
+
+### Threat model — composição
+
+Cada operação tem mesma defesa do `LensStrategy` base:
+- **API isolation:** composição recebe `readonly Post[]`, nunca write
+- **Determinism test:** evaluação 2× com mesma expr+universe = mesmo output
+- **Limite de profundidade:** rejeitar expressões com depth > 8 (DOS protection)
+
+**Cuidado novo:** complemento (`¬A`) em universe vazio retorna vazio.
+Documentar. Conformance test #N: `complement(any_lens, [])` retorna `[]`.
+
+### Limits do MVP
+
+- Composição binária (operações 2-ary). Generalização N-ary fica pra
+  POC futuro (`union([A, B, C])`).
+- Sem "weighted union" no MVP (ex: `0.7·A + 0.3·B`). Pode entrar
+  como operation custom no Sprint N+3.
+- Plugin externo NÃO pode adicionar novos operadores no MVP — só
+  built-in (`union`, `intersection`, `difference`, `symmetric`,
+  `complement`).
+
+### Manifesto compliance da composição
+
+| § | Como composição preserva |
+|---|---|
+| **§7 Determinismo** | Ordering rules acima são bit-exact reproduzíveis |
+| **§17 Sem chave mestra** | Receita é declarativa; nenhum operador "secreto" do fundador |
+| **§22 Sem reputação subjetiva** | Composição opera sobre ordens locais; nada exportado |
+| **§24 Sem afinidade canônica** | Mesmo que A∪B, resultado vive APENAS no view boundary |
+| **§28 Privacy mínima** | Receita compartilhada é code-only; nenhum dado pessoal embutido |
+
+### Roadmap composição (atualiza milestones gerais)
+
+| Fase | Adição vs milestones base |
+|---|---|
+| **SPIKE** (Sprint N+1) | + esboço de `LensExpression` type + 2 operadores (union, intersection) sketched em design |
+| **POC** (Sprint N+2) | + `evaluateLensExpression` impl + 3 operadores ship'd + UI "combinar lentes" simples (2 dropdowns + operador) + 5 conformance tests |
+| **SHIP** (Sprint N+3) | + complemento + symmetric + UI tree-editor + share expression via URL/QR/NIP-XX 9095 |
+
+---
+
 ## Compatibilidade retro
 
 - `useLensStore.setStrength()` continua funcionando — internamente

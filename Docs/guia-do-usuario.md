@@ -344,6 +344,17 @@ segue + drifts seus. **Default: desligada.**
 - **Strength > 0:** posts de quem você acompanha (e do entorno deles)
   sobem no SEU feed. **Não afeta o que os outros veem.**
 
+**Em desenvolvimento — lentes pluggable + compostas:**
+
+Hoje só existe a Sua Lente (PPR padrão). A próxima fase
+([`Docs/lens-pluggable-design.md`](lens-pluggable-design.md)) traz:
+- **Múltiplas lentes** (cronológica, image-first, customizadas)
+- **Importar lente de outros** via JSON / URL / QR (a *receita*; cada
+  cliente recomputa LOCAL — manifesto §24 preservado)
+- **Composição via teoria de conjuntos:** união (A ∪ B), interseção
+  (A ∩ B), diferença (A − B), diferença simétrica (A △ B), complemento
+  (¬A). Exemplo: "minha lente PLUS posts com imagem" = `ppr ∪ image-first`
+
 **Sub-toggles (só aparecem quando lente ativa):**
 
 - **"Mostrar quando a lente reordenou":** chip "lente" no canto fica
