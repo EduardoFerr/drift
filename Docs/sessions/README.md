@@ -85,6 +85,12 @@ arquitetura**, não estes arquivos. Eles são contexto auxiliar.
 - `ted-tinder-queue-architecture-2026-05-20.md` — Ted research sobre
   card stack queue patterns (Tinder), aplicado ao Drift feed
 
+### Algorithm audits
+- `satoshi-7-algoritmos-audit-2026-05-20.md` — Satoshi adversarial
+  audit dos 7 algoritmos documentados (`Docs/algoritmos.md`) — 6/7
+  consistentes, 3 game-theory gaps documentados (NOP, insider brigada,
+  edge-refresh)
+
 ### Misc
 - `15-e2e-testbed-scoping-2026-05-08.md`
 - `auto-mode-detection-algorithm-2026-05-08.md`

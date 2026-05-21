@@ -74,6 +74,55 @@ audits só por feio. Defer documentado > silence.
 
 ---
 
+## Weight / Score
+
+### 5b. Event NOP pode resetar contador de inactivity
+
+- **Issue:** `users.last_active` é atualizado em **qualquer** evento
+  assinado (mesmo kind 0 vazio, ou eventos sem payload útil). Sybil que
+  publica NOP a cada 58 dias mantém `inactivityDays = 0` → engagement
+  não decresce pela inatividade.
+- **Risk:** LOW. Identidade Sybil sem spreads/comments recebidos
+  permanece com engagement próximo de 0 mesmo sem decay de inatividade
+  — defesa real é a SOMA de pesos dos spreaders, não esse contador.
+  Gap é cosmético (honra algorítmica) mais que vetor explorável.
+- **Mitigation atual:** Score determinado por `spreadWeight`
+  (multiplicativo com weight dos spreaders), inatividade só ajuda
+  marginalmente.
+- **Fix correto:** `last_active` deveria atualizar APENAS em eventos
+  com payload (texto não-vazio OU spread/bury/report). Filtro no
+  intake em `events.ts`.
+- **Reopener:** Telemetria mostrar Sybil rings massivos usando esse
+  padrão, OR weight tier `🌱 novo` ficar "permanente" em identidades
+  óbvias.
+
+### 5c. Brigada de moderadores insider (5+ veteranos coordenados)
+
+- **Issue:** `getReportThreshold` escala com base ativa (0.1%). Em
+  comunidade média (~10k users → threshold 10 pts), 5 identidades
+  veteranas (weight ≥75, 2.0 pts cada) coordenadas podem atingir
+  threshold e derrubar post legítimo sem Sybil farming.
+- **Risk:** MEDIUM. Requer **collusion** real de identidades estabelecidas
+  (não Sybil simples). Vetor existe se comunidade tem conflito político
+  + faction organizada.
+- **Mitigation atual:**
+  - `report_threshold_override` em UserPrefs permite power user
+    customizar (mas é local, não comunitário)
+  - Reports são públicos (kind 9081) — auditoria post-hoc identifica
+    brigada
+  - Manifesto §17 garante que post **NUNCA é apagado** dos relays —
+    cliente alternativo exibe mesmo após score=-999
+- **Fix correto:** harder problem — defesa contra collusion organizada
+  esbarra em §22 (sem reputação subjetiva). Possibilidades:
+  - Time-window decay nos reports (5 reports em 1h vs 1 report/dia)
+  - Diversity bonus nos reporters (clusters de coordinators
+    detectáveis via Trust Lens GAP-CLUSTER quando shipar)
+  - Default-on threshold higher pra reports com cluster overlap
+- **Reopener:** Caso documentado de brigada coordenada, OR shipping
+  de GAP-CLUSTER detection (Phase 2).
+
+---
+
 ## DAOP / Capabilities
 
 ### 5. dismissRule sem rate limit
