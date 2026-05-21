@@ -93,6 +93,9 @@ arquitetura**, não estes arquivos. Eles são contexto auxiliar.
 - `satoshi-devsec-mitigations-2026-05-20.md` — Satoshi DevSec mode:
   mitigation plan + 2 fixes shipados (BUG SINK + Gap C NOP) + 2 spikes
   registrados (Gap B edge-refresh schema bump, Gap A time-window decay)
+- `ted-promessas-vs-impl-sprint-plan-2026-05-20.md` — Ted audit
+  "promessa vs implementação" + design lentes pluggable + Sprint N+1
+  plano zero-débito (~8d full-focus)
 
 ### Misc
 - `15-e2e-testbed-scoping-2026-05-08.md`

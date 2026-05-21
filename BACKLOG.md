@@ -17,6 +17,26 @@ Formato:
 - Item aberto: `- [ ] <decisão> — contexto: <origem> — bloqueio: <quem/quê>`
 - Item fechado: `- [x] <decisão> — fechado YYYY-MM-DD em <commit-hash> — <1 linha resolução>`
 
+**📋 Sprint N+1 plano completo:**
+`Docs/sessions/ted-promessas-vs-impl-sprint-plan-2026-05-20.md`
+
+Resumo (~8d full-focus + buffer):
+
+| P | Item | Est | LOCK_VIA_TEST |
+|---|---|:---:|---|
+| 0.1 | §16 IPFS pin automático (viral threshold) | 2d | `viral-ipfs-pin.test.ts` |
+| 0.2 | §15 Doc "instalar em país censurado" | 1.5d | — |
+| 0.3 | Lentes pluggable SPIKE (LensRegistry + design) | 2d | `lens-plugin-conformance.test.ts` |
+| 0.4 | §25 Conformance "zero scan automático" | 0.5d | `no-scan-automatico.test.ts` |
+| 0.5 | §20 Random walk spec | 0.5d | — |
+| 1.6 | CI grep "PhotoDNA NUNCA imported" | 0.5d | — |
+| 1.7 | `Docs/architecture-phases.md` Fase 6/7 → épicos | 1d | — |
+
+Sprint começa quando user der GO. Design lenses ready em
+`Docs/lens-pluggable-design.md`.
+
+---
+
 **Regra 2026-05-17**: cada fechamento DEVE ter commit hash anexo, mesmo
 que seja `(no-commit, decisão registrada apenas)`. Permite reconstruir
 o "porquê" via `git show <hash>`.

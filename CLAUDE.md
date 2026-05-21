@@ -15,6 +15,9 @@ consulte:
 - **`Docs/guia-do-usuario.md`** — guia user-facing (pt-BR) explicando
   consequência de cada ação (DRIFT, SINK, follow, report, settings).
   Quando alguma feature mudar UX, atualizar este guia.
+- **`Docs/lens-pluggable-design.md`** — design proposto pra lentes
+  pluggable + shareable (Strategy Registry + LensConfig + threat model).
+  Status PROPOSED — implementação em Sprint N+1 SPIKE.
 - **`Docs/manifesto-coverage-matrix-2026-05-20.md`** — STATUS atual dos
   34 princípios (source-of-truth mutável; resumo no rodapé deste arquivo).
 - **`Docs/drift-arquitetura-v4.md`** — fonte da verdade arquitetural
