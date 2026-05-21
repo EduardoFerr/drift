@@ -12,6 +12,9 @@ consulte:
   centrais (score, weight, threshold, edge influence, PPR, view
   multiplier, temporal decay) com fórmulas + simulações numéricas
   validadas + cenários integrados fim-a-fim.
+- **`Docs/guia-do-usuario.md`** — guia user-facing (pt-BR) explicando
+  consequência de cada ação (DRIFT, SINK, follow, report, settings).
+  Quando alguma feature mudar UX, atualizar este guia.
 - **`Docs/manifesto-coverage-matrix-2026-05-20.md`** — STATUS atual dos
   34 princípios (source-of-truth mutável; resumo no rodapé deste arquivo).
 - **`Docs/drift-arquitetura-v4.md`** — fonte da verdade arquitetural
