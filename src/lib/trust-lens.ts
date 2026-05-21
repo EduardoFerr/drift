@@ -36,7 +36,7 @@ import {
   type AdjacencyList,
 } from './trust/ppr'
 import { createPprRng } from './trust/rng'
-import { computeInfluence, sanitizeComponents } from './trust/edges'
+import { upsertEdge } from './trust/edges'
 import { parsePredicate, evaluatePredicate } from './trust/predicate'
 import { PPR_PARAMS, PPR_DECAY } from './trust/constants'
 import { usePrefsStore } from './prefs'
@@ -264,30 +264,21 @@ export function evaluateFilterRules(params: {
  * Upsert edge no `lens_edges`. Caller deve garantir que `source` é a
  * active identity. Manifesto §15 multi-identity: source SEMPRE = active.
  *
- * NaN-safe via `sanitizeComponents` (BUG-7 Marshall).
+ * **Thin wrapper sobre `trust/edges.ts:upsertEdge`** — DRY refactor
+ * 2026-05-21 pós Satoshi devsec fix Gap B (writers duplicados eram
+ * risco de divergir em mudanças futuras como schema bumps). Mantém o
+ * nome `upsertLensEdge` exportado pra retro-compat com callers internos
+ * (vide PPR recompute pipeline).
+ *
+ * Toda a lógica (sanitize NaN, computeInfluence, SQL com `created_at`
+ * IMUTÁVEL em ON CONFLICT) vive em `upsertEdge` — single source of truth.
  */
 export async function upsertLensEdge(
   source: string,
   target: string,
   rawComponents: Partial<LensEdgeComponentsV1> | null | undefined,
 ): Promise<void> {
-  const components = sanitizeComponents(rawComponents)
-  const influence = computeInfluence(components)
-  const now = Date.now()
-  await db.run(
-    // Satoshi devsec 2026-05-20 Gap B: created_at IMUTÁVEL após primeiro
-    // INSERT — defesa anti-Sybil edge-refresh (vide trust/ppr.ts
-    // temporalDecay). ON CONFLICT NÃO toca em created_at (não está no
-    // SET clause). NOTE: duplicado em trust/edges.ts:upsertEdge —
-    // mudanças aqui DEVEM refletir lá. TODO refactor: delegar pra writer único.
-    `INSERT INTO lens_edges (source_npub, target_npub, influence, components, updated_at, created_at)
-     VALUES (?, ?, ?, ?, ?, ?)
-     ON CONFLICT(source_npub, target_npub) DO UPDATE SET
-       influence = excluded.influence,
-       components = excluded.components,
-       updated_at = excluded.updated_at`,
-    [source, target, influence, JSON.stringify(components), now, now],
-  )
+  await upsertEdge(source, target, rawComponents)
 }
 
 // ─── PPR recompute (main-thread Phase 1; worker Phase 1.5 PR-4c) ──

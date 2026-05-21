@@ -39,8 +39,10 @@ audits só por feio. Defer documentado > silence.
   - DB-backed integration tests (real upsert + sleep + re-read) defer
     porque exigem SQLite WASM init em Vitest Node — conformance source-
     grep cobre o pattern
-- **TODO restante:** refactor `upsertLensEdge` em trust-lens.ts pra
-  delegar `upsertEdge` em trust/edges.ts (DRY). Backlog separado.
+- **TODO restante FECHADO 2026-05-21:** refactor DRY shipado —
+  `upsertLensEdge` em trust-lens.ts virou thin wrapper que delega
+  `upsertEdge` em trust/edges.ts. Single source of truth pro SQL.
+  Conformance test #29 atualizado pra travar o pattern (1 SQL site).
 
 ### 2. HINT_RULES + GuidanceRule.body — JSX injection vector futuro (DAOP Phase 2+)
 

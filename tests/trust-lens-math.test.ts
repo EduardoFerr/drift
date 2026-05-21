@@ -677,30 +677,34 @@ describe('Trust Lens — GAP-B Sybil edge-refresh defense', () => {
     expect(lensEdgesBlock![0]).toMatch(/created_at\s+INTEGER/)
   })
 
-  it('#29 upsertEdge (ambos writers) NÃO inclui created_at no DO UPDATE SET (imutável)', () => {
+  it('#29 upsertEdge (single source trust/edges.ts) NÃO inclui created_at no DO UPDATE SET', () => {
+    // DRY refactor 2026-05-21: trust-lens.ts:upsertLensEdge é thin
+    // wrapper que delega trust/edges.ts:upsertEdge. SQL canônico só
+    // existe em 1 lugar agora. Wrapper export preservado pra retro-compat.
     const edgesTs = fs.readFileSync('src/lib/trust/edges.ts', 'utf8')
     const lensTs = fs.readFileSync('src/lib/trust-lens.ts', 'utf8')
 
-    // Extrai bloco INSERT INTO lens_edges de cada writer
-    for (const [file, src] of [
-      ['trust/edges.ts', edgesTs],
-      ['trust-lens.ts', lensTs],
-    ] as const) {
-      const insertMatch = src.match(
-        /INSERT INTO lens_edges[\s\S]*?ON CONFLICT[\s\S]*?DO UPDATE SET[\s\S]*?`/,
-      )
-      expect(insertMatch, `${file}: bloco INSERT not found`).not.toBeNull()
-      const block = insertMatch![0]
-      // Deve incluir created_at no INSERT columns
-      expect(block, `${file}: created_at deve estar nas columns do INSERT`).toMatch(
-        /\(source_npub, target_npub, influence, components, updated_at, created_at\)/,
-      )
-      // Mas NÃO no DO UPDATE SET
-      const updateClause = block.match(/DO UPDATE SET([\s\S]*?)`/)![1]!
-      expect(updateClause, `${file}: created_at NÃO pode estar em DO UPDATE SET`).not.toMatch(
-        /created_at\s*=/,
-      )
-    }
+    const insertMatch = edgesTs.match(
+      /INSERT INTO lens_edges[\s\S]*?ON CONFLICT[\s\S]*?DO UPDATE SET[\s\S]*?`/,
+    )
+    expect(insertMatch, 'trust/edges.ts: bloco INSERT not found').not.toBeNull()
+    const block = insertMatch![0]
+    expect(block, 'created_at deve estar nas columns do INSERT').toMatch(
+      /\(source_npub, target_npub, influence, components, updated_at, created_at\)/,
+    )
+    const updateClause = block.match(/DO UPDATE SET([\s\S]*?)`/)![1]!
+    expect(updateClause, 'created_at NÃO pode estar em DO UPDATE SET').not.toMatch(
+      /created_at\s*=/,
+    )
+
+    // trust-lens.ts deve ter virado thin wrapper — NÃO declara mais SQL
+    // próprio com lens_edges. Garante que single source não regrida.
+    expect(lensTs, 'trust-lens.ts deve delegar pra upsertEdge (DRY)').toMatch(
+      /await upsertEdge\(source, target, rawComponents\)/,
+    )
+    expect(lensTs, 'trust-lens.ts NÃO pode ter SQL INSERT INTO lens_edges duplicado').not.toMatch(
+      /INSERT INTO lens_edges/,
+    )
   })
 
   it('#30 recomputeLens usa created_at como age proxy (COALESCE pra defesa em camada)', () => {
