@@ -639,17 +639,22 @@ vê a influência decaída.
 
 (²) `decay(365d, 30d) ≈ 2^-12 ≈ 2.4e-4` — vivo mas insignificante.
 
-### KNOWN LIMITATION (Satoshi audit)
+### Sybil edge-refresh defense (shipped 2026-05-20)
 
-`updated_at` é refresh-on-write (`upsertEdge` atualiza a cada
-follow/spread/bury). Sybil ring que "renova edges" (re-segue,
-re-drifta posts antigos) reseta timestamps → decay = 1.0.
+Defesa anti-Sybil via `lens_edges.created_at` **imutável**:
 
-**Defesa correta:** schema bump adicionando `lens_edges.created_at`
-**imutável** + decay usando `max(age_since_created, age_since_updated)`.
+- `created_at INTEGER` adicionado em schema (migration additive)
+- Writers incluem `created_at = now` no primeiro INSERT, mas **NÃO** no
+  `DO UPDATE SET` — imutável por construção SQL
+- Reader (`recomputeLens`) usa `row.created_at ?? row.updated_at`
+  (COALESCE defensivo pra rows pré-migration)
+- `lens_edges.influence` no SQLite permanece bit-exact — só o walk vê
+  o ajuste
 
-**Deferred Phase 2** — sem telemetria de attack real, schema bump
-prematuro. Documentado em `Docs/known-limitations.md` §1.
+**Por que `created_at` em vez de `updated_at`:** Sybil que re-segue/re-
+drifta atualizava `updated_at` → resetava decay. `created_at` imutável
+após primeiro INSERT trava esse vetor. 4 conformance tests
+(`tests/trust-lens-math.test.ts` #28-#31) travam o pattern.
 
 ---
 

@@ -391,6 +391,19 @@ function applyMigrations(schema: string) {
       column: 'kind',
       sql: `ALTER TABLE reports ADD COLUMN kind INTEGER NOT NULL DEFAULT 9081`,
     },
+    {
+      // Satoshi devsec 2026-05-20 Gap B — Sybil edge-refresh defense.
+      // Antes: temporalDecay usava updated_at (refresh-on-write) — Sybil
+      // re-segue/re-drifta pra zerar age. Agora created_at IMUTÁVEL após
+      // primeiro INSERT serve como age proxy real. Backfill conservativo
+      // pra rows pré-migration: created_at = updated_at (pior caso aceito;
+      // edge antigo continua "burlável" 1 vez até próximo refresh, depois
+      // trava). Telemetria post-deploy valida.
+      name: 'add_created_at_to_lens_edges',
+      table: 'lens_edges',
+      column: 'created_at',
+      sql: `ALTER TABLE lens_edges ADD COLUMN created_at INTEGER`,
+    },
   ]
 
   let anyFailed = false
@@ -421,6 +434,18 @@ function applyMigrations(schema: string) {
       log(`migração ${m.name} FALHOU: ${msg}`)
       anyFailed = true
     }
+  }
+
+  // Backfill: lens_edges.created_at = updated_at pra rows pré-Gap-B.
+  // Idempotente — UPDATE só toca rows com created_at IS NULL.
+  // Conservative pessimista: edge "antigo" assume age desde último update
+  // (não desde origem real). Aceitável — 1 vez só; degrada graciosamente.
+  try {
+    db.exec(`UPDATE lens_edges SET created_at = updated_at WHERE created_at IS NULL`)
+    log('backfill lens_edges.created_at concluído (ou no-op)')
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    log(`backfill lens_edges.created_at FALHOU (continuando — defesa em camada via COALESCE): ${msg}`)
   }
 
   // Migração de dados: copia identity (singular, Fase 1-4) pra

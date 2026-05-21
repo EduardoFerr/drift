@@ -342,6 +342,12 @@ CREATE TABLE IF NOT EXISTS lens_edges (
   influence   REAL NOT NULL CHECK (influence >= 0.0 AND influence <= 1.0),
   components  TEXT NOT NULL,         -- JSON {v:1, follow, mutual_spread, my_spread, my_bury, fof_paths}
   updated_at  INTEGER NOT NULL,      -- ms epoch
+  created_at  INTEGER,               -- ms epoch — IMUTÁVEL após primeiro INSERT
+                                     -- (Satoshi devsec 2026-05-20 Gap B: defesa
+                                     -- anti-Sybil edge-refresh. ON CONFLICT NÃO
+                                     -- toca em created_at. Nullable em DB pré-
+                                     -- migration; backfill via updated_at em
+                                     -- db.worker:applyMigrations.)
   PRIMARY KEY (source_npub, target_npub)
 );
 CREATE INDEX IF NOT EXISTS idx_lens_edges_source_influence

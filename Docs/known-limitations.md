@@ -16,26 +16,31 @@ audits só por feio. Defer documentado > silence.
 
 ## Trust Lens
 
-### 1. Sybil edge-refresh bypassa PPR decay temporal (GAP-1)
+### 1. ~~Sybil edge-refresh bypassa PPR decay temporal (GAP-1)~~ ✅ FECHADO
 
-- **Issue:** `temporalDecay()` em `recomputeLens()` usa `lens_edges.updated_at`
-  como age proxy. Mas `updated_at` é refresh-on-write (upsertEdge atualiza
-  a cada follow/spread/bury). Atacante que controla N identidades Sybil
-  pode "re-seguir" ou "re-driftar" posts antigos pra resetar timestamps
-  → decay = 1.0, edge volta a pesar como se fosse novo.
-- **Risk:** MEDIUM. Sybil ring com >10 identidades coordenadas pode
-  bypassar decay deliberadamente. User isolado (sem multi-conta) não
-  reproduz o ataque.
-- **Mitigation:** Documentado inline em `src/lib/trust-lens.ts` (KNOWN
-  LIMITATION comment em `recomputeLens`). `lens_ppr_decay_enabled`
-  default OFF — users sem feature ligada não são afetados.
-- **Fix correto:** Schema bump adicionando `created_at INTEGER NOT NULL`
-  imutável em `lens_edges`. Decay usa `max(age_since_created,
-  age_since_updated)` (conservative).
-- **Reopener:** (a) Telemetria local mostrar adoption rate de
-  `lens_ppr_decay_enabled` > 20%, OR (b) Sybil attack report concreto,
-  OR (c) início de Phase 2 Web-of-Trust audit. Backlog: "Lens edges:
-  column created_at imutável".
+- **Status:** FECHADO 2026-05-20 via Gap B fix.
+- **Issue original:** `temporalDecay()` usava `updated_at` (refresh-on-write).
+  Sybil que re-segue/re-drifta resetava timestamps → decay = 1.0.
+- **Fix shipado:**
+  - Schema: `lens_edges.created_at INTEGER` nullable adicionado via
+    migration additive em `db.worker.ts:applyMigrations`
+  - Backfill conservative: rows pré-migration recebem `created_at =
+    updated_at` (pior caso aceito; trava após 1 write)
+  - Writers (`trust-lens.ts:upsertLensEdge` + `trust/edges.ts:upsertEdge`):
+    `created_at` no INSERT columns mas NÃO no `DO UPDATE SET` — imutável
+    após primeiro INSERT por construção SQL
+  - Reader (`recomputeLens`): SELECT inclui `created_at`, decay usa
+    `row.created_at ?? row.updated_at` (COALESCE defensivo)
+  - 4 conformance tests source-grep (`#28-#31` em `trust-lens-math.test.ts`)
+- **Surface residual:**
+  - Grace window 1-write em rows pré-migration: edge antigo com backfill
+    `created_at = updated_at` ainda pode ser "burlado" 1 vez até próximo
+    refresh, depois trava
+  - DB-backed integration tests (real upsert + sleep + re-read) defer
+    porque exigem SQLite WASM init em Vitest Node — conformance source-
+    grep cobre o pattern
+- **TODO restante:** refactor `upsertLensEdge` em trust-lens.ts pra
+  delegar `upsertEdge` em trust/edges.ts (DRY). Backlog separado.
 
 ### 2. HINT_RULES + GuidanceRule.body — JSX injection vector futuro (DAOP Phase 2+)
 

@@ -275,13 +275,18 @@ export async function upsertLensEdge(
   const influence = computeInfluence(components)
   const now = Date.now()
   await db.run(
-    `INSERT INTO lens_edges (source_npub, target_npub, influence, components, updated_at)
-     VALUES (?, ?, ?, ?, ?)
+    // Satoshi devsec 2026-05-20 Gap B: created_at IMUTÁVEL após primeiro
+    // INSERT — defesa anti-Sybil edge-refresh (vide trust/ppr.ts
+    // temporalDecay). ON CONFLICT NÃO toca em created_at (não está no
+    // SET clause). NOTE: duplicado em trust/edges.ts:upsertEdge —
+    // mudanças aqui DEVEM refletir lá. TODO refactor: delegar pra writer único.
+    `INSERT INTO lens_edges (source_npub, target_npub, influence, components, updated_at, created_at)
+     VALUES (?, ?, ?, ?, ?, ?)
      ON CONFLICT(source_npub, target_npub) DO UPDATE SET
        influence = excluded.influence,
        components = excluded.components,
        updated_at = excluded.updated_at`,
-    [source, target, influence, JSON.stringify(components), now],
+    [source, target, influence, JSON.stringify(components), now, now],
   )
 }
 
@@ -307,24 +312,23 @@ export async function recomputeLens(source: string): Promise<number> {
   // Build adjacency list from lens_edges.
   // GAP-1 (2026-05-20): quando `lens_ppr_decay_enabled` true, aplica
   // decay temporal exponencial em `influence` baseado em
-  // `updated_at` do edge. Walker recebe influência decaída; SQLite
-  // (lens_edges.influence) permanece bit-exact — só o walk vê o ajuste.
+  // `created_at` do edge (IMUTÁVEL, Satoshi devsec 2026-05-20 Gap B fix).
+  // Walker recebe influência decaída; SQLite (lens_edges.influence)
+  // permanece bit-exact — só o walk vê o ajuste.
   //
-  // KNOWN LIMITATION (Satoshi audit pair review 2026-05-20):
-  // `updated_at` é refresh-on-write (upsertEdge atualiza a cada
-  // follow/spread/bury). Sybil ring que faz "edge refresh" (re-segue
-  // ou re-drifta posts antigos) reseta updated_at → decay = 1.0 → vetor
-  // de bypass. Defesa correta requer coluna `created_at` (immutable)
-  // em lens_edges + decay baseado em max(age_since_created,
-  // age_since_updated). Schema bump deferred pra Phase 2 quando
-  // telemetria mostrar attack real. Backlog item registrado.
+  // Por que `created_at` em vez de `updated_at`: Sybil que re-segue ou
+  // re-drifta posts antigos atualizava updated_at → resetava decay → vetor
+  // de bypass. created_at imutável após primeiro INSERT trava esse vetor.
+  // COALESCE defensivo: rows pré-migration (backfill via updated_at em
+  // db.worker) caem pra updated_at se created_at IS NULL.
   const rows = await db.exec<{
     source_npub: string
     target_npub: string
     influence: number
+    created_at: number | null
     updated_at: number
   }>(
-    `SELECT source_npub, target_npub, influence, updated_at FROM lens_edges
+    `SELECT source_npub, target_npub, influence, created_at, updated_at FROM lens_edges
      WHERE source_npub = ? OR target_npub IN (
        SELECT target_npub FROM lens_edges WHERE source_npub = ?
      )`,
@@ -336,9 +340,14 @@ export async function recomputeLens(source: string): Promise<number> {
   for (const row of rows) {
     const list = graph.get(row.source_npub) ?? []
     let influence = row.influence
-    if (decayEnabled && row.updated_at > 0) {
-      const ageMs = recomputeNow - row.updated_at
-      influence *= temporalDecay(ageMs, PPR_DECAY.HALF_LIFE_MS)
+    if (decayEnabled) {
+      // Age proxy IMUTÁVEL: created_at primário, updated_at fallback
+      // (defesa em camada pra rows pré-Gap-B sem backfill aplicado).
+      const ageReference = row.created_at ?? row.updated_at
+      if (ageReference > 0) {
+        const ageMs = recomputeNow - ageReference
+        influence *= temporalDecay(ageMs, PPR_DECAY.HALF_LIFE_MS)
+      }
     }
     list.push({ target: row.target_npub, influence })
     graph.set(row.source_npub, list)

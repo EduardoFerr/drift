@@ -658,3 +658,66 @@ describe('Trust Lens orchestrator — pure store ops (PR-4b smoke)', () => {
     __testing.resetStore()
   })
 })
+
+// ─── GAP-B tests (Sybil edge-refresh defense — shipped 2026-05-20) ───
+//
+// Source-grep conformance — código deve ter o pattern correto pra
+// preservar a defesa. DB-backed tests (real upsert + sleep + re-read)
+// estão deferred porque exigem SQLite WASM init no Vitest Node.
+
+describe('Trust Lens — GAP-B Sybil edge-refresh defense', () => {
+  const fs = require('node:fs') as typeof import('node:fs')
+
+  it('#28 schema.sql declara created_at em lens_edges (nullable pra backward compat)', () => {
+    const schema = fs.readFileSync('src/lib/schema.sql', 'utf8')
+    const lensEdgesBlock = schema.match(
+      /CREATE TABLE IF NOT EXISTS lens_edges[\s\S]*?\);/,
+    )
+    expect(lensEdgesBlock).not.toBeNull()
+    expect(lensEdgesBlock![0]).toMatch(/created_at\s+INTEGER/)
+  })
+
+  it('#29 upsertEdge (ambos writers) NÃO inclui created_at no DO UPDATE SET (imutável)', () => {
+    const edgesTs = fs.readFileSync('src/lib/trust/edges.ts', 'utf8')
+    const lensTs = fs.readFileSync('src/lib/trust-lens.ts', 'utf8')
+
+    // Extrai bloco INSERT INTO lens_edges de cada writer
+    for (const [file, src] of [
+      ['trust/edges.ts', edgesTs],
+      ['trust-lens.ts', lensTs],
+    ] as const) {
+      const insertMatch = src.match(
+        /INSERT INTO lens_edges[\s\S]*?ON CONFLICT[\s\S]*?DO UPDATE SET[\s\S]*?`/,
+      )
+      expect(insertMatch, `${file}: bloco INSERT not found`).not.toBeNull()
+      const block = insertMatch![0]
+      // Deve incluir created_at no INSERT columns
+      expect(block, `${file}: created_at deve estar nas columns do INSERT`).toMatch(
+        /\(source_npub, target_npub, influence, components, updated_at, created_at\)/,
+      )
+      // Mas NÃO no DO UPDATE SET
+      const updateClause = block.match(/DO UPDATE SET([\s\S]*?)`/)![1]!
+      expect(updateClause, `${file}: created_at NÃO pode estar em DO UPDATE SET`).not.toMatch(
+        /created_at\s*=/,
+      )
+    }
+  })
+
+  it('#30 recomputeLens usa created_at como age proxy (COALESCE pra defesa em camada)', () => {
+    const src = fs.readFileSync('src/lib/trust-lens.ts', 'utf8')
+    // SELECT deve incluir created_at
+    expect(src).toMatch(
+      /SELECT source_npub, target_npub, influence, created_at, updated_at FROM lens_edges/,
+    )
+    // Decay calc deve usar created_at PRIMEIRO (fallback updated_at)
+    expect(src).toMatch(/row\.created_at\s*\?\?\s*row\.updated_at/)
+  })
+
+  it('#31 db.worker.ts tem migration entry + backfill UPDATE created_at IS NULL', () => {
+    const src = fs.readFileSync('src/lib/db.worker.ts', 'utf8')
+    expect(src).toMatch(/add_created_at_to_lens_edges/)
+    expect(src).toMatch(
+      /UPDATE lens_edges SET created_at = updated_at WHERE created_at IS NULL/,
+    )
+  })
+})

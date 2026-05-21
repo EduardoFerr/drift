@@ -150,12 +150,18 @@ export async function upsertEdge(
   const influence = computeInfluence(components)
   const now = Date.now()
   await db.run(
-    `INSERT INTO lens_edges (source_npub, target_npub, influence, components, updated_at)
-     VALUES (?, ?, ?, ?, ?)
+    // Satoshi devsec 2026-05-20 Gap B: created_at IMUTÁVEL após primeiro
+    // INSERT. ON CONFLICT NÃO toca em created_at (não está no SET clause).
+    // Mantém defesa anti-Sybil edge-refresh — re-upsert do mesmo edge não
+    // rejuvenesce o age usado em temporalDecay. NOTE: este upsertEdge é
+    // duplicado em trust-lens.ts:upsertLensEdge — mudanças aqui DEVEM
+    // refletir lá. TODO refactor: delegar pra um único writer.
+    `INSERT INTO lens_edges (source_npub, target_npub, influence, components, updated_at, created_at)
+     VALUES (?, ?, ?, ?, ?, ?)
      ON CONFLICT(source_npub, target_npub) DO UPDATE SET
        influence = excluded.influence,
        components = excluded.components,
        updated_at = excluded.updated_at`,
-    [sourceNpub, targetNpub, influence, JSON.stringify(components), now],
+    [sourceNpub, targetNpub, influence, JSON.stringify(components), now, now],
   )
 }

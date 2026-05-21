@@ -161,18 +161,14 @@ Plano Ted HIMYM 2026-05-17 (analysis registrada em commit do PR1 [c823e8f]).
   `created_at` em lens_edges (schema bump deferred pra Phase 2 quando
   telemetria mostrar attack real). Item separado no backlog abaixo.
 
-- [ ] **SPIKE: Lens edges `created_at` imutável (GAP-1 mitigation)**
-  Trigger: Satoshi devsec audit 2026-05-20 (sessão pair-review).
-  Schema bump pra defender contra Sybil edge-refresh atual em
-  `temporalDecay` (vide `known-limitations.md` §1). Plano spike:
-  - Migration additive: `ALTER TABLE lens_edges ADD COLUMN created_at
-    INTEGER` + backfill `created_at = MIN(updated_at)` por linha
-  - Decay novo: `max(age_since_created, age_since_updated)` em
-    `recomputeLens`
-  - Test: Sybil pattern (re-upsert N vezes mesmo edge antigo) NÃO
-    reseta decay
-  Tamanho: ~2h spike + ~3h impl + tests. Defer Phase 2 quando
-  telemetria mostrar decay adoption > 20%.
+- [x] **Lens edges `created_at` imutável (Gap B Sybil edge-refresh defense)**
+  Fechado 2026-05-20 (Satoshi devsec implementation). Schema bump
+  additive + backfill conservative (`created_at = updated_at` pra rows
+  pré-migration) + writers imutáveis (não tocam created_at em ON
+  CONFLICT) + reader usa `created_at ?? updated_at` (COALESCE defesa
+  em camada) + 4 conformance tests source-grep (#28-#31). Surface
+  residual: grace window 1-write em rows pré-migration; refactor DRY
+  dos 2 writers duplicados defer.
 
 - [ ] **POC: time-window decay nos reports (Gap A insider mitigation)**
   Trigger: Satoshi devsec audit 2026-05-20 (`known-limitations.md` §5c).
