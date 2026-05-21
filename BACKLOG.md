@@ -141,6 +141,31 @@ Plano Ted HIMYM 2026-05-17 (analysis registrada em commit do PR1 [c823e8f]).
   `created_at` em lens_edges (schema bump deferred pra Phase 2 quando
   telemetria mostrar attack real). Item separado no backlog abaixo.
 
+- [ ] **SPIKE: Lens edges `created_at` imutável (GAP-1 mitigation)**
+  Trigger: Satoshi devsec audit 2026-05-20 (sessão pair-review).
+  Schema bump pra defender contra Sybil edge-refresh atual em
+  `temporalDecay` (vide `known-limitations.md` §1). Plano spike:
+  - Migration additive: `ALTER TABLE lens_edges ADD COLUMN created_at
+    INTEGER` + backfill `created_at = MIN(updated_at)` por linha
+  - Decay novo: `max(age_since_created, age_since_updated)` em
+    `recomputeLens`
+  - Test: Sybil pattern (re-upsert N vezes mesmo edge antigo) NÃO
+    reseta decay
+  Tamanho: ~2h spike + ~3h impl + tests. Defer Phase 2 quando
+  telemetria mostrar decay adoption > 20%.
+
+- [ ] **POC: time-window decay nos reports (Gap A insider mitigation)**
+  Trigger: Satoshi devsec audit 2026-05-20 (`known-limitations.md` §5c).
+  Brigada de 5+ veteranos coordenados atinge threshold sem Sybil.
+  Mitigation candidato (esbarra em §22 — sem reputação subjetiva):
+  - Time-window decay: `effective_weight = report_weight × decay(age_report,
+    half_life=24h)` — reports espalhados pesam menos que rajada de 5/h
+  - Diversity bonus: reports vindos de clusters distintos pesam mais
+    (requer GAP-CLUSTER que defer Phase 2)
+  Bloqueio: precisa pair-review Barney+Satoshi+Marshall pra validar
+  que time-decay sozinho não vira "moderação atrasada" frustrante.
+  Caso documentado de brigada real → re-trigger imediato.
+
 - [ ] **Refactor `useFeedStore` para cursor + threshold N/2 refill**
   Trigger: Ted research 2026-05-20 sobre queue management Tinder
   (`Docs/sessions/ted-tinder-queue-architecture-2026-05-20.md`).

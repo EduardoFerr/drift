@@ -550,7 +550,26 @@ function SlimModeHint() {
 
 function App() {
   const boot = useBootStore()
-  const posts = useFeedStore((s) => s.posts)
+  const allPosts = useFeedStore((s) => s.posts)
+  // SINK session hide (Satoshi devsec fix 2026-05-20):
+  // Posts que o user afundou (↓) nesta sessão são escondidos do stack
+  // ATÉ a próxima reload. Pré-fix o post sumia do view atual via
+  // advanceCursor mas reaparecia em jump-to-top/EndOfFeed.onBack
+  // (porque continuava no `posts` array). Promessa do guia-do-usuario:
+  // "Você não precisa ver de novo." — agora cumprida.
+  //
+  // Por que session-only (não persisted): bury já é evento Nostr 9080
+  // público — SoT canônico está nos relays + SQLite. Estado "já vi e
+  // afundei agora" é puramente UI ephemera; persistir seria schema
+  // bump sem ganho real (refresh é "reset" intencional do user).
+  // Manifesto §28 (privacy mínima) — sem dado novo gravado.
+  const [sessionBuriedIds, setSessionBuriedIds] = useState<Set<string>>(
+    () => new Set(),
+  )
+  const posts = useMemo(
+    () => allPosts.filter((p) => !sessionBuriedIds.has(p.id)),
+    [allPosts, sessionBuriedIds],
+  )
   const feedLoaded = useFeedStore((s) => s.loaded)
   const userWeight = useUserWeight(boot.identity?.npub ?? null)
   const installPrompt = useInstallPrompt()
@@ -1152,6 +1171,17 @@ function App() {
     // No-op silencioso se user já enterrou — ver handleSpread.
     if (myActions[post.id] === 'bury') return
     setPending((p) => ({ ...p, [post.id]: 'bury' }))
+    // SINK session hide — adiciona ao set local IMEDIATAMENTE pra que o
+    // próximo render do feed filtre o post fora. advanceCursor abaixo
+    // (em advanceHome('down')) move pro próximo; sessionBuriedIds garante
+    // que ele NÃO reapareça em jump-to-top / EndOfFeed.onBack até reload.
+    // Aplica mesmo se buryPost() falhar — bury é "intenção visível" do
+    // user; recuperar a opinião exige swipe ↑ explícito.
+    setSessionBuriedIds((prev) => {
+      const next = new Set(prev)
+      next.add(post.id)
+      return next
+    })
 
     const safetyTimeout = setTimeout(() => {
       setPending((p) => {

@@ -76,25 +76,29 @@ audits só por feio. Defer documentado > silence.
 
 ## Weight / Score
 
-### 5b. Event NOP pode resetar contador de inactivity
+### 5b. Event NOP pode resetar contador de inactivity (PARCIALMENTE FECHADO)
 
-- **Issue:** `users.last_active` é atualizado em **qualquer** evento
-  assinado (mesmo kind 0 vazio, ou eventos sem payload útil). Sybil que
-  publica NOP a cada 58 dias mantém `inactivityDays = 0` → engagement
-  não decresce pela inatividade.
-- **Risk:** LOW. Identidade Sybil sem spreads/comments recebidos
-  permanece com engagement próximo de 0 mesmo sem decay de inatividade
-  — defesa real é a SOMA de pesos dos spreaders, não esse contador.
-  Gap é cosmético (honra algorítmica) mais que vetor explorável.
-- **Mitigation atual:** Score determinado por `spreadWeight`
-  (multiplicativo com weight dos spreaders), inatividade só ajuda
-  marginalmente.
-- **Fix correto:** `last_active` deveria atualizar APENAS em eventos
-  com payload (texto não-vazio OU spread/bury/report). Filtro no
-  intake em `events.ts`.
-- **Reopener:** Telemetria mostrar Sybil rings massivos usando esse
-  padrão, OR weight tier `🌱 novo` ficar "permanente" em identidades
-  óbvias.
+- **Issue original:** `users.last_active` atualizado em qualquer evento
+  assinado. Vetor: POST kind 9078 com `{subposts:[]}` passava no
+  schema validation e disparava `updateUserActivity`.
+- **Status atual (pós-Satoshi devsec fix 2026-05-20):**
+  `validatePostShape` em `events.ts` agora REJEITA POST com
+  `subposts.length === 0`. Evento NOP nem chega ao pipeline persist.
+  Defesa em camada no schema gate. Cliente Drift oficial NUNCA cria
+  POST sem subposts; atacante que tenta é bloqueado.
+- **Surface restante:**
+  - SPREAD/BURY/REPORT exigem tag `e` válida (hex64) — atacante
+    precisa referenciar post real existente
+  - COMMENT (kind 1111) exige tags `e`+`E` válidas + content não-vazio
+    (já validado em parser)
+  - Kind 0 (profile) e kind 3 (follows) NÃO chamam updateUserActivity
+- **Risk pós-fix:** ~ZERO via NOP. Vetor remanescente exige criar
+  evento referenciando post real (SPREAD/BURY/REPORT) — custo do
+  atacante sobe pra "publicar conteúdo real OU repetir auto-spread"
+  (que já não passa porque IGNORE INTO + idempotência).
+- **Reopener:** Padrão de attack diferente surgir (ex: atacante usa
+  spreads recíprocos em ring), OR weight tier 🌱→⭐ permanente em
+  identidades óbvias.
 
 ### 5c. Brigada de moderadores insider (5+ veteranos coordenados)
 

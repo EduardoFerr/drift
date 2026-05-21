@@ -195,6 +195,14 @@ function validatePostShape(event: SignedEvent): boolean {
   try {
     const parsed = JSON.parse(event.content) as { subposts?: unknown }
     if (!Array.isArray(parsed.subposts)) return false
+    // Satoshi devsec audit 2026-05-20 (Gap C — NOP event filtering):
+    // POST com subposts=[] é NOP — sem payload útil, mas atualiza
+    // `users.last_active` via persistPost→updateUserActivity. Vetor de
+    // Sybil farming pra resetar inactivity decay. Rejeitar no schema
+    // gate impede o evento de chegar no pipeline (sem persist row, sem
+    // updateUserActivity, sem ruído). Cliente Drift oficial nunca cria
+    // POST sem subposts; atacante que tenta é detectado aqui.
+    if (parsed.subposts.length === 0) return false
   } catch {
     return false
   }

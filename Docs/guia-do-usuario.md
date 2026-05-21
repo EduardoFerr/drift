@@ -121,8 +121,9 @@ Quem fizer auditoria histórica vê que você mudou de opinião.
 **O que acontece:**
 
 1. Cliente assina e publica um **evento Nostr kind 9080**.
-2. **Localmente:** o post some do seu feed (não aparece mais no stack
-   atual). Você não precisa ver de novo.
+2. **Localmente:** o post some do seu feed e **não reaparece** até você
+   recarregar o app. Promessa cumprida via `sessionBuriedIds` (set
+   local UI, sem dado novo gravado).
 3. **Pros outros:** o `score` do post diminui, mas **proporcionalmente
    menos do que um SPREAD aumentaria** (peso 0.3× vs 1.0×). Bury é
    julgamento estético, não punição.

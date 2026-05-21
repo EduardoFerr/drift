@@ -90,6 +90,9 @@ arquitetura**, não estes arquivos. Eles são contexto auxiliar.
   audit dos 7 algoritmos documentados (`Docs/algoritmos.md`) — 6/7
   consistentes, 3 game-theory gaps documentados (NOP, insider brigada,
   edge-refresh)
+- `satoshi-devsec-mitigations-2026-05-20.md` — Satoshi DevSec mode:
+  mitigation plan + 2 fixes shipados (BUG SINK + Gap C NOP) + 2 spikes
+  registrados (Gap B edge-refresh schema bump, Gap A time-window decay)
 
 ### Misc
 - `15-e2e-testbed-scoping-2026-05-08.md`
