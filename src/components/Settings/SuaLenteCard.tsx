@@ -239,8 +239,8 @@ function ReorderIndicatorToggle() {
           mostrar quando a lente reordenou
         </span>
         <span className="block font-mono text-[10px] leading-relaxed text-drift-muted">
-          chip "lente" fica mais visível em posts afetados pelo reorder.
-          opt-in.
+          chip "lente" fica preenchido + glyph ↕ pra marcar posts
+          afetados. opt-in.
         </span>
       </div>
       <input

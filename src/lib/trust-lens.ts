@@ -309,6 +309,15 @@ export async function recomputeLens(source: string): Promise<number> {
   // decay temporal exponencial em `influence` baseado em
   // `updated_at` do edge. Walker recebe influência decaída; SQLite
   // (lens_edges.influence) permanece bit-exact — só o walk vê o ajuste.
+  //
+  // KNOWN LIMITATION (Satoshi audit pair review 2026-05-20):
+  // `updated_at` é refresh-on-write (upsertEdge atualiza a cada
+  // follow/spread/bury). Sybil ring que faz "edge refresh" (re-segue
+  // ou re-drifta posts antigos) reseta updated_at → decay = 1.0 → vetor
+  // de bypass. Defesa correta requer coluna `created_at` (immutable)
+  // em lens_edges + decay baseado em max(age_since_created,
+  // age_since_updated). Schema bump deferred pra Phase 2 quando
+  // telemetria mostrar attack real. Backlog item registrado.
   const rows = await db.exec<{
     source_npub: string
     target_npub: string

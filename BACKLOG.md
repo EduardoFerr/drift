@@ -130,11 +130,25 @@ Plano Ted HIMYM 2026-05-17 (analysis registrada em commit do PR1 [c823e8f]).
 
 (Originadas das deliberações HIMYM Stage 1-3, ainda não resolvidas.)
 
-- [ ] **GAP-1: PPR decay temporal** — edges devem decair sozinhos com idade?
-  Hoje só tem TTL 90d hard cut em não-follows.
-  Contexto: Barney WoT audit Stage 3.
-  Bloqueio: precisa de decisão entre (a) sem decay, (b) exp decay 30d half-life,
-  (c) score-based decay.
+- [x] **GAP-1: PPR decay temporal** — fechado 2026-05-20 em [2de0fc0].
+  Decisão: (b) exp decay 30d half-life, **opt-in** via
+  `lens_ppr_decay_enabled` (default OFF preserva math bit-exact).
+  Aplicado apenas no walk-time; `lens_edges.influence` SQLite intacto.
+  Pure helper `temporalDecay` em trust/ppr.ts + 6 conformance tests
+  (#22-#27). Toggle UI em SuaLenteCard ("esquecer follows antigos").
+  KNOWN LIMITATION (Satoshi pair-review): updated_at é refresh-on-write
+  → Sybil edge-refresh bypassa decay. Defesa correta requer coluna
+  `created_at` em lens_edges (schema bump deferred pra Phase 2 quando
+  telemetria mostrar attack real). Item separado no backlog abaixo.
+
+- [ ] **Lens edges: column `created_at` imutável (Sybil-refresh defense)**
+  Trigger: Satoshi audit pair-review 2026-05-20. Hoje `lens_edges.updated_at`
+  é refresh-on-write — atacante "renova edges" antigos zerando o decay
+  (GAP-1). Fix: schema bump pra adicionar `created_at INTEGER NOT NULL`
+  (imutable), decay usa `max(age_created, age_updated)` (conservative).
+  Bloqueio: schema bump requer migration script + LOCK_VIA_TEST update.
+  Defer até telemetria mostrar attack pattern real OR antes de Phase 2
+  Web of Trust audit.
 
 - [x] **GAP-2: filter → edge feedback loop** — fechado 2026-05-20
   em [PENDING-pool]. Decisão: **NÃO IMPLEMENTAR** (Satoshi pick).
