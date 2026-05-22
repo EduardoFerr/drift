@@ -116,6 +116,10 @@ arquitetura**, não estes arquivos. Eles são contexto auxiliar.
 - `handoff-2026-05-21-sprint-n2-close.md` — handoff Sprint N+2 close.
   10 items shipados em 3 rounds paralelos + 3 bug fixes pós-sprint.
   ~34 commits + ~170 tests novos. tsc 0, lint 0, manifesto OK.
+- `satoshi-sprint-n3-plan-2026-05-21.md` — Satoshi Sprint N+3 plan
+  zero-débito-maduro. 22 débitos auditados: 11 fecháveis + 6
+  dependentes + 5 Phase 2+. 4 batches paralelos = 5-6d wall-clock.
+  Veto agressivo D14/D17/D22/D12/D15/D18/D19/D20.
 
 ### Misc
 - `15-e2e-testbed-scoping-2026-05-08.md`

@@ -17,6 +17,50 @@ Formato:
 - Item aberto: `- [ ] <decisão> — contexto: <origem> — bloqueio: <quem/quê>`
 - Item fechado: `- [x] <decisão> — fechado YYYY-MM-DD em <commit-hash> — <1 linha resolução>`
 
+**📋 Sprint N+3 plan Satoshi (2026-05-21) — ZERO DÉBITO MADURO:**
+`Docs/sessions/satoshi-sprint-n3-plan-2026-05-21.md`
+
+Resumo (8-11d buffer-tolerant, 4 batches paralelos = 5-6d wall-clock):
+
+**P0 (3.5d) — must-ship:**
+| # | Item | Est | LOCK |
+|:---:|---|:---:|---|
+| 0.1 | D3 Profile picture render (já shipado N+2 2137243 — confirmar) | 4-6h | feed-author-avatar |
+| 0.2 | D2 LHCI re-measure + delta | 1d | (doc) |
+| 0.3 | D6 RadioGroupButton audit + WCAG contrast | 1d | radio-active-contrast |
+| 0.4 | D11 SuaLenteCard polish round 2 | 1d | UX |
+
+**P1 (2.25d) — abstração:**
+| # | Item | Est |
+|:---:|---|:---:|
+| 1.5 | D1 useLensToggle hook | 1d |
+| 1.6 | D4 ActionsFan visibility (drop-shadow) | 4h |
+| 1.7 | D7 Audit dialogs antigos | 4h |
+| 1.8 | D16 dismissRule rate-limit | 2h |
+
+**P2 (2.75d) — stretch:**
+| # | Item | Est |
+|:---:|---|:---:|
+| 2.9 | D5 ActionsFan labels PT-BR | 4h |
+| 2.10 | D21 9 conformance it.todo → it() | 6h |
+| 2.11 | D8 EditProfileCard banner → tooltip | 2h |
+| 2.12 | D9 ComposeOverlay preview flow | 1d |
+
+**Vetos:** D14 Satoshi Lacunas (threat-model first), D17/D22 (telemetria),
+D12 (decisão user §17), D15/D18/D19/D20 (Phase 2/Fase 6), composição §6
+lentes (defer N+4 pós feedback POC).
+
+**Risco residual:** ~55% débitos fecháveis P0+P1 / ~75% com P2.
+9 débitos ficam dependentes (correto — violar reopener seria
+shipping prematuro).
+
+**LHCI plan:** Day 0 (pré-sprint) + Day N (pós-sprint) — 5 métricas
+× 3 datas em `Docs/sessions/lhci-2026-05-21.md`.
+
+**Próxima ação user:** GO → Batch A dispatch (4 agents: 0.1+0.2+1.6+1.8).
+
+---
+
 **📋 Sprint N+2 plano consolidado (Satoshi + Ted 2026-05-21):**
 `Docs/sessions/satoshi-ted-sprint-n2-plan-2026-05-21.md`
 
