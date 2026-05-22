@@ -27,7 +27,7 @@ import type { SignedEvent } from '../types/nostr'
 import { db } from './db'
 import { getTag } from './nostr'
 import { verifyEventAsync } from './verify'
-import { DRIFT_KIND, SCORE_RECALC_DEBOUNCE_MS } from '../config/constants'
+import { DRIFT_KIND, SCORE_RECALC_DEBOUNCE_MS, VIRAL_PIN_THRESHOLD } from '../config/constants'
 import { applyCommentReceived, calculateScoreNow } from './scoring'
 import { bumpUnseenCount, invalidateFeed } from './feed'
 import { getReportWeight, maybeModerate } from './moderation'
@@ -1063,6 +1063,69 @@ async function recalculateScore(postId: string): Promise<void> {
     [score, spreadCount, buryCount, postId],
   )
   invalidateFeed()
+  // Satoshi audit redundância 2026-05-21 — auto-pin IPFS de posts virais.
+  // Hook fire-and-forget: quando score cruza VIRAL_PIN_THRESHOLD E user
+  // habilitou `auto_pin_enabled`, dispara pinBlob(cid) pra cada blob do
+  // post. Idempotente em Helia (pinar 2× não duplica). Lazy import pra
+  // evitar dep cycle events → helia → ... + manter Helia fora do bundle
+  // inicial (helia.ts §lazy-load).
+  void maybeAutoPinViralBlobs(postId, score)
+}
+
+/**
+ * Track B.2 (Satoshi audit 2026-05-21) — auto-pin de blobs em posts
+ * virais. Disparado por `recalculateScore` quando score cruza
+ * `VIRAL_PIN_THRESHOLD`. Manifesto §16 (disponibilidade distribuída):
+ * user power que opta-in ajuda a rede a hospedar conteúdo viral sem
+ * chave mestra central.
+ *
+ * Best-effort:
+ *  - Pref OFF (default) → no-op silencioso
+ *  - Score abaixo do threshold → no-op
+ *  - Post sem imeta tags (legacy ou só-texto) → no-op
+ *  - Helia indisponível → log e segue
+ *
+ * Lazy imports pra evitar cycle events ← prefs ← ... + manter Helia
+ * fora do bundle inicial (helia.ts §lazy-load — só baixa quando user
+ * efetivamente usa IPFS).
+ */
+async function maybeAutoPinViralBlobs(postId: string, score: number): Promise<void> {
+  try {
+    if (score <= VIRAL_PIN_THRESHOLD) return
+    const { getPrefs } = await import('./prefs')
+    if (!getPrefs().auto_pin_enabled) return
+
+    const row = await db.get<{ raw_event: string }>(
+      `SELECT raw_event FROM posts WHERE id = ?`,
+      [postId],
+    )
+    if (!row) return
+
+    const parsedEvent = JSON.parse(row.raw_event) as SignedEvent
+    const metas = parseImetaTags(parsedEvent)
+    if (metas.length === 0) return
+
+    // Dedup CIDs (post pode ter o mesmo blob em múltiplos subposts).
+    const cids = new Set<string>()
+    for (const meta of metas) {
+      if (meta.cid) cids.add(meta.cid)
+    }
+    if (cids.size === 0) return
+
+    const { pinBlob, cidFromString } = await import('./helia')
+    for (const cidStr of cids) {
+      void (async () => {
+        try {
+          const cid = await cidFromString(cidStr)
+          await pinBlob(cid)
+        } catch (err) {
+          console.warn('[events] auto-pin viral falhou pra cid', cidStr, err)
+        }
+      })()
+    }
+  } catch (err) {
+    console.warn('[events] maybeAutoPinViralBlobs falhou (degraded):', err)
+  }
 }
 
 /**

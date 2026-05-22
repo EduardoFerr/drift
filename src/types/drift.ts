@@ -556,6 +556,22 @@ export interface UserPrefs {
    * + IdentityPanel header.
    */
   last_nsec_export_at?: number
+  /**
+   * Auto-pin de blobs IPFS quando post atinge `VIRAL_PIN_THRESHOLD`
+   * (Satoshi audit redundância 2026-05-21 — gap auto-pin B.2 defer).
+   * Default OFF: storage cap IPFS (500MB) pode encher rapidamente
+   * em malha viral; user habilita explicitamente em settings quando
+   * tem capacidade de hospedar.
+   *
+   * Quando ON, `events.ts:recalculateScore` dispara `pinBlob(cid)`
+   * fire-and-forget pra cada `subposts[].meta.cid` distinto. Idempotente
+   * em Helia — pinar 2× não duplica. Falha não derruba o recalc.
+   *
+   * Manifesto §16 (disponibilidade distribuída): user power que
+   * habilita ajuda a rede a hospedar posts virais sem chave mestra
+   * central. Manifesto §28: local-only, zero export.
+   */
+  auto_pin_enabled: boolean
 }
 
 /**
@@ -604,6 +620,7 @@ export const DEFAULT_USER_PREFS: UserPrefs = {
   menu_detail_show_how_it_works: false,
   menu_detail_show_algorithm: false,
   menu_detail_show_action_labels: true,
+  auto_pin_enabled: false,
 }
 
 // ─── Trust Lens (Phase 1 — manifesto §24 view-layer carve-out) ────

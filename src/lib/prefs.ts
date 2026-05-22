@@ -135,6 +135,12 @@ function applyRow(target: UserPrefs, key: string, value: string): void {
     case 'menu_detail_show_action_labels':
       target.menu_detail_show_action_labels = value === '1'
       return
+    case 'auto_pin_enabled':
+      // Satoshi audit redundância 2026-05-21: auto-pin IPFS de posts
+      // virais (score > VIRAL_PIN_THRESHOLD). Default OFF — opt-in
+      // pra user power que aceita custo de storage IPFS.
+      target.auto_pin_enabled = value === '1'
+      return
     case 'upload_endpoint':
       // Sovereignty (Marshall NEEDS-FIX A): URL https:// pra Blossom
       // server. Empty = unset (cai no default constante). Validation

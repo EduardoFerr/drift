@@ -142,3 +142,22 @@ export const FEED_SNAPSHOT_STALE_MS = 10 * 60 * 1000
  * `lens_ppr_decay_enabled` — opt-in até telemetria validar.
  */
 export const REPORT_DECAY_HALF_LIFE_MS = 48 * 60 * 60 * 1000
+
+/**
+ * Score acima do qual posts são auto-pinados em IPFS (§16
+ * disponibilidade distribuída). Default 50 — conservative,
+ * user power pode override via pref futuro. Satoshi audit
+ * redundância 2026-05-21.
+ *
+ * Gap diagnosticado: `helia.ts:246-249` (API B.1 `pinBlob`) é 100%
+ * funcional mas auto-pin B.2 ficou defer — posts virais não eram
+ * pinados automaticamente. Manifesto §16 promete disponibilidade
+ * distribuída mas não ativava sozinho. Hook em `events.ts:recalculateScore`
+ * dispara `pinBlob(cid)` fire-and-forget pra cada blob do post quando
+ * `score > VIRAL_PIN_THRESHOLD && prefs.auto_pin_enabled`.
+ *
+ * Opt-in default OFF (Satoshi mitigation): IPFS storage cap default
+ * 500MB pode encher rapidamente em malha viral; user explicitamente
+ * habilita em settings depois que entende trade-off de banda/storage.
+ */
+export const VIRAL_PIN_THRESHOLD = 50
