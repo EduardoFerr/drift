@@ -212,6 +212,10 @@ export async function addRelay(input: AddRelayInput): Promise<void> {
   // Re-broadcast oportunista — manifesto §16. Roda fire-and-forget
   // pra não bloquear UI. Identidade obtida lazy pra evitar import
   // cíclico (relays.ts ← identity.ts ← bootstrap.ts ← relays.ts).
+  //
+  // Satoshi audit 2026-05-21 fix — §16 disponibilidade ativa sozinha
+  // agora, não depende user clicar em Settings. Guard `isNew` garante
+  // idempotência: re-adicionar mesmo relay NÃO redispara (anti-spam).
   if (isNew && (input.write !== false)) {
     void scheduleRebroadcast(url)
   }
