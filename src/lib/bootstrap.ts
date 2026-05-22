@@ -26,6 +26,7 @@ import { loadRelays } from './relays'
 import { loadIdentities } from './identities'
 import { loadFollows } from './follows'
 import { loadLens } from './trust-lens'
+import { initBuiltinLenses } from './lens/init'
 import { loadModLocal } from './moderation-local'
 // V10.11 — passkey movido pra dynamic import. ~3.58 KB raw / 1.4 KB gz
 // fica fora do entry chunk; só carrega se user efetivamente habilitou
@@ -253,6 +254,11 @@ async function doBootstrap(): Promise<void> {
     // Cold-start (cache vazio) é safe: getPprForAuthor retorna 0 e
     // viewMultiplier degrada graciosamente. Manifesto §24 (view-layer).
     await loadLens()
+
+    // Sprint N+2 P0.2 — registra built-in lens strategies (PprTrust + Chronological).
+    // Idempotente. Após este ponto, getActiveLens() está disponível.
+    // Manifesto §17 — registry open, user troca lente livremente.
+    initBuiltinLenses()
 
     // Identity exposure tracking — Satoshi adversarial guard 2026-05-17.
     // Carrega `last_nsec_export_at` pra UI mostrar "última exposição".

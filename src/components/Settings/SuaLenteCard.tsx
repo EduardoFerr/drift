@@ -20,6 +20,11 @@ import { useEffect, useState } from 'react'
 import { setLensStrength, useLensStore } from '../../lib/trust-lens'
 import { db } from '../../lib/db'
 import { usePrefsStore, setPref } from '../../lib/prefs'
+import {
+  listLenses,
+  setActiveLens,
+  useLensRegistryStore,
+} from '../../lib/lens/registry'
 import { FullPageCard } from '../UI/FullPageCard'
 import { DriftButton } from '../UI/DriftButton'
 import { EyeIcon } from '../UI/Icons'
@@ -64,6 +69,14 @@ function helperText(strength: number): string {
 export function SuaLenteCard({ onClose }: CardProps) {
   const strength = useLensStore((s) => s.strength)
   const [local, setLocal] = useState<number>(strength)
+  // Sprint N+2 P0.2 — lens registry reativo. activeId muda → re-render
+  // (Chronological lens não tem slider; dropdown decide se mostra).
+  const activeId = useLensRegistryStore((s) => s.activeId)
+  // `version` subscription pra re-render quando lentes chegam ao registry
+  // (caso UI montar antes de initBuiltinLenses; raro mas defensivo).
+  useLensRegistryStore((s) => s.version)
+  const lenses = listLenses()
+  const showStrengthControls = activeId === 'ppr-trust'
 
   // Sincroniza com store se mudar de fora (ex: boot load).
   useEffect(() => {
@@ -118,8 +131,38 @@ export function SuaLenteCard({ onClose }: CardProps) {
           compartilhada e não afeta o score canônico dos posts.
         </p>
 
+        {/* Sprint N+2 P0.2 — seletor de estratégia. POC ship com 2 lentes
+            (PPR Trust default + Cronológica). Composição §6 (∪ ∩ −) +
+            shareable config defer Sprint N+3.
+            Volátil: troca não persiste em UserPrefs (reset on reload).
+            Documentado em tests/lens-plugin-conformance.test.ts. */}
+        <label className="block space-y-2">
+          <span className="block font-mono text-[11px] uppercase tracking-meta text-drift-muted">
+            estratégia
+          </span>
+          <select
+            value={activeId}
+            onChange={(e) => setActiveLens(e.target.value)}
+            aria-label="estratégia da lente"
+            className="w-full cursor-pointer rounded border border-drift-border/40 bg-drift-surface px-3 py-2 font-mono text-[12px] text-drift-text focus:border-drift-accent2 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
+          >
+            {lenses.map((l) => (
+              <option key={l.id} value={l.id}>
+                {l.name}
+              </option>
+            ))}
+          </select>
+          {/* Descrição da lente atual — user entende o que muda antes de aplicar */}
+          <span className="block font-mono text-[10px] leading-relaxed text-drift-muted">
+            {lenses.find((l) => l.id === activeId)?.description ?? ''}
+          </span>
+        </label>
+
         {/* Slider region — sem inner card aninhado. divider-y como
-            agrupamento visual leve. */}
+            agrupamento visual leve.
+            Sprint N+2 P0.2: só renderiza pra lentes que usam strength
+            (chronological não tem intensidade — esconde slider). */}
+        {showStrengthControls && (
         <div className="space-y-3 border-y border-drift-border/30 py-5">
           {/* P1: dado é a estrela. Sentence-case display 18px semibold,
               não uppercase heading. Olho vai direto pra resposta. */}
@@ -191,13 +234,16 @@ export function SuaLenteCard({ onClose }: CardProps) {
             {helperText(local)}
           </p>
         </div>
+        )}
 
         {/* PR-5 (2026-05-20): toggle opt-in pra indicador visual de
             reorder. Default OFF — chip "lente" já cobre quem quer
-            investigar. Apenas exposto quando lente ativa (isActive). */}
-        {isActive && <ReorderIndicatorToggle />}
-        {isActive && <PprDecayToggle />}
-        {isActive && <MapColorsToggle />}
+            investigar. Apenas exposto quando lente ativa (isActive).
+            Sprint N+2 P0.2: gateado também por showStrengthControls —
+            sub-toggles PPR-específicos não fazem sentido em Chronological. */}
+        {showStrengthControls && isActive && <ReorderIndicatorToggle />}
+        {showStrengthControls && isActive && <PprDecayToggle />}
+        {showStrengthControls && isActive && <MapColorsToggle />}
 
         {/* CTA "ver feed agora" — só aparece quando lens ativa */}
         {isActive && (
@@ -323,7 +369,7 @@ function MapColorsToggle() {
         onChange={(e) => {
           void setPref('lens_show_in_map', e.target.checked)
         }}
-        aria-label="colorir pins do mapa por trust score"
+        aria-label="colorir pins do mapa por confiança local"
         className="mt-1 h-4 w-4 cursor-pointer accent-drift-accent2"
       />
     </label>
