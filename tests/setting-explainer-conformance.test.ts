@@ -175,12 +175,13 @@ describe('SettingExplainer — Phase 6 menu detalhado (4 flags granulares)', () 
     expect(explainers).toBe(5)
   })
 
-  it('PostViewer.tsx ActionsFan consome menu_detail_show_action_labels', () => {
-    const postViewerSrc = readFileSync(
-      'src/components/Post/PostViewer.tsx',
+  it('ActionsFan.tsx consome menu_detail_show_action_labels', () => {
+    // Extraído de PostViewer.tsx em Sprint N+2 P1.5 — primitive dedicado.
+    const actionsFanSrc = readFileSync(
+      'src/components/Post/ActionsFan.tsx',
       'utf8',
     )
-    expect(postViewerSrc).toMatch(/menu_detail_show_action_labels/)
+    expect(actionsFanSrc).toMatch(/menu_detail_show_action_labels/)
   })
 
   it("App.tsx NÃO tem mais AdvancedToggle (Phase 6 substitui por menu-detalhado entry)", () => {

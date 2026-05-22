@@ -19,8 +19,10 @@ const SUA_LENTE = readFileSync(
   'src/components/Settings/SuaLenteCard.tsx',
   'utf8',
 )
+// ActionsFan extraído de PostViewer.tsx em Sprint N+2 P1.5 — assertions
+// que validavam o menu de ações leem do novo arquivo dedicado.
 const POST_VIEWER = readFileSync(
-  'src/components/Post/PostViewer.tsx',
+  'src/components/Post/ActionsFan.tsx',
   'utf8',
 )
 const APP = readFileSync('src/App.tsx', 'utf8')
