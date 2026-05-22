@@ -252,5 +252,50 @@ audits só por feio. Defer documentado > silence.
 
 ---
 
-*Última atualização: 2026-05-20 (criado em pair-review Lily + Barney+Satoshi).
+---
+
+## Anti-eclipse / Discovery
+
+### 8. Random walk pós-CONNECTED entry não shipado
+
+- **Issue:** `src/lib/probe.ts` roda probe periódico 30min pra
+  detectar relay malicioso (silent-drop, fork, eclipse setup) — isso
+  está shipado. Mas **random walk ATIVO pós-CONNECTED** — amostragem
+  contínua de peers conhecidos após entrada na rede, conforme
+  manifesto §20 — não foi entregue no transporte WebRTC. Hoje, uma
+  vez `CONNECTED`, o cliente confia no conjunto de peers descoberto
+  via bootstrap + nostr signaling, sem re-amostragem agressiva.
+- **Risk:** MEDIUM. Eclipse attack via relay coordinator (atacante
+  controla todos os relays iniciais que o cliente conhece) só tem
+  defesa em camada via probe periódico — não há descoberta contínua
+  de paths alternativos pós-entry. Em país com poucos relays
+  acessíveis (cenário §15), isso aproxima MEDIUM-HIGH.
+- **Mitigation atual:**
+  - **Probe periódico 30min** (`startProbe()` em bootstrap) detecta
+    silent-drop e fork comparando estado entre relays redundantes
+  - **Path diversity scoring** em `src/lib/transport/webrtc/peerScore.ts`
+    avalia peer por quantos caminhos independentes levam a ele —
+    mitiga influência desproporcional de um operador
+  - **Multi-relay publish** (sempre ≥2 relays paralelos, manifesto
+    §14) reduz custo do atacante a coordenar TODOS os relays
+    descobertos
+  - **Cluster detection** em peer registry (`webrtc/discovery.ts`):
+    se >70% dos peers vêm da mesma origem inferida, cliente entra
+    em estado `ISOLATED` — mas isso é check de ENTRY, não contínuo
+- **Fix correto:** Random walk com path diversity quando WebRTC
+  P2P discovery shipar completo em Fase 6.4. Amostragem aleatória
+  de peers conhecidos a cada N minutos, com weight inverso à
+  path diversity já estabelecida (peers de origem under-represented
+  são preferidos). Função pura calculável + testável.
+- **Reopener:** Fase 6.4 WebRTC P2P transport completo (PeersCard
+  UI shipped + bootstrap UX validado em campo) OR telemetria
+  local mostrando eclipse attempt real (ex: probe detecta fork
+  recorrente em ambiente específico de user).
+- **Doc canônico:** `Docs/webrtc-6.4-plan.md` §random-walk;
+  manifesto §20.
+
+---
+
+*Última atualização: 2026-05-21 (criado em pair-review Lily + Barney+Satoshi;
+§8 random walk adicionada por Robin Sprint N+2).
 Reabrir requer condição explícita do "Reopener" — não suspicion geral.*
