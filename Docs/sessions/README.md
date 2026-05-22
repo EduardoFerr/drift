@@ -107,6 +107,12 @@ arquitetura**, não estes arquivos. Eles são contexto auxiliar.
   consolidado (convergência + divergências resolvidas: lentes POC vs
   SPIKE → POC ganhou; smoke test pré-sprint → ACEITO). 8-13d
   buffer-tolerant
+- `profile-picture-audit-2026-05-21.md` — Lily audit: feature MVP+1
+  incompleta. Publish OK, render no feed faltando (rowToPost omite
+  authorAvatar/authorAlias). Fix ~4-6h.
+- `satoshi-redundancia-audit-2026-05-21.md` — Satoshi audit 10 cenários:
+  7 OK / 3 parciais / 1 não-impl. Top 3 closures Sprint N+2 (~2.5h):
+  auto-rebroadcast em addRelay() + auto-pin IPFS + random walk doc.
 
 ### Misc
 - `15-e2e-testbed-scoping-2026-05-08.md`

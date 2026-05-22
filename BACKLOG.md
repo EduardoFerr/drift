@@ -39,8 +39,15 @@ validação Vercel completa = risco real).
 | 1.5 | Extract `<ActionsFan>` primitive | 1.5d |
 | 1.6 | `useLensToggle` hook (DRY 3 toggles) | 1d |
 | 1.7 | LHCI re-measure + delta vs cwv-final-report-2026-05-09 | 1d |
+| 1.8 | Auto-trigger re-broadcast em addRelay() (Satoshi #1) | 30min |
+| 1.9 | Auto-pin IPFS hook em score > threshold (parte de P0 0.1) | (incluso) |
 
-**P2 — se folga:** §20 spec (0.5d) + architecture-phases.md (1d).
+**P2 — se folga:**
+| # | Item | Est |
+|:---:|---|:---:|
+| 2.10 | §20 random walk pós-CONNECTED — DOC ONLY (Satoshi #3) | 0min (doc) |
+| 2.11 | Profile picture render em feed/comments (Lily fix) | 4-6h |
+| 2.12 | `Docs/architecture-phases.md` 6/7 → épicos | 1d |
 
 **Veto explícito (NÃO shipar):** content-hash, N/2 refill, PR-4c
 worker, GAP-CLUSTER LPA, sneakernet QR, NIP-44 DMs UI, composição
@@ -285,6 +292,40 @@ Plano Ted HIMYM 2026-05-17 (analysis registrada em commit do PR1 [c823e8f]).
   ABORTAR re-spawn — research já consolidado, nova rodada seria
   redundante. Se precisar revisitar, dispatch novo HIMYM com escopo
   fresh em vez de re-spawnar legacy.
+
+---
+
+## Bugs reportados — em investigação
+
+- [~] **Profile picture parcialmente funciona — auditado 2026-05-21**
+  Lily audit:
+  `Docs/sessions/profile-picture-audit-2026-05-21.md`. **Diagnóstico:**
+  NÃO é bug — feature MVP+1 incompleta. User CONSEGUE publicar (kind 0
+  com picture), avatar APARECE em ProfileModal. **Mas NÃO aparece** em
+  feed/PostViewer/CommentCard porque `feed.ts:rowToPost()` (linhas
+  319-339) omite `authorAvatar`/`authorAlias` (campos opcionais nunca
+  populados).
+  **Fix proposto** (~4-6h, ~200 LoC + tests):
+  - feed.ts rowToPost: LEFT JOIN users_metadata
+  - SubpostLayout: header autor (avatar + name) nos 3 layouts
+  - CommentCard: idem
+  - LOCK_VIA_TEST: avatar em feed === picture em kind 0
+  Cabe em Sprint N+2 P2 OR defer (cosmético — manifesto não exige).
+
+- [~] **Redundância — audit Satoshi 2026-05-21 (7 OK / 3 parciais / 1 não-impl)**
+  Doc: `Docs/sessions/satoshi-redundancia-audit-2026-05-21.md`.
+  **Diagnóstico:** Drift não falha em redundância core. 2 gaps de
+  **automação** (não código).
+  **Top 3 closures Sprint N+2 (~2.5h total):**
+  - **#1 Auto-trigger re-broadcast em `addRelay()`** (~30min) —
+    rebroadcast existe mas é manual. Promessa §16 só funciona se user
+    saber clicar. Fix ZERO risk.
+  - **#2 Auto-pin IPFS em score > threshold** (~60min) — alinha com
+    Sprint N+2 P0 0.1 já priorizado (§16 IPFS pin automático).
+  - **#3 Random walk pós-CONNECTED — DOC ONLY** (0min) — registrar em
+    known-limitations com reopener Fase 6 WebRTC.
+  **Cenários NÃO TOCAR:** multi-id, backup nsec, NIP-65, SQLite
+  rebuild, probe ciclo — gold-plating risk.
 
 ---
 
