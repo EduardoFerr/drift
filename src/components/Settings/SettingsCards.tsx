@@ -238,13 +238,37 @@ export function LocationCard({ onClose }: CardProps) {
             onChange={(v) => void setPref('location_granularity', v)}
             options={GRANULARITY_OPTIONS}
           />
-          {current && (
-            <div className="mt-3 rounded-xl border border-drift-border/40 bg-drift-surface/40 px-4 py-3 font-mono text-[11px] leading-relaxed text-drift-body">
-              <span className="font-bold text-drift-text">{current.label}</span>
-              {' — '}
-              {current.hint}
-            </div>
-          )}
+          {/* Lily audit 2026-05-21 fix — layout fix: minHeight no
+              container do summary pra evitar reflow visível quando
+              user troca granularity. Antes: div crescia/encolhia
+              abruptamente (hint text varia 50→160 chars). Agora:
+              sempre renderiza com minHeight estável; texto muda
+              suavemente. Adicional: nota explicativa pra "precise"
+              esclarecendo que GPS só dispara ao publicar/driftar
+              (não trava a UI ativando). */}
+          <div
+            className="mt-3 min-h-[88px] rounded-xl border border-drift-border/40 bg-drift-surface/40 px-4 py-3 font-mono text-[11px] leading-relaxed text-drift-body"
+            aria-live="polite"
+          >
+            {current ? (
+              <>
+                <span className="font-bold text-drift-text">{current.label}</span>
+                {' — '}
+                {current.hint}
+                {current.value === 'precise' && (
+                  <span className="mt-2 block text-drift-muted">
+                    💡 GPS só é solicitado ao publicar/driftar — ativar
+                    aqui NÃO bloqueia a UI. Browser pedirá permissão da
+                    primeira vez.
+                  </span>
+                )}
+              </>
+            ) : (
+              <span className="text-drift-muted">
+                escolha uma granularidade acima
+              </span>
+            )}
+          </div>
         </SettingExplainer>
       </div>
     </FullPageCard>

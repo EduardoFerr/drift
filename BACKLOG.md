@@ -297,7 +297,27 @@ Plano Ted HIMYM 2026-05-17 (analysis registrada em commit do PR1 [c823e8f]).
 
 ## Bugs reportados — em investigação
 
-- [ ] **Ativar localização travando + layout precisa refino**
+- [x] **Long-press 5s → 3s + ripple CSS animation (substituiu progress bar)**
+  User pedido 2026-05-21. Shipado same session:
+  - LONG_PRESS_MS 5000 → 3000 em PostViewer.tsx
+  - Progress bar linear + label substituídos por **animação radial CSS**
+    a partir do ponto exato do toque (pressOrigin coord)
+  - 3 ondas concêntricas com delays 0/0.4/0.8s — usuário SENTE tempo
+    passar via expansão visível, sem leitura de texto
+  - `src/styles/ripple.css` novo: @keyframes ripple-wave + reduced-motion
+    fallback (WCAG 2.3.3)
+  - Micro-label discreto bottom-center pra a11y (aria-live polite)
+
+- [~] **Ativar localização — fix shipado 2026-05-21**
+  Lily audit `Docs/sessions/profile-picture-audit-2026-05-21.md` style
+  (read-only Explore). Diagnóstico: 2 problemas:
+  - **Layout reflow:** div summary cresce/encolhe ao mudar granularity
+    → fix: minHeight 88px + sempre renderiza (zero reflow)
+  - **Confusão "GPS travando":** user pensa que ativar precise dispara
+    GPS imediato → fix: nota explicativa "GPS só é solicitado ao
+    publicar/driftar — ativar aqui NÃO bloqueia"
+  Residual: PermissionsCard (fora deste fix) ainda pode travar 10s sem
+  feedback — registrar como gap separado se reproduzir.
   Reportado user 2026-05-21. Sintoma: ao tentar ativar location
   granularity (Settings → Localização), tela trava OU layout quebra.
   Agent dispatch pra audit:
@@ -307,13 +327,23 @@ Plano Ted HIMYM 2026-05-17 (analysis registrada em commit do PR1 [c823e8f]).
   - Layout responsivo em mobile?
   Investigação pendente.
 
-- [ ] **Mapas mostrando mesmas localizações — bug ou falta de dados?**
-  Reportado user 2026-05-21. Sintoma: post mode, global mode, network
-  mode parecem mostrar mesmos pins. Hypothesis:
-  - (a) Bug real — query SQL ou render reusando data wrong mode
-  - (b) Falta de dados — base small (≤10 spreads geo) faz 3 modes
-    aparecerem similares
-  Agent dispatch pra audit + reproducer.
+- [x] **Mapas mostrando mesmas localizações — diagnóstico Ted 2026-05-21**
+  NÃO É BUG CÓDIGO. Ted audit (Read-only Explore) confirmou:
+  - Queries SQL retornam datasets distintos (post ⊂ global, network
+    ⊆ global filtered by follows)
+  - Cache invalidation correto (useEffect deps `[data, mapView]`)
+  - Sem reutilização cross-mode
+  **Root cause:** falta de dados (small base ~4-10 spreads geo).
+  - Se base tem 5 spreaders distintos e user segue 3 deles, os 3 modes
+    naturalmente convergem visualmente
+  - Aceito por construção em MVP — modes ficarão distintos quando base
+    crescer (DAU >100 + spreaders geo distintos)
+  **Mitigation futura (não-urgente):**
+  - UI hint "base pequena — modes podem parecer similares" quando
+    spreads count < 20
+  - Cores distintas por mode (post=âmbar, global=mint, network=rosa)
+  Reabrir quando user reportar regressão real OU base crescer + modes
+  continuarem idênticos.
 
 - [~] **Profile picture parcialmente funciona — auditado 2026-05-21**
   Lily audit:

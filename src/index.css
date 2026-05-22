@@ -24,6 +24,7 @@
  * @imports at the top). Vite + postcss-import resolve relative path.
  */
 @import './styles/themes.css';
+@import './styles/ripple.css';
 
 /*
  * Round CWV-2 §3.4 — Font optimization. @fontsource ships

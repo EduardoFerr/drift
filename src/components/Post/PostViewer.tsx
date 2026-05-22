@@ -149,14 +149,18 @@ export function PostViewer({
   //   - Antes: abria ModerationModal (block/mute/report)
   //   - Agora: alterna modo padrão ⇄ modo slim (chrome hidden, card
   //     ocupa toda a tela)
+  // V_2026-05-21 (user pedido): 5s → 3s + ripple animation CSS a partir
+  // do toque, substituindo o progress bar linear + label.
   // Moderação foi movida pro ActionsFan como item `moderar` (mesmo
   // modal real, só trigger mudou pra menu explícito).
-  // Estado local: `pressing` controla render do progress bar feedback.
+  // Estado local: `pressing` + `pressOrigin` (ponto do toque pra
+  // posicionar o ripple radial).
   const [pressing, setPressing] = useState(false)
+  const [pressOrigin, setPressOrigin] = useState<{ x: number; y: number } | null>(null)
   const [moderationOpen, setModerationOpen] = useState(false)
   const pressTimerRef = useRef<number | null>(null)
   const pressStartRef = useRef<{ x: number; y: number } | null>(null)
-  const LONG_PRESS_MS = 5000
+  const LONG_PRESS_MS = 3000
   const LONG_PRESS_SLOP_PX = 20
   // Acompanha slim mode pra label do progress bar feedback (mostra
   // "modo slim" quando entrando ou "modo padrão" quando saindo).
@@ -168,6 +172,7 @@ export function PostViewer({
     }
     pressStartRef.current = null
     setPressing(false)
+    setPressOrigin(null)
   }
   function handleCardPointerDown(e: React.PointerEvent) {
     // V10.6 (2026-05-15): opt-out explícito via `data-no-longpress` —
@@ -186,10 +191,20 @@ export function PostViewer({
     )
       return
     pressStartRef.current = { x: e.clientX, y: e.clientY }
+    // V_2026-05-21 (user pedido): captura coord relativo ao card pra
+    // posicionar ripple radial no ponto exato do toque. currentTarget
+    // é o elemento que ouve o evento (o card wrapper) — bounding rect
+    // permite normalizar clientX/Y → offset local.
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    setPressOrigin({
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+    })
     setPressing(true)
     pressTimerRef.current = window.setTimeout(() => {
       pressTimerRef.current = null
       setPressing(false)
+      setPressOrigin(null)
       pressStartRef.current = null
       navigator.vibrate?.(50)
       toggleSlim()
@@ -508,39 +523,47 @@ export function PostViewer({
             </m.div>
           )}
         </AnimatePresence>
-        {/* V9.16 — long-press progress bar (top edge, 4px, drift-bury).
-            Preenche linearmente em 5s. V9.24 — label "moderação" central
-            aparece em 600ms (após o user já passou da janela de "tap
-            normal") pra dar contexto do que está acontecendo. Sem label,
-            o user via uma barra vermelha aparecendo sem motivo aparente
-            (bad discoverability). */}
-        <AnimatePresence>
-          {pressing && (
-            <>
-              {/* Progress bar 5s — drift-accent2 (neutro, era drift-bury
-                  na semântica antiga de moderar). Label aparece em 600ms
-                  pós-pressing pra contexto. */}
-              <m.div
-                className="pointer-events-none absolute inset-x-0 top-0 z-[15] h-1 origin-left bg-drift-accent2"
-                initial={{ scaleX: 0, opacity: 0.9 }}
-                animate={{ scaleX: 1 }}
-                exit={{ opacity: 0, scaleX: 1, transition: { duration: 0.18 } }}
-                transition={{ duration: LONG_PRESS_MS / 1000, ease: 'linear' }}
+        {/* V_2026-05-21 (user pedido): long-press feedback agora é
+            **ripple radial CSS** a partir do ponto exato do toque,
+            substituindo progress bar linear + label. 3 ondas concêntricas
+            com delays 0/1/2s — usuário SENTE o tempo passar via expansão
+            visível, sem leitura de texto. 5s → 3s reduzido (user pedido
+            redução tactil).
+
+            Matemática: cada onda expande de 0 → max(card width, height)
+            em LONG_PRESS_MS, com fade-out simultâneo. Position fixa em
+            pressOrigin (coord relativo ao card). Multiple waves com
+            delays staggered dão sensação de respiração.
+
+            Pure CSS (sem framer-motion overhead) — keyframes inline via
+            style prop pra animation-duration parametrizada dinamicamente. */}
+        {pressing && pressOrigin && (
+          <div
+            className="pointer-events-none absolute inset-0 z-[15] overflow-hidden"
+            aria-hidden="true"
+          >
+            {[0, 1, 2].map((i) => (
+              <span
+                key={i}
+                className="ripple-wave"
+                style={{
+                  left: pressOrigin.x,
+                  top: pressOrigin.y,
+                  animationDuration: `${LONG_PRESS_MS}ms`,
+                  animationDelay: `${i * 0.4}s`,
+                }}
               />
-              <m.div
-                className="pointer-events-none absolute inset-x-0 top-2 z-[15] flex items-center justify-center"
-                initial={{ opacity: 0, y: -4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-                transition={{ duration: 0.18, delay: 0.6 }}
-              >
-                <span className="rounded-full border border-drift-accent2/60 bg-drift-bg/85 px-3 py-1 font-mono text-[12px] uppercase tracking-meta text-drift-accent2 backdrop-blur-sm">
-                  {isSlim ? 'segure pra sair do slim' : 'segure pra modo slim'}
-                </span>
-              </m.div>
-            </>
-          )}
-        </AnimatePresence>
+            ))}
+            {/* Micro-label centro inferior — discreto, só pra a11y/discover.
+                aria-live polite anuncia pra screen reader. */}
+            <span
+              aria-live="polite"
+              className="absolute bottom-6 left-1/2 -translate-x-1/2 rounded-full border border-drift-accent2/40 bg-drift-bg/70 px-2 py-0.5 font-mono text-[10px] uppercase tracking-meta text-drift-accent2/80 backdrop-blur-sm"
+            >
+              {isSlim ? 'soltando voltar' : 'soltando modo slim'}
+            </span>
+          </div>
+        )}
         {/* V11 — botões do header (⋮ ações + 💬 comments + 🗺 mapa).
             Absolute top-right do card area, z-30 pra ficar acima do
             SwipeHandler. onClick stopPropagation pra evitar conflito

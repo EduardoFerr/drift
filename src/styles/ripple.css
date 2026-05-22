@@ -1,0 +1,76 @@
+/*
+ * Drift — Ripple long-press feedback
+ *
+ * V_2026-05-21 (user pedido): substitui progress bar linear + label
+ * por animação radial CSS a partir do ponto exato do toque.
+ *
+ * 3 ondas concêntricas com delays staggered (0/0.4/0.8s) — usuário
+ * SENTE o tempo passar via expansão visível, sem leitura de texto.
+ *
+ * Cálculo geométrico:
+ *   - Onda nasce em (0,0) relativo ao ponto de toque (left/top inline)
+ *   - Translate -50% -50% centraliza no ponto exato
+ *   - Scale 0 → ~16 (≈800px diâmetro, cobre card médio ~700px)
+ *   - Opacity 0.8 → 0 (fade simultâneo expansão)
+ *   - Border width 2px → 0.5px (linha fina ao expandir, sem peso visual)
+ *
+ * Animation duration vem do JSX (style prop `animationDuration`),
+ * parametrizada pelo LONG_PRESS_MS (3s atual; 5s legacy preserved).
+ *
+ * Reduced motion respect: media query força scale=4 estático
+ * (visualmente: 1 anel visível sem expandir), preserva discoverability
+ * mas zero motion. WCAG 2.3.3 compliant.
+ *
+ * Manifesto §1 (feedback design): pure CSS, zero JS overhead após
+ * mount. Beleza + a11y simultâneos (feedback_design_beauty_principle).
+ */
+
+@keyframes ripple-wave {
+  0% {
+    transform: translate(-50%, -50%) scale(0);
+    opacity: 0.6;
+    border-width: 2px;
+  }
+  40% {
+    opacity: 0.4;
+    border-width: 1.5px;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(16);
+    opacity: 0;
+    border-width: 0.5px;
+  }
+}
+
+.ripple-wave {
+  position: absolute;
+  width: 50px;
+  height: 50px;
+  border-radius: 9999px;
+  border-style: solid;
+  border-color: var(--drift-accent2, #34d399);
+  pointer-events: none;
+  animation-name: ripple-wave;
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1); /* easeOutQuint — orgânico, não linear */
+  animation-iteration-count: infinite;
+  animation-fill-mode: both;
+  will-change: transform, opacity;
+}
+
+/* WCAG 2.3.3 — respect prefers-reduced-motion. Ondas viram pulses
+   discretos sem expansão; user ainda vê algo acontecendo mas sem motion. */
+@media (prefers-reduced-motion: reduce) {
+  @keyframes ripple-wave {
+    0%, 100% {
+      transform: translate(-50%, -50%) scale(2);
+      opacity: 0.4;
+      border-width: 1px;
+    }
+    50% {
+      opacity: 0.6;
+    }
+  }
+  .ripple-wave {
+    animation-timing-function: ease-in-out;
+  }
+}
