@@ -286,6 +286,28 @@ export interface PropagationArc {
   isCurrent?: boolean
 }
 
+/**
+ * Nó da "rede social geográfica" — autor/spreader dedupado, agregando
+ * múltiplos spreads na mesma localização. Computado em
+ * `useSpreadMap.ts:buildGlobalNodes` no modo `global` (e `network`).
+ *
+ * Satoshi+Ted plan E 2026-05-21 — Opção δ híbrido. Permite ver "hubs
+ * de atenção" geograficamente sem expor npub completo (UI mostra
+ * short alias `anon…<6chars>`). Manifesto §28: zero dado novo coletado
+ * — npub já é público em kind 9079.
+ */
+export interface GlobalNode {
+  /** npub hex do spreader (canônico). UI exibe short alias. */
+  npub: string
+  /** Localização dedupada — coordinates do PRIMEIRO spread observado
+   *  pra este npub (canonical anchor). Múltiplos spreads do mesmo npub
+   *  em locations distintas agrupam pelo primeiro. */
+  point: GeoPoint
+  /** Quantos spreads este npub fez no recorte do mapa. Tamanho do dot
+   *  na renderização é função de sqrt(spreadCount). */
+  spreadCount: number
+}
+
 export interface SpreadMapData {
   origin: GeoPoint | null
   /** Spread destinations with normalized animation time. */
@@ -302,6 +324,16 @@ export interface SpreadMapData {
   countries: string[]
   firstSpread: SpreadRecord | null
   latestSpread: SpreadRecord | null
+  /**
+   * Nós dedupados por npub (Satoshi+Ted plan E 2026-05-21) — usado pelo
+   * modo `global` e `network` pra renderizar "rede social geográfica":
+   * cada npub vira 1 dot, tamanho ∝ √spreadCount.
+   *
+   * Vazio em modo `post` (não faz sentido dedupar 1 post). Vazio quando
+   * não há spreads geo. UI fallback pro pattern antigo de dots por
+   * spread quando `nodes.length === 0`.
+   */
+  nodes: GlobalNode[]
 }
 
 // ─── Preferências locais ─────────────────────────────────────────────

@@ -417,6 +417,15 @@ function GlobalModeMap({ data, className, mode, onModeChange }: ModeMapProps) {
       isCurrent: d.isCurrent === true,
     }))
 
+    // Satoshi+Ted plan E 2026-05-21 — Opção δ híbrido. Nós dedupados
+    // por npub viram "rede social geográfica": tamanho ∝ √spreadCount.
+    // Renderizados como camada FIXA (não animada) abaixo dos arcos.
+    // Vazio em mode='post' (data.nodes = []).
+    const socialNodes = data.nodes.map((n) => ({
+      pos: [n.point.lng, n.point.lat] as [number, number],
+      count: n.spreadCount,
+    }))
+
     void (async () => {
       try {
         // DRY 2026-05-21 (Satoshi tech lead B): imports shared via loadMapDeps.
@@ -470,6 +479,27 @@ function GlobalModeMap({ data, className, mode, onModeChange }: ModeMapProps) {
 
           overlay.setProps({
             layers: [
+              // Rede social geográfica — nós dedupados por npub.
+              // Render antes dos arcos pra arcos passarem por cima.
+              // Fixed layer (não animada); pickable pra futuro tooltip.
+              ...(socialNodes.length > 0
+                ? [
+                    new ScatterplotLayer({
+                      id: 'social-nodes',
+                      data: socialNodes,
+                      getPosition: (d: { pos: [number, number] }) => d.pos,
+                      getRadius: (d: { count: number }) =>
+                        Math.max(4, Math.sqrt(d.count) * 4),
+                      getFillColor: [232, 255, 90, 50] as [number, number, number, number],
+                      radiusUnits: 'pixels',
+                      stroked: true,
+                      getLineColor: [232, 255, 90, 180] as [number, number, number, number],
+                      getLineWidth: 1,
+                      lineWidthUnits: 'pixels',
+                      pickable: true,
+                    }),
+                  ]
+                : []),
               new LineLayer({
                 id: 'prop-lines',
                 data: visSegs,
@@ -561,7 +591,13 @@ function GlobalModeMap({ data, className, mode, onModeChange }: ModeMapProps) {
       className={className}
       mode={mode}
       onModeChange={onModeChange}
-      stats={`${data.totalSpreads} drifts · ${data.countries.length} ${data.countries.length === 1 ? 'país' : 'países'} · todos os posts`}
+      stats={
+        // Satoshi+Ted plan E 2026-05-21 — stats refletem "rede social
+        // geográfica": pessoas (npubs dedupados) + drifts + países.
+        data.nodes.length > 0
+          ? `${data.nodes.length} ${data.nodes.length === 1 ? 'pessoa' : 'pessoas'} · ${data.totalSpreads} drifts · ${data.countries.length} ${data.countries.length === 1 ? 'país' : 'países'}`
+          : `${data.totalSpreads} drifts · ${data.countries.length} ${data.countries.length === 1 ? 'país' : 'países'} · todos os posts`
+      }
     />
   )
 }

@@ -26,7 +26,7 @@ import { db } from '../lib/db'
 import { seedFromSpreaders } from '../lib/seeder'
 import { useFollowsStore } from '../lib/follows'
 import { useBootStore } from '../lib/bootstrap'
-import type { GeoPoint, PropagationArc, SpreadMapData, SpreadRecord } from '../types/drift'
+import type { GeoPoint, GlobalNode, PropagationArc, SpreadMapData, SpreadRecord } from '../types/drift'
 
 export type SpreadMapMode = 'post' | 'global' | 'network'
 
@@ -187,16 +187,20 @@ async function buildPostData(postId: string): Promise<SpreadMapData> {
     countries: Array.from(allCountries),
     firstSpread: (records[0] ?? null) as SpreadRecord | null,
     latestSpread: (records[records.length - 1] ?? null) as SpreadRecord | null,
+    // PostMode: nodes vazio — dedup não faz sentido pra um único post
+    // (cada spreader é único por construção do feed).
+    nodes: [],
   }
 }
 
 // ─── Global mode ──────────────────────────────────────────────────────
 
 interface VirtualArcRow {
-  post_id: string    // identifica o post — usado pra tag isCurrent
-  from_loc: string   // posts.location (autor do post)
-  to_loc: string     // spreads.location (quem espalhou)
-  spread_at: number  // spreads.created_at
+  post_id: string       // identifica o post — usado pra tag isCurrent
+  from_loc: string      // posts.location (autor do post)
+  to_loc: string        // spreads.location (quem espalhou)
+  spread_at: number     // spreads.created_at
+  spreader_pub: string  // satoshi+ted plan E — dedup pra GlobalNode
 }
 
 /**
@@ -213,10 +217,11 @@ interface VirtualArcRow {
  */
 async function buildGlobalData(currentPostId: string | null): Promise<SpreadMapData> {
   const rows = await db.exec<VirtualArcRow>(
-    `SELECT s.post_id    AS post_id,
-            p.location   AS from_loc,
-            s.location   AS to_loc,
-            s.created_at AS spread_at
+    `SELECT s.post_id      AS post_id,
+            p.location     AS from_loc,
+            s.location     AS to_loc,
+            s.created_at   AS spread_at,
+            s.spreader_pub AS spreader_pub
      FROM spreads s
      JOIN posts p ON s.post_id = p.id
      WHERE s.location IS NOT NULL
@@ -258,7 +263,43 @@ async function buildGlobalData(currentPostId: string | null): Promise<SpreadMapD
     countries: Array.from(allCountries),
     firstSpread: null,
     latestSpread: null,
+    // Global/Network: dedupa por npub pra exibir "rede social geográfica"
+    // (Satoshi+Ted plan E 2026-05-21). UI renderiza nós dimensionados
+    // por √spreadCount.
+    nodes: buildGlobalNodes(rows),
   }
+}
+
+// ─── Global nodes dedup helper (Satoshi+Ted plan E 2026-05-21) ──────
+//
+// Transforma rows brutas de SPREAD em GlobalNode[] dedupado por npub.
+// Cada nó agrega multiplos spreads do mesmo npub: tamanho ∝ √spreadCount.
+//
+// Anchor location: PRIMEIRO spread observado pra aquele npub
+// (canonical, determinístico). Spreads subsequentes do mesmo npub em
+// locations diferentes NÃO se tornam novos nós — o npub vira singleton.
+// Trade-off aceito: mapa mostra "onde X aparece pela primeira vez",
+// não "onde X está agora". Manifesto §28 — minimal exposure.
+//
+// Pure function (manifesto §7). Testable sem db.
+//
+// Manifesto §28 OK: npub já é público em kind 9079; dedup é só visual.
+// Sem novo dado coletado vs status quo do mapa de arcos.
+function buildGlobalNodes(rows: VirtualArcRow[]): GlobalNode[] {
+  const seen = new Map<string, GlobalNode>()
+  for (const row of rows) {
+    const npub = row.spreader_pub
+    const existing = seen.get(npub)
+    if (existing) {
+      existing.spreadCount += 1
+      continue
+    }
+    const point = parseLocation(row.to_loc)
+    if (!point) continue
+    seen.set(npub, { npub, point, spreadCount: 1 })
+  }
+  // Sort desc por spreadCount pra UI priorizar hubs maiores no render order
+  return Array.from(seen.values()).sort((a, b) => b.spreadCount - a.spreadCount)
 }
 
 // ─── K=1 doxx detection helper (Satoshi devsec C 2026-05-21) ────────
@@ -307,10 +348,11 @@ async function buildNetworkData(
   currentPostId: string | null,
 ): Promise<SpreadMapData> {
   const rows = await db.exec<VirtualArcRow>(
-    `SELECT s.post_id    AS post_id,
-            p.location   AS from_loc,
-            s.location   AS to_loc,
-            s.created_at AS spread_at
+    `SELECT s.post_id      AS post_id,
+            p.location     AS from_loc,
+            s.location     AS to_loc,
+            s.created_at   AS spread_at,
+            s.spreader_pub AS spreader_pub
      FROM spreads s
      JOIN posts p ON s.post_id = p.id
      WHERE s.location IS NOT NULL
@@ -355,6 +397,10 @@ async function buildNetworkData(
     countries: Array.from(allCountries),
     firstSpread: null,
     latestSpread: null,
+    // Global/Network: dedupa por npub pra exibir "rede social geográfica"
+    // (Satoshi+Ted plan E 2026-05-21). UI renderiza nós dimensionados
+    // por √spreadCount.
+    nodes: buildGlobalNodes(rows),
   }
 }
 

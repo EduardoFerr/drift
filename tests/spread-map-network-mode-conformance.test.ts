@@ -101,6 +101,45 @@ describe('SpreadMap network mode — UI ModeToggle', () => {
   })
 })
 
+describe('SpreadMap global como rede social geográfica (Satoshi+Ted plan E)', () => {
+  it('SpreadMapData declara field `nodes: GlobalNode[]`', () => {
+    const types = readFileSync('src/types/drift.ts', 'utf8')
+    expect(types).toMatch(/export interface GlobalNode/)
+    expect(types).toMatch(/npub:\s*string/)
+    expect(types).toMatch(/spreadCount:\s*number/)
+    expect(types).toMatch(/nodes:\s*GlobalNode\[\]/)
+  })
+
+  it('buildGlobalNodes dedupa por spreader_pub + sort desc por count', () => {
+    expect(HOOK).toMatch(/function buildGlobalNodes/)
+    expect(HOOK).toMatch(/seen\.set\(npub/)
+    expect(HOOK).toMatch(/existing\.spreadCount\s*\+=\s*1/)
+    expect(HOOK).toMatch(/sort\(\(a,\s*b\)\s*=>\s*b\.spreadCount\s*-\s*a\.spreadCount\)/)
+  })
+
+  it('SELECT global/network inclui spreader_pub na query', () => {
+    // VirtualArcRow precisa expor spreader_pub
+    expect(HOOK).toMatch(/spreader_pub:\s*string/)
+    expect(HOOK).toMatch(/s\.spreader_pub\s+AS\s+spreader_pub/)
+  })
+
+  it('buildPostData retorna nodes: [] (dedup não faz sentido em post único)', () => {
+    const postMatch = HOOK.match(/async function buildPostData[\s\S]*?(?=\n\/\/)/m)
+    expect(postMatch).not.toBeNull()
+    expect(postMatch![0]).toMatch(/nodes:\s*\[\]/)
+  })
+
+  it('GlobalModeMap renderiza ScatterplotLayer social-nodes', () => {
+    expect(MAP).toMatch(/id:\s*['"]social-nodes['"]/)
+    expect(MAP).toMatch(/Math\.sqrt\(d\.count\)/)
+    expect(MAP).toMatch(/socialNodes\.length\s*>\s*0/)
+  })
+
+  it('stats label mostra "N pessoas" quando há nodes dedupados', () => {
+    expect(MAP).toMatch(/data\.nodes\.length === 1 \? 'pessoa' : 'pessoas'/)
+  })
+})
+
 describe('SpreadMap K=1 doxx defense (Satoshi devsec C 2026-05-21)', () => {
   it('hook exporta isUserSoloSpreader pure helper', () => {
     expect(HOOK).toMatch(/export function isUserSoloSpreader\b/)

@@ -149,6 +149,36 @@ concreto em small-town community.
 
 ---
 
+## Adendum E (2026-05-21) — Mapa global como "rede social geográfica"
+
+User pediu transformação semântica do global: deixar de ser agregação
+pura de arcos viral, virar **rede social geográfica** (nós + clusters).
+
+**Implementação:** Opção δ híbrido (Satoshi recomendação):
+- **Nós dedupados:** `buildGlobalNodes(rows)` dedupa rows por
+  `spreader_pub`, agrega `spreadCount`, sort desc
+- **GlobalNode interface:** `{ npub, point, spreadCount }` exposta em
+  `SpreadMapData.nodes`
+- **Layer Deck.gl:** `ScatterplotLayer id='social-nodes'`, radius ∝
+  √spreadCount, render abaixo dos arcos animados
+- **Pickable: true** — preparado pra tooltip futuro (mostra
+  `anon…<6chars> | N drifts`)
+- **Stats label atualizado:** "N pessoas · M drifts · K países"
+  quando há nodes dedupados
+
+**Threat model adendum:**
+- Nó grande visível geograficamente = "hub identificável" — atacante
+  vê "X pessoas em São Paulo estão postando muito". Mas npub já é
+  público em kind 9079; dedup é apenas visual. Manifesto §28 OK.
+- UI tooltip mostra short alias (`anon…<6chars>`), nunca npub completo.
+
+**Clusters semânticos NÃO implementados** (LPA-style cluster detection
+defer Phase 2 — GAP-CLUSTER já documentado em known-limitations §3).
+HexagonLayer agregação visual pode entrar em polish futuro
+(`UserPrefs.map_show_density_hex`?) sem schema bump.
+
+---
+
 ## Roadmap mitigações remanescentes
 
 | Fase | Item | Fecha vetor |
