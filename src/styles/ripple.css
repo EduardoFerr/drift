@@ -74,3 +74,75 @@
     animation-timing-function: ease-in-out;
   }
 }
+
+/*
+ * ─── Material Design 3 ripple (touch feedback genérico) ────────────
+ *
+ * V_2026-05-21 — primitive `<MaterialRipple>` / `useMaterialRipple()`.
+ * Diferente de `.ripple-wave` (long-press com 3 ondas + 3s duration):
+ * - **Single wave** (uma expansão por tap, não repete)
+ * - **Curta** (~550ms — M3 spec)
+ * - **Filled** circle (não outline; cor sólida com alpha)
+ * - **Contained** dentro do parent (overflow:hidden no host)
+ * - **Cor herdada** via currentColor pra adaptar cada componente
+ *
+ * Spec M3:
+ *   - Press: opacity 0.12 → 0 ao longo de 550ms (state layer expand)
+ *   - Easing: cubic-bezier(0.4, 0.0, 0.2, 1) — standard M3
+ *   - Scale: 0 → distance(touch, farthest corner) (cálculo no JS)
+ *
+ * Cálculo de scale máximo (JS no hook):
+ *   maxR = Math.hypot(
+ *     Math.max(x, w - x),
+ *     Math.max(y, h - y),
+ *   )
+ *   width = maxR * 2 (diâmetro)
+ *
+ * Pure CSS keyframe — JS só posiciona + injeta dimensão via inline
+ * style (left, top, width, height). Animation runs uma vez via
+ * `animation-fill-mode: forwards` + cleanup no `animationend`.
+ *
+ * Manifesto §1 (feedback design): zero JS overhead pós-mount.
+ * Beleza + WCAG simultâneos.
+ */
+@keyframes material-ripple {
+  0% {
+    transform: translate(-50%, -50%) scale(0);
+    opacity: 0.24;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0;
+  }
+}
+
+.material-ripple-host {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate; /* z-index containment — ripple não vaza */
+}
+
+.material-ripple {
+  position: absolute;
+  border-radius: 9999px;
+  background: currentColor;
+  pointer-events: none;
+  animation-name: material-ripple;
+  animation-duration: 550ms;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1); /* M3 standard */
+  animation-fill-mode: forwards;
+  will-change: transform, opacity;
+  z-index: 0; /* abaixo do conteúdo do botão */
+}
+
+@media (prefers-reduced-motion: reduce) {
+  @keyframes material-ripple {
+    0%, 100% {
+      transform: translate(-50%, -50%) scale(0.6);
+      opacity: 0.18;
+    }
+  }
+  .material-ripple {
+    animation-duration: 350ms; /* mais rápido + pulso simples */
+  }
+}
