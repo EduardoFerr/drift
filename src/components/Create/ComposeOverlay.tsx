@@ -520,7 +520,11 @@ function PreviewOverlay({
 
   const mockPost: import('../../types/drift').Post = {
     id: 'preview-mock',
-    authorPub: 'preview',
+    // Fix 2026-05-21: 'preview' (não-hex) quebrava AuthorChip identicon
+    // (parseInt('preview', 16) = NaN → hsl(NaN,...) CSS inválido).
+    // Usa hex pattern reservado pra preview — determinístico + válido.
+    // AuthorChip também ganhou guard defensivo (defesa em camada).
+    authorPub: '0000000000000000000000000000000000000000000000000000000000000000',
     content: '',
     subposts,
     createdAt: Math.floor(Date.now() / 1000),

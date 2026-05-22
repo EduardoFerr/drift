@@ -554,15 +554,15 @@ export function PostViewer({
                 }}
               />
             ))}
-            {/* Micro-label centro inferior — discreto, só pra a11y/discover.
-                aria-live polite anuncia pra screen reader. */}
-            <span
-              aria-live="polite"
-              className="absolute bottom-6 left-1/2 -translate-x-1/2 rounded-full border border-drift-accent2/40 bg-drift-bg/70 px-2 py-0.5 font-mono text-[10px] uppercase tracking-meta text-drift-accent2/80 backdrop-blur-sm"
-            >
-              {isSlim ? 'soltando voltar' : 'soltando modo slim'}
-            </span>
           </div>
+        )}
+        {/* Screen reader announcement — fora do visual layer pra zero
+            interferência com a animação. user com SR ouve "alternando
+            modo slim" quando pressing começa; visual user vê só ondas. */}
+        {pressing && (
+          <span className="sr-only" aria-live="polite">
+            {isSlim ? 'soltando para sair do modo slim' : 'soltando para entrar no modo slim'}
+          </span>
         )}
         {/* V11 — botões do header (⋮ ações + 💬 comments + 🗺 mapa).
             Absolute top-right do card area, z-30 pra ficar acima do

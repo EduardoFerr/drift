@@ -125,7 +125,13 @@ function Avatar({
   // (hex ou npub funciona). Mesma fórmula do ProfileModal pra consistência
   // visual cross-component (user vê o mesmo "tom" do avatar no feed e no
   // modal). Manifesto §7 determinismo.
-  const hue = parseInt(pub.slice(0, 8), 16) % 360
+  //
+  // Fix 2026-05-21 (Lily): parseInt('preview', 16) = NaN → hsl(NaN,...)
+  // = CSS inválido → avatar quebra visualmente (bug PreviewOverlay).
+  // Guard defensivo: pub não-hex → hue fallback 180 (cyan neutro).
+  // Defesa em camada — ComposeOverlay também passa pub hex válido agora.
+  const parsedHue = parseInt(pub.slice(0, 8), 16)
+  const hue = Number.isFinite(parsedHue) ? parsedHue % 360 : 180
   const initials = pub.slice(0, 2).toUpperCase()
   return (
     <span

@@ -80,8 +80,17 @@ describe('Profile picture render — Sprint N+2 P2.11 LOCK_VIA_TEST', () => {
     })
 
     it('fallback identicon determinístico derivado do authorPub (manifesto §7)', () => {
-      // Mesma fórmula do ProfileModal pra consistência cross-component
-      expect(chip).toMatch(/parseInt\(pub\.slice\(0,\s*8\),\s*16\)\s*%\s*360/)
+      // Mesma fórmula do ProfileModal pra consistência cross-component.
+      // Fix 2026-05-21 quebrou em 2 linhas (guard NaN pra pub não-hex
+      // como 'preview' do PreviewOverlay) — pattern continua usando
+      // parseInt do slice + %360 mas via Number.isFinite check.
+      expect(chip).toMatch(/parseInt\(pub\.slice\(0,\s*8\),\s*16\)/)
+      expect(chip).toMatch(/%\s*360/)
+    })
+
+    it('guard NaN — pub não-hex (preview) → hue fallback 180', () => {
+      expect(chip).toMatch(/Number\.isFinite\(parsedHue\)/)
+      expect(chip).toMatch(/\?\s*parsedHue\s*%\s*360\s*:\s*180/)
     })
 
     it('fallback alias "anon…<last6>" quando picture/alias ausentes', () => {
