@@ -113,6 +113,9 @@ arquitetura**, não estes arquivos. Eles são contexto auxiliar.
 - `satoshi-redundancia-audit-2026-05-21.md` — Satoshi audit 10 cenários:
   7 OK / 3 parciais / 1 não-impl. Top 3 closures Sprint N+2 (~2.5h):
   auto-rebroadcast em addRelay() + auto-pin IPFS + random walk doc.
+- `handoff-2026-05-21-sprint-n2-close.md` — handoff Sprint N+2 close.
+  10 items shipados em 3 rounds paralelos + 3 bug fixes pós-sprint.
+  ~34 commits + ~170 tests novos. tsc 0, lint 0, manifesto OK.
 
 ### Misc
 - `15-e2e-testbed-scoping-2026-05-08.md`
