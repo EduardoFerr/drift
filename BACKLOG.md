@@ -17,20 +17,34 @@ Formato:
 - Item aberto: `- [ ] <decisão> — contexto: <origem> — bloqueio: <quem/quê>`
 - Item fechado: `- [x] <decisão> — fechado YYYY-MM-DD em <commit-hash> — <1 linha resolução>`
 
-**📋 Sprint N+1 plano completo:**
-`Docs/sessions/ted-promessas-vs-impl-sprint-plan-2026-05-20.md`
+**📋 Sprint N+2 plano consolidado (Satoshi + Ted 2026-05-21):**
+`Docs/sessions/satoshi-ted-sprint-n2-plan-2026-05-21.md`
 
-Resumo (~8d full-focus + buffer):
+Resumo (~8d P0 + 3.5d P1 + 1.5d P2 = 10-13d, buffer-tolerant):
 
-| P | Item | Est | LOCK_VIA_TEST |
-|---|---|:---:|---|
-| 0.1 | §16 IPFS pin automático (viral threshold) | 2d | `viral-ipfs-pin.test.ts` |
-| 0.2 | §15 Doc "instalar em país censurado" | 1.5d | — |
-| 0.3 | Lentes pluggable SPIKE (LensRegistry + LensExpression set-theory composition + design §6) | 2.5d | `lens-plugin-conformance.test.ts` + `lens-composition-determinism.test.ts` |
-| 0.4 | §25 Conformance "zero scan automático" | 0.5d | `no-scan-automatico.test.ts` |
-| 0.5 | §20 Random walk spec | 0.5d | — |
-| 1.6 | CI grep "PhotoDNA NUNCA imported" | 0.5d | — |
-| 1.7 | `Docs/architecture-phases.md` Fase 6/7 → épicos | 1d | — |
+**Pré-sprint:** smoke test ~2.5h (Satoshi push — ~50 commits sem
+validação Vercel completa = risco real).
+
+**P0 — must-ship:**
+| # | Item | Est | LOCK_VIA_TEST |
+|:---:|---|:---:|---|
+| 0.1 | §16 IPFS pin automático | 2d | `viral-ipfs-pin.test.ts` |
+| 0.2 | Lentes pluggable POC (Registry + 2 lentes + UI) | 4-5d | `lens-plugin-conformance.test.ts` |
+| 0.3 | §15 Doc país censurado | 1.5d | — |
+| 0.4 | §25 CI grep zero scan | 0.5d | `no-scan-automatico.test.ts` |
+
+**P1 — reforça abstração:**
+| # | Item | Est |
+|:---:|---|:---:|
+| 1.5 | Extract `<ActionsFan>` primitive | 1.5d |
+| 1.6 | `useLensToggle` hook (DRY 3 toggles) | 1d |
+| 1.7 | LHCI re-measure + delta vs cwv-final-report-2026-05-09 | 1d |
+
+**P2 — se folga:** §20 spec (0.5d) + architecture-phases.md (1d).
+
+**Veto explícito (NÃO shipar):** content-hash, N/2 refill, PR-4c
+worker, GAP-CLUSTER LPA, sneakernet QR, NIP-44 DMs UI, composição
+§6 lentes (defer Sprint N+3 pós feedback do POC).
 
 Sprint começa quando user der GO. Design lenses ready em
 `Docs/lens-pluggable-design.md`.
@@ -271,6 +285,28 @@ Plano Ted HIMYM 2026-05-17 (analysis registrada em commit do PR1 [c823e8f]).
   ABORTAR re-spawn — research já consolidado, nova rodada seria
   redundante. Se precisar revisitar, dispatch novo HIMYM com escopo
   fresh em vez de re-spawnar legacy.
+
+---
+
+## Performance / Métricas
+
+- [ ] **Mais uma rodada LHCI — melhorar métricas Core Web Vitals**
+  Adicionado pelo user 2026-05-21. Última rodada LHCI registrada em
+  `Docs/sessions/cwv-final-report-2026-05-09.md` e
+  `round-11-perf-2026-05-16.md`. Reabrir pra:
+  - Re-measure LCP / CLS / INP / TTFB / TBT pós sessões maratona
+    2026-05-17→05-21 (PostViewer cleanup, primitives novos, mapa 5
+    refactors, etc.)
+  - Identificar regressões (PostViewer perdeu 270 LoC mas ganhou
+    HintChip, SoloSpreaderWarning, ModeToggle, social-nodes layer —
+    delta?)
+  - Bundle size delta (deck.gl layers tree-shake ainda OK pós-E?)
+  - LCP threshold mid-range mobile (Lily targets 2.5s)
+  - INP threshold 200ms (post SINK sessionBuriedIds adicionou
+    useMemo extra — verify não regrediu)
+  Bloqueio: nenhum técnico — só agendar quando user quiser.
+  Tools: Vercel deploy preview + Chrome DevTools Lighthouse OR
+  GitHub Actions LHCI workflow (se já existe; senão adicionar).
 
 ---
 

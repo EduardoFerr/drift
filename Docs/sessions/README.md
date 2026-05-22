@@ -103,6 +103,10 @@ arquitetura**, não estes arquivos. Eles são contexto auxiliar.
   dispatch sobre proposta user "hash content pra evitar spam".
   Decisão: NO-GO atual (Satoshi flagou defesa teatro + Ted Opção B
   arquitetural pronta se reabrir)
+- `satoshi-ted-sprint-n2-plan-2026-05-21.md` — sprint N+2 plan
+  consolidado (convergência + divergências resolvidas: lentes POC vs
+  SPIKE → POC ganhou; smoke test pré-sprint → ACEITO). 8-13d
+  buffer-tolerant
 
 ### Misc
 - `15-e2e-testbed-scoping-2026-05-08.md`
