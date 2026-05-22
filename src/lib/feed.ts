@@ -51,14 +51,39 @@ interface PostRow {
   buries: number
   /** raw_event JSON — usado pra extrair tags `imeta` no read path (B.2). */
   raw_event: string
+  /**
+   * Lily Sprint N+2 P2.11 — campos opt-in vindos do LEFT JOIN
+   * `users_metadata` por `author_pub = npub`. Null quando o autor nunca
+   * publicou kind 0 (modo Anônimo §5.3). Apenas decorativos — NÃO
+   * participam de score/ranking (manifesto §22 LOCK_VIA_TEST).
+   */
+  author_name: string | null
+  author_display_name: string | null
+  author_picture: string | null
 }
+
+/**
+ * Lily Sprint N+2 P2.11 — colunas do SELECT compartilhadas entre as
+ * queries de feed. Sempre LEFT JOIN com `users_metadata` pra popular
+ * `author_*` (decorativo opt-in, §5.3). LEFT (não INNER) preserva posts
+ * de autores em modo Anônimo — não some do feed por falta de kind 0.
+ *
+ * Index `idx_users_metadata_nip05` existe; PK `npub` faz o JOIN ser O(1)
+ * por row. Cost negligenciável vs cost da query base.
+ */
+const POST_SELECT = `SELECT
+    p.id, p.author_pub, p.content, p.created_at, p.category, p.location,
+    p.client, p.content_warning, p.score, p.spreads, p.buries, p.raw_event,
+    um.name AS author_name, um.display_name AS author_display_name,
+    um.picture AS author_picture
+  FROM posts p
+  LEFT JOIN users_metadata um ON um.npub = p.author_pub`
 
 export async function getGlobalFeed(limit = 50): Promise<Post[]> {
   const rows = await db.exec<PostRow>(
-    `SELECT id, author_pub, content, created_at, category, location, client, content_warning, score, spreads, buries, raw_event
-     FROM posts
-     WHERE score > -999
-     ORDER BY score DESC, created_at DESC
+    `${POST_SELECT}
+     WHERE p.score > -999
+     ORDER BY p.score DESC, p.created_at DESC
      LIMIT ?`,
     [limit],
   )
@@ -79,10 +104,9 @@ export async function getFollowingFeed(limit = 50): Promise<Post[]> {
 
   const placeholders = Array.from(followingSet).map(() => '?').join(',')
   const rows = await db.exec<PostRow>(
-    `SELECT id, author_pub, content, created_at, category, location, client, content_warning, score, spreads, buries, raw_event
-     FROM posts
-     WHERE score > -999 AND author_pub IN (${placeholders})
-     ORDER BY score DESC, created_at DESC
+    `${POST_SELECT}
+     WHERE p.score > -999 AND p.author_pub IN (${placeholders})
+     ORDER BY p.score DESC, p.created_at DESC
      LIMIT ?`,
     [...followingSet, limit],
   )
@@ -99,10 +123,9 @@ export async function getFollowingFeed(limit = 50): Promise<Post[]> {
 export async function getTrendingFeed(limit = 50, now = Date.now()): Promise<Post[]> {
   const cutoffSeconds = Math.floor((now - TRENDING_WINDOW_HOURS * 3600 * 1000) / 1000)
   const rows = await db.exec<PostRow>(
-    `SELECT id, author_pub, content, created_at, category, location, client, content_warning, score, spreads, buries, raw_event
-     FROM posts
-     WHERE score > -999 AND created_at >= ?
-     ORDER BY score DESC, created_at DESC
+    `${POST_SELECT}
+     WHERE p.score > -999 AND p.created_at >= ?
+     ORDER BY p.score DESC, p.created_at DESC
      LIMIT ?`,
     [cutoffSeconds, limit],
   )
@@ -117,9 +140,8 @@ export async function getTrendingFeed(limit = 50, now = Date.now()): Promise<Pos
  */
 export async function getPostById(id: string): Promise<Post | null> {
   const row = await db.get<PostRow>(
-    `SELECT id, author_pub, content, created_at, category, location, client, content_warning, score, spreads, buries, raw_event
-     FROM posts
-     WHERE id = ?
+    `${POST_SELECT}
+     WHERE p.id = ?
      LIMIT 1`,
     [id],
   )
@@ -322,6 +344,14 @@ function rowToPost(row: PostRow): Post {
   // Convenção Drift (RFC §3.5.3): imetas aparecem na ordem dos subposts
   // que têm imageUrl. Subposts só-texto não consomem entrada da lista.
   attachImetasToSubposts(subposts, row.raw_event)
+  // Lily Sprint N+2 P2.11 — picks decorativos opt-in vindos do LEFT JOIN
+  // com `users_metadata`. Alias = display_name OR name (autores costumam
+  // preencher um ou outro, mas display_name tem prioridade pela
+  // convenção NIP-01). Validação anti-tracker do `picture` fica no
+  // render layer (vide `isSafeAvatarUrl` no AuthorChip + ProfileModal).
+  // Manifesto §22: campos NÃO entram em score/weight/ranking — LOCK_VIA_TEST.
+  const authorAlias = row.author_display_name ?? row.author_name ?? undefined
+  const authorAvatar = row.author_picture ?? undefined
   return {
     id: row.id,
     authorPub: row.author_pub,
@@ -335,6 +365,8 @@ function rowToPost(row: PostRow): Post {
     score: row.score,
     spreads: row.spreads,
     buries: row.buries,
+    authorAlias,
+    authorAvatar,
   }
 }
 

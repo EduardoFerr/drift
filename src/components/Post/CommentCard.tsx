@@ -25,8 +25,10 @@ import {
 } from '../../lib/thread-list'
 import { applyContentFiltersComment } from '../../lib/feed'
 import { usePrefsStore } from '../../lib/prefs'
+import { useUserMetadata } from '../../lib/profiles'
 import { timeAgo } from '../../lib/format'
 import { Image } from '../UI/Image'
+import { AuthorChip } from '../UI/AuthorChip'
 import { DriftChip } from '../UI/DriftChip'
 import { commentRevealVariants } from '../../lib/motion-variants'
 
@@ -151,6 +153,15 @@ export function CommentCard({
   const reduced = useReducedMotion() ?? false
   const reveal = commentRevealVariants(reduced)
 
+  // Lily Sprint N+2 P2.11 — busca metadata do autor reativamente. Comments
+  // (`CommentNode`) NÃO recebem JOIN no read path (buildThread opera fora
+  // do feed.ts query). Reativo via `useUserMetadata` re-query quando
+  // `bumpProfileVersion(npub)` dispara — picture aparece assim que kind 0
+  // chega via subscribe. Manifesto §5.3 opt-in (null = modo Anônimo).
+  const authorMeta = useUserMetadata(node.author_pub)
+  const authorAlias = authorMeta?.displayName ?? authorMeta?.name ?? undefined
+  const authorPicture = authorMeta?.picture ?? undefined
+
   // Phase A (list variant) — render compacto, threaded, indent visual.
   // Branch antes do return tradicional pra não inflar o card existing.
   if (variant === 'list') {
@@ -177,6 +188,8 @@ export function CommentCard({
         isExpanded={isExpanded}
         onToggleExpand={onToggleExpand}
         onTap={onTap}
+        authorAlias={authorAlias}
+        authorPicture={authorPicture}
       />
     )
   }
@@ -203,11 +216,17 @@ export function CommentCard({
         isNew ? 'border-l-drift-accent2' : 'border-l-transparent'
       }`}
     >
-      {/* Header: autor + tempo + content-warning chip (C.6.2) */}
+      {/* Header: autor + tempo + content-warning chip (C.6.2)
+          Lily Sprint N+2 P2.11 — AuthorChip primitive (avatar + alias).
+          Fallback identicon + `anon…<last6>` quando autor não publicou
+          kind 0 (modo Anônimo §5.3). */}
       <header className="flex items-center justify-between gap-2 border-b border-drift-border/40 px-4 py-3.5">
-        <span className="font-display text-fluid-display font-bold uppercase tracking-tag text-drift-text">
-          anon{truncate(node.author_pub)}
-        </span>
+        <AuthorChip
+          authorPub={node.author_pub}
+          alias={authorAlias}
+          picture={authorPicture}
+          size="sm"
+        />
         <div className="flex items-center gap-2">
           {node.content_warning && (
             <DriftChip
@@ -404,6 +423,9 @@ interface ListVariantProps {
   isExpanded: boolean
   onToggleExpand?: () => void
   onTap?: () => void
+  /** Lily Sprint N+2 P2.11 — opt-in NIP-01 metadata do autor. */
+  authorAlias?: string
+  authorPicture?: string
 }
 
 /**
@@ -440,6 +462,8 @@ function ListVariant({
   isExpanded,
   onToggleExpand,
   onTap,
+  authorAlias,
+  authorPicture,
 }: ListVariantProps) {
   // "ver mais" / "ver menos" — expand/collapse for truncated text.
   // Detection: ref on <p> compares scrollHeight > clientHeight after
@@ -496,12 +520,18 @@ function ListVariant({
               : 'border-l-transparent'
       }`}
     >
-      {/* Header: autor · tempo · CW chip · collapse toggle */}
+      {/* Header: autor · tempo · CW chip · collapse toggle
+          Lily Sprint N+2 P2.11 — AuthorChip primitive substitui label
+          legacy "anon{trunc}". Avatar pequeno (xs) + alias opt-in. */}
       <header className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="truncate font-display text-fluid-base font-bold uppercase tracking-tag text-drift-text">
-            anon{truncate(node.author_pub)}
-          </span>
+          <AuthorChip
+            authorPub={node.author_pub}
+            alias={authorAlias}
+            picture={authorPicture}
+            size="xs"
+            className="min-w-0 truncate"
+          />
           <span className="shrink-0 font-mono text-[12px] uppercase tracking-meta text-drift-muted">
             {timeAgo(node.created_at)}
           </span>

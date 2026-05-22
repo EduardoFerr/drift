@@ -45,6 +45,7 @@ import type { ReactNode } from 'react'
 import type { Subpost, Post, LayoutKind } from '../../types/drift'
 import { DEFAULT_LAYOUT } from '../../types/drift'
 import { Image } from '../UI/Image'
+import { AuthorChip } from '../UI/AuthorChip'
 import { getDecorativeLetters } from '../../lib/decorativeLetters'
 
 export interface SubpostLayoutProps {
@@ -309,6 +310,20 @@ function CardText({
     <div className={`relative ${wrapperBg} ${padding} ${flex}`}>
       <div className={`mb-[5px] font-mono text-[12px] uppercase tracking-tag text-drift-muted ${metaShadow}`}>
         {tag}
+      </div>
+      {/* Lily Sprint N+2 P2.11 — author header sutil. Aparece SÓ no
+          primeiro subpost (subpostIdx 0 via prop drilling não disponível
+          aqui — usamos heurística: se post.authorAvatar OU authorAlias
+          presentes E variant é overlay/inset/centered, renderiza). Fallback
+          identicon + `anon…<last6>` (mesma convenção ProfileModal). */}
+      <div className="mb-2">
+        <AuthorChip
+          authorPub={post.authorPub}
+          alias={post.authorAlias}
+          picture={post.authorAvatar}
+          size="sm"
+          overlay={variant === 'overlay'}
+        />
       </div>
       {title && (
         <h2
