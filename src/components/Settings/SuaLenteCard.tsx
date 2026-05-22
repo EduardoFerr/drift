@@ -197,6 +197,7 @@ export function SuaLenteCard({ onClose }: CardProps) {
             investigar. Apenas exposto quando lente ativa (isActive). */}
         {isActive && <ReorderIndicatorToggle />}
         {isActive && <PprDecayToggle />}
+        {isActive && <MapColorsToggle />}
 
         {/* CTA "ver feed agora" — só aparece quando lens ativa */}
         {isActive && (
@@ -286,6 +287,43 @@ function PprDecayToggle() {
           void setPref('lens_ppr_decay_enabled', e.target.checked)
         }}
         aria-label="aplicar decay temporal a follows antigos"
+        className="mt-1 h-4 w-4 cursor-pointer accent-drift-accent2"
+      />
+    </label>
+  )
+}
+
+/**
+ * Sub-toggle "mostrar confiança no mapa" — Trust Lens D 2026-05-21.
+ *
+ * Default OFF (Satoshi audit anterior: cor por trust list vaza info
+ * adversarial pra observer casual com acesso ao device). Quando ON,
+ * nós do SpreadMap (modo global/network) ganham cor por tier discreto
+ * de PPR score: blue (low) → yellow (mid) → orange (high). Spreader
+ * sem edge → cor default (preserva privacy quem não está na rede).
+ *
+ * Manifesto §24 view-layer + §28 zero novo dado vazado.
+ */
+function MapColorsToggle() {
+  const enabled = usePrefsStore((s) => s.lens_show_in_map)
+  return (
+    <label className="flex cursor-pointer items-start justify-between gap-3 border-t border-drift-border/30 pt-3">
+      <div className="space-y-0.5">
+        <span className="block font-mono text-[12px] text-drift-text">
+          mostrar confiança no mapa
+        </span>
+        <span className="block font-mono text-[10px] leading-relaxed text-drift-muted">
+          pins no spread-map ganham cor por nível de confiança local
+          (azul/amarelo/laranja). visível apenas pra você. opt-in.
+        </span>
+      </div>
+      <input
+        type="checkbox"
+        checked={enabled}
+        onChange={(e) => {
+          void setPref('lens_show_in_map', e.target.checked)
+        }}
+        aria-label="colorir pins do mapa por trust score"
         className="mt-1 h-4 w-4 cursor-pointer accent-drift-accent2"
       />
     </label>

@@ -114,6 +114,9 @@ function applyRow(target: UserPrefs, key: string, value: string): void {
     case 'lens_ppr_decay_enabled':
       target.lens_ppr_decay_enabled = value === '1'
       return
+    case 'lens_show_in_map':
+      target.lens_show_in_map = value === '1'
+      return
     case 'report_decay_enabled':
       target.report_decay_enabled = value === '1'
       return

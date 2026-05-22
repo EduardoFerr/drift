@@ -455,6 +455,21 @@ export interface UserPrefs {
    */
   lens_ppr_decay_enabled: boolean
   /**
+   * Trust Lens D 2026-05-21 — opt-in pra colorir nós do SpreadMap por
+   * PPR score local. Default OFF (Satoshi audit: cor por trust list
+   * vaza info adversarial pra observer casual com acesso ao device).
+   *
+   * Quando ON, `social-nodes` ScatterplotLayer em modo global/network
+   * passa `getFillColor: pinColor(pprScore)` em vez do default
+   * chartreuse uniforme. Spreader sem edge em lens_edges → cor default
+   * (preserva privacy quem você nem segue).
+   *
+   * Manifesto §22 OK: pinColor é função pura discreta. §24 OK:
+   * view-layer carve-out, não afeta posts.score. §28 OK: pprScores já
+   * são local-only.
+   */
+  lens_show_in_map: boolean
+  /**
    * Time-window decay nos reports (Gap A insider brigada partial
    * mitigation — Barney devsec 2026-05-21). Default OFF.
    *
@@ -582,6 +597,7 @@ export const DEFAULT_USER_PREFS: UserPrefs = {
   lens_nudge_dismissed: false,
   lens_show_reorder_indicator: false,
   lens_ppr_decay_enabled: false,
+  lens_show_in_map: false,
   report_decay_enabled: false,
   menu_detail_show_details: true,
   menu_detail_show_manifesto: false,

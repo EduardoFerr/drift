@@ -101,6 +101,62 @@ describe('SpreadMap network mode — UI ModeToggle', () => {
   })
 })
 
+describe('SpreadMap WoT colors opt-in (Satoshi+Ted plan D)', () => {
+  it('pinColor é função pura — 4-tier discreto', async () => {
+    const { pinColor, PIN_COLOR_DEFAULT } = await import('../src/lib/trust/map-color')
+    // undefined → default (sem edge)
+    expect(pinColor(undefined)).toEqual(PIN_COLOR_DEFAULT)
+    // 0/negativo → default (proteção)
+    expect(pinColor(0)).toEqual(PIN_COLOR_DEFAULT)
+    expect(pinColor(-0.5)).toEqual(PIN_COLOR_DEFAULT)
+    expect(pinColor(NaN)).toEqual(PIN_COLOR_DEFAULT)
+    // < 0.3 → low blue
+    expect(pinColor(0.1)).toEqual([100, 150, 180, 180])
+    expect(pinColor(0.29)).toEqual([100, 150, 180, 180])
+    // 0.3-0.7 → mid yellow
+    expect(pinColor(0.3)).toEqual([200, 180, 80, 200])
+    expect(pinColor(0.5)).toEqual([200, 180, 80, 200])
+    expect(pinColor(0.69)).toEqual([200, 180, 80, 200])
+    // ≥ 0.7 → high orange
+    expect(pinColor(0.7)).toEqual([244, 130, 14, 220])
+    expect(pinColor(1.0)).toEqual([244, 130, 14, 220])
+  })
+
+  it('pinColor determinístico — mesmo input → mesmo output', async () => {
+    const { pinColor } = await import('../src/lib/trust/map-color')
+    const out1 = pinColor(0.45)
+    const out2 = pinColor(0.45)
+    expect(out1).toEqual(out2)
+  })
+
+  it('UserPrefs declara lens_show_in_map default false', () => {
+    const types = readFileSync('src/types/drift.ts', 'utf8')
+    expect(types).toMatch(/lens_show_in_map:\s*boolean/)
+    expect(types).toMatch(/lens_show_in_map:\s*false/)
+  })
+
+  it('prefs.ts deserialize case lens_show_in_map', () => {
+    const prefs = readFileSync('src/lib/prefs.ts', 'utf8')
+    expect(prefs).toMatch(/case 'lens_show_in_map'/)
+    expect(prefs).toMatch(/target\.lens_show_in_map\s*=\s*value === '1'/)
+  })
+
+  it('SpreadMap importa pinColor + usa em getFillColor condicional', () => {
+    expect(MAP).toMatch(/import\s*\{[^}]*pinColor[^}]*\}/)
+    expect(MAP).toMatch(/lensShowInMap\s*\?\s*\(d:.*\)\s*=>\s*pinColor/)
+  })
+
+  it('SuaLenteCard tem MapColorsToggle (3º toggle isActive)', () => {
+    const card = readFileSync('src/components/Settings/SuaLenteCard.tsx', 'utf8')
+    expect(card).toMatch(/MapColorsToggle/)
+    expect(card).toMatch(/setPref\('lens_show_in_map'/)
+  })
+
+  it('social-nodes layer passa npub no data (pra pinColor lookup)', () => {
+    expect(MAP).toMatch(/npub:\s*n\.npub/)
+  })
+})
+
 describe('SpreadMap global como rede social geográfica (Satoshi+Ted plan E)', () => {
   it('SpreadMapData declara field `nodes: GlobalNode[]`', () => {
     const types = readFileSync('src/types/drift.ts', 'utf8')

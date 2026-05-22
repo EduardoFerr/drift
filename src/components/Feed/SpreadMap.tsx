@@ -20,6 +20,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useSpreadMap, isUserSoloSpreader, type SpreadMapMode } from '../../hooks/useSpreadMap'
 import { useBootStore } from '../../lib/bootstrap'
 import { useFollowsStore } from '../../lib/follows'
+import { useLensStore } from '../../lib/trust-lens'
+import { pinColor, PIN_COLOR_DEFAULT } from '../../lib/trust/map-color'
 import { loadMapDeps } from './useMapDeps'
 import { usePrefsStore } from '../../lib/prefs'
 import type { PropagationArc, SpreadMapData } from '../../types/drift'
@@ -393,6 +395,12 @@ function SoloSpreaderWarning({ onDismiss }: { onDismiss: () => void }) {
 function GlobalModeMap({ data, className, mode, onModeChange }: ModeMapProps) {
   const mapView = usePrefsStore((s) => s.map_view)
   const tileTemplate = usePrefsStore((s) => s.map_tile_url_template)
+  // Trust Lens D 2026-05-21 — opt-in WoT colors. Default OFF (Satoshi
+  // audit). Quando ON, social-nodes layer usa pinColor(pprScore) em
+  // vez de cor uniforme. pprScores vem do useLensStore (já em memória
+  // pós-recomputeLens; zero query extra).
+  const lensShowInMap = usePrefsStore((s) => s.lens_show_in_map)
+  const pprScores = useLensStore((s) => s.pprScores)
   const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -421,9 +429,14 @@ function GlobalModeMap({ data, className, mode, onModeChange }: ModeMapProps) {
     // por npub viram "rede social geográfica": tamanho ∝ √spreadCount.
     // Renderizados como camada FIXA (não animada) abaixo dos arcos.
     // Vazio em mode='post' (data.nodes = []).
+    //
+    // npub preservado pra item D (WoT colors opt-in): quando
+    // lens_show_in_map=true, pinColor lê pprScores[npub] e devolve
+    // RGBA por tier discreto.
     const socialNodes = data.nodes.map((n) => ({
       pos: [n.point.lng, n.point.lat] as [number, number],
       count: n.spreadCount,
+      npub: n.npub,
     }))
 
     void (async () => {
@@ -482,6 +495,10 @@ function GlobalModeMap({ data, className, mode, onModeChange }: ModeMapProps) {
               // Rede social geográfica — nós dedupados por npub.
               // Render antes dos arcos pra arcos passarem por cima.
               // Fixed layer (não animada); pickable pra futuro tooltip.
+              //
+              // D 2026-05-21: quando lens_show_in_map=ON, getFillColor
+              // chama pinColor(pprScore) — RGBA por tier discreto.
+              // OFF (default): cor uniforme, bit-exact pré-D.
               ...(socialNodes.length > 0
                 ? [
                     new ScatterplotLayer({
@@ -490,13 +507,16 @@ function GlobalModeMap({ data, className, mode, onModeChange }: ModeMapProps) {
                       getPosition: (d: { pos: [number, number] }) => d.pos,
                       getRadius: (d: { count: number }) =>
                         Math.max(4, Math.sqrt(d.count) * 4),
-                      getFillColor: [232, 255, 90, 50] as [number, number, number, number],
+                      getFillColor: lensShowInMap
+                        ? (d: { npub: string }) => pinColor(pprScores.get(d.npub))
+                        : (PIN_COLOR_DEFAULT as [number, number, number, number]),
                       radiusUnits: 'pixels',
                       stroked: true,
                       getLineColor: [232, 255, 90, 180] as [number, number, number, number],
                       getLineWidth: 1,
                       lineWidthUnits: 'pixels',
                       pickable: true,
+                      updateTriggers: { getFillColor: lensShowInMap },
                     }),
                   ]
                 : []),

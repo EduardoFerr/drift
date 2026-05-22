@@ -93,15 +93,29 @@ vaza lista de trusts.
 
 ---
 
-### 4. Trust Coloration Leak — LOW
+### 4. Trust Coloration Leak — LOW (MITIGADO 2026-05-21 D)
 
 **Sub-vetor de #3.** Atacante observando shoulder-surfing vê pin
 laranja brilhante = "user confia muito nesse spreader" → social
 engineering vector.
 
-**Mitigação:** mesma do #3 (opt-in OFF). Quando opt-in ON, palette
-distingue trust níveis via cor + accessibilidade RG-colorblind (Phase
-2 polish).
+**Mitigação shipada 2026-05-21 (item D Satoshi+Ted plan):**
+- `UserPrefs.lens_show_in_map` default OFF — pin colors uniformes
+  até user opt-in explícito via SuaLenteCard
+- 4-tier discreto (default/low/mid/high) — não revela score
+  contínuo preciso
+- Spreader sem edge em `lens_edges` → cor default (não vaza "esse
+  npub não está na minha rede" visualmente)
+- Helper puro `pinColor(pprScore)` em `src/lib/trust/map-color.ts`
+- Toggle UI: "mostrar confiança no mapa · visível apenas pra você"
+
+**Trade-off aceito:** user que liga opt-in expõe sua trust list pra
+observer casual com acesso ao device. Manifesto §28 já protege contra
+servidor (pprScores são local-only); device security é responsabilidade
+compartilhada.
+
+**Polish futuro:** accessibilidade RG-colorblind (palette adicional
+shape ou pattern em vez de só cor) — Phase 2.
 
 ---
 
