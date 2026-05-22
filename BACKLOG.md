@@ -297,6 +297,24 @@ Plano Ted HIMYM 2026-05-17 (analysis registrada em commit do PR1 [c823e8f]).
 
 ## Bugs reportados — em investigação
 
+- [ ] **Ativar localização travando + layout precisa refino**
+  Reportado user 2026-05-21. Sintoma: ao tentar ativar location
+  granularity (Settings → Localização), tela trava OU layout quebra.
+  Agent dispatch pra audit:
+  - LocationCard render correto pra todos granularities?
+  - getCurrentLocation Promise hangs sem timeout?
+  - granularity 'precise' espera GPS browser API; timeout adequado?
+  - Layout responsivo em mobile?
+  Investigação pendente.
+
+- [ ] **Mapas mostrando mesmas localizações — bug ou falta de dados?**
+  Reportado user 2026-05-21. Sintoma: post mode, global mode, network
+  mode parecem mostrar mesmos pins. Hypothesis:
+  - (a) Bug real — query SQL ou render reusando data wrong mode
+  - (b) Falta de dados — base small (≤10 spreads geo) faz 3 modes
+    aparecerem similares
+  Agent dispatch pra audit + reproducer.
+
 - [~] **Profile picture parcialmente funciona — auditado 2026-05-21**
   Lily audit:
   `Docs/sessions/profile-picture-audit-2026-05-21.md`. **Diagnóstico:**
