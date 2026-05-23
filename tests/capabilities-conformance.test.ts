@@ -137,14 +137,19 @@ describe('Satoshi audit fixes (2026-05-19)', () => {
     expect(CAPS_SRC).toMatch(/db\.get[\s\S]*?DISMISSED_PREF_KEY/)
   })
 
-  it('#3 — dismissRule/dismissRules delegam ao persistDismissedIds', () => {
+  it('#3 — dismissRule/dismissRules delegam à pipeline de persistência', () => {
     const stripped = CAPS_SRC.replace(/\/\*[\s\S]*?\*\//g, '').replace(
       /^\s*\/\/.*$/gm,
       '',
     )
-    // Funções públicas viraram thin wrappers
-    expect(stripped).toMatch(/dismissRule[\s\S]*?persistDismissedIds/)
-    expect(stripped).toMatch(/dismissRules[\s\S]*?persistDismissedIds/)
+    // Funções públicas viraram thin wrappers. D16 (Sprint N+3) introduziu
+    // debounce: dismissRule → scheduleDismissFlush → flushPendingDismisses
+    // → persistDismissedIds. Match aceita qualquer um dos dois lados da
+    // chain (persistDismissedIds direto OU scheduleDismissFlush wrapper).
+    expect(stripped).toMatch(/dismissRule[\s\S]*?(?:persistDismissedIds|scheduleDismissFlush)/)
+    expect(stripped).toMatch(/dismissRules[\s\S]*?(?:persistDismissedIds|scheduleDismissFlush)/)
+    // persistDismissedIds continua existindo (downstream do flush).
+    expect(stripped).toMatch(/async function persistDismissedIds/)
     // Race-fix: NÃO mais 'if (!current) return' silencioso
     expect(stripped).not.toMatch(
       /export async function dismissRule[\s\S]*?if \(!current\) return/,

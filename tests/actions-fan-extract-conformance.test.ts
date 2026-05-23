@@ -137,6 +137,38 @@ describe('ActionsFan — bit-exact behavior markers', () => {
   })
 })
 
+describe('ActionsFan — D4 visibility hardening (Sprint N+3 Batch A)', () => {
+  // Source: D4 issue 2026-05-21 — drop-shadow/alpha insuficiente em
+  // backgrounds claros / fotos brilhantes. Reforço requer contraste
+  // WCAG AA (≥4.5:1) entre container e qualquer bg via combinação
+  // shadow + ring + border.
+
+  // Strip docstring/comments antes de grep — docstrings históricos mencionam
+  // as classes antigas (shadow-lg, bg-drift-surface/85) por contexto.
+  const FAN_CODE_ONLY = ACTIONS_FAN_SRC.replace(/\/\*[\s\S]*?\*\//g, '').replace(
+    /^\s*\/\/.*$/gm,
+    '',
+  )
+
+  it('usa shadow-2xl (não shadow-lg) — drop shadow forte sobre foto', () => {
+    expect(FAN_CODE_ONLY).toMatch(/\bshadow-2xl\b/)
+    // Hard fail se alguém reverter pra shadow-lg no JSX (não no docstring)
+    expect(FAN_CODE_ONLY).not.toMatch(/\bshadow-lg\b/)
+  })
+
+  it('container tem ring-1 ring-black/10 (segunda borda externa anti-bg-claro)', () => {
+    expect(FAN_CODE_ONLY).toMatch(/\bring-1\b/)
+    expect(FAN_CODE_ONLY).toMatch(/\bring-black\/10\b/)
+  })
+
+  it('bg-drift-surface SOLID — sem alpha modifier no JSX (preserva contraste WCAG)', () => {
+    // /85 ou /90 quebraria contraste em bg branco/foto clara — preferimos
+    // backdrop-blur via container chrome (não aplicado aqui) ao invés de
+    // alpha translúcido que comprime contraste.
+    expect(FAN_CODE_ONLY).not.toMatch(/bg-drift-surface\/(?:5\d|6\d|7\d|8\d|9\d)\b/)
+  })
+})
+
 describe('ActionsFan — props contract preserved', () => {
   const REQUIRED_PROPS = [
     'visible',

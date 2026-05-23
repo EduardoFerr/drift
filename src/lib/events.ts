@@ -807,6 +807,17 @@ async function persistUserMetadata(event: SignedEvent): Promise<void> {
   )
   // Notify reactive consumers (useUserMetadata hook) — re-query.
   bumpProfileVersion(event.pubkey)
+  // D3 Sprint N+3 Batch A — kind 0 metadata feeds `users_metadata` JOIN
+  // que popula `authorAvatar`/`authorAlias` em `feed.ts:rowToPost`. Sem
+  // invalidateFeed aqui, a store Zustand mantém o array materializado
+  // de um refresh anterior (avatares = undefined) até o próximo evento
+  // de domínio (POST/SPREAD/BURY) chegar e disparar refresh — pode
+  // levar minutos. Resultado: avatares só apareciam ao abrir Profile
+  // page (que faz query própria). Invalidar aqui re-query o feed e
+  // atualiza os campos decorativos. Manifesto §22 LOCK_VIA_TEST OK:
+  // refresh re-aplica o mesmo ranking determinístico, só joga os
+  // campos decorativos extras na shape do Post.
+  invalidateFeed()
 }
 
 // ─── Users — atividade agregada (Fase 4) ─────────────────────────────

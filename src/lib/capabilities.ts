@@ -210,15 +210,110 @@ async function persistDismissedIds(newIds: string[]): Promise<void> {
   }
 }
 
+// ─── D16 dismissRule rate-limit debounce (Sprint N+3 Batch A) ─────────
+//
+// Source: D16 hardening 2026-05-21 — `dismissRule` (e `dismissRules`)
+// faziam db.get + db.run a cada invocação. Em caso de flood (XSS
+// payload chamando dismissRule em loop, ou bug de UI re-disparando o
+// handler), cada call hit o SQLite. Idempotência protegia o dataset,
+// mas o I/O era desperdiçado e podia degradar.
+//
+// Fix: debounce trailing-edge 250ms. Múltiplas calls coalescem em 1
+// flush — buffer acumula ruleIds, primeira call agenda timer, calls
+// subsequentes só fazem buffer.add. Timer expira → flush único.
+//
+// Idempotência preservada (Set dedup), API pública inalterada
+// (Promise<void>), comportamento single-call indistinguível (apenas
+// +250ms de latência).
+const DISMISS_DEBOUNCE_MS = 250
+
+interface PendingFlush {
+  /** Buffer dedup-ed de ruleIds aguardando flush. */
+  ids: Set<string>
+  /** Timer handle pra cancelar/agendar. */
+  timer: ReturnType<typeof setTimeout> | null
+  /** Promise resolvida quando o flush terminar (compartilhada por callers). */
+  promise: Promise<void> | null
+  /** Resolver da promise compartilhada. */
+  resolve: (() => void) | null
+  /** Rejector da promise compartilhada (propaga erro de persist). */
+  reject: ((err: unknown) => void) | null
+}
+
+const pending: PendingFlush = {
+  ids: new Set(),
+  timer: null,
+  promise: null,
+  resolve: null,
+  reject: null,
+}
+
+function scheduleDismissFlush(ruleIds: readonly string[]): Promise<void> {
+  for (const id of ruleIds) pending.ids.add(id)
+
+  if (!pending.promise) {
+    pending.promise = new Promise<void>((resolve, reject) => {
+      pending.resolve = resolve
+      pending.reject = reject
+    })
+  }
+
+  if (pending.timer) clearTimeout(pending.timer)
+  pending.timer = setTimeout(() => {
+    void flushPendingDismisses()
+  }, DISMISS_DEBOUNCE_MS)
+
+  return pending.promise
+}
+
+async function flushPendingDismisses(): Promise<void> {
+  const ids = Array.from(pending.ids)
+  const resolve = pending.resolve
+  const reject = pending.reject
+  // Limpa estado ANTES de await — calls que chegam durante o flush
+  // iniciam um novo ciclo (não merge com o ciclo que está saindo).
+  pending.ids = new Set()
+  pending.timer = null
+  pending.promise = null
+  pending.resolve = null
+  pending.reject = null
+
+  try {
+    await persistDismissedIds(ids)
+    resolve?.()
+  } catch (err) {
+    reject?.(err)
+  }
+}
+
+/**
+ * @internal — flush imediato pra testes. Limpa timer pendente e
+ * dispara persistência sincronamente (no que diz respeito ao timer).
+ * Não exportar pra produção.
+ */
+export async function __flushDismissForTests(): Promise<void> {
+  if (pending.timer) {
+    clearTimeout(pending.timer)
+    pending.timer = null
+  }
+  if (pending.ids.size > 0 || pending.promise) {
+    await flushPendingDismisses()
+  }
+}
+
 /**
  * Marca uma regra como dispensada pelo user. Persiste em user_prefs +
  * atualiza store. Idempotente — re-dismiss da mesma rule é no-op.
  *
  * Resiliente a race (Satoshi #3): funciona mesmo se caps ainda não
  * loaded — lê bag direto do SQLite, faz merge, escreve.
+ *
+ * D16 (Sprint N+3): debounced 250ms trailing-edge. Floods de chamadas
+ * coalescem em 1 db.get+db.run. Promise resolve após o flush
+ * efetivamente persistir.
  */
 export async function dismissRule(ruleId: string): Promise<void> {
-  await persistDismissedIds([ruleId])
+  return scheduleDismissFlush([ruleId])
 }
 
 /**
@@ -227,9 +322,13 @@ export async function dismissRule(ruleId: string): Promise<void> {
  *
  * Resiliente a race (Satoshi #3): funciona mesmo se caps ainda não
  * loaded — lê bag direto do SQLite, faz merge, escreve.
+ *
+ * D16 (Sprint N+3): debounced 250ms trailing-edge — mesmo buffer de
+ * `dismissRule`. Chamadas misturadas (dismissRule + dismissRules)
+ * coalescem em 1 flush.
  */
 export async function dismissRules(ruleIds: string[]): Promise<void> {
-  await persistDismissedIds(ruleIds)
+  return scheduleDismissFlush(ruleIds)
 }
 
 /**

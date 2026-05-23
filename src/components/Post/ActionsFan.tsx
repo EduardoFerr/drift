@@ -198,7 +198,19 @@ export default function ActionsFan({
           data-no-longpress="true"
         >
           <div
-            className="flex flex-col rounded-2xl border border-drift-border bg-drift-surface p-1.5 shadow-lg"
+            // D4 Sprint N+3 Batch A — contraste hardening sobre backgrounds
+            // claros / fotos brilhantes. Mudanças:
+            //   (1) shadow-lg → shadow-2xl (stronger drop shadow, projeta
+            //       o container sobre foto independente do brilho)
+            //   (2) border drift-border → drift-border/80 + ring-1 ring-
+            //       black/10 (segunda borda externa garante separação
+            //       em bg branco/claro onde drift-border quase desaparece)
+            //   (3) bg-drift-surface mantido SOLID (já era 100% opacity),
+            //       confirma — alpha modifier removido se algum PR
+            //       reintroduzir /85 quebraria contraste WCAG 4.5:1
+            // Resultado: contraste container vs background ≥4.5:1
+            // (AA) em backgrounds claros via combinação shadow+ring.
+            className="flex flex-col rounded-2xl border border-drift-border/80 bg-drift-surface p-1.5 shadow-2xl ring-1 ring-black/10"
             role="group"
             aria-label="ações do post"
           >

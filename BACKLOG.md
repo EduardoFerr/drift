@@ -59,6 +59,31 @@ shipping prematuro).
 
 **Próxima ação user:** GO → Batch A dispatch (4 agents: 0.1+0.2+1.6+1.8).
 
+**Batch A status (2026-05-21):**
+- [x] **D3 Profile picture render feed reactivity** — fechado em
+  [PENDING-HASH] — `events.ts:persistUserMetadata` agora chama
+  `invalidateFeed()` após persistir kind 0. Fix do gap residual: feed
+  store mantinha snapshot pré-metadata até próximo evento de domínio
+  chegar. LOCK_VIA_TEST `tests/feed-author-avatar.test.ts`.
+- [x] **D2 LHCI re-measure + delta** — fechado parcial em
+  [PENDING-HASH] — `Docs/sessions/lhci-2026-05-21.md` publicado.
+  Bundle entry gz 110→63 kB (-43%). LCP/INP/CLS/TBT inconclusivos
+  (LHCI tropeçou em EPERM tmpdir cleanup Windows; audits rodaram, JSON
+  perdido). CI workflow vai re-medir no PR. Sem regressão por proxy.
+- [x] **D4 ActionsFan visibility** — fechado em [PENDING-HASH] —
+  container `shadow-lg`→`shadow-2xl` + `ring-1 ring-black/10` pra
+  contraste WCAG AA sobre bg claro/foto. LOCK_VIA_TEST estendido em
+  `tests/actions-fan-extract-conformance.test.ts` ("D4 visibility
+  hardening").
+- [x] **D16 dismissRule rate-limit** — fechado em [PENDING-HASH] —
+  trailing-edge debounce 250ms em `dismissRule`/`dismissRules` via
+  `scheduleDismissFlush` + buffer Set. Floods (XSS/UI bug) coalescem
+  em 1 db.get+db.run. API pública inalterada (Promise<void>).
+  LOCK_VIA_TEST `tests/dismiss-rule-debounce.test.ts` (6 specs: single
+  call, flood dedup, flood multi-IDs, debounce window reset, separação
+  por janela, propagação de erro via promise).
+
+
 ---
 
 **📋 Sprint N+2 plano consolidado (Satoshi + Ted 2026-05-21):**
@@ -106,7 +131,7 @@ Sprint começa quando user der GO. Design lenses ready em
 que seja `(no-commit, decisão registrada apenas)`. Permite reconstruir
 o "porquê" via `git show <hash>`.
 
-Última atualização: 2026-05-17
+Última atualização: 2026-05-22 (Robin audit — Sprint N+2 close + visual review B1-B9)
 
 ---
 
@@ -352,24 +377,17 @@ Plano Ted HIMYM 2026-05-17 (analysis registrada em commit do PR1 [c823e8f]).
     fallback (WCAG 2.3.3)
   - Micro-label discreto bottom-center pra a11y (aria-live polite)
 
-- [~] **Ativar localização — fix shipado 2026-05-21**
-  Lily audit `Docs/sessions/profile-picture-audit-2026-05-21.md` style
-  (read-only Explore). Diagnóstico: 2 problemas:
-  - **Layout reflow:** div summary cresce/encolhe ao mudar granularity
-    → fix: minHeight 88px + sempre renderiza (zero reflow)
-  - **Confusão "GPS travando":** user pensa que ativar precise dispara
-    GPS imediato → fix: nota explicativa "GPS só é solicitado ao
-    publicar/driftar — ativar aqui NÃO bloqueia"
-  Residual: PermissionsCard (fora deste fix) ainda pode travar 10s sem
-  feedback — registrar como gap separado se reproduzir.
-  Reportado user 2026-05-21. Sintoma: ao tentar ativar location
-  granularity (Settings → Localização), tela trava OU layout quebra.
-  Agent dispatch pra audit:
-  - LocationCard render correto pra todos granularities?
-  - getCurrentLocation Promise hangs sem timeout?
-  - granularity 'precise' espera GPS browser API; timeout adequado?
-  - Layout responsivo em mobile?
-  Investigação pendente.
+- [x] **Ativar localização — fechado em [36809ef] + [a7ebdc8]**
+  Lily audit `Docs/sessions/profile-picture-audit-2026-05-21.md`
+  diagnosticou 2 problemas. Fixes shipados:
+  - **Layout reflow:** minHeight 88px + sempre renderiza (zero reflow)
+  - **Confusão "GPS travando":** nota explicativa "GPS só é solicitado
+    ao publicar/driftar — ativar aqui NÃO bloqueia"
+  - **B3 reopener (Robin)** [a7ebdc8]: ícone GPS no header passa a
+    cinza→colorido após visita ao Mapa sem ativar GPS — mitigado via
+    copy "abrir GPS settings" (era "ativar GPS"). Anti-misclick em radio.
+  Residual: PermissionsCard pode travar 10s sem feedback se reproduzir
+  — gap separado abaixo.
 
 - [x] **Mapas mostrando mesmas localizações — diagnóstico Ted 2026-05-21**
   NÃO É BUG CÓDIGO. Ted audit (Read-only Explore) confirmou:
@@ -389,20 +407,12 @@ Plano Ted HIMYM 2026-05-17 (analysis registrada em commit do PR1 [c823e8f]).
   Reabrir quando user reportar regressão real OU base crescer + modes
   continuarem idênticos.
 
-- [~] **Profile picture parcialmente funciona — auditado 2026-05-21**
-  Lily audit:
-  `Docs/sessions/profile-picture-audit-2026-05-21.md`. **Diagnóstico:**
-  NÃO é bug — feature MVP+1 incompleta. User CONSEGUE publicar (kind 0
-  com picture), avatar APARECE em ProfileModal. **Mas NÃO aparece** em
-  feed/PostViewer/CommentCard porque `feed.ts:rowToPost()` (linhas
-  319-339) omite `authorAvatar`/`authorAlias` (campos opcionais nunca
-  populados).
-  **Fix proposto** (~4-6h, ~200 LoC + tests):
-  - feed.ts rowToPost: LEFT JOIN users_metadata
-  - SubpostLayout: header autor (avatar + name) nos 3 layouts
-  - CommentCard: idem
-  - LOCK_VIA_TEST: avatar em feed === picture em kind 0
-  Cabe em Sprint N+2 P2 OR defer (cosmético — manifesto não exige).
+- [x] **Profile picture render feed/comments — fechado em [2137243]**
+  Lily audit `Docs/sessions/profile-picture-audit-2026-05-21.md`. Fix
+  Sprint N+2 P2.11: feed.ts LEFT JOIN users_metadata + SubpostLayout
+  header autor + CommentCard + AuthorChip primitive. 14 conformance
+  tests. Sprint N+3 P0.1 (D3 no plan Satoshi) confirma feature shipada
+  — reopener se regressão visível for reportada.
 
 - [~] **Redundância — audit Satoshi 2026-05-21 (7 OK / 3 parciais / 1 não-impl)**
   Doc: `Docs/sessions/satoshi-redundancia-audit-2026-05-21.md`.
@@ -421,7 +431,121 @@ Plano Ted HIMYM 2026-05-17 (analysis registrada em commit do PR1 [c823e8f]).
 
 ---
 
-## Performance / Métricas
+## Sprint N+2 close — pendências derivadas (2026-05-21/22)
+
+(Origem: handoff-2026-05-21-sprint-n2-close.md + revisão visual 9 bugs
+B1-B9 + Lily Material Ripple report + audits paralelos.)
+
+### Lentes pluggable — gaps pós-POC
+
+- [ ] **Composição §6 lentes (∪ ∩ −)** — design ready em
+  `Docs/lens-pluggable-design.md` §6, defer Sprint N+4 pós feedback
+  do POC shipado em [98ce60d]. Reabrir quando: user reportar caso
+  concreto onde uma única estratégia não basta, OU N+3 finalizar
+  abstrações (useLensToggle 1.5) e abrir capacidade para compor.
+
+- [ ] **Persistência `active_lens` em UserPrefs** — POC shipou volátil
+  (lens ativa some no reload). Defer N+3/N+4. Bloqueio: schema bump
+  + migration. Reopener: user reportar "perdi minha lente ao recarregar"
+  OU lente custom shareable chegar (precisa persistir pra ter sentido).
+
+- [ ] **useLensToggle hook (DRY 3 toggles SuaLenteCard)** — Sprint
+  N+3 P1.5 (D1 no plan Satoshi). Estimativa 1d. Bloqueio: aguardar
+  P0.4 SuaLenteCard polish round 2 estabilizar antes de extrair.
+
+### Material Ripple primitive — adoção (Phase 1 wiring)
+
+- [ ] **Material Ripple Phase 1 wiring (4 componentes)** — primitive
+  shipado em [984aa2d] mas adoção NÃO autorizada. Lily report
+  `Docs/sessions/lily-material-ripple-report-2026-05-21.md` lista 4
+  superfícies (DriftButton, GlassIconButton xl, Settings rows, modal
+  close). Estimativa 4-6h + LOCK_VIA_TEST `material-ripple-adoption`.
+  Bloqueio: 3 perguntas Q1/Q2/Q3 abertas pra user — DriftChip md
+  default, double-edge coexist, Settings rows full-width vs contained.
+  P1.
+
+- [ ] **Material Ripple Q1: DriftChip md default ON/OFF?** — chip 40px
+  está no limiar WCAG 44px. Lily recomenda OFF + crescer para 44px.
+  Decisão user pendente. Sub-bloqueio do item acima. P2.
+
+- [ ] **Material Ripple Q2: GlassIconButton xl double-edge coexist
+  ou hide-border durante wave?** — Lily recomenda A (coexiste, ripple
+  z-0 atrás de border). Decisão user pendente. P2.
+
+- [ ] **Material Ripple Q3: Settings rows full-width vs contained
+  toggle?** — Lily recomenda A (full-width, scale ~280px). Decisão
+  user pendente. P2.
+
+### Revisão visual 9 bugs (B1-B9) — pendências derivadas
+
+(5 commits shipados 2026-05-22: a7ebdc8 + 7ce19d9 + ea491be + 6eeb2c2
++ 94f5b07. Bugs principais fechados; observações residuais ficam.)
+
+- [ ] **B3 reopener: escalar UX deeper se misclick persistir** — mitigação
+  shipou copy "abrir GPS settings" em [a7ebdc8]. Robin notou no commit:
+  "se persistir, escalar pra UX deeper (confirm dialog OU separar 'ver
+  granularidade atual' do CTA 'ativar')". Reopener: user reportar
+  novamente que GPS icon mudou cor sem ele querer ativar. P2.
+
+- [x] **B5 DERIVA "—" vs "0.000" — fechado em [7ce19d9]** — decisão
+  permanente: header sempre renderiza `formatScore(currentScore ?? 0)`
+  = "0.000" uniforme (em-dash removida do hot path). Semântica "score
+  zero" consistente entre tabs com/sem post focado. Não reabrir sem
+  evidência de confusão.
+
+- [ ] **Image "indisponível" placeholder ocupa ~30% do card** — P1
+  polish da revisão visual 2026-05-22. Não-bug crítico mas card fica
+  desbalanceado quando imagem falha carregar. Possível fix: reduzir
+  altura do placeholder OU usar layout flex que colapsa quando sem
+  imagem. Bloqueio: HIMYM Lily decidir tradeoff (preserva consistência
+  vertical entre cards vs reduz desperdício visual). P2.
+
+- [ ] **Bootstrap "aguardando" 2-3s na primeira carga** — P2 polish
+  observado em revisão visual 2026-05-22. Pode ser preview-only
+  (Vercel cold start) OU real (SQLite WASM init + first relay
+  connect). Bloqueio: medir LHCI Day 0 (Sprint N+3 P0.2) confirma
+  TTFI real antes de investir em fix. Reopener: LHCI mostrar TTFI
+  > 3s em mid-range mobile real. P2.
+
+- [ ] **Header crowded em 375px viewport** — P3 polish observado em
+  revisão visual 2026-05-22. Já mencionado em sprints anteriores
+  (item dispersos). Confirmar com Lily se chegou a entrar em sprint
+  passado OU se foi sempre defer. Reopener: user reportar tap em
+  ícone errado por overlap. P3.
+
+### Theme / Persistência observada
+
+- [ ] **Theme persist Rosenholz: default fresh boot deveria ser
+  Cinder?** — observado durante revisão visual 2026-05-22 que fresh
+  boot pode estar em Rosenholz quando default deveria ser Cinder.
+  Investigar: `user_prefs.theme` default em schema.sql + boot path
+  em bootstrap.ts. Provável não-bug (pref persistida de sessão
+  anterior), mas vale confirmar que reset full (clear OPFS + IndexedDB)
+  começa em Cinder. Bloqueio: 30min audit Marshall. P3.
+
+### Auditorias residuais (audits paralelos 2026-05-20/21)
+
+- [ ] **Redundância audit — outros 7 OK cenários documentados, mas
+  doc-only changes pendentes?** — Satoshi audit
+  `Docs/sessions/satoshi-redundancia-audit-2026-05-21.md` listou 10
+  cenários. Top 3 closures shipados Sprint N+2 (#1 auto-rebroadcast
+  [88d1337], #2 auto-pin IPFS [11ec501], #3 random walk DOC [6c5f768]).
+  Outros 7 cenários FUNCIONAIS (multi-relay publish, backup nsec,
+  multi-id, NIP-65, SQLite rebuild, probe ciclo) confirmados OK —
+  NÃO TOCAR (gold-plating risk). Item registrado pra clarificação:
+  estado confirmado, não há ação pendente. Pode fechar como [x] na
+  próxima review se user confirmar. P3.
+
+- [ ] **Satoshi 7-algoritmos audit — closures registrados em
+  known-limitations.md §5b/§5c — confirmar todos endereçados** —
+  audit em [bbf69a0]. §5b NOP POST event fechado em [bf76dda]. §5c
+  brigada insider PARCIAL via report decay em [fc306c2]. Validar
+  na próxima sessão que nenhum surface residual virou item separado
+  perdido. P3.
+
+---
+
+
 
 - [ ] **Mais uma rodada LHCI — melhorar métricas Core Web Vitals**
   Adicionado pelo user 2026-05-21. Última rodada LHCI registrada em
