@@ -294,9 +294,7 @@ trava classnames / a11y shape contra regressão de theme/contrast.
 | `FullPageCard` | `UI/FullPageCard.tsx` | — | 2026-05-12 | Card fullscreen com close |
 | `DotsIndicator` | `UI/DotsIndicator.tsx` | — | 2026-05-08 | Pílula de dots p/ subposts |
 | `GlassIconButton` | `UI/GlassIconButton.tsx` | `glass-icon-button` | 2026-05-15 | Botão ⋮ glass effect |
-| `HintChip` | `UI/HintChip.tsx` | `hint-primitives-conformance` | 2026-05-17 | Hint ambient (DAOP PR3) |
-| `HintToast` | `UI/HintToast.tsx` | (mesmo) | 2026-05-17 | Hint floating auto-dismiss |
-| `HintModal` | `UI/HintModal.tsx` | (mesmo) | 2026-05-17 | Hint overlay interruptivo |
+| `HintChip` | `UI/HintChip.tsx` | `hint-primitives-conformance` | 2026-05-17 | Hint ambient (DAOP PR3). HintToast/HintModal irmãos removidos 2026-05-23 (shelf-ware) |
 | `SettingExplainer` | `UI/SettingExplainer.tsx` | `setting-explainer-conformance` | 2026-05-18 | Wrapper canônico settings |
 | `AccordionGroup` | `UI/AccordionGroup.tsx` | `accordion-group-conformance` | 2026-05-19 | 1-aberto-por-vez collapse |
 | `RadioGroupButton` | `UI/RadioGroupButton.tsx` | `radio-group-button-conformance` | 2026-05-20 | Radio em forma de botões; Velatura-safe |

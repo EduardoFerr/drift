@@ -1,21 +1,22 @@
 // Hint primitives conformance — LOCK_VIA_TEST.
 //
 // Source: RFC DAOP-001 Phase 1 PR3 (Ted HIMYM analysis 2026-05-17).
+// 2026-05-23 — HintToast e HintModal removidos (Ted+Barney audit dead
+// code 2026-05-23 §4.2/§4.3 — zero callers em 6 dias após criação;
+// shelf-ware confessado). Apenas HintChip permanece (consumido em
+// App.tsx via capability gate).
 //
 // Trava:
-//   1. 3 primitives existem em src/components/UI/ (HintChip, HintToast, HintModal)
-//   2. Cada um exporta componente + Props interface canônicas
-//   3. Cada um respeita appliesIf + dismissedRuleIds (capability gate)
-//   4. HintChip + HintModal usam DriftChip/SlideUpOverlay (design system)
-//   5. HintToast usa DriftAlert (não overlay manual)
-//   6. Nenhum consome eventos Nostr — manifesto §28 (zero behavioral signal)
+//   1. HintChip existe em src/components/UI/ (passive primitive)
+//   2. Exporta componente + Props interface canônicas
+//   3. Respeita appliesIf + dismissedRuleIds (capability gate)
+//   4. Usa DriftChip (design system)
+//   5. Não consome eventos Nostr — manifesto §28 (zero behavioral signal)
 
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { readFileSync, existsSync } from 'node:fs'
 
 const CHIP = readFileSync('src/components/UI/HintChip.tsx', 'utf8')
-const TOAST = readFileSync('src/components/UI/HintToast.tsx', 'utf8')
-const MODAL = readFileSync('src/components/UI/HintModal.tsx', 'utf8')
 
 describe('HintChip — passive primitive', () => {
   it('exporta HintChip + HintChipProps', () => {
@@ -39,70 +40,28 @@ describe('HintChip — passive primitive', () => {
   })
 })
 
-describe('HintToast — reactive primitive', () => {
-  it('exporta HintToast + HintToastProps', () => {
-    expect(TOAST).toMatch(/export\s+function\s+HintToast\b/)
-    expect(TOAST).toMatch(/export\s+interface\s+HintToastProps/)
+describe('manifesto §28 — HintChip é local-only', () => {
+  it('não importa nostr/events/sync (zero behavioral export)', () => {
+    expect(CHIP).not.toMatch(/from\s+['"][^'"]*\/nostr['"]/)
+    expect(CHIP).not.toMatch(/from\s+['"][^'"]*\/events['"]/)
+    expect(CHIP).not.toMatch(/from\s+['"][^'"]*\/sync['"]/)
+    expect(CHIP).not.toMatch(/publishToRelays|signDriftEvent/)
   })
 
-  it('usa DriftAlert primitive (não banner ad-hoc)', () => {
-    expect(TOAST).toMatch(/from\s+['"]\.\/DriftAlert['"]/)
-    expect(TOAST).toMatch(/<DriftAlert\b/)
-  })
-
-  it('tem auto-dismiss via setTimeout (durationMs)', () => {
-    expect(TOAST).toMatch(/setTimeout/)
-    expect(TOAST).toMatch(/durationMs/)
-  })
-
-  it('aplica capability gate', () => {
-    expect(TOAST).toMatch(/useCapabilitiesStore/)
-    expect(TOAST).toMatch(/appliesIf/)
-    expect(TOAST).toMatch(/dismissedRuleIds/)
-  })
-
-  it('persiste dismiss explícito via dismissRule', () => {
-    expect(TOAST).toMatch(/dismissRule\s*\(/)
+  it('não faz fetch/XHR direto', () => {
+    expect(CHIP).not.toMatch(/\bfetch\s*\(/)
+    expect(CHIP).not.toMatch(/XMLHttpRequest/)
   })
 })
 
-describe('HintModal — interactive primitive', () => {
-  it('exporta HintModal + HintModalProps', () => {
-    expect(MODAL).toMatch(/export\s+function\s+HintModal\b/)
-    expect(MODAL).toMatch(/export\s+interface\s+HintModalProps/)
+describe('Dead-code anti-regressão (Ted+Barney audit 2026-05-23)', () => {
+  // HintToast e HintModal removidos em 2026-05-23 (zero callers).
+  // Este guard impede re-introdução acidental — se DAOP Phase 2 quiser
+  // re-criar, faça com pelo menos 1 caller real no PR.
+  it('HintToast.tsx não existe (removido — re-introduzir exige caller real)', () => {
+    expect(existsSync('src/components/UI/HintToast.tsx')).toBe(false)
   })
-
-  it('usa SlideUpOverlay primitive (design-system invariante)', () => {
-    expect(MODAL).toMatch(/from\s+['"]\.\/SlideUpOverlay['"]/)
-    expect(MODAL).toMatch(/<SlideUpOverlay\b/)
-  })
-
-  it('aplica capability gate', () => {
-    expect(MODAL).toMatch(/useCapabilitiesStore/)
-    expect(MODAL).toMatch(/appliesIf/)
-    expect(MODAL).toMatch(/dismissedRuleIds/)
-  })
-
-  it('persiste dismiss via dismissRule + suporta snooze', () => {
-    expect(MODAL).toMatch(/dismissRule\s*\(/)
-    expect(MODAL).toMatch(/allowSnooze/)
-  })
-})
-
-describe('manifesto §28 — Hint primitives são local-only', () => {
-  it('nenhum primitive importa nostr/events/sync (zero behavioral export)', () => {
-    for (const src of [CHIP, TOAST, MODAL]) {
-      expect(src).not.toMatch(/from\s+['"][^'"]*\/nostr['"]/)
-      expect(src).not.toMatch(/from\s+['"][^'"]*\/events['"]/)
-      expect(src).not.toMatch(/from\s+['"][^'"]*\/sync['"]/)
-      expect(src).not.toMatch(/publishToRelays|signDriftEvent/)
-    }
-  })
-
-  it('nenhum primitive faz fetch/XHR direto', () => {
-    for (const src of [CHIP, TOAST, MODAL]) {
-      expect(src).not.toMatch(/\bfetch\s*\(/)
-      expect(src).not.toMatch(/XMLHttpRequest/)
-    }
+  it('HintModal.tsx não existe (removido — re-introduzir exige caller real)', () => {
+    expect(existsSync('src/components/UI/HintModal.tsx')).toBe(false)
   })
 })

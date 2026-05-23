@@ -16,9 +16,9 @@
  * mesmo schema — uma regra pode ser onboarding step OU hint reativo
  * dependendo do trigger.
  *
- * **PR3 (futuro)** — HintChip / HintToast / HintModal primitives que
- * consomem regras + capabilities pra mostrar hints ambient (não
- * interrompendo flow).
+ * **PR3** — HintChip primitive consome regras + capabilities pra mostrar
+ * hints ambient (não interrompendo flow). HintToast/HintModal irmãos
+ * foram removidos em 2026-05-23 (shelf-ware, 0 callers).
  *
  * Manifesto §17 (sem chave mestra): regras vivem NO REPO, versionadas
  * em código. Não há "engine remoto" servindo guidance — auditável,
@@ -216,9 +216,8 @@ export const ONBOARDING_RULES: readonly GuidanceRule[] = [
  * Hints contextuais (Phase 2 PR3 — 2026-05-20).
  *
  * Diferença vs ONBOARDING_RULES: hints NÃO viram steps da overlay
- * inicial. Renderizam ambient via HintChip/HintToast/HintModal em pontos
- * estratégicos da UI onde a capability gap é relevante (post-action,
- * not pre-action).
+ * inicial. Renderizam ambient via HintChip em pontos estratégicos da
+ * UI onde a capability gap é relevante (post-action, not pre-action).
  *
  * Filosofia (Ted/Lily): nag <-> contextual. Onboarding cobre quem nunca
  * usou. Hints cobrem quem usou parcialmente — adquiriu uma capability

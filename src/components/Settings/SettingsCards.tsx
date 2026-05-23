@@ -218,16 +218,19 @@ export function LocationCard({ onClose }: CardProps) {
     (o) => o.value === prefs.location_granularity,
   )
   return (
-    <FullPageCard onClose={onClose} title="location" ariaLabel="granularidade de location">
+    <FullPageCard onClose={onClose} title="localização" ariaLabel="padrão de localização pra novos posts">
       <div className="space-y-3 px-4 py-5">
-        {/* Refactor 2026-05-18: SettingExplainer primitive substitui card
-            cru. Resolve text-drift-muted/30 invisível em Velatura +
-            impacto agora always-visible (não só title-hover desktop). */}
+        {/* Refactor 2026-05-23 (manifesto §28 — privacy mínima por inércia
+            eliminada): este card antes era "vaza sempre que ligado".
+            Agora é só o DEFAULT pré-selecionado quando user abre o
+            ComposeOverlay; o botão no header do compose permite override
+            per-post sem mexer aqui. Pref name mantido (location_granularity)
+            pra compat de SQLite; semântica re-framada na UI. */}
         <SettingExplainer
-          label="onde mostrar sua localização"
-          description="Quando você publica um post, ele pode incluir uma localização que aparece no mapa pra outros usuários. Aqui você escolhe o quanto desse dado vaza."
-          impact="Mexer aqui não muda posts antigos — só afeta o que você publicar daqui pra frente. Quanto mais preciso, mais identificável você fica em rede pequena."
-          defaultExplained="Off. Cidade pequena + opinião política = você identificado (manifesto §28)."
+          label="padrão pra novos posts"
+          description="Este valor é PRÉ-SELECIONADO toda vez que você abre o compose. Não vaza automaticamente — você ainda decide por post no botão de localização ao lado do CANCELAR."
+          impact="Mexer aqui só muda o ponto de partida. Você sempre pode trocar per-post no compose (ou deixar off uma vez sem alterar este default). Quanto mais preciso o default, mais fácil esquecer e vazar acidentalmente."
+          defaultExplained="Off. Compose abre sempre com GPS desligado; user precisa optar consciente por post."
           reversible
           reference="manifesto §28 — privacidade pelo mínimo"
         >
@@ -257,9 +260,9 @@ export function LocationCard({ onClose }: CardProps) {
                 {current.hint}
                 {current.value === 'precise' && (
                   <span className="mt-2 block text-drift-muted">
-                    💡 GPS só é solicitado ao publicar/driftar — ativar
-                    aqui NÃO bloqueia a UI. Browser pedirá permissão da
-                    primeira vez.
+                    💡 GPS só é solicitado quando você confirma no compose
+                    (não aqui). Este card NÃO ativa nada sozinho — só
+                    define o que vem pré-selecionado no botão do compose.
                   </span>
                 )}
               </>

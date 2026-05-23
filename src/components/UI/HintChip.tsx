@@ -3,14 +3,14 @@
  * Phase 1 PR3 (Ted HIMYM analysis 2026-05-17).
  *
  * Filosofia: hint NÃO interrompe flow. Renderiza como chip discreto
- * (drift-accent outline) com label curto. Click → callback (geralmente
- * abre HintModal com rule.body completo, ou dispatcha ação).
+ * (drift-accent outline) com label curto. Click → callback (caller
+ * decide ação — pode abrir um overlay próprio, navegar para settings,
+ * ou só marcar como visto).
  *
- * Diferença vs HintToast/HintModal:
- *   - **HintChip** = inline, sempre visível enquanto regra aplica.
- *     User opta por interagir.
- *   - HintToast = floating bottom, auto-dismiss timer.
- *   - HintModal = overlay full, interrompe.
+ * Histórico: era irmão de HintToast (floating auto-dismiss) e HintModal
+ * (overlay full), ambos removidos em 2026-05-23 por shelf-ware (zero
+ * callers em 6 dias). Se Phase 2 do DAOP precisar dos formatos toast/
+ * modal, re-criar a partir do git log com pelo menos 1 caller real.
  *
  * Capability gate: chip só renderiza se rule.appliesIf(caps) === true
  * AND !caps.dismissedRuleIds.has(rule.id). Dismiss explícito (click X)
@@ -28,7 +28,7 @@ export interface HintChipProps {
   rule: GuidanceRule
   /** Label curto (default = rule.title). */
   label?: string
-  /** Click handler — geralmente abre HintModal com a regra. */
+  /** Click handler — caller decide ação (abrir overlay, navegar, etc). */
   onActivate?: () => void
   /** Quando true, esconde o X de dismiss (hint sticky até user agir). */
   hideDismiss?: boolean
