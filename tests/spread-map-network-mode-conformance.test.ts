@@ -253,11 +253,18 @@ describe('SpreadMap DRY — loadMapDeps shared (B refactor 2026-05-21)', () => {
     expect(DEPS).toMatch(/import\(['"]\.\/spreadMapLayers['"]\)/)
   })
 
-  it('SpreadMap PostMode + GlobalMode chamam loadMapDeps (sem duplicar imports)', () => {
-    const loadDepsCalls = MAP.match(/await loadMapDeps\(\)/g) ?? []
-    // PostModeMap + GlobalModeMap = 2 call sites mínimo
-    expect(loadDepsCalls.length).toBeGreaterThanOrEqual(2)
-    // SpreadMap NÃO pode mais importar maplibre-gl direto (ficou em useMapDeps)
+  it('SpreadMap consome loadMapDeps via useMapInstance OU await direto (sem duplicar imports)', () => {
+    // Ted refactor B 2026-05-22: PostModeMap migrou pra useMapInstance
+    // (que internamente chama loadMapDeps). GlobalModeMap mantém await
+    // direto (animation loop tem ciclo próprio). Total = 1 direct + 1
+    // via hook.
+    const HOOK = readFileSync('src/components/Feed/useMapInstance.ts', 'utf8')
+    const directCalls = MAP.match(/await loadMapDeps\(\)/g) ?? []
+    const hookCalls = HOOK.match(/await loadMapDeps\(\)/g) ?? []
+    expect(directCalls.length + hookCalls.length).toBeGreaterThanOrEqual(2)
+    // SpreadMap importa useMapInstance (refactor #1 Ted)
+    expect(MAP).toMatch(/from\s+'\.\/useMapInstance'/)
+    // SpreadMap NÃO pode importar maplibre-gl direto (ficou em useMapDeps)
     expect(MAP).not.toMatch(/import\(['"]maplibre-gl['"]\)/)
   })
 })

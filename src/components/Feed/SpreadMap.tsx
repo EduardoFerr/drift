@@ -27,6 +27,7 @@ import { useFollowsStore } from '../../lib/follows'
 import { useLensStore } from '../../lib/trust-lens'
 import { pinColor, PIN_COLOR_DEFAULT } from '../../lib/trust/map-color'
 import { loadMapDeps } from './useMapDeps'
+import { useMapInstance } from './useMapInstance'
 import { usePrefsStore } from '../../lib/prefs'
 import type { PropagationArc, SpreadMapData } from '../../types/drift'
 
@@ -242,105 +243,88 @@ function PostModeMap({ data, className, mode, onModeChange }: ModeMapProps) {
   const [k1WarningDismissed, setK1WarningDismissed] = useState(false)
   const showK1Warning = isUserSoloSpreader(data, activeNpub) && !k1WarningDismissed
 
-  useEffect(() => {
-    if (!containerRef.current) return
-    let cancelled = false
-    let cleanup: (() => void) | null = null
+  // Ted refactor B 2026-05-22: useMapInstance encapsula loadMapDeps +
+  // new Map + addControl + cleanup. Mantém comportamento bit-equivalente
+  // ao pré-refactor — layers + fitBounds aplicados via onReady.
+  const centerPoint = data.origin ?? data.destinations[0]?.point ?? null
+  const center: [number, number] = centerPoint
+    ? [centerPoint.lng, centerPoint.lat]
+    : [0, 20]
 
-    void (async () => {
-      try {
-        // DRY 2026-05-21 (Satoshi tech lead B): imports shared via
-        // loadMapDeps. Ted bundle audit §1.8 preserve (tree-shake estático).
-        const { maplibregl, MapboxOverlay, layers } = await loadMapDeps()
-        if (cancelled) return
+  useMapInstance({
+    containerRef,
+    style: buildMapStyle(tileTemplate),
+    center,
+    zoom: 1.5,
+    deps: [data, mapView, tileTemplate],
+    onReady: ({ map, overlay, deps: mapDeps }) => {
+      const { ScatterplotLayer, HeatmapLayer } = mapDeps.layers
 
-        const { ScatterplotLayer, HeatmapLayer } = layers
-
-        const centerPoint = data.origin ?? data.destinations[0]?.point ?? null
-        const center: [number, number] = centerPoint
-          ? [centerPoint.lng, centerPoint.lat]
-          : [0, 20]
-
-        const map = new maplibregl.Map({
-          container: containerRef.current!,
-          style: buildMapStyle(tileTemplate),
-          center,
-          zoom: 1.5,
-          attributionControl: false,
-          dragRotate: false,
-        })
-
-        if (mapView === 'fit-bounds') {
-          const bounds = computeBounds([
-            ...(data.origin ? [[data.origin.lng, data.origin.lat] as [number, number]] : []),
-            ...data.destinations.map((d): [number, number] => [d.point.lng, d.point.lat]),
-          ])
-          if (bounds) {
-            map.once('load', () => {
-              map.fitBounds(bounds, { padding: 60, maxZoom: 11, duration: 0 })
-            })
-          }
+      if (mapView === 'fit-bounds') {
+        const bounds = computeBounds([
+          ...(data.origin ? [[data.origin.lng, data.origin.lat] as [number, number]] : []),
+          ...data.destinations.map((d): [number, number] => [d.point.lng, d.point.lat]),
+        ])
+        if (bounds) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          ;(map as any).once('load', () => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            ;(map as any).fitBounds(bounds, { padding: 60, maxZoom: 11, duration: 0 })
+          })
         }
-
-        const originPoints: PointLayerProps[] = data.origin
-          ? [{ position: [data.origin.lng, data.origin.lat] }]
-          : []
-        const destPoints: PointLayerProps[] = data.destinations.map((d) => ({
-          position: [d.point.lng, d.point.lat],
-        }))
-
-        const overlay = new MapboxOverlay({
-          layers: [
-            new HeatmapLayer({
-              id: 'spread-heat',
-              data: data.destinations,
-              getPosition: (d: HeatmapPointProps) => [d.point.lng, d.point.lat],
-              getWeight: 1,
-              radiusPixels: 40,
-              intensity: 1,
-              threshold: 0.05,
-              aggregation: 'SUM',
-              colorRange: [
-                [33, 102, 172, 0],
-                [103, 169, 207, 80],
-                [209, 229, 240, 130],
-                [253, 219, 199, 180],
-                [239, 138, 98, 220],
-                [178, 24, 43, 250],
-              ],
-            }),
-            new ScatterplotLayer({
-              id: 'spread-origin',
-              data: originPoints,
-              getPosition: (p: PointLayerProps) => p.position,
-              getFillColor: [251, 191, 36, 230],
-              getRadius: 8,
-              radiusUnits: 'pixels',
-              stroked: true,
-              getLineColor: [251, 191, 36, 255],
-              lineWidthUnits: 'pixels',
-              getLineWidth: 1.5,
-            }),
-            new ScatterplotLayer({
-              id: 'spread-destinations',
-              data: destPoints,
-              getPosition: (p: PointLayerProps) => p.position,
-              getFillColor: [52, 211, 153, 140],
-              getRadius: 3,
-              radiusUnits: 'pixels',
-            }),
-          ],
-        })
-
-        map.addControl(overlay)
-        cleanup = () => { try { map.remove() } catch { /* noop */ } }
-      } catch (err) {
-        console.error('[SpreadMap post] init error:', err)
       }
-    })()
 
-    return () => { cancelled = true; cleanup?.() }
-  }, [data, mapView])
+      const originPoints: PointLayerProps[] = data.origin
+        ? [{ position: [data.origin.lng, data.origin.lat] }]
+        : []
+      const destPoints: PointLayerProps[] = data.destinations.map((d) => ({
+        position: [d.point.lng, d.point.lat],
+      }))
+
+      overlay.setProps({
+        layers: [
+          new HeatmapLayer({
+            id: 'spread-heat',
+            data: data.destinations,
+            getPosition: (d: HeatmapPointProps) => [d.point.lng, d.point.lat],
+            getWeight: 1,
+            radiusPixels: 40,
+            intensity: 1,
+            threshold: 0.05,
+            aggregation: 'SUM',
+            colorRange: [
+              [33, 102, 172, 0],
+              [103, 169, 207, 80],
+              [209, 229, 240, 130],
+              [253, 219, 199, 180],
+              [239, 138, 98, 220],
+              [178, 24, 43, 250],
+            ],
+          }),
+          new ScatterplotLayer({
+            id: 'spread-origin',
+            data: originPoints,
+            getPosition: (p: PointLayerProps) => p.position,
+            getFillColor: [251, 191, 36, 230],
+            getRadius: 8,
+            radiusUnits: 'pixels',
+            stroked: true,
+            getLineColor: [251, 191, 36, 255],
+            lineWidthUnits: 'pixels',
+            getLineWidth: 1.5,
+          }),
+          new ScatterplotLayer({
+            id: 'spread-destinations',
+            data: destPoints,
+            getPosition: (p: PointLayerProps) => p.position,
+            getFillColor: [52, 211, 153, 140],
+            getRadius: 3,
+            radiusUnits: 'pixels',
+          }),
+        ],
+      })
+    },
+  })
 
   return (
     <div className="relative h-full w-full">
