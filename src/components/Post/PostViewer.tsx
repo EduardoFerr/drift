@@ -152,6 +152,27 @@ export function PostViewer({
   const mapLongPress = useLongPress({
     onLongPress: () => setShowMapExplainer(true),
   })
+  // Satoshi A6 2026-05-22 (audit E.1): mini-map persistente vira surface
+  // persuasiva. Hint discreto "tocar 🗺 de novo pra fechar" aparece nas
+  // primeiras 2 aberturas (counter localStorage). 3ª+ silencia.
+  // localStorage local-only (manifesto §28 — zero analytics export).
+  const [mapHintVisible, setMapHintVisible] = useState(false)
+  useEffect(() => {
+    if (!showMap) {
+      setMapHintVisible(false)
+      return
+    }
+    try {
+      const k = 'drift.minimap.openCount'
+      const n = Number(localStorage.getItem(k) ?? '0')
+      if (n < 2) {
+        localStorage.setItem(k, String(n + 1))
+        setMapHintVisible(true)
+        const t = setTimeout(() => setMapHintVisible(false), 4500)
+        return () => clearTimeout(t)
+      }
+    } catch { /* localStorage indisponível — silencia */ }
+  }, [showMap])
   const [showReport, setShowReport] = useState(false)
   // V_2026-05-17 (user pedido): long-press 5s mudou semantics.
   //   - Antes: abria ModerationModal (block/mute/report)
@@ -527,6 +548,13 @@ export function PostViewer({
                     {...(onOpenLocationSettings ? { onOpenLocationSettings } : {})}
                   />
                 </LazyBoundary>
+                {/* Satoshi A6 — hint discreto. z-30 sobre o map mas
+                    pointer-events-none pra não bloquear gestures. */}
+                {mapHintVisible && (
+                  <div className="pointer-events-none absolute right-3 top-3 z-30 rounded-lg border border-drift-border/40 bg-drift-bg/95 px-2.5 py-1 font-mono text-[10px] text-drift-muted backdrop-blur-sm">
+                    tocar 🗺 de novo pra fechar
+                  </div>
+                )}
               </m.div>
             </m.div>
           )}

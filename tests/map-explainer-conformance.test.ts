@@ -112,6 +112,19 @@ describe('MapExplainerCard — export + copy + legenda', () => {
     const copy = getMapExplainerCopy('network')
     expect(copy.purpose).toMatch(/§24/)
   })
+
+  it('copy post/global/network reforça "tamanho ≠ qualidade" (Satoshi A5 Gap #1)', () => {
+    // LOCK_VIA_TEST: bandwagon visual mitigation — explicit no-quality
+    // disclaimer em cada copy de mode.
+    const postCopy = getMapExplainerCopy('post')
+    const globalCopy = getMapExplainerCopy('global')
+    const networkCopy = getMapExplainerCopy('network')
+    expect(postCopy.purpose).toMatch(/≠ qualidade/)
+    expect(globalCopy.purpose).toMatch(/≠ qualidade/)
+    expect(networkCopy.purpose).toMatch(/≠ qualidade/)
+    // Cita §22 (sem reputação subjetiva)
+    expect(postCopy.purpose + globalCopy.purpose + networkCopy.purpose).toMatch(/§22/)
+  })
 })
 
 describe('Long-press wiring — botões de ação dos mapas', () => {

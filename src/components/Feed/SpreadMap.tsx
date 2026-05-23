@@ -49,6 +49,16 @@ export interface SpreadMapProps {
 const MAP_ATTRIBUTION =
   '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · © <a href="https://carto.com/attributions">CARTO</a>'
 
+/**
+ * Satoshi A4 2026-05-22 (audit Gap CARTO sovereignty): tiles default
+ * vêm de carto.com (CDN externo que loga IP). Disclaimer discreto no
+ * footer permite override em Settings (`map_tile_url_template`).
+ * Quando user tem template custom, omitimos o nudge (já fez a escolha
+ * de sovereignty). Manifesto §17 awareness.
+ */
+const CARTO_SOVEREIGNTY_NUDGE =
+  ' · <span title="tiles cortesia carto.com — substitua em Ajustes ▸ Mapa pra usar seu próprio servidor">tiles externos</span>'
+
 const CARTO_TILE_URLS_DEFAULT = [
   'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
   'https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
@@ -642,6 +652,14 @@ function MapShell({
    */
   timelineEvents?: Array<{ created_at: number }>
 }) {
+  // Satoshi A4: omite o nudge "tiles externos" quando user já configurou
+  // template custom (sovereignty pref) — sinaliza que respeitamos a
+  // escolha consciente. Read direto da store; impacto perf nulo.
+  const tileTemplate = usePrefsStore((s) => s.map_tile_url_template)
+  const usingCustomTiles = !!tileTemplate
+  const attributionHTML = usingCustomTiles
+    ? MAP_ATTRIBUTION
+    : MAP_ATTRIBUTION + CARTO_SOVEREIGNTY_NUDGE
   return (
     <div className={`relative overflow-hidden rounded-2xl border border-drift-border/40 ${className}`}>
       <div ref={containerRef} className="h-full w-full" />
@@ -668,7 +686,7 @@ function MapShell({
       </div>
       <div
         className="pointer-events-auto absolute bottom-3 right-3 rounded-lg bg-drift-bg/95 px-2.5 py-1 text-[10px] text-drift-muted backdrop-blur-sm [&_a]:underline [&_a]:hover:text-drift-text"
-        dangerouslySetInnerHTML={{ __html: MAP_ATTRIBUTION }}
+        dangerouslySetInnerHTML={{ __html: attributionHTML }}
       />
     </div>
   )

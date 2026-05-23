@@ -64,7 +64,7 @@ export function getMapExplainerCopy(context: MapExplainerContext): ExplainerCopy
     return {
       title: 'mapa de propagação',
       purpose:
-        'Este mapa mostra onde este post foi DRIFT-ado. Cada ponto é um lugar onde alguém viu o post e decidiu espalhar (gesto ↑). A origem é onde o autor publicou.',
+        'Este mapa mostra onde este post foi DRIFT-ado. Cada ponto é um lugar onde alguém viu o post e decidiu espalhar (gesto ↑). A origem é onde o autor publicou. 💡 tamanho do pin ≠ qualidade do post — só conta espalhamentos geográficos (manifesto §22).',
       legend: [
         {
           swatch: 'rgb(232, 255, 90)',
@@ -91,7 +91,7 @@ export function getMapExplainerCopy(context: MapExplainerContext): ExplainerCopy
     return {
       title: 'rede geográfica',
       purpose:
-        'Cada ponto é uma pessoa que já espalhou (DRIFT) algum post na rede Drift, no local que ela declarou. Tamanho do ponto cresce com quantos drifts ela fez. Arcos mostram propagação cross-post no tempo.',
+        'Cada ponto é uma pessoa que já espalhou (DRIFT) algum post na rede Drift, no local que ela declarou. Tamanho do ponto cresce com quantos drifts ela fez. Arcos mostram propagação cross-post no tempo. 💡 tamanho do ponto ≠ qualidade nem importância — só conta espalhamentos geográficos (manifesto §22).',
       legend: [
         {
           swatch: 'rgb(232, 255, 90)',
@@ -116,7 +116,7 @@ export function getMapExplainerCopy(context: MapExplainerContext): ExplainerCopy
     return {
       title: 'sua rede geográfica',
       purpose:
-        'Mesma visualização do mapa global, mas filtrado por quem você segue (NIP-02). Útil pra ver onde estão geograficamente as pessoas que importam pra você. É lente local — não afeta o feed canônico (manifesto §24).',
+        'Mesma visualização do mapa global, mas filtrado por quem você segue (NIP-02). Útil pra ver onde estão geograficamente as pessoas que importam pra você. É lente local — não afeta o feed canônico (manifesto §24). 💡 tamanho do ponto ≠ qualidade — só conta espalhamentos geográficos (§22).',
       legend: [
         {
           swatch: 'rgb(244, 130, 14)',
