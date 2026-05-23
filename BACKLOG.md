@@ -128,6 +128,17 @@ N+3 Batch A. Rodada paralela HIMYM, todos pushed.
 
 **Ted maps review:**
 
+- [ ] **TimelineScrubber: sincronização exata com RAF do GlobalModeMap**
+  V_2026-05-23 follow-up. Hoje fill bar sincroniza por **timing matching**
+  (ambos componentes têm ciclo 10s linear infinite + montam juntos, fase
+  coincide naturalmente). Funciona perceptualmente, mas se um remount
+  acontecer (re-query data) sem o outro, a fase pode dessincronizar até
+  o próximo loop. Solução robusta: migrar GlobalModeMap pra hook
+  useMapInstance (igual ao PostModeMap) + extrair RAF state pra hook
+  compartilhado que emite `progress (0..1)`; scrubber consome via prop
+  controlled (currentTime mapped from progress). Estimativa ~3-4h.
+  P3 — só priorizar se user reportar dessincronização visível.
+
 - [ ] **Split SpreadMap.tsx (794 LoC) — fadiga estrutural iminente**
   Ted arquitetural review 2026-05-21
   (`Docs/sessions/ted-maps-review-2026-05-21.md`). Arquivo cresceu
