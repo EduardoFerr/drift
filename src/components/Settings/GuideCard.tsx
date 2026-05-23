@@ -187,8 +187,8 @@ export function GuideCard({ onClose }: GuideCardProps) {
                   Ao DRIFT-ar um post com GPS ligado, você adiciona um
                   ponto verde ao mapa daquele post. Os outros usuários
                   conseguem ver que alguém espalhou daqui — não veem
-                  quem. Se você quer DRIFT-ar sem deixar rastro, basta
-                  ter location off (default).
+                  quem. Você decide isso per-post no botão de localização
+                  ao lado do CANCELAR no compose — default off.
                 </Responsibility>
               </SettingExplainer>
 
@@ -210,8 +210,8 @@ export function GuideCard({ onClose }: GuideCardProps) {
                 <Responsibility>
                   Se você publica com GPS, vira um ponto aqui. Quanto
                   mais DRIFTs você faz, maior seu ponto. Isso é
-                  voluntário — você pode usar Drift inteiro sem nunca
-                  aparecer no mapa global (basta deixar location off).
+                  voluntário — você decide per-post no compose (botão
+                  de localização ao lado do CANCELAR); default off.
                 </Responsibility>
               </SettingExplainer>
 
