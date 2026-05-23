@@ -1948,7 +1948,12 @@ function MapOverlay({
   onClose: () => void
 }) {
   const events = useSyncStore((s) => s.eventsReceived)
-  const [mapMode, setMapMode] = useState<SpreadMapMode>('post')
+  // Satoshi A1 2026-05-22 (audit satoshi-maps-audit Gap #3): default
+  // `global` quando entry-point é NavBar — user pediu "ver o mapa" da
+  // rede, não deste post específico. Mini-map embedded no PostViewer
+  // continua `post` fixo (não passa onModeChange, ModeToggle não
+  // renderiza). Resolve "abro NavBar MAPA e vejo só este post".
+  const [mapMode, setMapMode] = useState<SpreadMapMode>('global')
 
   const headerRight = (
     <div className="flex items-center gap-3">

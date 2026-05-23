@@ -269,6 +269,15 @@ describe('SpreadMap DRY — loadMapDeps shared (B refactor 2026-05-21)', () => {
   })
 })
 
+describe('MapOverlay default mode (Satoshi A1 2026-05-22)', () => {
+  it('App.tsx MapOverlay default mapMode = "global" (não "post")', () => {
+    const APP = readFileSync('src/App.tsx', 'utf8')
+    // LOCK_VIA_TEST: NavBar entry-point sempre abre em modo agregado.
+    // Mini-map embedded no PostViewer continua `post` (não passa mode prop).
+    expect(APP).toMatch(/useState<SpreadMapMode>\(['"]global['"]\)/)
+  })
+})
+
 describe('SpreadMap network mode — empty states', () => {
   it('network + anônimo: placeholder "modo rede desativado"', () => {
     expect(MAP).toMatch(/modo rede desativado/)
