@@ -549,7 +549,17 @@ function PreviewOverlay({
         </DriftButton>
       }
     >
-      <div className="flex min-h-0 flex-1 flex-col px-4 py-4">
+      {/* B8 fix 2026-05-22 (Robin): PreviewOverlay renderizava tela
+          preta após fix 64e1d59 — culpa de height collapse. FullPageCard
+          envolve children num `<div min-h-0 flex-1 overflow-y-auto>`
+          (block, sem flex flex-col). Nossa wrapper interno usava
+          `flex-1` que sem flex-parent vira altura 0; SubpostLayout's
+          TextLayout depende de `h-full` herdada → renderiza 0px ⇒
+          card preto. Trocar pra `h-full` resolve: usa 100% da altura
+          do body (que tem altura concreta via flex-1 do FullPageCard
+          flex-col root). Min-height fallback 320px protege contra
+          edge-case onde body collapsa em viewports muito curtos. */}
+      <div className="flex h-full min-h-[320px] flex-col px-4 py-4">
         <div className="relative flex-1 overflow-hidden rounded-2xl border border-drift-border/40 bg-drift-surface">
           <SubpostLayout subpost={subposts[safeIdx]!} post={mockPost} subpostIdx={safeIdx} subpostsTotal={total} />
         </div>
