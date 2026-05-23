@@ -51,7 +51,7 @@ export interface TimelineScrubberProps {
   /**
    * Ted polish 2026-05-22: semântica do label varia por mode. Caller
    * (MapShell) passa o mode pra customizar o counter:
-   *   - 'post'    → "N spreads do post"
+   *   - 'post'    → "N DRIFTs do post"
    *   - 'global'  → "N eventos na rede"
    *   - 'network' → "N edges da sua lente"
    * Default (undefined) → "N eventos" (fallback genérico).
@@ -70,7 +70,7 @@ export function counterLabelForMode(
   mode: TimelineScrubberProps['mode'],
 ): string {
   if (mode === 'post') {
-    return `${count} ${count === 1 ? 'spread do post' : 'spreads do post'}`
+    return `${count} ${count === 1 ? 'DRIFT do post' : 'DRIFTs do post'}`
   }
   if (mode === 'global') {
     return `${count} ${count === 1 ? 'evento na rede' : 'eventos na rede'}`

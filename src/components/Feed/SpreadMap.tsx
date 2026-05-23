@@ -190,10 +190,10 @@ export function SpreadMap({
         : 'sem dados de localização'
     const body =
       mode === 'global'
-        ? 'Nenhum spread com tag location ainda. Quando alguém com GPS ativo driftar, a rede aparece aqui.'
+        ? 'Nenhum DRIFT com tag location ainda. Quando alguém com GPS ativo driftar, a rede aparece aqui.'
         : mode === 'network'
         ? 'Ninguém que você segue driftou com GPS ativo ainda. Quando isso acontecer, aparece aqui.'
-        : 'Drifts deste post ainda não têm tag location. Quando alguém com GPS ativo driftar, aparece aqui.'
+        : 'DRIFTs deste post ainda não têm tag location. Quando alguém com GPS ativo driftar, aparece aqui.'
     return <Placeholder className={className} title={title} body={body} />
   }
 

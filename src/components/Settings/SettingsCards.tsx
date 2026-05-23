@@ -288,7 +288,7 @@ export function MapViewCard({ onClose }: CardProps) {
   // opções, mesmo padrão FeedTabs indicator.
   const activeIndex = MAP_VIEW_OPTIONS.findIndex((o) => o.value === prefs.map_view)
   return (
-    <FullPageCard onClose={onClose} title="mapa de spread" ariaLabel="enquadramento do mapa">
+    <FullPageCard onClose={onClose} title="mapa de DRIFT" ariaLabel="enquadramento do mapa">
       <div className="space-y-3 px-4 py-5">
         <SettingExplainer
           label="enquadramento padrão do mapa"

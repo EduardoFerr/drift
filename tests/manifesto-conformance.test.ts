@@ -422,6 +422,64 @@ describe('Vocabulary UI guard (V0 redesign — Marshall LOCK_VIA_TEST)', () => {
     ).toEqual([])
   })
 
+  it('zero "spread/spreads" lowercase em strings JSX user-facing (Barney audit 2026-05-23)', () => {
+    // UI usa DRIFT/DRIFTs. Camada protocolo (kind 9079=SPREAD, types
+    // como SpreadMap, vars como spreadCount) é OK — só strings JSX
+    // visíveis ao user violam. Heurística: lowercase "spread"/"spreads"
+    // como palavra inteira em JSX text (>...<) ou string literal.
+    // Comments, identificadores camelCase (spreadCount), PascalCase
+    // (SpreadMap, SpreadMapProps), e ocorrências dentro de outras
+    // palavras (spreading, spreader, spreadsheet) ficam OK — não
+    // confundem o user.
+    const tsxFiles = findFiles(join(ROOT, 'src'))
+    const offenders: { file: string; line: number; text: string }[] = []
+    // Banido: "spread" / "spreads" lowercase como palavra inteira em
+    // texto JSX visível (entre > e <). Heurística conservadora — só
+    // captura texto JSX puro pra evitar falsos positivos em strings
+    // técnicas (console warns, dialog.confirm strings, title attrs,
+    // que misturam termos protocolo com PT-BR e exigem migração mais
+    // ampla — track futuro pós-audit Barney 2026-05-23).
+    //
+    // Track futuro: ampliar pra body="..." attrs e dialog.* args quando
+    // todas as ~10 ocorrências forem migradas (não é blocking pra este
+    // commit; LOCK serve como fundação anti-regressão).
+    const banned = /(?<!-)(?<!drift-)\bspreads?\b(?![:\-])/
+
+    function detectSpreadOffense(line: string): boolean {
+      if (!banned.test(line)) return false
+      // Captura "spread"/"spreads" em texto JSX (entre > de tag open e
+      // < de tag close/expression). Pula linhas com className= pra não
+      // bater em CSS classnames residuais.
+      if (/className=/.test(line)) return false
+      const jsxText = /(>)([^<>]*\bspreads?\b[^<>]*)(<)/.exec(line)
+      if (jsxText && !/^\s*$/.test(jsxText[2])) return true
+      return false
+    }
+
+    for (const file of tsxFiles) {
+      const content = stripComments(readFileSync(file, 'utf8'))
+      const lines = content.split('\n')
+      for (let i = 0; i < lines.length; i++) {
+        if (detectSpreadOffense(lines[i])) {
+          offenders.push({
+            file: file.replace(ROOT, '').replace(/\\/g, '/'),
+            line: i + 1,
+            text: lines[i].trim().slice(0, 100),
+          })
+        }
+      }
+    }
+
+    expect(
+      offenders,
+      `Vocab "spread/spreads" lowercase em strings JSX user-facing. UI deve usar DRIFT/DRIFTs ` +
+        `(Barney audit 2026-05-23). Camada protocolo (kind 9079=SPREAD, SpreadMap type, ` +
+        `spreadCount var) fica OK — só strings visíveis ao user. Hits:\n${offenders
+          .map((o) => `  ${o.file}:${o.line}: ${o.text}`)
+          .join('\n')}`,
+    ).toEqual([])
+  })
+
   it('protocol-spec.md preserva associação 9079↔SPREAD e 9080↔BURY', () => {
     const spec = readFileSync(join(ROOT, 'Docs', 'protocol-spec.md'), 'utf8')
     expect(spec, 'spec deve associar 9079 a SPREAD em alguma seção').toMatch(/9079[^]{0,100}SPREAD/)
