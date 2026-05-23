@@ -21,7 +21,7 @@ import { useSpreadMap, isUserSoloSpreader, type SpreadMapMode } from '../../hook
 import { useLongPress, LONG_PRESS_MS } from '../../hooks/useLongPress'
 import { MapExplainerCard } from './MapExplainerCard'
 import { TimelineScrubber } from './TimelineScrubber'
-import { AnimatePresence } from 'framer-motion'
+import { AnimatePresence, m } from 'framer-motion'
 import { useBootStore } from '../../lib/bootstrap'
 import { useFollowsStore } from '../../lib/follows'
 import { useLensStore } from '../../lib/trust-lens'
@@ -658,10 +658,12 @@ function MapShell({
         </div>
       )}
 
-      {/* WCAG: bg sobre tile dinâmico (mapa). Marshall regra de 2 camadas
-          — alpha mínimo /95 + text sem alpha. Tile pode ser claro ou
-          escuro; com /95 + text-muted sólido garantimos ≥ 4.5:1 nos 3 temas. */}
-      <div className="pointer-events-none absolute bottom-3 left-3 rounded-lg bg-drift-bg/95 px-2.5 py-1 font-mono text-[11px] text-drift-muted backdrop-blur-sm">
+      {/* Satoshi A3 deemphasis (audit 2026-05-22 Gap #1 "termômetro
+          social"): stats com font-size text-[10px] (era [11px]) + alpha
+          /60 no text-muted pra reduzir visual primacy. Número agregado
+          continua presente (informação útil), mas perde proeminência
+          de "métrica de validação social". Manifesto §22 alignment. */}
+      <div className="pointer-events-none absolute bottom-3 left-3 rounded-lg bg-drift-bg/95 px-2.5 py-1 font-mono text-[10px] text-drift-muted/60 backdrop-blur-sm">
         {stats}
       </div>
       <div
@@ -693,6 +695,19 @@ function ModeToggle({
   // V_2026-05-22 (user pedido): long-press 3s em cada modo abre
   // MapExplainerCard com copy do modo. Tap continua trocando o modo.
   const [explainer, setExplainer] = useState<SpreadMapMode | null>(null)
+
+  // Satoshi A2 2026-05-22 (audit Gap #2): badge ao trocar modo. Toast
+  // ~2s pra educar user que network mode é "lente local" (não compete
+  // com feed canônico §24). Init false pra não exibir no mount.
+  const [badgeMode, setBadgeMode] = useState<SpreadMapMode | null>(null)
+  const initialModeRef = useRef(mode)
+  useEffect(() => {
+    if (mode === initialModeRef.current) return // ignora mount inicial
+    setBadgeMode(mode)
+    const t = setTimeout(() => setBadgeMode(null), 2000)
+    return () => clearTimeout(t)
+  }, [mode])
+
   return (
     <>
       <div
@@ -730,6 +745,29 @@ function ModeToggle({
             context={explainer}
             onClose={() => setExplainer(null)}
           />
+        )}
+      </AnimatePresence>
+      {/* Satoshi A2 mode badge — toast 2s ao alternar modo. Posiciona
+          abaixo do ModeToggle (top-3 left-3 ocupado), centrado no top
+          do mapa pra leitura rápida. role=status pra SR. */}
+      <AnimatePresence>
+        {badgeMode && (
+          <m.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
+            role="status"
+            aria-live="polite"
+            className="pointer-events-none absolute left-1/2 top-3 z-30 -translate-x-1/2 rounded-lg border border-drift-border/40 bg-drift-bg/95 px-3 py-1.5 font-mono text-[10px] uppercase tracking-meta text-drift-muted backdrop-blur-sm"
+          >
+            modo:{' '}
+            <span className="text-drift-text">
+              {badgeMode === 'post' && 'este post'}
+              {badgeMode === 'global' && 'rede inteira'}
+              {badgeMode === 'network' && 'sua rede (lente local §24)'}
+            </span>
+          </m.div>
         )}
       </AnimatePresence>
     </>

@@ -269,6 +269,27 @@ describe('SpreadMap DRY — loadMapDeps shared (B refactor 2026-05-21)', () => {
   })
 })
 
+describe('Stats deemphasis + mode badge (Satoshi A2+A3 2026-05-22)', () => {
+  it('stats badge usa text-[10px] + text-drift-muted/60 (deemphasis)', () => {
+    // LOCK_VIA_TEST Gap #1 audit: número agregado perde primacy visual.
+    expect(MAP).toMatch(/text-\[10px\][^"]*text-drift-muted\/60/)
+  })
+
+  it('ModeToggle dispara badge quando mode muda (toast 2s)', () => {
+    expect(MAP).toMatch(/badgeMode/)
+    expect(MAP).toMatch(/setBadgeMode\(mode\)/)
+    expect(MAP).toMatch(/setTimeout\(\(\)\s*=>\s*setBadgeMode\(null\),\s*2000\)/)
+  })
+
+  it('badge texto inclui "lente local" pra network mode (Gap #2)', () => {
+    expect(MAP).toMatch(/lente local/)
+  })
+
+  it('badge tem role=status (a11y SR announcement)', () => {
+    expect(MAP).toMatch(/role="status"[\s\S]{0,100}aria-live="polite"/)
+  })
+})
+
 describe('MapOverlay default mode (Satoshi A1 2026-05-22)', () => {
   it('App.tsx MapOverlay default mapMode = "global" (não "post")', () => {
     const APP = readFileSync('src/App.tsx', 'utf8')
