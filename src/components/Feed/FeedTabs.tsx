@@ -65,12 +65,18 @@ export function FeedTabs({ onActiveTabTap }: FeedTabsProps = {}) {
 
   return (
     <div className="flex items-stretch font-mono text-[12px] uppercase tracking-[2px]">
-      <div className="relative flex flex-1 items-stretch">
+      <div className="relative flex flex-1 items-stretch" role="tablist" aria-label="feed">
         {tabs.map((t) => (
           <FeedTabBtn
             key={t.id}
             active={tab === t.id}
-            unseen={unseenByTab[t.id]}
+            // B1 fix (2026-05-22, Marshall): dot só em tab INATIVA com
+            // unseen > 0. Tab ativa não mostra dot — ambíguo
+            // ("precisa atenção?" vs. "estou aqui mesmo"). Combinado
+            // com bumpUnseenCount que incrementa todas as 3 tabs por
+            // simplicidade, sem este guard as 3 tabs sempre piscavam
+            // dot juntas após qualquer evento.
+            unseen={tab === t.id ? 0 : unseenByTab[t.id]}
             onClick={() => handleTabClick(t.id)}
             title={
               tab === t.id
@@ -120,12 +126,23 @@ function FeedTabBtn({
     <button
       onClick={onClick}
       title={title}
-      className={`relative flex-1 px-2 py-[10px] text-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2 focus-visible:ring-offset-1 focus-visible:ring-offset-drift-bg ${
+      role="tab"
+      // B2 fix (2026-05-22, Marshall WCAG 4.1.2): aria-selected é o
+      // estado canônico de tab. aria-pressed preservado por compat
+      // com qualquer screen reader que ainda inspecione (não-padrão
+      // pra role=tab mas inofensivo). Container tem role=tablist.
+      aria-selected={active}
+      // B6 fix (2026-05-22, Marshall): focus ring com `ring-inset`
+      // (sem offset) evita aparência de "box outline" em volta da
+      // tab clicada, que se confundia com indicador de ativa. Único
+      // indicador de active-state é o underline animado (m.span no
+      // container). Tab "em alta" parecia "ter caixa" porque era
+      // a última focada; agora foco e ativa têm visuais distintos.
+      className={`relative flex-1 px-2 py-[10px] text-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-drift-accent2 ${
         active
           ? 'text-drift-text'
           : 'text-drift-muted hover:text-drift-text'
       }`}
-      aria-pressed={active}
     >
       <span className="relative inline-block">
         {children}
