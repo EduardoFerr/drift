@@ -85,6 +85,28 @@ shipping prematuro).
 
 ---
 
+## Bugs descobertos em re-verificação visual 2026-05-23
+
+- [ ] **Mode badge (Satoshi A2) não renderiza** — `SpreadMap.tsx:746-753`
+  tem `setBadgeMode` + AnimatePresence inteiramente correto, MAS:
+  (a) `initialModeRef` nunca atualiza → retornar ao mode inicial não
+  dispara badge; (b) badge está dentro de MapShell — em network mode
+  com empty state ("SUA REDE ESTÁ VAZIA") MapShell pode não montar,
+  fazendo badge nunca aparecer mesmo na primeira troca. Verificado em
+  localhost: switching global → network não mostrou badge. Fix:
+  (1) hoistar badge pra fora do MapShell pro overlay root, (2) deixar
+  `initialModeRef` rastrear mode anterior em vez de só o inicial.
+  ~20min. P1 (Satoshi feature shipou mas não funciona end-to-end).
+
+- [ ] **GPS state persistente surge "preciso" sem ativação consciente** —
+  pref `location_granularity` ficou `precise` após sessão de teste
+  visual (re-aberto compose mostrou `📍 GPS` selecionado). Pode ser:
+  (a) algum tap acidental durante navegação no LocationCard,
+  (b) leftover de session anterior. Já existe item B3 reopener
+  registrado — confirmar se essa observação reabre o gap. P2.
+
+---
+
 ## Pool de tarefas — gap audit Robin 2026-05-23
 
 (Origem: `Docs/sessions/robin-pool-tarefas-gap-audit-2026-05-23.md`.
