@@ -182,6 +182,11 @@ import {
 const SpreadMap = lazy(() =>
   import('./components/Feed/SpreadMap').then((m) => ({ default: m.SpreadMap })),
 )
+// V_2026-05-22 — MapExplainerCard via long-press 3s no botão MAPA da NavBar
+// E no toggle de modos do SpreadMap. NOT lazy: pesa ~3KB e abre rápido
+// (UX: long-press já demanda 3s de espera; load chunk dropframe seria ruim).
+import { MapExplainerCard } from './components/Feed/MapExplainerCard'
+import type { MapExplainerContext } from './components/Feed/MapExplainerCard'
 // Type-only re-export pra type ser tree-shaken sem trigger lazy chunk
 import type { SpreadMapMode } from './hooks/useSpreadMap'
 import type {
@@ -1441,6 +1446,14 @@ function App() {
               icon: <MapIcon size={18} />,
               label: 'mapa',
               onClick: () => pushLayer({ id: 'map', component: MapOverlay, props: { currentPost } }),
+              // V_2026-05-22 (user pedido): long-press 3s abre explainer
+              // user descobre o que cada mapa significa sem ter que abrir.
+              onLongPress: () =>
+                pushLayer({
+                  id: 'map-explainer-default',
+                  component: MapExplainerCard,
+                  props: { context: 'overlay-default' as MapExplainerContext },
+                }),
               ariaLabel: 'abrir mapa de propagação',
             },
           ]}

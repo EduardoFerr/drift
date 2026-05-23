@@ -32,6 +32,7 @@
 import type { ReactNode } from 'react'
 // `m` é o primitive leve do framer-motion (LazyMotion). Features via main.tsx.
 import { m } from 'framer-motion'
+import { useLongPress, LONG_PRESS_MS } from '../../hooks/useLongPress'
 
 export interface NavAction {
   /** Ícone (SVG component ou emoji em ReactNode). */
@@ -40,6 +41,12 @@ export interface NavAction {
   label: string
   /** Click handler. */
   onClick: () => void
+  /**
+   * Long-press handler (3s). V_2026-05-22 — usado pra abrir
+   * MapExplainerCard no botão MAPA. Tap continua disparando onClick
+   * normalmente. Quando ausente, NavBtn é só tap.
+   */
+  onLongPress?: () => void
   /** Variante visual ativa (ex.: aba selecionada). Default false. */
   active?: boolean
   /** aria-label se label não for descritivo o suficiente. */
@@ -137,13 +144,20 @@ export function NavBar({
 }
 
 function NavBtn({ action }: { action: NavAction }) {
+  // Long-press opcional. Quando action.onLongPress não fornecido,
+  // hook fica disabled e handlers viram no-op (zero overhead).
+  const lp = useLongPress({
+    onLongPress: action.onLongPress ?? (() => undefined),
+    disabled: !action.onLongPress,
+  })
   return (
     <m.button
       whileTap={{ scale: 0.95 }}
       onClick={action.onClick}
+      {...lp.handlers}
       aria-label={action.ariaLabel ?? action.label}
       aria-pressed={action.active}
-      className={`flex flex-col items-center gap-1 rounded px-2 py-1 transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2 ${
+      className={`relative flex flex-col items-center gap-1 overflow-hidden rounded px-2 py-1 transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2 ${
         action.active
           ? 'text-drift-accent'
           : 'text-drift-muted hover:text-drift-text'
@@ -153,6 +167,18 @@ function NavBtn({ action }: { action: NavAction }) {
       <span className="font-mono text-[12px] uppercase tracking-widest">
         {action.label}
       </span>
+      {/* Ripple feedback durante long-press (só monta se hook ativo). */}
+      {lp.pressing && lp.pressOrigin && (
+        <span
+          className="ripple-wave"
+          aria-hidden="true"
+          style={{
+            left: lp.pressOrigin.x,
+            top: lp.pressOrigin.y,
+            animationDuration: `${LONG_PRESS_MS}ms`,
+          }}
+        />
+      )}
     </m.button>
   )
 }

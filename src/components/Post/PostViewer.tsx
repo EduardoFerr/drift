@@ -33,6 +33,8 @@ import {
 // (que ainda vive inline em PostViewer). Quando ModerationModal sair daqui
 // também, este import pode ir junto.
 import ActionsFan, { FanIcon } from './ActionsFan'
+import { useLongPress, LONG_PRESS_MS as MAP_EXPLAINER_LONG_PRESS_MS } from '../../hooks/useLongPress'
+import { MapExplainerCard } from '../Feed/MapExplainerCard'
 // `m` é o primitive leve do framer-motion (LazyMotion). Features via main.tsx.
 import { m, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { MOTION } from '../../lib/motion'
@@ -144,6 +146,12 @@ export function PostViewer({
 
   const [subpostIdx, setSubpostIdx] = useState(0)
   const [showMap, setShowMap] = useState(false)
+  // V_2026-05-22 (user pedido): long-press 3s no botão 🗺 abre MapExplainerCard
+  // (explica propósito + legenda + §28). Tap continua alternando o mini-map.
+  const [showMapExplainer, setShowMapExplainer] = useState(false)
+  const mapLongPress = useLongPress({
+    onLongPress: () => setShowMapExplainer(true),
+  })
   const [showReport, setShowReport] = useState(false)
   // V_2026-05-17 (user pedido): long-press 5s mudou semantics.
   //   - Antes: abria ModerationModal (block/mute/report)
@@ -667,7 +675,8 @@ export function PostViewer({
                 e.stopPropagation()
                 setShowMap((v) => !v)
               }}
-              className={`absolute right-[132px] top-4 z-30 flex h-11 w-11 items-center justify-center rounded-full border bg-drift-surface/80 shadow-drift-md backdrop-blur-sm transition-colors focus:outline-none focus:ring-1 focus:ring-drift-accent2 ${
+              {...mapLongPress.handlers}
+              className={`absolute right-[132px] top-4 z-30 flex h-11 w-11 items-center justify-center overflow-hidden rounded-full border bg-drift-surface/80 shadow-drift-md backdrop-blur-sm transition-colors focus:outline-none focus:ring-1 focus:ring-drift-accent2 ${
                 showMap
                   ? 'border-drift-accent text-drift-accent'
                   : 'border-drift-border text-drift-muted hover:border-drift-accent hover:text-drift-accent'
@@ -675,12 +684,26 @@ export function PostViewer({
               style={{ touchAction: 'manipulation' }}
               aria-label={showMap ? 'fechar mapa de spread' : 'abrir mapa de spread'}
               aria-pressed={showMap}
-              title="mapa de spread (geografia de quem drift-ou)"
+              title="mapa de spread (geografia de quem drift-ou) — segure 3s pra explicação"
               data-no-longpress="true"
             >
               <span aria-hidden="true">
                 <MapIcon size={18} strokeWidth={2} />
               </span>
+              {/* Ripple visual durante long-press 3s (1 onda, contida no
+                  botão circular via overflow-hidden). Mesmo CSS keyframe
+                  do PostViewer card. */}
+              {mapLongPress.pressing && mapLongPress.pressOrigin && (
+                <span
+                  className="ripple-wave"
+                  aria-hidden="true"
+                  style={{
+                    left: mapLongPress.pressOrigin.x,
+                    top: mapLongPress.pressOrigin.y,
+                    animationDuration: `${MAP_EXPLAINER_LONG_PRESS_MS}ms`,
+                  }}
+                />
+              )}
             </button>
             {/* Trust Lens inspector chip — bottom-right do card.
                 Aparece só quando lens strength > 0 E post foi tocado. */}
@@ -765,6 +788,18 @@ export function PostViewer({
           removido em [PostViewer cleanup 2026-05-20] — branch !embedded
           era dead code desde V8 (swipe é único input no home view;
           ActionsFan cobre comments + ações secundárias). */}
+
+      {/* V_2026-05-22: MapExplainerCard via long-press 3s no 🗺.
+          Coexiste com showMap (mini-map embedded) — overlay separado
+          em z mais alto via FullPageCard z-40. */}
+      <AnimatePresence>
+        {showMapExplainer && (
+          <MapExplainerCard
+            context="embedded"
+            onClose={() => setShowMapExplainer(false)}
+          />
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {showReport && (
