@@ -83,6 +83,99 @@ shipping prematuro).
   call, flood dedup, flood multi-IDs, debounce window reset, separação
   por janela, propagação de erro via promise).
 
+---
+
+## ✅ Fechados — rodada paralela Maps audits + Menu Detalhado (2026-05-22)
+
+Sequência: Satoshi adversarial maps audit + Ted arquitetural review +
+maps polish (long-press 3s + TimelineScrubber + GuideCard) + Sprint
+N+3 Batch A. Rodada paralela HIMYM, todos pushed.
+
+- [x] **SpreadMap ModeBtn long-press 3s educacional** — fechado em
+  [e0b3741]. Long-press 3s em cada ModeBtn (post/global/network)
+  revela MapExplainerCard com explicação contextual do mode. Reusa
+  `useLongPress` hook + ripple CSS animation (pattern PostViewer).
+  Gesture descoberta deferred via help text discreto. Bundled em
+  [4eb72a2] junto com hook `useLongPress` extraído + LOCK_VIA_TEST
+  `tests/map-explainer-conformance.test.ts`.
+
+- [x] **TimelineScrubber básico (mapa temporal)** — fechado em
+  [5433291]. Scrubber UI primitive permite ao user filtrar pontos do
+  SpreadMap por janela temporal (slider 1h/6h/24h/7d/all). Defer:
+  controle bidirecional drag-handles + persistência em user_prefs
+  (separados, P3). MVP shipa range fixo.
+
+- [x] **GuideCard educação user (Menu Detalhado expansão)** — fechado
+  em [966d91e]. Card educativo inline em Settings Menu Detalhado
+  explicando cada flag granular com exemplo concreto (não só label).
+  Reduz fricção pra power-user descobrir efeito de cada toggle.
+  Pattern reusável pra outras superfícies Settings.
+
+- [x] **Ted arquitetural maps review** — fechado em [4eb72a2].
+  Read-only audit conferiu queries SQL (post ⊂ global, network ⊆
+  global), cache invalidation correto, sem leaks cross-mode.
+  Arquivo: `Docs/sessions/ted-maps-review-2026-05-21.md`. 3 gaps
+  estruturais registrados como items separados abaixo (split
+  SpreadMap.tsx, camera persist, legend respect flag).
+
+- [x] **Satoshi adversarial maps audit** — fechado em [a74639d].
+  Threat model rodou em SpreadMap.tsx + queries + UI. Arquivo:
+  `Docs/sessions/satoshi-maps-audit-2026-05-21.md`. Gaps P1 sendo
+  atacados pelo agent Maps polish round 2 em paralelo (commit pending).
+  1 P_phase2 doxx preventivo registrado abaixo (Profile map).
+
+### Novos items deferidos da rodada
+
+**Ted maps review:**
+
+- [ ] **Split SpreadMap.tsx (794 LoC) — fadiga estrutural iminente**
+  Ted arquitetural review 2026-05-21
+  (`Docs/sessions/ted-maps-review-2026-05-21.md`). Arquivo cresceu
+  pra 794 LoC e mistura: layer rendering, mode toggle, long-press
+  detector, scrubber, explainer card mount, query orchestration.
+  Estimativa Ted: ~2h split em 4 sub-componentes (SpreadMapShell +
+  SpreadMapLayers + SpreadMapControls + SpreadMapExplainer), zero
+  risco funcional (refactor puro). Sprint dedicada futura. P2.
+  Bloqueio: agendar Sprint N+4 ou pulse paralela quando agent maps
+  polish round 2 finalizar (evitar conflito).
+
+- [ ] **Camera state persist em `user_prefs.map_camera`** — Ted
+  gap UX 2026-05-21. Hoje camera (lng/lat/zoom/bearing/pitch)
+  reseta ao trocar mode OU sair/voltar do mapa. User power perde
+  contexto. Fix: persistir tuple `{ lng, lat, zoom, bearing, pitch,
+  ts }` em UserPrefs com debounce ~500ms, restore on mount.
+  Estimativa: 1-2h + LOCK_VIA_TEST schema. P3.
+
+- [ ] **MapShell legend network respect `lens_show_in_map`** — Ted
+  polish 2026-05-21. Legend (badge tier moderation per relay)
+  hoje aparece sempre em network mode; deveria respeitar flag
+  granular `lens_show_in_map` quando user power desligar. Fix
+  trivial: prop drilling do flag até MapShell legend render.
+  Estimativa: 30min. P3.
+
+**Satoshi maps audit:**
+
+- [ ] **Map novo no Profile — NO-GO preventivo (K=1 doxx amplification)**
+  Satoshi adversarial audit 2026-05-21
+  (`Docs/sessions/satoshi-maps-audit-2026-05-21.md`). Adicionar
+  mapa no Profile (mostrar spreads do user específico geo) seria
+  amplificador K=1 doxx — feed-level já protege via aggregation,
+  Profile expõe individual. Mesmo com location off-default,
+  histórico de quem ativou GPS vira target. Reopener: K-anonymity
+  engine (Phase 2 quando DAU > 1000 + threshold aggregation
+  garantido). P_phase2.
+
+**Menu Detalhado expansão:**
+
+- [ ] **Sincronizar `Docs/guia-do-usuario.md` com GuideCard content**
+  Agent Lily/Robin sugeriu spawn task separada quando shipou
+  GuideCard em [966d91e]. Hoje GuideCard tem strings inline; guia
+  do usuário PT-BR (Docs/guia-do-usuario.md) não menciona as flags
+  granulares do Menu Detalhado. Fix: extrair fonte canônica
+  (constante TS exportada OU MD parsing) + atualizar guia com
+  seção "Menu Detalhado" + cross-link bidirecional. Estimativa
+  ~2h escrita. P2. Bloqueio: nenhum técnico — agendar quando
+  user power feedback indicar gap.
 
 ---
 
@@ -131,7 +224,7 @@ Sprint começa quando user der GO. Design lenses ready em
 que seja `(no-commit, decisão registrada apenas)`. Permite reconstruir
 o "porquê" via `git show <hash>`.
 
-Última atualização: 2026-05-22 (Robin audit — Sprint N+2 close + visual review B1-B9)
+Última atualização: 2026-05-22 (Robin hygiene — pós rodada Maps audits + Sprint N+3 Batch A)
 
 ---
 
@@ -548,7 +641,12 @@ B1-B9 + Lily Material Ripple report + audits paralelos.)
 
 
 - [ ] **Mais uma rodada LHCI — melhorar métricas Core Web Vitals**
-  Adicionado pelo user 2026-05-21. Última rodada LHCI registrada em
+  Adicionado pelo user 2026-05-21. **Status 2026-05-22:** Sprint N+3
+  Batch A (D2 LHCI re-measure) rodou parcial — `Docs/sessions/lhci-2026-05-21.md`
+  publicado com bundle entry gz 110→63 kB (-43%). LCP/INP/CLS/TBT
+  inconclusivos (EPERM tmpdir Windows; CI workflow disparado, await
+  Linux run pra resultado limpo). NÃO fechar até CI Linux entregar
+  números íntegros. Última rodada LHCI registrada em
   `Docs/sessions/cwv-final-report-2026-05-09.md` e
   `round-11-perf-2026-05-16.md`. Reabrir pra:
   - Re-measure LCP / CLS / INP / TTFB / TBT pós sessões maratona
