@@ -61,21 +61,21 @@ shipping prematuro).
 
 **Batch A status (2026-05-21):**
 - [x] **D3 Profile picture render feed reactivity** — fechado em
-  [PENDING-HASH] — `events.ts:persistUserMetadata` agora chama
+  [b84d63c] — `events.ts:persistUserMetadata` agora chama
   `invalidateFeed()` após persistir kind 0. Fix do gap residual: feed
   store mantinha snapshot pré-metadata até próximo evento de domínio
   chegar. LOCK_VIA_TEST `tests/feed-author-avatar.test.ts`.
 - [x] **D2 LHCI re-measure + delta** — fechado parcial em
-  [PENDING-HASH] — `Docs/sessions/lhci-2026-05-21.md` publicado.
+  [b84d63c] — `Docs/sessions/lhci-2026-05-21.md` publicado.
   Bundle entry gz 110→63 kB (-43%). LCP/INP/CLS/TBT inconclusivos
   (LHCI tropeçou em EPERM tmpdir cleanup Windows; audits rodaram, JSON
   perdido). CI workflow vai re-medir no PR. Sem regressão por proxy.
-- [x] **D4 ActionsFan visibility** — fechado em [PENDING-HASH] —
+- [x] **D4 ActionsFan visibility** — fechado em [b84d63c] —
   container `shadow-lg`→`shadow-2xl` + `ring-1 ring-black/10` pra
   contraste WCAG AA sobre bg claro/foto. LOCK_VIA_TEST estendido em
   `tests/actions-fan-extract-conformance.test.ts` ("D4 visibility
   hardening").
-- [x] **D16 dismissRule rate-limit** — fechado em [PENDING-HASH] —
+- [x] **D16 dismissRule rate-limit** — fechado em [b84d63c] —
   trailing-edge debounce 250ms em `dismissRule`/`dismissRules` via
   `scheduleDismissFlush` + buffer Set. Floods (XSS/UI bug) coalescem
   em 1 db.get+db.run. API pública inalterada (Promise<void>).
