@@ -119,6 +119,9 @@ const SovereigntyCard = lazy(() =>
 const MenuDetailCard = lazy(() =>
   import('./components/Settings/SettingsCards').then((m) => ({ default: m.MenuDetailCard })),
 )
+const GuideCard = lazy(() =>
+  import('./components/Settings/GuideCard').then((m) => ({ default: m.GuideCard })),
+)
 const AppearanceCard = lazy(() =>
   import('./components/Settings/AppearanceCard').then((m) => ({ default: m.AppearanceCard })),
 )
@@ -2030,6 +2033,7 @@ type SettingsTarget =
   | 'sua-lente'
   | 'soberania'
   | 'menu-detalhado'
+  | 'guia'
   | 'instalar'
   | 'limpar'
 
@@ -2111,6 +2115,9 @@ function SettingsRoot({ onClose }: { onClose: () => void }) {
         break
       case 'menu-detalhado':
         pushLayer({ id: 'menu-detail', component: MenuDetailCard, parent: p })
+        break
+      case 'guia':
+        pushLayer({ id: 'guia', component: GuideCard, parent: p })
         break
       case 'status':
         pushLayer({ id: 'status', component: StatusCardLayer, parent: p })
@@ -2225,6 +2232,12 @@ function SettingsRoot({ onClose }: { onClose: () => void }) {
           label: 'listas',
           hint: 'pinned, blocked, muted',
           icon: ListIcon,
+        },
+        {
+          target: 'guia',
+          label: 'guia do drift',
+          hint: 'o que cada mapa, ação e algoritmo faz na rede',
+          icon: InfoIcon,
         },
         {
           target: 'menu-detalhado',
