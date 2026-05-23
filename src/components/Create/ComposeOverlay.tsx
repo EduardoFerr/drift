@@ -41,6 +41,7 @@ import {
   CONTENT_WARNING_VALUES,
   type Subpost,
   type ContentWarning,
+  type LocationGranularity,
 } from '../../types/drift'
 import { inferLayout } from '../../lib/layout-inference'
 import { uploadBlob, BlobError } from '../../lib/blobs'
@@ -53,6 +54,7 @@ import { DriftButton } from '../UI/DriftButton'
 import { SubpostLayout } from '../Post/SubpostLayout'
 import { usePrefsStore } from '../../lib/prefs'
 import { WarningIcon } from '../UI/Icons'
+import { GpsScopeButton } from './GpsScopeButton'
 
 export interface ComposeOverlayProps {
   publishing: boolean
@@ -66,6 +68,15 @@ export interface ComposeOverlayProps {
      *  a ordem dos subposts que têm imageUrl. Subposts sem imagem não
      *  contribuem entrada aqui. */
     imetas: BlobMeta[]
+    /**
+     * Escopo GPS escolhido per-post (manifesto §28 — privacy mínima por
+     * inércia eliminada). Pre-selecionado a partir de
+     * `user_prefs.location_granularity` (que vira "padrão pra novos
+     * posts"); user pode override per-post via GpsScopeButton no header.
+     * Caller (App.tsx) usa esse valor em `getCurrentLocation(scope)`
+     * — NÃO mais lê `prefs.location_granularity` direto no publish flow.
+     */
+    gpsScope: LocationGranularity
   }) => Promise<void> | void
 }
 
@@ -149,6 +160,16 @@ export function ComposeOverlay({
   )
   const [currentIdx, setCurrentIdx] = useState(0)
   const [showPreview, setShowPreview] = useState(false)
+  // Manifesto §28 (privacy mínima por inércia eliminada): GPS é decisão
+  // per-post, não setting persistente. Pre-selecionamos com o valor de
+  // `user_prefs.location_granularity` (que agora é "padrão pra novos
+  // posts" — não mais "sempre vaza"). User pode override per-post via
+  // GpsScopeButton no header sem mexer no setting persistente.
+  const defaultScope = usePrefsStore((s) => s.location_granularity)
+  const [gpsScope, setGpsScope] = useState<LocationGranularity>(defaultScope)
+  // Toast inline quando permission GPS é negada após user selecionar
+  // country/city/precise. Visível 4s; dismiss manual via tap.
+  const [gpsDeniedToast, setGpsDeniedToast] = useState(false)
   // Satoshi audit 2026-05-19: upload_endpoint customizado é invisível
   // no compose flow. Adversário com 5min de acesso ao device pode setar
   // endpoint malicioso em Settings > Soberania; user manda foto pro
@@ -235,7 +256,7 @@ export function ComposeOverlay({
       .map((d) => d.blobMeta)
       .filter((m): m is BlobMeta => m !== null)
 
-    await onPublish({ subposts, contentWarning, imetas })
+    await onPublish({ subposts, contentWarning, imetas, gpsScope })
     // Reset interno (caller fecha o overlay).
     setDrafts([newDraft()])
     setCurrentIdx(0)
@@ -250,18 +271,32 @@ export function ComposeOverlay({
   const used = draft.text.length
   const nearLimit = remaining < 20 && !overLimit
 
-  // Botão CANCELAR no header right (mockup pattern). Em vez do default
-  // FECHAR; UX semântico — "cancela a composição" é mais claro que "fecha".
+  // Header right: GpsScopeButton (decisão per-post de localização —
+  // manifesto §28) + CANCELAR. Ordem: GPS antes de CANCELAR, alinhados
+  // à direita. GpsScopeButton tem popover próprio (z-50) que escapa
+  // do header.
   const headerRight = (
-    <DriftButton
-      variant="ghost"
-      size="md"
-      onClick={onClose}
-      disabled={publishing}
-      aria-label="cancelar"
-    >
-      cancelar
-    </DriftButton>
+    <div className="flex items-center gap-2">
+      <GpsScopeButton
+        value={gpsScope}
+        onChange={setGpsScope}
+        disabled={publishing}
+        onPermissionDenied={() => {
+          setGpsDeniedToast(true)
+          // Auto-dismiss em 4s.
+          setTimeout(() => setGpsDeniedToast(false), 4000)
+        }}
+      />
+      <DriftButton
+        variant="ghost"
+        size="md"
+        onClick={onClose}
+        disabled={publishing}
+        aria-label="cancelar"
+      >
+        cancelar
+      </DriftButton>
+    </div>
   )
 
   // Footer com -SUB + DRIFT ↑. -SUB só aparece se >1 subpost.
@@ -320,6 +355,20 @@ export function ComposeOverlay({
             visibilidade — adversário não consegue mais setar endpoint
             malicioso silenciosamente. Não bloqueia publicação (user
             consciente que setou pode prosseguir); só TORNA EVIDENTE. */}
+        {gpsDeniedToast && (
+          <div
+            role="alert"
+            className="flex shrink-0 items-start gap-2 border-b border-drift-warning/40 bg-drift-warning/10 px-4 py-2.5 text-drift-warning"
+          >
+            <span aria-hidden="true" className="mt-0.5 shrink-0">
+              <WarningIcon size={14} strokeWidth={2} />
+            </span>
+            <p className="font-mono text-[11px] leading-relaxed">
+              permissão de localização negada — post vai sem GPS. ajuste no
+              ícone de cadeado da URL pra liberar.
+            </p>
+          </div>
+        )}
         {hasCustomUpload && hasAnyImage && customUploadHost && (
           <div
             role="alert"

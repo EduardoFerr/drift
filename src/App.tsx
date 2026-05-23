@@ -1033,10 +1033,14 @@ function App() {
     subposts: Subpost[]
     contentWarning: ContentWarning | null
     imetas: import('./lib/nip94').BlobMeta[]
+    /** Per-post scope decidido em ComposeOverlay (manifesto §28). Substitui
+     *  leitura direta de `prefs.location_granularity` — pref agora é
+     *  só "padrão pra novos posts" (pre-selecionado), não "vaza sempre". */
+    gpsScope: import('./types/drift').LocationGranularity
   }) {
     if (publishing || input.subposts.length === 0) return
     setPublishing(true)
-    const granularity = getPrefs().location_granularity
+    const granularity = input.gpsScope
     const willCapture = granularity !== 'off'
     if (willCapture) setGpsCapturing((s) => new Set(s).add('__publish__'))
     try {
