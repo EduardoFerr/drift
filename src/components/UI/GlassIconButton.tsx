@@ -30,10 +30,13 @@
  * efeito glass pressupõe overlay sobre algo.
  *
  * Sizes:
- *   - `sm` → h-6 w-6, ícone text-[12px] (visual-only, sem tap)
- *   - `md` → h-7 w-7, ícone text-[14px] (legacy — pre-WCAG 2.5.5)
- *   - `lg` → h-8 w-8, ícone text-[16px] (legacy)
  *   - `xl` → h-11 w-11, ícone text-[18px] (WCAG 2.5.5 AA — tap target 44px)
+ *
+ * Histórico: `sm` (h-6 w-6, visual-only), `md` (h-7 w-7) e `lg` (h-8 w-8)
+ * existiram como legacy pre-WCAG 2.5.5 e foram removidas em 2026-05-23
+ * (Ted+Barney audit 2026-05-23 §2.2 — WCAG threat: trap pra novos
+ * contributors adotarem tap target sub-44px). Único caller já passava
+ * `xl`; default mudou pra `xl`.
  *
  * Variants:
  *   - `default`     → hover chartreuse (drift-accent)
@@ -54,11 +57,11 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
 
 export type GlassIconButtonVariant = 'default' | 'destructive'
-export type GlassIconButtonSize = 'sm' | 'md' | 'lg' | 'xl'
+export type GlassIconButtonSize = 'xl'
 
 export interface GlassIconButtonProps
   extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'type' | 'aria-label'> {
-  /** Tamanho — default `md`. */
+  /** Tamanho — default `xl` (WCAG 2.5.5 AA 44px tap target). */
   size?: GlassIconButtonSize
   /** Variante visual — default `default`. */
   variant?: GlassIconButtonVariant
@@ -103,16 +106,10 @@ export function glassIconButtonVariantClass(
  */
 export function glassIconButtonSizeClass(size: GlassIconButtonSize): string {
   switch (size) {
-    case 'sm':
-      return 'h-6 w-6 text-[12px]'
-    case 'md':
-      // Default: alinhado ao botão ⋮ original do PostViewer.
-      return 'h-7 w-7 text-[14px]'
-    case 'lg':
-      return 'h-8 w-8 text-[16px]'
     case 'xl':
-      // WCAG 2.5.5 AA — touch target 44×44 mínimo. Adotado em
-      // PostViewer (Round CWV-4 a11y pass 2026-05-09).
+      // WCAG 2.5.5 AA — touch target 44×44 mínimo. Único size suportado
+      // desde 2026-05-23 (Ted+Barney audit §2.2 — legacy sm/md/lg removidos
+      // pra evitar trap WCAG em novos call-sites).
       return 'h-11 w-11 text-[18px]'
   }
 }
@@ -130,7 +127,7 @@ export const GLASS_ICON_BUTTON_BASE_CLASS =
  */
 export function glassIconButtonClassName(
   variant: GlassIconButtonVariant = 'default',
-  size: GlassIconButtonSize = 'md',
+  size: GlassIconButtonSize = 'xl',
   extra?: string,
 ): string {
   const parts = [
@@ -143,7 +140,7 @@ export function glassIconButtonClassName(
 }
 
 export function GlassIconButton({
-  size = 'md',
+  size = 'xl',
   variant = 'default',
   type = 'button',
   children,

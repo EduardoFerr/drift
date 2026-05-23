@@ -51,27 +51,10 @@ describe('glassIconButtonVariantClass', () => {
 })
 
 describe('glassIconButtonSizeClass', () => {
-  it('sm = h-6 w-6 com ícone text-[12px]', () => {
-    const cls = glassIconButtonSizeClass('sm')
-    expect(cls).toContain('h-6')
-    expect(cls).toContain('w-6')
-    expect(cls).toContain('text-[12px]')
-  })
-
-  it('md = h-7 w-7 com ícone text-[14px] (default — match PostViewer ⋮)', () => {
-    const cls = glassIconButtonSizeClass('md')
-    expect(cls).toContain('h-7')
-    expect(cls).toContain('w-7')
-    expect(cls).toContain('text-[14px]')
-  })
-
-  it('lg = h-8 w-8 com ícone text-[16px]', () => {
-    const cls = glassIconButtonSizeClass('lg')
-    expect(cls).toContain('h-8')
-    expect(cls).toContain('w-8')
-    expect(cls).toContain('text-[16px]')
-  })
-
+  // 2026-05-23 (Ted+Barney audit §2.2): sizes legacy `sm`/`md`/`lg`
+  // removidas — eram pre-WCAG 2.5.5 e funcionavam como trap pra novos
+  // contributors adotarem tap target sub-44px. Único size suportado
+  // agora é `xl` (44×44).
   it('xl = h-11 w-11 com ícone text-[18px] (WCAG 2.5.5 AA — 44×44 tap target)', () => {
     const cls = glassIconButtonSizeClass('xl')
     expect(cls).toContain('h-11')
@@ -79,20 +62,10 @@ describe('glassIconButtonSizeClass', () => {
     expect(cls).toContain('text-[18px]')
   })
 
-  it('todas as sizes distintas produzem strings diferentes', () => {
-    const sizes: GlassIconButtonSize[] = ['sm', 'md', 'lg', 'xl']
-    const classes = sizes.map(glassIconButtonSizeClass)
-    const uniqueCount = new Set(classes).size
-    expect(uniqueCount).toBe(sizes.length)
-  })
-
   it('size H = W (aspect 1:1, círculo regular)', () => {
     // h-N e w-N com mesmo N — aspect ratio garantido pra rounded-full.
-    const sizes: GlassIconButtonSize[] = ['sm', 'md', 'lg', 'xl']
+    const sizes: GlassIconButtonSize[] = ['xl']
     const expected: Record<GlassIconButtonSize, [string, string]> = {
-      sm: ['h-6', 'w-6'],
-      md: ['h-7', 'w-7'],
-      lg: ['h-8', 'w-8'],
       xl: ['h-11', 'w-11'],
     }
     for (const s of sizes) {
@@ -137,10 +110,10 @@ describe('GLASS_ICON_BUTTON_BASE_CLASS', () => {
 })
 
 describe('glassIconButtonClassName (composer)', () => {
-  it('default: inclui base + size md + variant default', () => {
+  it('default: inclui base + size xl + variant default (WCAG-by-default)', () => {
     const cls = glassIconButtonClassName()
     expect(cls).toContain(GLASS_ICON_BUTTON_BASE_CLASS)
-    expect(cls).toContain(glassIconButtonSizeClass('md'))
+    expect(cls).toContain(glassIconButtonSizeClass('xl'))
     expect(cls).toContain(glassIconButtonVariantClass('default'))
   })
 
@@ -150,16 +123,10 @@ describe('glassIconButtonClassName (composer)', () => {
     expect(cls).not.toContain(glassIconButtonVariantClass('default'))
   })
 
-  it('respeita size prop quando passado', () => {
-    const cls = glassIconButtonClassName('default', 'lg')
-    expect(cls).toContain(glassIconButtonSizeClass('lg'))
-    expect(cls).not.toContain(glassIconButtonSizeClass('md'))
-  })
-
   it('apenda extra className (positioning) no final', () => {
     const cls = glassIconButtonClassName(
       'default',
-      'md',
+      'xl',
       'absolute right-6 top-6 z-30',
     )
     expect(cls).toContain('absolute')
@@ -170,28 +137,27 @@ describe('glassIconButtonClassName (composer)', () => {
   })
 
   it('extra=undefined não adiciona "undefined" string', () => {
-    const cls = glassIconButtonClassName('default', 'md', undefined)
+    const cls = glassIconButtonClassName('default', 'xl', undefined)
     expect(cls).not.toContain('undefined')
   })
 
   it('extra empty string não muda output', () => {
-    const cls = glassIconButtonClassName('default', 'md', '')
-    expect(cls).toBe(glassIconButtonClassName('default', 'md'))
+    const cls = glassIconButtonClassName('default', 'xl', '')
+    expect(cls).toBe(glassIconButtonClassName('default', 'xl'))
   })
 
   it('produz output estável (determinismo — função pura)', () => {
-    const a = glassIconButtonClassName('destructive', 'lg', 'absolute top-2')
-    const b = glassIconButtonClassName('destructive', 'lg', 'absolute top-2')
+    const a = glassIconButtonClassName('destructive', 'xl', 'absolute top-2')
+    const b = glassIconButtonClassName('destructive', 'xl', 'absolute top-2')
     expect(a).toBe(b)
   })
 
-  it('replica o pattern original do PostViewer ⋮ (smoke test do pattern)', () => {
-    // Composição equivalente ao botão hardcoded em PostViewer.tsx:427
-    // (com positioning extra). Os tokens críticos do "glass" devem estar
-    // todos presentes — defesa contra regressão silenciosa.
+  it('replica o pattern do PostViewer ⋮ (smoke test do glass effect)', () => {
+    // Os tokens críticos do "glass" devem estar todos presentes —
+    // defesa contra regressão silenciosa em refactor futuro.
     const cls = glassIconButtonClassName(
       'default',
-      'md',
+      'xl',
       'absolute right-6 top-6 z-30',
     )
     const requiredTokens = [
@@ -204,11 +170,20 @@ describe('glassIconButtonClassName (composer)', () => {
       'hover:text-drift-accent',
       'focus:ring-1',
       'focus:ring-drift-accent2',
-      'h-7',
-      'w-7',
+      'h-11',
+      'w-11',
     ]
     for (const token of requiredTokens) {
       expect(cls).toContain(token)
     }
+  })
+
+  it('WCAG anti-regressão: bundle nunca contém sub-44px sizes legacy', () => {
+    // Trap pra futuro: se alguém re-introduzir `sm`/`md`/`lg`, este
+    // teste falha. Ted+Barney audit 2026-05-23 §2.2 (WCAG threat).
+    const cls = glassIconButtonClassName()
+    expect(cls, 'glass icon button default não pode ser sub-44px (h-11 w-11 = 44px)').toContain('h-11')
+    expect(cls).not.toMatch(/\bh-[678]\b/)
+    expect(cls).not.toMatch(/\bw-[678]\b/)
   })
 })
