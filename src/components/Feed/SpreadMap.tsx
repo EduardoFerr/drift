@@ -156,7 +156,14 @@ export function SpreadMap({
           className={className}
           title="GPS desativado nas suas configurações"
           body="Mapa de spreads precisa de location opt-in (manifesto §28 — default off por privacidade). Ative se quiser que seus spreads apareçam no mapa de outros posts."
-          {...(onOpenLocationSettings ? { action: { label: 'ativar GPS', onClick: onOpenLocationSettings } } : {})}
+          // B3 fix 2026-05-22 (Robin): label antes era 'ativar GPS' — soava
+          // como toggle one-click. Botão na verdade só ABRE a tela de
+          // settings de location (user escolhe granularidade lá). User
+          // reportou: 'sem ativar GPS, só visualizou empty state, ícone
+          // passa a colorido' — provável misclick num radio dentro do
+          // LocationCard. Label novo explicita o destino → user vê tela
+          // e fecha sem mudar nada se quiser.
+          {...(onOpenLocationSettings ? { action: { label: 'abrir GPS settings', onClick: onOpenLocationSettings } } : {})}
         />
       )
     }
