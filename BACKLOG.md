@@ -85,6 +85,66 @@ shipping prematuro).
 
 ---
 
+## UX iniciante — fricções observadas 2026-05-23 (revisão visual user)
+
+(User observou ao testar o app na perspectiva de iniciante. 7 items
+descobertos em 1 sessão. Padrão comum: signals visuais sem legenda
+acessível imediata + estados sutis demais pra discriminar.)
+
+- [ ] **"DERIVA 0.810" no header não é clicável / sem feedback** —
+  novo usuário vai querer saber o que esse número significa. Score
+  muda visualmente (vi de 0.000 → 0.810) mas sem explicação on-screen.
+  Possíveis fixes: (a) tap abre tooltip/popover com 2-3 linhas "O que
+  é DERIVA" + link pro GuideCard, (b) long-press 3s abre MapExplainer-
+  style (consistente com pattern recém-shipado). P1.
+
+- [ ] **"463 EV" opaco pra iniciante** — EV = Eventos. Status panel
+  explica mas user médio passa direto sem clicar. Possíveis fixes:
+  (a) tooltip on hover/long-press, (b) trocar copy "463 EV" → "463
+  eventos" (custa horizontal space — header já crowded P3 conhecido),
+  (c) primeiro tap abre painel status (já é o behavior — só faltou
+  affordance visual indicando que é tappable). P1.
+
+- [ ] **Tab dots (global•, seguindo•, em alta•) sem legenda** —
+  fechado em [6eeb2c2] o bug de "dot na ativa" + a11y `aria-label="N
+  novos"`. MAS visualmente a diferença laranja vs vermelho é sutil
+  e sem onboarding/affordance que dot = novidade. Fixes: (a) primeira
+  ocorrência mostra HintChip "○ indica posts novos" (dismissRule),
+  (b) hover/long-press tooltip "N novos posts em <tab>". P2.
+
+- [ ] **Botão "◐ Prévia" disabled state muito sutil** — quando
+  textarea vazia, botão fica acinzentado mas visualmente parece
+  "fraco" não "inativo". User pode clicar sem feedback. Fixes:
+  (a) `cursor-not-allowed` + `opacity-50` + `pointer-events-none`,
+  (b) tooltip "Escreva algo antes" no disabled state, (c) trocar
+  copy disabled pra "✕ Prévia (escreva algo)". P2.
+
+- [ ] **Tela "Modo de Rede" mostra aviso amber "REINICIA app"
+  mesmo sem interação** — gera ansiedade desnecessária. Aviso
+  deveria aparecer só após user mudar a seleção. Fix: gate
+  `showRestartWarning` em `selectedMode !== currentMode`. P1.
+
+- [ ] **Network mode no mapa: mental model fragmentado** —
+  header "propagação", nav "MAPA", abas internas POST/GLOBAL/NETWORK
+  com comportamentos distintos. User vê 3 nomenclaturas diferentes
+  pra "mapa". Convergência com Satoshi (`satoshi-maps-audit`) +
+  Ted (`ted-maps-review`) — já capturado parcialmente. Fixes
+  possíveis: (a) consolidar naming (escolher "MAPA" como label
+  primário em TODAS surfaces), (b) header overlay dinâmico
+  "MAPA · este post" / "MAPA · global" / "MAPA · sua rede"
+  (sub-header explicativo). P1.
+
+- [ ] **Identidades múltiplas — sem preview do fluxo de criação** —
+  submenu existe em Settings → Identidade → "identidades" mas não
+  é claro o que acontece ao criar uma segunda. Falta:
+  (a) preview dos passos antes de iniciar (1. gera nova nsec, 2.
+  backup obrigatório, 3. troca ativa requer reload), (b) warning
+  manifesto §3 "dispositivo descartável, identidade não — backup
+  ANTES de qualquer ação destrutiva", (c) example empty state com
+  call-to-action vs blank screen. P1.
+
+---
+
 ## ✅ Fechados — rodada paralela Maps audits + Menu Detalhado (2026-05-22)
 
 Sequência: Satoshi adversarial maps audit + Ted arquitetural review +
