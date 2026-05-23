@@ -171,7 +171,7 @@ export const ONBOARDING_RULES: readonly GuidanceRule[] = [
     body: () => (
       <>
         <p>
-          Se ativar em <code>Ajustes → localização</code>, seus drifts aparecem no
+          Se ativar em <code>Configurações → localização</code>, seus drifts aparecem no
           mapa de outros posts. Padrão é <span className="text-drift-text">desligado</span>{' '}
           por privacidade (manifesto §28).
         </p>

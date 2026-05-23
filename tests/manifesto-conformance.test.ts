@@ -480,6 +480,52 @@ describe('Vocabulary UI guard (V0 redesign — Marshall LOCK_VIA_TEST)', () => {
     ).toEqual([])
   })
 
+  it('UI usa "Configurações" (não "Ajustes" / "Settings") em strings PT-BR — Barney audit 2026-05-23', () => {
+    // Vocabulário UI canonico PT-BR: a tela de settings do Drift chama
+    // "Configurações". "Ajustes" é o nome do app de Settings do iOS/iPadOS
+    // (Apple) — quando uma string refere o sistema operacional, manter
+    // "Ajustes". Quando refere a tela INTERNA do Drift, usar "Configurações".
+    // "Settings" lowercase em PT-BR é estrangeirismo — também banido.
+    //
+    // Allowlist: src/components/UI/GpsErrorBanner.tsx tem instruções pra
+    // iOS Safari ("Ajustes → Safari → Localização") — manter como é
+    // (label literal do app Apple). Outros files que referenciam Drift
+    // settings devem usar "Configurações".
+    const tsxFiles = findFiles(join(ROOT, 'src'))
+    const offenders: { file: string; line: number; text: string }[] = []
+    const allowFiles = new Set(['/src/components/UI/GpsErrorBanner.tsx'])
+
+    for (const file of tsxFiles) {
+      const rel = file.replace(ROOT, '').replace(/\\/g, '/')
+      if (allowFiles.has(rel)) continue
+      const content = stripComments(readFileSync(file, 'utf8'))
+      const lines = content.split('\n')
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i]
+        // Match "Ajustes" como palavra inteira em string literal ou
+        // JSX text. Pula identificadores TS (RelaySettings etc.) via
+        // palavra "Ajustes" (capitalizada exata; não bate ProfileSettings).
+        // Para "Settings": só pega quando aparece como JSX text user-
+        // facing (`>Settings<` ou `'Settings'` em string isolada).
+        if (/\bAjustes\b/.test(line)) {
+          offenders.push({
+            file: rel,
+            line: i + 1,
+            text: line.trim().slice(0, 100),
+          })
+        }
+      }
+    }
+
+    expect(
+      offenders,
+      `"Ajustes" detectado em strings JSX user-facing fora do allowlist (iOS labels). ` +
+        `UI Drift canonica usa "Configurações" (Barney audit 2026-05-23). Hits:\n${offenders
+          .map((o) => `  ${o.file}:${o.line}: ${o.text}`)
+          .join('\n')}`,
+    ).toEqual([])
+  })
+
   it('protocol-spec.md preserva associação 9079↔SPREAD e 9080↔BURY', () => {
     const spec = readFileSync(join(ROOT, 'Docs', 'protocol-spec.md'), 'utf8')
     expect(spec, 'spec deve associar 9079 a SPREAD em alguma seção').toMatch(/9079[^]{0,100}SPREAD/)

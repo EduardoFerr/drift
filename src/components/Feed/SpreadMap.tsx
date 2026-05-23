@@ -57,7 +57,7 @@ const MAP_ATTRIBUTION =
  * de sovereignty). Manifesto §17 awareness.
  */
 const CARTO_SOVEREIGNTY_NUDGE =
-  ' · <span title="tiles cortesia carto.com — substitua em Ajustes ▸ Mapa pra usar seu próprio servidor">tiles externos</span>'
+  ' · <span title="tiles cortesia carto.com — substitua em Configurações ▸ Mapa pra usar seu próprio servidor">tiles externos</span>'
 
 const CARTO_TILE_URLS_DEFAULT = [
   'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
@@ -178,7 +178,7 @@ export function SpreadMap({
           // passa a colorido' — provável misclick num radio dentro do
           // LocationCard. Label novo explicita o destino → user vê tela
           // e fecha sem mudar nada se quiser.
-          {...(onOpenLocationSettings ? { action: { label: 'abrir GPS settings', onClick: onOpenLocationSettings } } : {})}
+          {...(onOpenLocationSettings ? { action: { label: 'abrir Configurações de GPS', onClick: onOpenLocationSettings } } : {})}
         />
       )
     }

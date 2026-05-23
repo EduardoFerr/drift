@@ -319,7 +319,7 @@ export function PostViewer({
 
   async function handleBlock() {
     const ok = await dialog.confirm(
-      `Posts e interações deste autor somem do SEU feed (manifesto §24 — filtro local).\nNão muda o score nem afeta outros usuários.\nVocê pode desbloquear depois em Ajustes → listas.`,
+      `Posts e interações deste autor somem do SEU feed (manifesto §24 — filtro local).\nNão muda o score nem afeta outros usuários.\nVocê pode desbloquear depois em Configurações → listas.`,
       { title: 'bloquear autor', dangerous: true, okLabel: 'bloquear' },
     )
     if (!ok) return
