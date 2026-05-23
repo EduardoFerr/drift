@@ -68,7 +68,7 @@ const DiscoverNudgeBanner = lazy(() =>
   })),
 )
 import { dialog } from './lib/dialog'
-import { pushLayer, popLayer, hasLayer } from './lib/layer-stack'
+import { pushLayer, popLayer, useLayerStack } from './lib/layer-stack'
 import { NavBar } from './components/UI/NavBar'
 import { HintChip } from './components/UI/HintChip'
 import { getHintRule } from './lib/guidance'
@@ -586,6 +586,16 @@ function App() {
 
   const onboardingDone = usePrefsStore((s) => s.onboarding_done)
   const locationGranularity = usePrefsStore((s) => s.location_granularity)
+  // B4 fix 2026-05-22: NavBar deve sumir quando QUALQUER overlay
+  // fullscreen estiver aberto (Settings, LocationCard, MapView, etc.).
+  // Antes só sumia em 'map' explicitamente — com Settings aberto, o user
+  // ainda via os botões MAPA/CONFIG na bottom-nav (modal não cobre
+  // 100% da altura visualmente?), e click ali navegava errado (passava
+  // pelo modal pro NavBar embaixo? não — z-index ok, mas user
+  // confundia itens internos do modal "location" com bottom-nav).
+  // Tirar NavBar de cena quando overlay aberto remove a ambiguidade:
+  // só há uma "lista de ações" visível por vez.
+  const overlayOpen = useLayerStack((s) => s.layers.length > 0)
 
   const [publishing, setPublishing] = useState(false)
   const [pending, setPending] = useState<Record<string, 'spread' | 'bury'>>({})
@@ -1424,7 +1434,7 @@ function App() {
           futuro V10).
           Hidden quando showCreate ou showMap em vôo (não competir com
           modais fullscreen). */}
-      {!showCreate && !hasLayer('map') && (
+      {!showCreate && !overlayOpen && (
         <NavBar
           left={[
             {
@@ -1683,7 +1693,15 @@ function HomeHeader({
           <div className="font-mono text-[10px] uppercase tracking-meta text-drift-muted">
             deriva{' '}
             <b className="inline-block w-[44px] font-medium text-drift-accent2">
-              {currentScore !== null ? formatScore(currentScore) : '—'}
+              {/* B5 fix 2026-05-22: consistência de DERIVA entre tabs.
+                  Antes: tab `global` com post mostrava '0.000' / tab
+                  `seguindo` vazia mostrava '—' — mesma "ausência de
+                  valor" com copy diferente, confundia user. Agora:
+                  sempre '0.000' quando não há post (null) — semântica
+                  "score zero" uniforme. Em-dash reservada pra casos de
+                  boot indefinido (não chega aqui, currentPost?.score
+                  default null → 0 via ??). */}
+              {formatScore(currentScore ?? 0)}
             </b>
           </div>
         </div>
