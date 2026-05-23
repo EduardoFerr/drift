@@ -1192,7 +1192,7 @@ export function DiagnosticCard({ onClose }: CardProps) {
 
 // ─── PermissionsCard ────────────────────────────────────────────
 
-type PermissionKey = 'geolocation' | 'camera' | 'microphone'
+type PermissionKey = 'geolocation' | 'camera'
 type PermState = 'granted' | 'denied' | 'prompt' | 'unsupported'
 
 const PERM_ITEMS: {
@@ -1223,15 +1223,11 @@ const PERM_ITEMS: {
       stream.getTracks().forEach((t) => t.stop())
     },
   },
-  {
-    key: 'microphone',
-    label: 'áudio / microfone',
-    hint: 'reservado — speech e notas de voz (futuro)',
-    requestFn: async () => {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      stream.getTracks().forEach((t) => t.stop())
-    },
-  },
+  // microphone removido em 2026-05-23 (Barney audit) — entry era
+  // 'reservado pra speech/notas de voz futuro' sem feature consumindo.
+  // Cliente oficial Drift não usa microfone; manifesto §28 (privacidade
+  // pelo mínimo) desaconselha permissão sem feature ativa. Re-introduzir
+  // quando voice notes virarem feature real.
 ]
 
 function stateLabel(s: PermState): { text: string; color: string } {
@@ -1251,7 +1247,6 @@ export function PermissionsCard({ onClose }: CardProps) {
   const [perms, setPerms] = useState<Record<PermissionKey, PermState>>({
     geolocation: 'prompt',
     camera: 'prompt',
-    microphone: 'prompt',
   })
   const [requesting, setRequesting] = useState<PermissionKey | null>(null)
 
@@ -1259,7 +1254,6 @@ export function PermissionsCard({ onClose }: CardProps) {
     const next: Record<PermissionKey, PermState> = {
       geolocation: 'prompt',
       camera: 'prompt',
-      microphone: 'prompt',
     }
     for (const item of PERM_ITEMS) {
       try {
@@ -1323,7 +1317,7 @@ export function PermissionsCard({ onClose }: CardProps) {
       <div className="space-y-3 px-4 py-5">
         <SettingExplainer
           label="o que o app pode acessar"
-          description="O navegador controla acesso a GPS, câmera e microfone. O Drift NÃO usa nada disso automaticamente — só quando você opta por uma feature específica (ex: anexar localização no post)."
+          description="O navegador controla acesso a GPS e câmera. O Drift NÃO usa nada disso automaticamente — só quando você opta por uma feature específica (ex: anexar localização no post)."
           impact="Conceder permissão NÃO ativa nada — só dá ao app o direito de pedir se você usar a feature relacionada. Negar bloqueia a feature inteira (ex: posts sem location). Você pode revogar a qualquer momento nas configurações do navegador."
           defaultExplained="Tudo em 'não solicitado'. Drift só pede quando você ativa a feature correspondente (manifesto §28 — privacidade pelo mínimo)."
           reversible

@@ -160,9 +160,9 @@ describe('computeTimelineRange — pure helper', () => {
 })
 
 describe('counterLabelForMode — Ted polish #8a (label por mode)', () => {
-  it('post mode → "X spread(s) do post"', () => {
-    expect(counterLabelForMode(1, 'post')).toBe('1 spread do post')
-    expect(counterLabelForMode(3, 'post')).toBe('3 spreads do post')
+  it('post mode → "X DRIFT(s) do post" (vocab UI migrado 2026-05-23)', () => {
+    expect(counterLabelForMode(1, 'post')).toBe('1 DRIFT do post')
+    expect(counterLabelForMode(3, 'post')).toBe('3 DRIFTs do post')
   })
   it('global mode → "X evento(s) na rede"', () => {
     expect(counterLabelForMode(1, 'global')).toBe('1 evento na rede')

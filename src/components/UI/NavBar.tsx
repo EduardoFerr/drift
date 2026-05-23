@@ -22,11 +22,12 @@
  *     onCompose={openComposer}
  *   />
  *
- * Status: ZERO CONSUMER em V3.3 — Drift atual usa header inline +
- * SubpostEditor always-mounted, o que torna bottom-nav structural
- * change (fora do escopo "visual only" de V3.x). Track futuro
- * (V7+ ou structural rework) consome este primitive. Pattern
- * idêntico aos primitives V3.0 (SlideUpOverlay/Chip/...).
+ * Status: adotado em V8 (App.tsx:1446) como bottom-nav primary. Suporta
+ * slim mode (slide-off animado quando view-mode = slim, ex.: overlays
+ * fullscreen). Long-press 3s no botão MAPA dispara MapExplainerCard
+ * (V_2026-05-22). Histórico: docstring antigo dizia "ZERO CONSUMER em
+ * V3.3" — stale (~3 sprints atrás). Atualizado em 2026-05-23 (Barney
+ * audit dead-UX §comentários stale).
  */
 
 import type { ReactNode } from 'react'

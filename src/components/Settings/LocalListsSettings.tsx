@@ -1,7 +1,8 @@
 /**
  * LocalListsSettings — gerenciamento das listas locais do user:
  *
- *   - Pinned: posts que o user "fixou" (manifesto §16, "espalhar = seedear")
+ *   - Pinned: posts que o user "fixou" (manifesto §16, "DRIFT = seedear":
+ *     vocab UI = DRIFT, vocab protocolo/manifesto histórico = espalhar)
  *   - Blocked: npubs cujo conteúdo NÃO aparece no feed
  *   - Muted: npubs cujos POSTS estão silenciados (mas spreads/buries
  *     deles ainda contam pro score visualizado)
