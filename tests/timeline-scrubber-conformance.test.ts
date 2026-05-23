@@ -20,6 +20,7 @@ import { readFileSync } from 'node:fs'
 import {
   computeTimelineRange,
   formatRelativePtBr,
+  counterLabelForMode,
 } from '../src/components/Feed/TimelineScrubber'
 
 const SCRUBBER = readFileSync('src/components/Feed/TimelineScrubber.tsx', 'utf8')
@@ -155,6 +156,33 @@ describe('computeTimelineRange — pure helper', () => {
       { created_at: 0 },
     ])
     expect(result).toBeNull()
+  })
+})
+
+describe('counterLabelForMode — Ted polish #8a (label por mode)', () => {
+  it('post mode → "X spread(s) do post"', () => {
+    expect(counterLabelForMode(1, 'post')).toBe('1 spread do post')
+    expect(counterLabelForMode(3, 'post')).toBe('3 spreads do post')
+  })
+  it('global mode → "X evento(s) na rede"', () => {
+    expect(counterLabelForMode(1, 'global')).toBe('1 evento na rede')
+    expect(counterLabelForMode(5, 'global')).toBe('5 eventos na rede')
+  })
+  it('network mode → "X edge(s) da sua lente"', () => {
+    expect(counterLabelForMode(1, 'network')).toBe('1 edge da sua lente')
+    expect(counterLabelForMode(2, 'network')).toBe('2 edges da sua lente')
+  })
+  it('mode undefined → fallback "X evento(s)"', () => {
+    expect(counterLabelForMode(1, undefined)).toBe('1 evento')
+    expect(counterLabelForMode(4, undefined)).toBe('4 eventos')
+  })
+})
+
+describe('Empty state — Ted polish #8b (ocultar quando N<2)', () => {
+  it('scrubber retorna null quando count < 2', () => {
+    // computeTimelineRange retorna count=1 pra 1 evento; component
+    // adiciona guard "range.count < 2" pra evitar lapso degenerado.
+    expect(SCRUBBER).toMatch(/range\.count\s*<\s*2/)
   })
 })
 

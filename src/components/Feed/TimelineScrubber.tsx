@@ -42,8 +42,37 @@ export interface TimelineScrubberProps {
    * Omitido → só range + ticks.
    */
   currentTime?: number
+  /**
+   * Ted polish 2026-05-22: semântica do label varia por mode. Caller
+   * (MapShell) passa o mode pra customizar o counter:
+   *   - 'post'    → "N spreads do post"
+   *   - 'global'  → "N eventos na rede"
+   *   - 'network' → "N edges da sua lente"
+   * Default (undefined) → "N eventos" (fallback genérico).
+   */
+  mode?: 'post' | 'global' | 'network'
   /** className adicional. */
   className?: string
+}
+
+/**
+ * Label do counter por mode — pure function exportada pra teste.
+ * Ted polish 2026-05-22 (audit ted-maps-review #8a — semântica per-mode).
+ */
+export function counterLabelForMode(
+  count: number,
+  mode: TimelineScrubberProps['mode'],
+): string {
+  if (mode === 'post') {
+    return `${count} ${count === 1 ? 'spread do post' : 'spreads do post'}`
+  }
+  if (mode === 'global') {
+    return `${count} ${count === 1 ? 'evento na rede' : 'eventos na rede'}`
+  }
+  if (mode === 'network') {
+    return `${count} ${count === 1 ? 'edge da sua lente' : 'edges da sua lente'}`
+  }
+  return `${count} ${count === 1 ? 'evento' : 'eventos'}`
 }
 
 /**
@@ -103,12 +132,18 @@ export function TimelineScrubber({
   events,
   now,
   currentTime,
+  mode,
   className = '',
 }: TimelineScrubberProps) {
   const nowSec = now ?? Math.floor(Date.now() / 1000)
   const range = computeTimelineRange(events)
 
-  if (!range) {
+  // Ted polish 2026-05-22 #8b: empty state. Scrubber só informa lapso
+  // temporal — com 0 ou 1 evento, não há lapso. Oculta em vez de
+  // mostrar range degenerado ("—" vazio). Caller (MapShell) já filtra
+  // events.length > 0; este guard pega o caso N=1 e events só com
+  // timestamps inválidos.
+  if (!range || range.count < 2) {
     return null
   }
 
@@ -116,6 +151,7 @@ export function TimelineScrubber({
   const startLabel = formatRelativePtBr(min, nowSec)
   const endLabel = max === min ? 'mesmo instante' : formatRelativePtBr(max, nowSec)
   const span = max - min
+  const counterLabel = counterLabelForMode(count, mode)
 
   // Posição do caret de "current time" (0..1). Clamped pra range.
   const caretPos =
@@ -127,12 +163,12 @@ export function TimelineScrubber({
     <div
       className={`pointer-events-none rounded-lg border border-drift-border/40 bg-drift-bg/95 px-3 py-2 backdrop-blur-sm ${className}`}
       role="group"
-      aria-label={`linha do tempo dos eventos no mapa, ${count} eventos entre ${startLabel} e ${endLabel}`}
+      aria-label={`linha do tempo dos eventos no mapa, ${counterLabel} entre ${startLabel} e ${endLabel}`}
     >
       <div className="mb-1.5 flex items-center justify-between font-mono text-[10px] uppercase tracking-meta text-drift-muted">
         <span>{startLabel}</span>
         <span aria-hidden="true" className="text-drift-muted/60">
-          {count} {count === 1 ? 'evento' : 'eventos'}
+          {counterLabel}
         </span>
         <span>{endLabel}</span>
       </div>

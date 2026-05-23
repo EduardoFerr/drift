@@ -611,21 +611,47 @@ function GlobalModeMap({ data, className, mode, onModeChange }: ModeMapProps) {
     }
   }, [data, mapView])
 
+  // Ted polish #9 2026-05-22: hint discreto quando user habilitou WoT
+  // colors mas cache PPR ainda vazio (primeira vez vendo lente). Evita
+  // sensação de "toggle ON mas mapa sem mudar — quebrado?".
+  const showLensComputingHint = lensShowInMap && pprScores.size === 0
+  const [lensHintVisible, setLensHintVisible] = useState(false)
+  useEffect(() => {
+    if (!showLensComputingHint) {
+      setLensHintVisible(false)
+      return
+    }
+    setLensHintVisible(true)
+    const t = setTimeout(() => setLensHintVisible(false), 3000)
+    return () => clearTimeout(t)
+  }, [showLensComputingHint])
+
   return (
-    <MapShell
-      containerRef={containerRef}
-      className={className}
-      mode={mode}
-      onModeChange={onModeChange}
-      stats={
-        // Satoshi+Ted plan E 2026-05-21 — stats refletem "rede social
-        // geográfica": pessoas (npubs dedupados) + drifts + países.
-        data.nodes.length > 0
-          ? `${data.nodes.length} ${data.nodes.length === 1 ? 'pessoa' : 'pessoas'} · ${data.totalSpreads} drifts · ${data.countries.length} ${data.countries.length === 1 ? 'país' : 'países'}`
-          : `${data.totalSpreads} drifts · ${data.countries.length} ${data.countries.length === 1 ? 'país' : 'países'} · todos os posts`
-      }
-      timelineEvents={data.destinations.map((d) => ({ created_at: d.createdAt }))}
-    />
+    <div className="relative h-full w-full">
+      <MapShell
+        containerRef={containerRef}
+        className={className}
+        mode={mode}
+        onModeChange={onModeChange}
+        stats={
+          // Satoshi+Ted plan E 2026-05-21 — stats refletem "rede social
+          // geográfica": pessoas (npubs dedupados) + drifts + países.
+          data.nodes.length > 0
+            ? `${data.nodes.length} ${data.nodes.length === 1 ? 'pessoa' : 'pessoas'} · ${data.totalSpreads} drifts · ${data.countries.length} ${data.countries.length === 1 ? 'país' : 'países'}`
+            : `${data.totalSpreads} drifts · ${data.countries.length} ${data.countries.length === 1 ? 'país' : 'países'} · todos os posts`
+        }
+        timelineEvents={data.destinations.map((d) => ({ created_at: d.createdAt }))}
+      />
+      {lensHintVisible && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="pointer-events-none absolute right-3 top-14 z-30 rounded-lg border border-drift-border/40 bg-drift-bg/95 px-2.5 py-1 font-mono text-[10px] text-drift-muted backdrop-blur-sm"
+        >
+          calculando lente social…
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -672,7 +698,7 @@ function MapShell({
           mapa (pan/zoom). */}
       {timelineEvents && timelineEvents.length > 0 && (
         <div className="pointer-events-none absolute bottom-[44px] left-3 right-3 z-10">
-          <TimelineScrubber events={timelineEvents} />
+          <TimelineScrubber events={timelineEvents} mode={mode} />
         </div>
       )}
 
