@@ -18,6 +18,9 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useSpreadMap, isUserSoloSpreader, type SpreadMapMode } from '../../hooks/useSpreadMap'
+import { useLongPress, LONG_PRESS_MS } from '../../hooks/useLongPress'
+import { MapExplainerCard } from './MapExplainerCard'
+import { AnimatePresence } from 'framer-motion'
 import { useBootStore } from '../../lib/bootstrap'
 import { useFollowsStore } from '../../lib/follows'
 import { useLensStore } from '../../lib/trust-lens'
@@ -682,27 +685,49 @@ function ModeToggle({
 }) {
   const activeNpub = useBootStore((s) => s.identity?.npub ?? null)
   const networkDisabled = !activeNpub
+  // V_2026-05-22 (user pedido): long-press 3s em cada modo abre
+  // MapExplainerCard com copy do modo. Tap continua trocando o modo.
+  const [explainer, setExplainer] = useState<SpreadMapMode | null>(null)
   return (
-    <div
-      role="tablist"
-      aria-label="modo do mapa"
-      className="pointer-events-auto absolute left-3 top-3 flex overflow-hidden rounded-xl border border-drift-border/40 bg-drift-bg/90 backdrop-blur-sm"
-    >
-      <ModeBtn active={mode === 'post'} onClick={() => onModeChange('post')}>
-        post
-      </ModeBtn>
-      <ModeBtn active={mode === 'global'} onClick={() => onModeChange('global')}>
-        global
-      </ModeBtn>
-      <ModeBtn
-        active={mode === 'network'}
-        onClick={() => onModeChange('network')}
-        disabled={networkDisabled}
-        title={networkDisabled ? 'identifique-se pra ver sua rede' : 'spreads de quem você segue'}
+    <>
+      <div
+        role="tablist"
+        aria-label="modo do mapa"
+        className="pointer-events-auto absolute left-3 top-3 flex overflow-hidden rounded-xl border border-drift-border/40 bg-drift-bg/90 backdrop-blur-sm"
       >
-        network
-      </ModeBtn>
-    </div>
+        <ModeBtn
+          active={mode === 'post'}
+          onClick={() => onModeChange('post')}
+          onLongPress={() => setExplainer('post')}
+        >
+          post
+        </ModeBtn>
+        <ModeBtn
+          active={mode === 'global'}
+          onClick={() => onModeChange('global')}
+          onLongPress={() => setExplainer('global')}
+        >
+          global
+        </ModeBtn>
+        <ModeBtn
+          active={mode === 'network'}
+          onClick={() => onModeChange('network')}
+          onLongPress={() => setExplainer('network')}
+          disabled={networkDisabled}
+          title={networkDisabled ? 'identifique-se pra ver sua rede' : 'spreads de quem você segue · segure 3s pra explicação'}
+        >
+          network
+        </ModeBtn>
+      </div>
+      <AnimatePresence>
+        {explainer && (
+          <MapExplainerCard
+            context={explainer}
+            onClose={() => setExplainer(null)}
+          />
+        )}
+      </AnimatePresence>
+    </>
   )
 }
 
@@ -711,24 +736,31 @@ function ModeToggle({
 function ModeBtn({
   active,
   onClick,
+  onLongPress,
   children,
   disabled = false,
   title,
 }: {
   active: boolean
   onClick: () => void
+  onLongPress?: () => void
   children: React.ReactNode
   disabled?: boolean
   title?: string
 }) {
+  const lp = useLongPress({
+    onLongPress: onLongPress ?? (() => undefined),
+    disabled: disabled || !onLongPress,
+  })
   return (
     <button
       onClick={onClick}
+      {...lp.handlers}
       disabled={disabled}
       title={title}
       aria-pressed={active}
       role="tab"
-      className={`px-3.5 py-2 font-mono text-[11px] uppercase tracking-meta transition-colors ${
+      className={`relative overflow-hidden px-3.5 py-2 font-mono text-[11px] uppercase tracking-meta transition-colors ${
         disabled
           ? 'cursor-not-allowed text-drift-muted/30'
           : active
@@ -737,6 +769,17 @@ function ModeBtn({
       }`}
     >
       {children}
+      {lp.pressing && lp.pressOrigin && (
+        <span
+          className="ripple-wave"
+          aria-hidden="true"
+          style={{
+            left: lp.pressOrigin.x,
+            top: lp.pressOrigin.y,
+            animationDuration: `${LONG_PRESS_MS}ms`,
+          }}
+        />
+      )}
     </button>
   )
 }
