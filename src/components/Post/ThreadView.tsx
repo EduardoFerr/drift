@@ -186,12 +186,19 @@ export function ThreadView({ postId, postAuthorPub, post, onClose }: ThreadViewP
       aria-label="thread de comentários"
       tabIndex={-1}
       // TX-2 (Ted UX spike §2) — ThreadView NÃO usa FullPageCard porque
-      // tem semantics próprios (role=tree, bg semi-transparent +
-      // backdrop-blur). Mas precisa do mesmo cap visual max-w-md mx-auto
-      // pra não vazar edge-to-edge em viewport > 448px (mockup mobile-first).
-      // sm:border-x espelha FullPageCard.
-      // design-system: ok reason=role-tree-bg-transparent-not-fullpage-card
-      className="fixed inset-0 z-[60] mx-auto flex max-w-md flex-col border-drift-border bg-drift-bg/90 backdrop-blur-sm focus:outline-none motion-reduce:backdrop-blur-none sm:border-x"
+      // tem semantics próprios (role=tree). Mas precisa do mesmo cap visual
+      // max-w-md mx-auto pra não vazar edge-to-edge em viewport > 448px
+      // (mockup mobile-first). sm:border-x espelha FullPageCard.
+      //
+      // Bug B7/B9 fix (2026-05-22): bg-drift-bg/90 + backdrop-blur-sm
+      // vazava o conteúdo subjacente (SpreadMap, PostViewer, bottom-nav)
+      // tanto pelos pixels translúcidos quanto pelo blur que filtrava
+      // (mas não escondia) a UI debaixo — causando texto washed-out no
+      // bottom e mapa visível atrás do empty state. Trocado por bg-drift-bg
+      // opaco, alinhando com FullPageCard / SettingsCards (mesma família
+      // de modal full-page que cobre 100% do viewport).
+      // design-system: ok reason=role-tree-not-fullpage-card
+      className="fixed inset-0 z-[60] mx-auto flex max-w-md flex-col border-drift-border bg-drift-bg focus:outline-none sm:border-x"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
