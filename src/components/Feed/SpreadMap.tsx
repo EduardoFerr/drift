@@ -20,6 +20,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useSpreadMap, isUserSoloSpreader, type SpreadMapMode } from '../../hooks/useSpreadMap'
 import { useLongPress, LONG_PRESS_MS } from '../../hooks/useLongPress'
 import { MapExplainerCard } from './MapExplainerCard'
+import { TimelineScrubber } from './TimelineScrubber'
 import { AnimatePresence } from 'framer-motion'
 import { useBootStore } from '../../lib/bootstrap'
 import { useFollowsStore } from '../../lib/follows'
@@ -349,6 +350,7 @@ function PostModeMap({ data, className, mode, onModeChange }: ModeMapProps) {
         mode={mode}
         onModeChange={onModeChange}
         stats={`${data.totalSpreads} drifts · ${data.countries.length} ${data.countries.length === 1 ? 'país' : 'países'}`}
+        timelineEvents={data.destinations.map((d) => ({ created_at: d.createdAt }))}
       />
       {showK1Warning && (
         <SoloSpreaderWarning onDismiss={() => setK1WarningDismissed(true)} />
@@ -628,6 +630,7 @@ function GlobalModeMap({ data, className, mode, onModeChange }: ModeMapProps) {
           ? `${data.nodes.length} ${data.nodes.length === 1 ? 'pessoa' : 'pessoas'} · ${data.totalSpreads} drifts · ${data.countries.length} ${data.countries.length === 1 ? 'país' : 'países'}`
           : `${data.totalSpreads} drifts · ${data.countries.length} ${data.countries.length === 1 ? 'país' : 'países'} · todos os posts`
       }
+      timelineEvents={data.destinations.map((d) => ({ created_at: d.createdAt }))}
     />
   )
 }
@@ -640,18 +643,36 @@ function MapShell({
   mode,
   onModeChange,
   stats,
+  timelineEvents,
 }: {
   containerRef: React.RefObject<HTMLDivElement>
   className: string
   mode: SpreadMapMode
   onModeChange?: (m: SpreadMapMode) => void
   stats: string
+  /**
+   * V_2026-05-22 (user pedido): mapas animados ganham TimelineScrubber
+   * mostrando lapso temporal dos eventos. Array de eventos com
+   * created_at (segundos unix). Quando ausente ou vazio, scrubber não
+   * renderiza (zero footprint).
+   */
+  timelineEvents?: Array<{ created_at: number }>
 }) {
   return (
     <div className={`relative overflow-hidden rounded-2xl border border-drift-border/40 ${className}`}>
       <div ref={containerRef} className="h-full w-full" />
 
       {onModeChange && <ModeToggle mode={mode} onModeChange={onModeChange} />}
+
+      {/* V_2026-05-22 TimelineScrubber — barra acima de stats/attribution.
+          Full-width (inset 3) pra noção do tempo decorrido entre os
+          eventos animados. Pointer-events-none = não bloqueia gesto no
+          mapa (pan/zoom). */}
+      {timelineEvents && timelineEvents.length > 0 && (
+        <div className="pointer-events-none absolute bottom-[44px] left-3 right-3 z-10">
+          <TimelineScrubber events={timelineEvents} />
+        </div>
+      )}
 
       {/* WCAG: bg sobre tile dinâmico (mapa). Marshall regra de 2 camadas
           — alpha mínimo /95 + text sem alpha. Tile pode ser claro ou
