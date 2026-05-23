@@ -85,6 +85,235 @@ shipping prematuro).
 
 ---
 
+## Pool de tarefas — gap audit Robin 2026-05-23
+
+(Origem: `Docs/sessions/robin-pool-tarefas-gap-audit-2026-05-23.md`.
+17 itens novos descobertos em audit AMPLA de 7 dias — docs de sessão,
+commits, TODOs em código, sprint plans vs realidade. Top 3 críticos:
+L-ID lens tests, AppErrorBoundary custom modal, GlassIconButton purge.)
+
+### Bloqueantes pre-merge lens `identified-only`
+
+- [ ] **L-ID-1 LOCK_VIA_TEST lens copy vocabulário proibido** —
+  Barney threat-model 2026-05-23. `tests/lens-copy-conformance.test.ts`
+  grep regex (`/verified/i`, `/trusted/i`, `/official/i`, `/genuine/i`,
+  `/real\s+user/i`, `/not\s+a\s+bot/i`, `/anti[-\s]?spam/i`,
+  `/✓\s*identif/i`, `/selo/i`, `/verificad/i`) em radius 200 chars
+  de `identified-only`/`IdentifiedOnly`. ~50 LoC. Bloqueia copy creep
+  que destrói §4 em 6 meses. **P1**. Reopener: se feature `identified-only`
+  for shipada sem este test = NO-GO retroativo.
+
+- [ ] **L-ID-2 LOCK_VIA_TEST registry sem promoção +
+  Onboarding-veto** — `tests/lens-registry-conformance.test.ts`:
+  nenhuma strategy com `default: true`/`recommended`/`featured`;
+  grep `src/components/Onboarding/**` veta menção a `identified-only`;
+  ordem dropdown determinística. ~80 LoC. **P1**. Bloqueante merge.
+
+- [ ] **L-ID-3 Grep guard telemetria-zero em
+  `src/lib/lens/**`** — sem `INSERT INTO`, `localStorage.setItem`,
+  `analytics.track`. Sem KPI = sem nudge default-on. ~20 LoC (pode
+  entrar no L-ID-2). **P1**.
+
+- [ ] **L-ID-4 Warning modal não-dismissable + delay 3s na primeira
+  ativação lens** — anti-click-through. ~30 LoC componente. **P2**.
+
+- [ ] **L-ID-5 Composability warning quando 2+ filtros restritivos
+  ativos** — banner "pode esconder a maior parte do feed". ~20 LoC.
+  **P2**.
+
+- [ ] **L-ID-6 Entry em `manifesto-coverage-matrix-*.md` linkando
+  ambos docs Marshall+Barney lens** — rastro permanente pra
+  contributors futuros entenderem POR QUE os guards existem. ~10 min
+  edit. **P3**.
+
+### Threats UX descobertos (Barney audit 2026-05-23)
+
+- [ ] **B-UX-3 AppErrorBoundary custom inline modal** — P0 threat.
+  `AppErrorBoundary.tsx:62` usa `window.confirm` em fluxo destrutivo
+  (apaga TUDO local, inclusive nsec). User em estado de erro pode
+  perder identidade achando que é "fix bug". Chicken-egg: boundary
+  monta acima do provider, não pode importar `dialog.confirm`.
+  Solução: inline custom modal pré-provider estilizado igual
+  DialogHost. ~30-50 LoC. **P0**. Reopener: não precisa — bug agora.
+
+- [ ] **B-UX-4 Remover microfone de PERM_ITEMS** — P1 threat privacy.
+  `SettingsCards.tsx:1226` pede `getUserMedia({audio:true})` pra
+  feature "futura" inexistente. Browser concede; Drift não usa.
+  Footprint permanente sem benefício, manifesto §28 violação suave.
+  Fix: remover item OU `disabled` + tooltip "indisponível — versão
+  futura". ~10 LoC. **P1**.
+
+- [ ] **B-UX-6 disablePasskey confirm com `dangerous: true`** —
+  P1 threat. `IdentityPanel:650`. Remove camada de segurança mas
+  confirm não comunica gravidade. ~3 LoC. **P1**.
+
+### Vocabulário / copy LOCK_VIA_TESTs (Barney audit 2026-05-23)
+
+- [ ] **B-UX-1 LOCK_VIA_TEST "configurações" canônico em strings
+  JSX user-facing** — P0 vocab. 5 paths pra Settings com 5 labels
+  distintos (config/configurações/Ajustes/Settings/location). Mesma
+  família DRIFT/SINK do CLAUDE.md. Whitelist pra: "Ajustes" em
+  iOS-guidance contexts (`GpsErrorBanner` etc). ~30 LoC test. **P0**.
+
+- [ ] **B-UX-2 LOCK_VIA_TEST "spread" em strings JSX user-facing** —
+  P0 vocab violação CLAUDE.md mapping (SPREAD é spec/código; DRIFT é
+  UI). 5 hits hoje: `SpreadMap.tsx:193,196` empty state,
+  `TimelineScrubber.tsx:73` aria-label, `SettingsCards.tsx:288,1204,
+  1507`. `tests/manifesto-conformance.test.ts` cobre só
+  `espalha|enterra`. Whitelist controlada (DriftChip `variant='spread'`
+  é prop interno, não copy). ~30 LoC test. **P0**.
+
+### Threats / debt estrutural (Ted audit 2026-05-23)
+
+- [ ] **T-DC-2 GlassIconButton purge sizes `sm`/`md`/`lg` + default
+  → `xl`** — P2 WCAG threat estrutural. Sizes < 44px ainda no union
+  public (`md` é default!). Trap pra novos contributors violarem
+  WCAG 2.5.5. Único caller usa `xl`. No-op runtime, fix
+  WCAG-by-default. ~25 LoC. **P2**.
+
+- [ ] **T-DC-3 Substituir comments `ContentSettings` →
+  `SettingsCards`** — P3 doc rot. Arquivo `ContentSettings.tsx`
+  não existe mais (V9.2c). 7 hits stale em App.tsx + lib/ confundem
+  novos agents/devs. ~7 lines edit. **P3**.
+
+- [ ] **T-DC-8 GlassPillButton extend (PostViewer comment+map
+  buttons)** — P2 refactor. 2 botões inline em PostViewer (670-735)
+  duplicam `glassIconButtonVariantClass('default')` base. Extender
+  GlassIconButton com `slots: { badge, ripple }` ou criar
+  primitive separado. ~2-3h. **P2**.
+
+- [ ] **T-DC-10 PostViewer.tsx split (1044 LoC → sub-files)** —
+  P2 manutenibilidade. Beira "Deus-component". Extrair
+  `PostViewer/ActionsBar.tsx`, `QueueOverlay.tsx`. 3-4h. **P2**.
+  Bloqueio: não bloquear sprint atual; coordenar com qualquer
+  feature em vôo que mexa em PostViewer.
+
+- [ ] **T-DC-11 `tests/primitive-adoption.test.ts` — defesa
+  anti-shelf-ware** — P2 structural. Detecta primitive exportado em
+  `src/components/UI/` sem caller externo por >30 dias. Defesa
+  contra reincidência HintToast/HintModal/DriftCard. ~4h. **P2**.
+
+### Gaps mapas (Satoshi P1 abertos + Ted polish)
+
+- [ ] **S-MAP-2 CARTO tile banner one-time (sovereignty awareness)**
+  — P1 sovereignty. Satoshi audit §6.5. Banner one-time (dismissible
+  permanent) primeira vez que user abre mapa: "tiles servidos por
+  carto.com — seu IP é logado por eles". Reusa LensNudgeBanner.
+  Sovereignty pref já existe; user precisa SABER pra usar. ~40 LoC.
+  **P1**.
+
+- [ ] **S-MAP-3 Mini-map auto-close hint 30s inactivity** — P1
+  anti-persuasion. Satoshi audit §6.1. Após 30s sem interação
+  pan/zoom, mostrar hint "toque pra fechar" + animação subtle. Reset
+  em pointer events. Mitiga E.1 (persistence persuasiva). ~25 LoC.
+  **P1**.
+
+- [ ] **S-MAP-4 CARTO tile cache em service worker
+  `runtimeCaching`** — P3 perf. Workbox `CacheFirst + MaxAgeMs(7d)`
+  pra `basemaps.cartocdn.com`. 2nd-open de mapa instantâneo. **P3**.
+
+- [ ] **T-MAP-1 Tests puros mapas (4 helpers)** — P2 manifesto §7.
+  `isUserSoloSpreader`, `pinColor(pprScore)` (5 branches),
+  `buildGlobalNodes(rows)` (dedup + sort), `getMapExplainerCopy
+  (context)`. Sem test direto hoje. ~80 LoC. ~30min. **P2**.
+
+- [ ] **T-MAP-2 MapExplainerCard network legend respect
+  `lens_show_in_map`** — P3 UX gap. Copy mostra 3 tiers PPR mas
+  legend só faz sentido quando flag ON. Quando OFF, mostrar 1 dot
+  "DRIFT remoto, default chartreuse". ~30min. **P3**.
+
+- [ ] **T-MAP-3 Pin tap handler** — P3 feature. `pickable: true`
+  configurado em socialNodes mas sem `onClick`. Tooltip futuro:
+  npub + spread count + link Profile. **P3**.
+
+- [ ] **T-MAP-4 Network mode empty state CTA** — P3 UX polish. Quando
+  follows=0, oferecer "ir pro feed global" botão (não só copy).
+  ~1h. **P3**.
+
+### NO-GOs preventivos registrados
+
+- [~] **NO-GO `<EmptyStateCard>` primitive** — registrado 2026-05-23.
+  4 ad-hocs hoje (HomeEmpty + SpreadMap empty + EndOfFeed + ThreadView
+  "sem comments"). Tentação de extrair (regra N=3+). Veto: cada empty
+  state tem contexto semântico diferente; primitive forçaria props
+  soup. Reopener: ≥6 ad-hocs + pattern visual idêntico.
+
+- [~] **NO-GO `DriftButton` variants `danger`/`danger-prominent`
+  purge** — registrado 2026-05-23. 0 callers atuais mas design intent
+  (ações destrutivas merecem visual semântico distinto). Manter +
+  comment "RESERVED — sem callers atuais; ver Round 11". Reopener:
+  se feature destrutiva real (delete identity, reset profile UI)
+  for shipada.
+
+- [~] **NO-GO badge `✓`/`verified`/`selo`/`identif` em UI ao lado
+  de autores** — registrado 2026-05-23. Marshall §6 veto duro #2 +
+  Barney C2/C5 cultural pressure. Apenas copy factual ("perfil
+  declarado"). LOCK_VIA_TEST L-ID-1 ENFORCE.
+
+- [~] **NO-GO lens `identified-only` em Onboarding wizard** —
+  registrado 2026-05-23. Barney B2. Qualquer menção em
+  `src/components/Onboarding/**` (mesmo como exemplo) = NO-GO
+  retroativo. LOCK_VIA_TEST L-ID-2 ENFORCE.
+
+- [~] **NO-GO telemetria de adoção lens (local OU remoto)** —
+  registrado 2026-05-23. Barney B3. Métrica vira KPI; KPI mata
+  default-OFF. LOCK_VIA_TEST L-ID-3 ENFORCE.
+
+### Fechamentos retroativos (descobertos no audit)
+
+- [x] **HintToast + HintModal primitive shelf-ware removed** —
+  fechado em [49b2a66] (descoberto retroativo 2026-05-23). 0 callers
+  desde DAOP-001 PR3 design-ahead. 210 LoC removidas. Convergência
+  Ted §4.2/§4.3 + Barney §3.1 audit 2026-05-23.
+
+- [x] **GpsScopeButton primitive + lazy permission per-post (§28)** —
+  fechado em [bf71ab7] + [0fb8c17] + [7f92e7e]. Per-post GPS scope
+  decisão (off/país/cidade/GPS) com popover + frase de impacto. Lazy
+  permission: navigator.geolocation só solicita quando user opta.
+  LocationCard re-frameado como "padrão pra novos posts". 23
+  conformance tests. Origem: agent Lily GPS `a1e860`.
+
+### Sprint N+3 follow-ups (7 itens semi-fechados)
+
+(Sprint plan Satoshi `Docs/sessions/satoshi-sprint-n3-plan-2026-05-21.md`
+listou 11 fecháveis; Batch A rodou 4. Batches B/C/D nunca
+dispatchados explicitamente. Itens abaixo são os pendentes
+re-promovidos ao backlog raiz.)
+
+- [ ] **D6 RadioGroupButton cross-component audit + WCAG** — Sprint
+  N+3 P0.3 não-shipado. Audit `radio-active-contrast` LOCK_VIA_TEST
+  + cross-component grep `/10` `/30` `/50` em radio-groups ad-hoc
+  fora de Settings. ~1d. **P2**.
+
+- [ ] **D11 SuaLenteCard polish round 2** — Sprint N+3 P0.4
+  não-shipado. 5 pontos confusão flagged 2026-05-17 sessão noite V.
+  ~1d. **P2**.
+
+- [ ] **D1 useLensToggle hook (DRY 3 toggles)** — Sprint N+3 P1.5
+  não-shipado. JÁ ESTÁ no backlog seção "Lentes pluggable — gaps
+  pós-POC" — só reforçar bloqueio: aguarda D11 SuaLenteCard polish.
+  (false-positive — não duplicar.)
+
+- [ ] **D7 Audit dialogs antigos (grep `role="dialog"`)** — Sprint
+  N+3 P1.7 não-shipado. Marshall + Lily, ~25 hits Ted §7.2 audit
+  2026-05-23. Cross-ref FullPageCard/SlideUpOverlay. ~4h. **P2**.
+
+- [ ] **D5 ActionsFan labels PT-BR (always-on first-show)** —
+  Sprint N+3 P2.9 não-shipado. Ver detalhe em seção "ActionsFan"
+  abaixo. **P2**.
+
+- [ ] **D21 9 conformance it.todo → it()** — Sprint N+3 P2.10
+  não-shipado. 6 grep-based + 3 Stage 3. ~6h. **P3**.
+
+- [ ] **D8 EditProfileCard banner → tooltip** — Sprint N+3 P2.11
+  não-shipado. ~2h. **P3**.
+
+- [ ] **D9 ComposeOverlay "Prévia do post" preview flow** — Sprint
+  N+3 P2.12 não-shipado. JÁ ESTÁ no backlog seção "ComposeOverlay
+  — 'Publicar' → 'Prévia do post'". (false-positive — não duplicar.)
+
+---
+
 ## UX iniciante — fricções observadas 2026-05-23 (revisão visual user)
 
 (User observou ao testar o app na perspectiva de iniciante. 7 items
@@ -295,7 +524,7 @@ Sprint começa quando user der GO. Design lenses ready em
 que seja `(no-commit, decisão registrada apenas)`. Permite reconstruir
 o "porquê" via `git show <hash>`.
 
-Última atualização: 2026-05-22 (Robin hygiene — pós rodada Maps audits + Sprint N+3 Batch A)
+Última atualização: 2026-05-23 (Robin pool de tarefas gap audit — 17 novos + 5 NO-GOs + 2 fechados retroativos)
 
 ---
 
