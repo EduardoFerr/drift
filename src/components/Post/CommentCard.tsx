@@ -16,8 +16,6 @@
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-// `m` é o primitive leve do framer-motion (LazyMotion). Features via main.tsx.
-import { AnimatePresence, m, useReducedMotion } from 'framer-motion'
 import type { CommentNode } from '../../lib/thread-cursor'
 import {
   LIST_INDENT_PER_LEVEL_PX,
@@ -30,7 +28,6 @@ import { timeAgo } from '../../lib/format'
 import { Image } from '../UI/Image'
 import { AuthorChip } from '../UI/AuthorChip'
 import { DriftChip } from '../UI/DriftChip'
-import { commentRevealVariants } from '../../lib/motion-variants'
 
 export interface CommentCardProps {
   node: CommentNode
@@ -52,49 +49,36 @@ export interface CommentCardProps {
    */
   isNew?: boolean
   /**
-   * UX-11 (Robin audit 2026-05-08) — callback opcional pro footer
-   * "↳ N respostas" virar tap-to-descend. Mantém swipe ↑ como input
-   * primário; este só adiciona alternativa pra users que não conhecem
-   * o gesto. Quando `undefined`, footer renderiza como texto estático
-   * (compat com qualquer caller que não esteja em ThreadView).
-   */
-  onDescend?: () => void
-  /**
    * Round Comments Nav Redesign — Phase A (RFC `2026-05-rfc-comments-
-   * navigation-redesign`).
+   * navigation-redesign`). Variant `'card'` (legacy fullscreen swipe-
+   * driven) removida em 2026-05-23 (Ted dead-code audit §1.1, ZERO
+   * call-sites — ThreadView é o único caller e sempre passou 'list').
    *
-   *  - `'card'` (default, legacy): layout fullscreen ocupa o viewport
-   *    do ThreadView (cards-mode swipe-driven). Border own, padding
-   *    generoso, font fluid-display.
-   *  - `'list'` (novo, default user-facing): compact threaded row sem
-   *    fullscreen. Indent visual via `paddingLeft = depth*12px` (cap
-   *    em depth 5 visual, manifesto §RFC §3 plateau). Border-left thread
-   *    line só pra `depth > 0`. Font fluid-base.
+   * Layout atual: compact threaded row. Indent visual via
+   * `paddingLeft = depth*12px` (cap em depth 5 visual, manifesto §RFC
+   * §3 plateau). Border-left thread line só pra `depth > 0`. Font
+   * fluid-base.
    *
    * Phase B (próximo sprint): collapse/expand persistido + virtualized
    * list (`@tanstack/react-virtual`). Phase C: jump-to-parent pill.
-   */
-  variant?: 'card' | 'list'
-  /**
-   * Phase A (list variant) — `true` se o user clicou neste card e ele
-   * é o foco atual (ARIA `aria-selected`, border accent). `false` em
-   * list comum. Ignorado em variant='card' (cards-mode usa cursor).
+   *
+   * `true` se o user clicou neste card e ele é o foco atual (ARIA
+   * `aria-selected`, border accent).
    */
   isFocused?: boolean
   /**
-   * Phase A (list variant) — `false` colapsa subtree (esconde respostas
-   * filhas no render do caller, footer mostra `[+ N respostas]` em vez
-   * de `[- N respostas]`). Default `true`. Ignorado em variant='card'.
+   * `false` colapsa subtree (esconde respostas filhas no render do
+   * caller, footer mostra `[+ N respostas]` em vez de `[- N respostas]`).
+   * Default `true`.
    */
   isExpanded?: boolean
   /**
-   * Phase A (list variant) — toggle collapse/expand do subtree. Caller
-   * mantém Set<commentId> de IDs colapsados. Ignorado em variant='card'.
+   * Toggle collapse/expand do subtree. Caller mantém Set<commentId> de
+   * IDs colapsados.
    */
   onToggleExpand?: () => void
   /**
-   * Phase A (list variant) — tap no body abre ReplySheet com ESTE
-   * comment como target. Ignorado em variant='card' (lá o tap é no FAB).
+   * Tap no body abre ReplySheet com ESTE comment como target.
    */
   onTap?: () => void
 }
@@ -108,8 +92,6 @@ export function CommentCard({
   childCount,
   postId,
   isNew = false,
-  onDescend,
-  variant = 'card',
   isFocused = false,
   isExpanded = true,
   onToggleExpand,
@@ -148,11 +130,6 @@ export function CommentCard({
   // CC-T2 cleanup: data-post-id é só pra debug; só anexa em DEV.
   const debugProps = import.meta.env.DEV ? { 'data-post-id': postId } : {}
 
-  // Round 4 Fase B2: motion variants tokenizados (substitui durations
-  // hardcoded 0.18 / 0.22). Reduced motion respeitado via factory.
-  const reduced = useReducedMotion() ?? false
-  const reveal = commentRevealVariants(reduced)
-
   // Lily Sprint N+2 P2.11 — busca metadata do autor reativamente. Comments
   // (`CommentNode`) NÃO recebem JOIN no read path (buildThread opera fora
   // do feed.ts query). Reativo via `useUserMetadata` re-query quando
@@ -162,191 +139,32 @@ export function CommentCard({
   const authorAlias = authorMeta?.displayName ?? authorMeta?.name ?? undefined
   const authorPicture = authorMeta?.picture ?? undefined
 
-  // Phase A (list variant) — render compacto, threaded, indent visual.
-  // Branch antes do return tradicional pra não inflar o card existing.
-  if (variant === 'list') {
-    return (
-      <ListVariant
-        node={node}
-        depth={depth}
-        posInSet={posInSet}
-        setSize={setSize}
-        childCount={childCount}
-        ariaLabel={ariaLabel}
-        debugProps={debugProps}
-        isNew={isNew}
-        isHidden={isHidden}
-        cwHide={cwHide}
-        cwBlur={cwBlur}
-        cwHint={cwHint}
-        overrideMod={overrideMod}
-        setOverrideMod={setOverrideMod}
-        overrideCw={overrideCw}
-        setOverrideCw={setOverrideCw}
-        setOverrideBlur={setOverrideBlur}
-        isFocused={isFocused}
-        isExpanded={isExpanded}
-        onToggleExpand={onToggleExpand}
-        onTap={onTap}
-        authorAlias={authorAlias}
-        authorPicture={authorPicture}
-      />
-    )
-  }
-
   return (
-    <article
-      role="treeitem"
-      aria-level={depth}
-      aria-posinset={posInSet}
-      aria-setsize={setSize}
-      aria-label={ariaLabel}
-      tabIndex={0}
-      {...debugProps}
-      // UX-5 (Robin audit) — border-left mint quando isNew sinaliza
-      // "chegou desde abertura/refresh". Aplicado via classe condicional
-      // pra evitar shift do conteúdo (border-l-2 sempre presente: cor
-      // alterna entre transparente e drift-accent2).
-      // Round 4 Fase A: convergente com DriftCard primitive (Ted §3.1) —
-      // usa mesmo bg-drift-surface + focus-visible do primitive, mas
-      // mantém este article com layout custom flex-col h-full + border-l
-      // dinâmica (CommentCard tem layout próprio que DriftCard genérico
-      // não replica). DriftCard helpers exported pra futuro lift.
-      className={`flex h-full w-full flex-col bg-drift-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2 border-l-2 ${
-        isNew ? 'border-l-drift-accent2' : 'border-l-transparent'
-      }`}
-    >
-      {/* Header: autor + tempo + content-warning chip (C.6.2)
-          Lily Sprint N+2 P2.11 — AuthorChip primitive (avatar + alias).
-          Fallback identicon + `anon…<last6>` quando autor não publicou
-          kind 0 (modo Anônimo §5.3). */}
-      <header className="flex items-center justify-between gap-2 border-b border-drift-border/40 px-4 py-3.5">
-        <AuthorChip
-          authorPub={node.author_pub}
-          alias={authorAlias}
-          picture={authorPicture}
-          size="sm"
-        />
-        <div className="flex items-center gap-2">
-          {node.content_warning && (
-            <DriftChip
-              variant="warning"
-              size="xs"
-              icon="⚠"
-              ariaLabel={`aviso de conteúdo: ${node.content_warning}`}
-            >
-              {node.content_warning}
-            </DriftChip>
-          )}
-          <span className="font-mono text-[12px] uppercase tracking-meta text-drift-muted">
-            {timeAgo(node.created_at)}
-          </span>
-        </div>
-      </header>
-
-      {/* Body */}
-      {/* polish: CC-P1 transition reveal (Track C P1) — fade suave quando
-          troca placeholder ↔ conteúdo revelado, em vez de pop abrupto.
-          motion-reduce respeitado via Framer (useReducedMotion global). */}
-      <div className="flex-1 overflow-y-auto px-5 py-4">
-        <AnimatePresence mode="wait" initial={false}>
-        {isHidden ? (
-          <m.div key="hidden-mod" {...reveal} className="h-full">
-            <HiddenPlaceholder onReveal={() => setOverrideMod(true)} />
-          </m.div>
-        ) : cwHide ? (
-          <m.div key="hidden-cw" {...reveal} className="h-full">
-            <CwHiddenPlaceholder
-              warning={cwHint.reason ?? cwHint.modReason ?? 'oculto'}
-              onReveal={() => setOverrideCw(true)}
-            />
-          </m.div>
-        ) : (
-          <m.div
-            key="content"
-            {...reveal}
-            className="flex flex-col gap-3"
-          >
-            {/* C.6.3 — imagem anexada (Track B integration). Renderiza
-                via Image c/ hash verify quando meta presente. Blur por
-                CW aplica via filtro CSS. */}
-            {node.meta && (
-              <div
-                className={cwBlur ? 'relative cursor-pointer' : 'relative'}
-                onClick={cwBlur ? () => setOverrideBlur(true) : undefined}
-              >
-                <Image
-                  src={node.meta.url ?? ''}
-                  meta={node.meta}
-                  alt={node.meta.alt ?? ''}
-                  className={`max-h-[40vh] w-full rounded border border-drift-border object-contain transition ${
-                    cwBlur ? 'blur-xl' : ''
-                  }`}
-                  aspect="auto"
-                  fit="contain"
-                />
-                {cwBlur && (
-                  <span
-                    className="pointer-events-none absolute inset-0 flex items-center justify-center font-mono text-[12px] uppercase tracking-meta text-drift-warning"
-                    aria-hidden="true"
-                  >
-                    toque pra revelar
-                  </span>
-                )}
-              </div>
-            )}
-            <p
-              className={`whitespace-pre-wrap break-words font-mono text-fluid-lg leading-relaxed text-drift-text ${
-                cwBlur ? 'blur-sm' : ''
-              }`}
-              onClick={cwBlur ? () => setOverrideBlur(true) : undefined}
-            >
-              {node.content}
-            </p>
-          </m.div>
-        )}
-        </AnimatePresence>
-      </div>
-
-      {/* Footer meta — childCount = hint pra descend.
-          UX-11 (Robin audit) — vira <button> tappable quando há filhos
-          E o caller passou onDescend. Mantém swipe ↑ (gesto primário);
-          tap é input alternativo pra users que não conhecem o gesto. */}
-      <footer className="flex items-center justify-between border-t border-drift-border/40 px-4 py-3.5">
-        {childCount > 0 && onDescend ? (
-          <button
-            type="button"
-            onClick={onDescend}
-            className="flex items-center gap-2 rounded font-mono text-[12px] uppercase tracking-meta text-drift-accent2 hover:text-drift-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2"
-            aria-label={`ver ${childCount} ${childCount === 1 ? 'resposta' : 'respostas'} (ou swipe para cima)`}
-            aria-keyshortcuts="ArrowUp"
-            title="ver respostas (toque ou swipe ↑)"
-          >
-            <span>
-              ↳ {childCount} {childCount === 1 ? 'resposta' : 'respostas'}
-            </span>
-            <span aria-hidden="true" className="text-drift-accent2/80">
-              ↑ ver
-            </span>
-          </button>
-        ) : (
-          <>
-            <span className="font-mono text-[12px] uppercase tracking-meta text-drift-muted">
-              ↳ {childCount} {childCount === 1 ? 'resposta' : 'respostas'}
-            </span>
-            {childCount > 0 && (
-              <span
-                className="font-mono text-[12px] uppercase tracking-meta text-drift-accent2"
-                title="swipe ↑ pra descer na thread"
-                aria-hidden="true"
-              >
-                ↑ ver
-              </span>
-            )}
-          </>
-        )}
-      </footer>
-    </article>
+    <ListVariant
+      node={node}
+      depth={depth}
+      posInSet={posInSet}
+      setSize={setSize}
+      childCount={childCount}
+      ariaLabel={ariaLabel}
+      debugProps={debugProps}
+      isNew={isNew}
+      isHidden={isHidden}
+      cwHide={cwHide}
+      cwBlur={cwBlur}
+      cwHint={cwHint}
+      overrideMod={overrideMod}
+      setOverrideMod={setOverrideMod}
+      overrideCw={overrideCw}
+      setOverrideCw={setOverrideCw}
+      setOverrideBlur={setOverrideBlur}
+      isFocused={isFocused}
+      isExpanded={isExpanded}
+      onToggleExpand={onToggleExpand}
+      onTap={onTap}
+      authorAlias={authorAlias}
+      authorPicture={authorPicture}
+    />
   )
 }
 

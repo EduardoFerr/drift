@@ -372,7 +372,6 @@ function ListModeBody({
               }}
             >
               <CommentCard
-                variant="list"
                 node={entry.node}
                 depth={entry.depth}
                 posInSet={entry.posInSet}
