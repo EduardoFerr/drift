@@ -25,6 +25,7 @@
  */
 @import './styles/themes.css';
 @import './styles/ripple.css';
+@import './styles/timeline-scrubber.css';
 
 /*
  * Round CWV-2 §3.4 — Font optimization. @fontsource ships

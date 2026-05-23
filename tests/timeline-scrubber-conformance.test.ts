@@ -186,6 +186,63 @@ describe('Empty state — Ted polish #8b (ocultar quando N<2)', () => {
   })
 })
 
+describe('Fill bar animado — V_2026-05-23 (user pedido)', () => {
+  it('renderiza fill bar com classe drift-scrubber-fill', () => {
+    expect(SCRUBBER).toMatch(/className="[^"]*drift-scrubber-fill[^"]*"/)
+  })
+
+  it('keyframe CSS drift-scrubber-fill existe em styles/timeline-scrubber.css', () => {
+    const css = readFileSync('src/styles/timeline-scrubber.css', 'utf8')
+    expect(css).toMatch(/@keyframes\s+drift-scrubber-fill/)
+    expect(css).toMatch(/scaleX\(0\)/)
+    expect(css).toMatch(/scaleX\(1\)/)
+  })
+
+  it('respeita prefers-reduced-motion (fill estático)', () => {
+    const css = readFileSync('src/styles/timeline-scrubber.css', 'utf8')
+    expect(css).toMatch(/@media\s*\(prefers-reduced-motion:\s*reduce\)/)
+    // No bloco reduced-motion deve forçar scaleX(1) e animation none.
+    const block = css.match(/@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*?\n\}/)
+    expect(block).not.toBeNull()
+    expect(block![0]).toMatch(/animation:\s*none/)
+    expect(block![0]).toMatch(/scaleX\(1\)/)
+  })
+
+  it('CSS importado no index.css', () => {
+    const idx = readFileSync('src/index.css', 'utf8')
+    expect(idx).toMatch(/@import\s+'\.\/styles\/timeline-scrubber\.css'/)
+  })
+})
+
+describe('Toggle ▶/⏸ — autoplay ON default', () => {
+  it('componente monta com paused=false (autoplay ON default)', () => {
+    // useState(false) — autoplay ligado no mount. User pode pausar.
+    expect(SCRUBBER).toMatch(/useState\(false\)/)
+  })
+
+  it('botão toggle com aria-label correto pra ambos os estados', () => {
+    expect(SCRUBBER).toMatch(/aria-label=\{paused\s*\?\s*'tocar animação da linha do tempo'\s*:\s*'pausar animação da linha do tempo'\}/)
+  })
+
+  it('botão usa PT-BR (vocabulário UI) — sem "play"/"pause" em inglês', () => {
+    // Permite "tocar" / "pausar" em labels; rejeita "play"/"pause" em strings JSX.
+    const matchPlay = SCRUBBER.match(/>\s*play\s*</i)
+    const matchPause = SCRUBBER.match(/>\s*pause\s*</i)
+    expect(matchPlay).toBeNull()
+    expect(matchPause).toBeNull()
+  })
+
+  it('toggle button é pointer-events-auto (clicável dentro do container pointer-events-none)', () => {
+    // Container do scrubber é pointer-events-none (não bloqueia gesture do mapa);
+    // botão precisa re-habilitar pra ser clicável.
+    expect(SCRUBBER).toMatch(/pointer-events-auto/)
+  })
+
+  it('data-paused attribute sincroniza fill + caret', () => {
+    expect(SCRUBBER).toMatch(/data-paused=\{pausedAttr\}/)
+  })
+})
+
 describe('Integração TimelineScrubber em SpreadMap MapShell', () => {
   it('SpreadMap importa TimelineScrubber', () => {
     expect(SPREAD_MAP).toMatch(/from '\.\/TimelineScrubber'/)

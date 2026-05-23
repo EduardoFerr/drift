@@ -1,0 +1,82 @@
+/*
+ * Drift — TimelineScrubber fill animation
+ *
+ * V_2026-05-23 (user pedido): "a barra não está enchendo. Era para encher
+ * da esquerda para a direita conforme o tempo passasse né?"
+ *
+ * Fill bar enche esquerda→direita ao longo de 8s (matching ANIM_DURATION
+ * do GlobalModeMap em SpreadMap.tsx), pausa 2s, loop. Sincroniza
+ * visualmente com pins do mapa que aparecem progressivamente via
+ * `d.t <= p` no RAF tick (mesmo timing, fase 0).
+ *
+ * Implementação: transform: scaleX(0→1) com transform-origin: left.
+ * GPU-accelerated, zero setState 60fps. animation-play-state controla
+ * pause/play via classe Tailwind paused / data-attr.
+ *
+ * Total cycle: 8s fill + 2s hold-at-100 = 10s loop. Keyframe usa
+ * scaleX(1) já em 80% pra criar o "hold at full" antes do restart.
+ *
+ * Reduced motion respect (WCAG 2.3.3): media query força fill estático
+ * em scaleX(1) — user com motion sensitivity vê range completo sem
+ * animação.
+ */
+
+@keyframes drift-scrubber-fill {
+  0% {
+    transform: scaleX(0);
+  }
+  80% {
+    transform: scaleX(1);
+  }
+  100% {
+    transform: scaleX(1);
+  }
+}
+
+.drift-scrubber-fill {
+  transform-origin: left center;
+  transform: scaleX(0);
+  animation: drift-scrubber-fill 10s linear infinite;
+  will-change: transform;
+}
+
+.drift-scrubber-fill[data-paused='true'] {
+  animation-play-state: paused;
+}
+
+/*
+ * Caret indicator — segue a borda direita do fill via mesma animation.
+ * Usa `left: 0` + scaleX shadow? Não — usa width animation pra simplificar.
+ * Aqui aproveitamos translateX(0→100%) num span absolute.
+ */
+@keyframes drift-scrubber-caret {
+  0% {
+    left: 0%;
+  }
+  80% {
+    left: 100%;
+  }
+  100% {
+    left: 100%;
+  }
+}
+
+.drift-scrubber-caret {
+  animation: drift-scrubber-caret 10s linear infinite;
+  will-change: left;
+}
+
+.drift-scrubber-caret[data-paused='true'] {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drift-scrubber-fill {
+    animation: none;
+    transform: scaleX(1);
+  }
+  .drift-scrubber-caret {
+    animation: none;
+    left: 100%;
+  }
+}

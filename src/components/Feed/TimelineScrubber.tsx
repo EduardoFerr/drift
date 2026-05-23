@@ -6,23 +6,29 @@
  * precisa de uma barra de lapso temporal, para termos noção do
  * tempo decorrido entre os eventos ali registrados e exibidos."
  *
- * Modo passive (atual): mostra range [min, max] em labels relative
- * PT-BR + tick marks pra cada evento, posicionados proporcionalmente
- * dentro do range. Não interage com o estado de animação do mapa
- * (escopo passive — display visual do range + atual).
+ * V_2026-05-23 (user pedido): "a barra não está enchendo. Era para
+ * encher da esquerda para a direita conforme o tempo passasse né?"
+ *   → Fill bar autoplay ON default + toggle ▶/⏸ visível.
  *
- * Modo interactive (futuro): drag handle muda current time → filtra
- * eventos. Por ora deixamos `current` opcional + indicador visual
- * preparado, sem handle drag.
+ * Fill animation: scaleX(0→1) em 8s + hold 2s = ciclo de 10s linear
+ * infinite. Sincroniza visualmente com o RAF loop do GlobalModeMap
+ * (mesma ANIM_DURATION/PAUSE) — ambos componentes montam juntos no
+ * MapShell, então a fase coincide naturalmente. Pins do mapa
+ * aparecem progressivamente via `d.t <= p`; fill cresce no mesmo
+ * tempo → sensação de "barra acompanha o spreading".
  *
- * WCAG 2.3.3 — `prefers-reduced-motion` desativa qualquer transition;
- * fica estático mostrando só labels start/end.
+ * Autoplay default ON (preserva spirit §22/§24 — user no controle
+ * via toggle visível; não é métrica de validação social).
+ *
+ * WCAG 2.3.3 — `prefers-reduced-motion` força fill estático em
+ * scaleX(1) — vê range completo sem animação. CSS em
+ * `src/styles/timeline-scrubber.css`.
  *
  * Pure rendering — recebe events array, deriva range internamente.
- * Sem fetch, sem effect; ideal pra placement em MapShell.
+ * Sem fetch; só estado local `paused` pro toggle.
  */
 
-import type { CSSProperties } from 'react'
+import { useState, type CSSProperties } from 'react'
 
 export interface TimelineScrubberProps {
   /**
@@ -138,6 +144,10 @@ export function TimelineScrubber({
   const nowSec = now ?? Math.floor(Date.now() / 1000)
   const range = computeTimelineRange(events)
 
+  // V_2026-05-23: autoplay ON default. Toggle ▶/⏸ visível pra user pausar
+  // (preserva spirit §22/§24 — user no controle, sem manipulação opaca).
+  const [paused, setPaused] = useState(false)
+
   // Ted polish 2026-05-22 #8b: empty state. Scrubber só informa lapso
   // temporal — com 0 ou 1 evento, não há lapso. Oculta em vez de
   // mostrar range degenerado ("—" vazio). Caller (MapShell) já filtra
@@ -154,10 +164,15 @@ export function TimelineScrubber({
   const counterLabel = counterLabelForMode(count, mode)
 
   // Posição do caret de "current time" (0..1). Clamped pra range.
+  // Modo "controlled": caller passa currentTime explícito. Usado por
+  // testes determinísticos. Quando ausente, render usa caret animado
+  // via CSS (drift-scrubber-caret) que sincroniza com o fill.
   const caretPos =
     currentTime !== undefined && span > 0
       ? Math.min(1, Math.max(0, (currentTime - min) / span))
       : null
+
+  const pausedAttr = paused ? 'true' : 'false'
 
   return (
     <div
@@ -165,21 +180,39 @@ export function TimelineScrubber({
       role="group"
       aria-label={`linha do tempo dos eventos no mapa, ${counterLabel} entre ${startLabel} e ${endLabel}`}
     >
-      <div className="mb-1.5 flex items-center justify-between font-mono text-[10px] uppercase tracking-meta text-drift-muted">
+      <div className="mb-1.5 flex items-center justify-between gap-2 font-mono text-[10px] uppercase tracking-meta text-drift-muted">
         <span>{startLabel}</span>
-        <span aria-hidden="true" className="text-drift-muted/60">
+        <span aria-hidden="true" className="flex-1 text-center text-drift-muted/60">
           {counterLabel}
         </span>
         <span>{endLabel}</span>
+        {/* Toggle ▶/⏸ — pointer-events-auto pra clicável dentro de
+            container pointer-events-none. PT-BR labels (vocabulário UI). */}
+        <button
+          type="button"
+          onClick={() => setPaused((p) => !p)}
+          aria-label={paused ? 'tocar animação da linha do tempo' : 'pausar animação da linha do tempo'}
+          aria-pressed={!paused}
+          className="pointer-events-auto -my-0.5 ml-1 rounded px-1 text-[11px] text-drift-muted/80 transition-colors hover:text-drift-text focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2"
+        >
+          {paused ? '▶' : '⏸'}
+          <span className="sr-only">{paused ? ' tocar' : ' pausar'}</span>
+        </button>
       </div>
-      {/* Trilha + ticks. role="presentation" — info semântica já no aria-label
-          do group acima. */}
+      {/* Trilha. Order: fill (atrás) → ticks → caret. aria-hidden — info
+          semântica no group acima. */}
       <div
-        className="relative h-2 w-full rounded-full bg-drift-surface"
+        className="relative h-2 w-full overflow-hidden rounded-full bg-drift-surface"
         aria-hidden="true"
       >
-        {/* Tick marks pra cada evento. Cada tick é um pixel-fino dot.
-            Posição via left:%. */}
+        {/* Fill bar animado esquerda→direita. CSS handles animation;
+            scaleX(0→1) em 10s linear infinite. animation-play-state
+            controlado via data-paused. */}
+        <span
+          className="drift-scrubber-fill absolute inset-0 rounded-full bg-drift-accent2/35"
+          data-paused={pausedAttr}
+        />
+        {/* Tick marks pra cada evento. Render acima do fill. */}
         {ticks.map((p, i) => {
           const style: CSSProperties = {
             left: `${p * 100}%`,
@@ -188,20 +221,29 @@ export function TimelineScrubber({
           return (
             <span
               key={i}
-              className="absolute top-1/2 -translate-y-1/2 h-2 w-[2px] rounded-full bg-drift-accent2/70"
+              className="absolute top-1/2 z-10 -translate-y-1/2 h-2 w-[2px] rounded-full bg-drift-accent2/70"
               style={style}
             />
           )
         })}
-        {/* Caret de current time, quando passado. Triangle/diamond
-            apontando pra trilha. */}
+        {/* Caret controlled (testes / future drag): posição explícita
+            por currentTime prop. */}
         {caretPos !== null && (
           <span
-            className="absolute -top-1 h-4 w-[3px] rounded-full bg-drift-accent shadow-[0_0_6px_rgba(232,255,90,0.55)]"
+            className="absolute -top-1 z-20 h-4 w-[3px] rounded-full bg-drift-accent shadow-[0_0_6px_rgba(232,255,90,0.55)]"
             style={{
               left: `${caretPos * 100}%`,
               transform: 'translateX(-50%)',
             }}
+          />
+        )}
+        {/* Caret animado — segue a borda direita do fill via CSS keyframe.
+            Só renderiza quando currentTime não foi passado (modo autoplay). */}
+        {caretPos === null && (
+          <span
+            className="drift-scrubber-caret absolute -top-1 z-20 h-4 w-[3px] rounded-full bg-drift-accent shadow-[0_0_6px_rgba(232,255,90,0.55)]"
+            data-paused={pausedAttr}
+            style={{ transform: 'translateX(-50%)' }}
           />
         )}
       </div>
