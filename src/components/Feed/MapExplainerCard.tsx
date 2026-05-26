@@ -64,7 +64,7 @@ export function getMapExplainerCopy(context: MapExplainerContext): ExplainerCopy
     return {
       title: 'mapa de propagação',
       purpose:
-        'Este mapa mostra onde este post foi DRIFT-ado. Cada ponto é um lugar onde alguém viu o post e decidiu espalhar (gesto ↑). A origem é onde o autor publicou. 💡 tamanho do pin ≠ qualidade do post — só conta espalhamentos geográficos (manifesto §22).',
+        'Este mapa mostra onde este post foi DRIFT-ado. Cada ponto é um lugar onde alguém viu o post e decidiu dar DRIFT (gesto ↑). A origem é onde o autor publicou. 💡 tamanho do pin ≠ qualidade do post — só conta DRIFTs geográficos (manifesto §22).',
       legend: [
         {
           swatch: 'rgb(232, 255, 90)',
@@ -91,7 +91,7 @@ export function getMapExplainerCopy(context: MapExplainerContext): ExplainerCopy
     return {
       title: 'rede geográfica',
       purpose:
-        'Cada ponto é uma pessoa que já espalhou (DRIFT) algum post na rede Drift, no local que ela declarou. Tamanho do ponto cresce com quantos drifts ela fez. Arcos mostram propagação cross-post no tempo. 💡 tamanho do ponto ≠ qualidade nem importância — só conta espalhamentos geográficos (manifesto §22).',
+        'Cada ponto é uma pessoa que já deu DRIFT em algum post na rede Drift, no local que ela declarou. Tamanho do ponto cresce com quantos drifts ela fez. Arcos mostram propagação cross-post no tempo. 💡 tamanho do ponto ≠ qualidade nem importância — só conta DRIFTs geográficos (manifesto §22).',
       legend: [
         {
           swatch: 'rgb(232, 255, 90)',
@@ -103,7 +103,7 @@ export function getMapExplainerCopy(context: MapExplainerContext): ExplainerCopy
           swatch: 'rgb(52, 211, 153)',
           shape: 'dot',
           label: 'outras pessoas',
-          hint: 'agregado de quem espalhou outros posts',
+          hint: 'agregado de quem deu DRIFT em outros posts',
         },
         {
           shape: 'badge',
@@ -116,7 +116,7 @@ export function getMapExplainerCopy(context: MapExplainerContext): ExplainerCopy
     return {
       title: 'sua rede geográfica',
       purpose:
-        'Mesma visualização do mapa global, mas filtrado por quem você segue (NIP-02). Útil pra ver onde estão geograficamente as pessoas que importam pra você. É lente local — não afeta o feed canônico (manifesto §24). 💡 tamanho do ponto ≠ qualidade — só conta espalhamentos geográficos (§22).',
+        'Mesma visualização do mapa global, mas filtrado por quem você segue (NIP-02). Útil pra ver onde estão geograficamente as pessoas que importam pra você. É lente local — não afeta o feed canônico (manifesto §24). 💡 tamanho do ponto ≠ qualidade — só conta DRIFTs geográficos (§22).',
       legend: [
         {
           swatch: 'rgb(244, 130, 14)',
@@ -143,7 +143,7 @@ export function getMapExplainerCopy(context: MapExplainerContext): ExplainerCopy
   return {
     title: 'o que é o mapa',
     purpose:
-      'O mapa mostra a geografia de quem espalhou (DRIFT-ou) posts na rede Drift. Você pode alternar entre 3 modos: post (este post), global (rede toda), network (só quem você segue).',
+      'O mapa mostra a geografia de quem deu DRIFT em posts na rede Drift. Você pode alternar entre 3 modos: post (este post), global (rede toda), network (só quem você segue).',
     legend: [
       { shape: 'badge', label: 'POST — propagação de um post específico' },
       { shape: 'badge', label: 'GLOBAL — agregado de toda a rede' },
@@ -204,7 +204,7 @@ export function MapExplainerCard({ context, onClose }: MapExplainerCardProps) {
           <p className="text-[12px] leading-relaxed text-drift-muted">
             O ponto de alguém só aparece no mapa se essa pessoa{' '}
             <strong className="text-drift-text">escolheu publicar</strong> a
-            localização ao postar ou espalhar. Drift{' '}
+            localização ao postar ou dar DRIFT. Drift{' '}
             <strong className="text-drift-text">nunca</strong> infere local via
             IP, GPS automático ou metadados de imagem.
           </p>
