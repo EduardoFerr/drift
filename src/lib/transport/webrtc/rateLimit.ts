@@ -87,3 +87,20 @@ export function consumeRateBudget(peer: PeerState, now: number): boolean {
   }
   return false
 }
+
+/**
+ * QW3 (Lily P2P idle audit 2026-05-23): libera entry no `lastRateWarnAt`
+ * Map quando peer é descartado por caminhos NÃO-tripped (ICE timeout,
+ * cross-proto kill, pagehide → closeAll → cleanupPeer, peer.bye via
+ * signaling). Antes, só o caso `tripped` chamava `.delete()`. Em sessão
+ * longa com churn de peers (random walk a cada 30 min), Map crescia
+ * monotônico (~30 B/entry).
+ *
+ * Idempotente — `.delete()` de chave inexistente é no-op. Sem invariante
+ * de "peer existia": chamável de qualquer cleanup path.
+ *
+ * Re-exportado em `webrtc/index.ts` como `_cleanupRateState` (test-only).
+ */
+export function _cleanupRateState(peerId: string): void {
+  lastRateWarnAt.delete(peerId)
+}

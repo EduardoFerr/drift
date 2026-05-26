@@ -48,7 +48,7 @@ import type {
   Unsubscribe,
 } from '../index'
 import { _isPeerDegraded } from './health'
-import { ensureSignalingAsync, myPeerId } from './boot'
+import { ensureSignalingAsync, myPeerId, useNostrSignaling } from './boot'
 import {
   iterPeers,
   setSubscription,
@@ -132,12 +132,39 @@ function subscribe(filter: Filter, handlers: SubscribeHandlers): Unsubscribe {
     }
   }
 
-  // Fire-and-forget — boot do signaling pode ser async (modo Nostr).
-  // Subscribe shape externa permanece síncrona; falhas async são logadas
-  // pelo caller via onevent que nunca dispara, ou pelo console aqui.
-  void ensureSignalingAsync().catch((err) =>
-    console.error('[webrtc] signaling boot falhou:', err),
-  )
+  // QW2 (Lily P2P idle audit 2026-05-23, convergência Marshall+Satoshi):
+  // boot lazy do signaling. Em modo mock (default dev e default prod até
+  // `VITE_USE_NOSTR_SIGNALING=1`), `subscribe()` é chamado pelo
+  // orchestrator no `startSync()` — bootava BroadcastChannel + pagehide
+  // listener + healthTimer + randomWalkTimer **mesmo sem nenhum peer
+  // jamais conectar** (mock UUID per-tab descobre só abas same-origin,
+  // raríssimo). Aqui registramos a subscription (record fica pronto pra
+  // receber eventos cross-proto via DataChannel quando peer aparecer),
+  // mas NÃO bootamos signaling em mock.
+  //
+  // Reativação: continua acontecendo de forma reativa via
+  // (a) `publish()` quando user escreve — writes garantem caminho
+  //     alternativo (§15 anti-censura);
+  // (b) `connectTo()` quando user pede explicitamente (PeersCard, QR,
+  //     seeder DEV);
+  // (c) modo Nostr signaling (flag flip) onde boot eager faz sentido —
+  //     channel real é aberto, peers reais descobrem via DM kind 1059.
+  //
+  // §15 (anti-censura) preserved: capacidade técnica do WebRTC P2P
+  //   continua plena; ativação é apenas reativa, não proativa.
+  // §16 (disponibilidade distribuída) preserved: seeding só vale com
+  //   peer conectado; heartbeat sem peer não contribui pra §16.
+  // §17 (sem chave-mestra disfarçada) preserved: NÃO consultamos
+  //   vendor APIs (NetworkInformation, Battery, IdleDetector) — Satoshi
+  //   NO-GO. Critério é puramente local (modo signaling configurado).
+  if (useNostrSignaling()) {
+    // Fire-and-forget — boot do signaling pode ser async (modo Nostr).
+    // Subscribe shape externa permanece síncrona; falhas async são logadas
+    // pelo caller via onevent que nunca dispara, ou pelo console aqui.
+    void ensureSignalingAsync().catch((err) =>
+      console.error('[webrtc] signaling boot falhou:', err),
+    )
+  }
   const id =
     typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
       ? crypto.randomUUID()
@@ -248,4 +275,8 @@ export {
 // `_injectPeerForTest` e `_resetPeersForTest` moram em `state.ts`
 // (encapsulam o Map). Re-export direto pra preservar API de tests.
 export { _injectPeerForTest, _resetPeersForTest } from './state'
-export { _RATE_LIMIT_CONSTANTS, consumeRateBudget as _consumeRateBudget } from './rateLimit'
+export {
+  _RATE_LIMIT_CONSTANTS,
+  consumeRateBudget as _consumeRateBudget,
+  _cleanupRateState,
+} from './rateLimit'

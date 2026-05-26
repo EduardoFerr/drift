@@ -17,7 +17,7 @@ import {
   HEALTH_STALE_MS,
   PING_PREFIX,
 } from './config'
-import { iterPeers } from './state'
+import { iterPeers, peerCount } from './state'
 import type { PeerState } from './types'
 import { markPing, validatePong } from '../policy/pingPongTracker'
 import { clampPeerTimestamp } from '../policy/clockClamp'
@@ -98,6 +98,16 @@ export function _isPeerDegraded(peer: PeerState, now: number): boolean {
 export function startHealthCheckTimer(): void {
   if (healthTimer) return
   healthTimer = setInterval(() => {
+    // QW1 (Lily P2P idle audit 2026-05-23, convergência Marshall+Satoshi):
+    // skip cedo quando não há peers conectados. Em uso solo (mock signaling
+    // sem aba paralela same-origin), `peerCount() === 0` é o estado quase
+    // permanente — o timer disparava 4×/min queimando ~240 ticks vazios/h
+    // por aba. Manter o setInterval vivo (vs `stopHealthCheckTimer`) é
+    // intencional: §16 prefere reativação imediata quando o primeiro peer
+    // aparece via `hello` (signaling decide adicionar/remover, não nós).
+    // NÃO usar APIs vendor (NetworkInformation, Battery, IdleDetector) —
+    // Satoshi NO-GO §17 (chave-mestra disfarçada — vendor decide idle).
+    if (peerCount() === 0) return
     const now = Date.now()
     for (const peer of iterPeers()) {
       if (peer.status !== 'open' || !peer.dc || peer.dc.readyState !== 'open') continue

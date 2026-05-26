@@ -304,6 +304,16 @@ export function cleanupPeer(remoteId: string): void {
   // ICE timeout, o counter ficava inflado pra reconexões futuras
   // (não era leak — Map vive até pagehide — mas semanticamente errado).
   _resetReconnectCounter(remoteId)
+  // QW3 (Lily P2P idle audit 2026-05-23): libera entry no Map module-scoped
+  // `lastRateWarnAt` do rateLimit.ts. Antes só o caso `tripped` chamava
+  // `.delete()`, então peers limpos via ICE timeout / cross-proto kill /
+  // pagehide / bye signaling deixavam entry pendurada (~30 B/peer,
+  // monotônico em sessão longa com churn). Lazy import pra evitar
+  // circular peer ↔ rateLimit (rateLimit já importa cleanupPeer).
+  // Sincronia não importa — cleanup do Map é fire-and-forget puro.
+  void import('./rateLimit').then(({ _cleanupRateState }) => {
+    _cleanupRateState(remoteId)
+  })
   // fix: B1 / B3 — cancelar timers pendentes pra liberar referências
   // ao PeerState antes do GC natural. Audit §B1 / §B3.
   if (peer.disconnectGraceTimer) {
