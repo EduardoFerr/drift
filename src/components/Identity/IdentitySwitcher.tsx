@@ -326,6 +326,41 @@ export function IdentitySwitcher({ onRequestExport, onClose }: IdentitySwitcherP
               Vai gerar uma nova chave criptográfica local. Não substitui a
               ativa atual — só adiciona à lista.
             </p>
+            {/* Item #7 fricção UX iniciante 2026-05-23: antes de criar
+                nova identidade, mostrar preview do que vai acontecer.
+                User iniciante não sabia o que esperar — clicava sem
+                modelo mental de "criação local" vs "trocar ativa" vs
+                "backup obrigatório depois". Card preview reduz fricção
+                e reforça manifesto §3 (dispositivo descartável,
+                identidade não — backup ANTES de qualquer ação destrutiva). */}
+            <div
+              className="rounded-xl border border-drift-accent2/20 bg-drift-accent2/5 px-4 py-3 space-y-2 font-mono text-[11px] leading-relaxed text-drift-body/85"
+              role="note"
+              aria-label="passos da criação"
+            >
+              <p className="font-display text-[11px] uppercase tracking-tag text-drift-accent2">
+                o que vai acontecer
+              </p>
+              <ol className="space-y-1.5 list-none">
+                <li>
+                  <span className="text-drift-accent2 font-medium">1.</span>{' '}
+                  Gera uma nova chave secp256k1 local, criptografada com a
+                  master key do seu dispositivo (AES-GCM 256).
+                </li>
+                <li>
+                  <span className="text-drift-accent2 font-medium">2.</span>{' '}
+                  A identidade entra na sua lista — não troca a ativa. Você
+                  pode trocar depois explicitamente.
+                </li>
+                <li>
+                  <span className="text-drift-accent2 font-medium">3.</span>{' '}
+                  Trocar a identidade ativa exige reload do app (sync e feed
+                  resetam). Por isso, faça <strong>backup do nsec antes</strong>
+                  {' '}de trocar — sem o nsec exportado e este dispositivo
+                  perdido, a identidade some pra sempre (manifesto §3).
+                </li>
+              </ol>
+            </div>
             <input
               type="text"
               value={newLabel}
