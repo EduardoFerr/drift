@@ -491,13 +491,28 @@ export function ComposeOverlay({
               >
                 {used} / {DRIFT_LIMITS.TEXT_MAX_CHARS}
               </span>
+              {/* Item #4 fricção iniciante 2026-05-23: disabled state
+                  era sutil (opacity-30 não comunicava 'inativo' bem ao
+                  user iniciante). Agora:
+                  - opacity-40 + border-dashed quando vazio (visual mais
+                    forte de 'campo aguardando ação')
+                  - copy muda pra '✕ escreva algo' (explica POR QUÊ
+                    está inativo)
+                  - title tooltip cobre hover desktop
+                  Mantém pointer-events: none implícito de `disabled` no
+                  HTML — sem precisar de classe extra. */}
               <button
                 type="button"
                 onClick={() => setShowPreview(true)}
                 disabled={allEmpty}
-                className="rounded-lg border border-drift-accent2/30 bg-drift-surface/30 px-3 py-1 font-mono text-[10px] uppercase tracking-meta text-drift-accent2 transition-colors hover:bg-drift-accent2/10 disabled:cursor-not-allowed disabled:opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
+                title={allEmpty ? 'escreva algo antes de pré-visualizar' : 'pré-visualizar o post'}
+                className={`rounded-lg border px-3 py-1 font-mono text-[10px] uppercase tracking-meta transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40 ${
+                  allEmpty
+                    ? 'cursor-not-allowed border-dashed border-drift-muted/30 bg-transparent text-drift-muted/50'
+                    : 'border-drift-accent2/30 bg-drift-surface/30 text-drift-accent2 hover:bg-drift-accent2/10'
+                }`}
               >
-                ◐ prévia
+                {allEmpty ? '✕ escreva algo' : '◐ prévia'}
               </button>
               {draft.uploadError && (
                 <span className="ml-3 truncate text-drift-danger" title={draft.uploadError}>
