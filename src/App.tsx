@@ -1274,6 +1274,7 @@ function App() {
             props: { identity: boot.identity },
           })
         }}
+        onOpenGuide={() => pushLayer({ id: 'guia', component: GuideCard })}
         onActiveTabTap={() => setPostByIndex(0)}
       />
 
@@ -1628,14 +1629,18 @@ function StatusIndicators({
         <WarningIcon size={14} />
       </button>
 
-      {/* Events counter — abre StatusCard. */}
+      {/* Events counter — abre StatusCard.
+          UX 2026-05-25 (item #2 fricção iniciante): EV é tappable mas
+          affordance visual era fraca (text muted indistinto). Adicionado
+          underline pontilhado on hover/focus + tooltip já existente
+          comunica "N eventos recebidos do Nostr". */}
       <button
         onClick={onOpenStatus}
         className="flex items-center gap-1 font-mono text-[10px] uppercase tracking-[1px] text-drift-muted transition-colors hover:text-drift-text focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2"
-        title={`${events} eventos recebidos · subscribe ${active ? 'ativo' : 'offline'}`}
+        title={`${events} eventos recebidos do Nostr · subscribe ${active ? 'ativo' : 'offline'} · toque pra detalhes`}
         // WCAG 2.5.3 — aria-label inclui o número visível "ev" pra
         // bater com o texto que voice control users veem.
-        aria-label={`${events} ev — abrir painel de status`}
+        aria-label={`${events} eventos recebidos — abrir painel de status`}
       >
         <span
           className={active ? 'text-drift-spread' : 'text-drift-muted'}
@@ -1643,7 +1648,7 @@ function StatusIndicators({
         >
           ●
         </span>
-        <span className="inline-block w-[52px]">{events > 9999 ? '9999+' : events} ev</span>
+        <span className="inline-block w-[52px] underline decoration-dotted decoration-drift-muted/30 underline-offset-2 transition-colors hover:decoration-drift-accent2">{events > 9999 ? '9999+' : events} ev</span>
       </button>
     </div>
   )
@@ -1659,6 +1664,7 @@ function HomeHeader({
   onOpenStatus,
   onOpenIdentity,
   onOpenProfile,
+  onOpenGuide,
   onActiveTabTap,
 }: {
   identity: DriftIdentity | null
@@ -1671,6 +1677,14 @@ function HomeHeader({
   onOpenStatus: () => void
   onOpenIdentity: () => void
   onOpenProfile: () => void
+  /**
+   * Abre o GuideCard (explicação dos algoritmos: score/DERIVA, weight,
+   * threshold, PPR/decay). UX 2026-05-25 (item #1 fricção iniciante):
+   * tap em "deriva 0.810" passou a abrir o Guide. Antes era display
+   * estático sem feedback — user iniciante não sabia o que o número
+   * significava.
+   */
+  onOpenGuide?: () => void
   /** Tap-on-active-tab handler (Twitter/Bluesky pattern, scroll-to-top). */
   onActiveTabTap?: () => void
 }) {
@@ -1710,9 +1724,22 @@ function HomeHeader({
             onOpenNetworkMode={onOpenNetworkMode}
             onOpenLocation={onOpenLocation}
           />
-          <div className="font-mono text-[10px] uppercase tracking-meta text-drift-muted">
+          {/* DERIVA — score do post atualmente visível (manifesto §22).
+              UX 2026-05-25 (item #1 fricção iniciante): wrap em <button>
+              clicável que abre GuideCard. Antes era display estático;
+              user iniciante via "deriva 0.810" mudar sem saber o que
+              era. Title tooltip cobre hover desktop; tap mobile abre
+              Guide direto pra "score · weight · threshold · …". */}
+          <button
+            type="button"
+            onClick={onOpenGuide}
+            disabled={!onOpenGuide}
+            title="DERIVA é o score do post atual (manifesto §22). Toque pra abrir o guia."
+            aria-label={`deriva ${formatScore(currentScore ?? 0)} — abrir guia`}
+            className="font-mono text-[10px] uppercase tracking-meta text-drift-muted transition-colors hover:text-drift-text focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2 disabled:cursor-default disabled:hover:text-drift-muted"
+          >
             deriva{' '}
-            <b className="inline-block w-[44px] font-medium text-drift-accent2">
+            <b className="inline-block w-[44px] font-medium text-drift-accent2 underline decoration-dotted decoration-drift-accent2/30 underline-offset-2">
               {/* B5 fix 2026-05-22: consistência de DERIVA entre tabs.
                   Antes: tab `global` com post mostrava '0.000' / tab
                   `seguindo` vazia mostrava '—' — mesma "ausência de
@@ -1723,7 +1750,7 @@ function HomeHeader({
                   default null → 0 via ??). */}
               {formatScore(currentScore ?? 0)}
             </b>
-          </div>
+          </button>
         </div>
       </div>
       <div className="border-b border-drift-border">
