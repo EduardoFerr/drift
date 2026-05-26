@@ -87,16 +87,21 @@ shipping prematuro).
 
 ## Bugs descobertos em re-verificação visual 2026-05-23
 
-- [ ] **Mode badge (Satoshi A2) não renderiza** — `SpreadMap.tsx:746-753`
-  tem `setBadgeMode` + AnimatePresence inteiramente correto, MAS:
-  (a) `initialModeRef` nunca atualiza → retornar ao mode inicial não
-  dispara badge; (b) badge está dentro de MapShell — em network mode
-  com empty state ("SUA REDE ESTÁ VAZIA") MapShell pode não montar,
-  fazendo badge nunca aparecer mesmo na primeira troca. Verificado em
-  localhost: switching global → network não mostrou badge. Fix:
-  (1) hoistar badge pra fora do MapShell pro overlay root, (2) deixar
-  `initialModeRef` rastrear mode anterior em vez de só o inicial.
-  ~20min. P1 (Satoshi feature shipou mas não funciona end-to-end).
+- [x] **Mode badge (Satoshi A2) não renderiza** — fechado 2026-05-26 em
+  [pending-commit] — bug tinha 2 causas: (a) `initialModeRef` rastreava
+  só mode inicial → retornar ao mode inicial (global → network → global)
+  não disparava badge na 2ª transição; (b) badge vivia dentro de
+  `ModeToggle`, que é remountado entre transições empty state ↔ mapa
+  (ex: global com mapa → network "sua rede vazia" remonta ModeToggle e
+  reseta state). Fix: estado `badgeMode` + `prevModeRef` hoisted pro
+  `SpreadMap` top-level; badge renderiza como sibling estável do
+  conteúdo dentro de wrapper `<div class="relative h-full w-full">`.
+  `prevModeRef` rastreia mode anterior (sentinel `null` skip mount).
+  4 specs novos em `spread-map-network-mode-conformance.test.ts`
+  ("Mode badge — bug fix re-verificação visual 2026-05-26"). 6 specs
+  do `spread-map-empty-state-toggle.test.ts` atualizados (regex aceita
+  `content = renderEmpty` além de `return renderEmpty` pra refletir
+  novo control flow). 70/70 spread-map tests verdes; tsc clean.
 
 - [ ] **GPS state persistente surge "preciso" sem ativação consciente** —
   pref `location_granularity` ficou `precise` após sessão de teste

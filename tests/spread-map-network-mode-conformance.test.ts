@@ -290,6 +290,79 @@ describe('Stats deemphasis + mode badge (Satoshi A2+A3 2026-05-22)', () => {
   })
 })
 
+describe('Mode badge — bug fix re-verificação visual 2026-05-26', () => {
+  // Bug original (registrado em BACKLOG 2026-05-23, commit e94bf2b):
+  //   (1) initialModeRef nunca atualizava — voltar pro mode inicial
+  //       (ex: global → network → global) não disparava badge na 2ª
+  //       transição. State semantics estavam "primeira diferença do
+  //       inicial" em vez de "qualquer transição".
+  //   (2) badge vivia dentro de ModeToggle, que vivia dentro de
+  //       MapShell — em empty states (network sem follows etc.), o
+  //       MapShell nem montava (early return retornava só Placeholder),
+  //       deixando o badge sem lugar pra aparecer. Adicionalmente,
+  //       ModeToggle era remountado entre transições empty ↔ mapa,
+  //       resetando state interno.
+  //
+  // Fix: estado e effect hoisted pro SpreadMap top-level; badge
+  // renderiza como sibling estável do conteúdo (não dentro do
+  // ModeToggle nem do MapShell).
+
+  it('SpreadMap top-level declara prevModeRef (não initialModeRef)', () => {
+    // prevModeRef rastreia mode anterior → qualquer transição dispara
+    // badge, incluindo retorno ao mode inicial.
+    expect(MAP).toMatch(/prevModeRef\s*=\s*useRef<SpreadMapMode\s*\|\s*null>\(null\)/)
+    // initialModeRef NÃO pode mais aparecer no arquivo (semantics bug).
+    expect(MAP).not.toMatch(/initialModeRef/)
+  })
+
+  it('effect skip mount inicial via prevModeRef === null sentinel', () => {
+    // Pattern explícito: primeiro render seta prevModeRef = mode sem
+    // disparar badge; transições subsequentes comparam mode !== prev.
+    expect(MAP).toMatch(/if\s*\(\s*prevModeRef\.current\s*===\s*null\s*\)/)
+    expect(MAP).toMatch(/prevModeRef\.current\s*=\s*mode/)
+  })
+
+  it('badge state vive em SpreadMap top-level (não em ModeToggle)', () => {
+    // ModeToggle agora é stateless quanto a badge. Useful porque o
+    // componente é remountado quando o SpreadMap alterna entre
+    // renderEmpty (empty states) e PostModeMap/GlobalModeMap (com
+    // mapa) — perderia state.
+    const toggleMatch = MAP.match(/function ModeToggle[\s\S]*?(?=\nfunction )/m)
+    expect(toggleMatch, 'ModeToggle function not found').not.toBeNull()
+    const body = toggleMatch![0]
+    expect(body, 'ModeToggle não pode declarar badgeMode (hoist pro SpreadMap)').not.toMatch(/badgeMode|setBadgeMode/)
+    // Top-level SpreadMap declara badgeMode
+    const spreadMatch = MAP.match(/export function SpreadMap\([\s\S]*?(?=\n\/\/ ─{3,} PostModeMap)/m)
+    expect(spreadMatch).not.toBeNull()
+    expect(spreadMatch![0]).toMatch(/setBadgeMode/)
+    expect(spreadMatch![0]).toMatch(/prevModeRef/)
+  })
+
+  it('badge AnimatePresence renderiza no top-level (sibling do content)', () => {
+    // SpreadMap top-level wraps conteúdo numa div.relative com badge
+    // como sibling — sobrevive a transições empty ↔ mapa. Pattern:
+    // após `let content` ou similar, o return tem <div relative>
+    // {content} <AnimatePresence>{badgeMode && ...
+    const spreadMatch = MAP.match(/export function SpreadMap\([\s\S]*?(?=\n\/\/ ─{3,} PostModeMap)/m)
+    expect(spreadMatch).not.toBeNull()
+    const body = spreadMatch![0]
+    // AnimatePresence com badgeMode deve aparecer no return do
+    // SpreadMap top-level, não só dentro de helpers internos.
+    expect(body).toMatch(/<AnimatePresence>[\s\S]*?\{badgeMode/)
+  })
+
+  it('badge renderiza em empty states (não embrulhado em MapShell condicional)', () => {
+    // Anti-regressão crítica: badge precisa ser sibling estável do
+    // content (que pode ser empty state OR mapa). O test acima já
+    // verifica posição no SpreadMap; este reforça que ModeToggle
+    // (que vive dentro de empty wrappers) não contém mais o
+    // AnimatePresence do badge — badge é INDEPENDENTE da árvore do
+    // ModeToggle/MapShell.
+    const toggleMatch = MAP.match(/function ModeToggle[\s\S]*?(?=\nfunction )/m)
+    expect(toggleMatch![0]).not.toMatch(/\{badgeMode\s*&&/)
+  })
+})
+
 describe('MapOverlay default mode (Satoshi A1 2026-05-22)', () => {
   it('App.tsx MapOverlay default mapMode = "global" (não "post")', () => {
     const APP = readFileSync('src/App.tsx', 'utf8')

@@ -49,40 +49,49 @@ describe('SpreadMap empty state — todos os early returns passam por renderEmpt
   // que inclui o ModeToggle. Se algum return <Placeholder ... /> direto
   // for re-introduzido em SpreadMap (não em PostModeMap/GlobalModeMap),
   // este teste falha.
+  //
+  // 2026-05-26 mode badge fix: early returns viraram atribuições a
+  // `content` (`content = renderEmpty(...)`) pra que o badge possa
+  // renderizar como sibling estável no return do SpreadMap. A defesa
+  // permanece: empty state precisa usar o helper renderEmpty (que
+  // inclui ModeToggle). Regex agora aceita ambos os patterns.
 
-  it('early return loading usa renderEmpty', () => {
-    expect(MAP).toMatch(/if \(loading\)\s*\{[\s\S]*?return renderEmpty\(/)
+  const ASSIGN = /(?:return|content =) renderEmpty\(/
+
+  it('caminho loading usa renderEmpty', () => {
+    expect(MAP).toMatch(/if \(loading\)\s*\{[\s\S]*?(?:return|content =) renderEmpty\(/)
   })
 
-  it('early return error usa renderEmpty', () => {
-    expect(MAP).toMatch(/if \(error\)\s*\{[\s\S]*?return renderEmpty\(/)
+  it('caminho error usa renderEmpty', () => {
+    expect(MAP).toMatch(/if \(error\)\s*\{[\s\S]*?(?:return|content =) renderEmpty\(/)
   })
 
-  it('early return network anônimo usa renderEmpty', () => {
-    const block = MAP.match(/if \(!activeNpub\)\s*\{[\s\S]*?\}/m)
-    expect(block).not.toBeNull()
-    expect(block![0]).toMatch(/return renderEmpty\(/)
+  it('caminho network anônimo usa renderEmpty', () => {
+    // Pattern agora é `else if (mode === 'network' && !activeNpub)`.
+    // Captura do branch específico via predicado de mode + activeNpub.
+    const block = MAP.match(/mode === 'network' && !activeNpub[\s\S]*?(?=\}\s*else if|\}\s*else \{)/m)
+    expect(block, 'network anônimo branch not found').not.toBeNull()
+    expect(block![0]).toMatch(ASSIGN)
   })
 
-  it('early return network sem follows usa renderEmpty', () => {
-    const block = MAP.match(/if \(followsCount === 0\)\s*\{[\s\S]*?\}/m)
-    expect(block).not.toBeNull()
-    expect(block![0]).toMatch(/return renderEmpty\(/)
+  it('caminho network sem follows usa renderEmpty', () => {
+    const block = MAP.match(/followsCount === 0[\s\S]*?(?=\}\s*else if|\}\s*else \{)/m)
+    expect(block, 'network sem follows branch not found').not.toBeNull()
+    expect(block![0]).toMatch(ASSIGN)
   })
 
-  it('early return GPS off + mode=post usa renderEmpty', () => {
+  it('caminho GPS off + mode=post usa renderEmpty', () => {
     const block = MAP.match(
-      /if \(granularity === 'off' && mode === 'post'\)\s*\{[\s\S]*?\n {4}\}/m,
+      /granularity === 'off' && mode === 'post'[\s\S]*?(?=\}\s*else if|\}\s*else \{)/m,
     )
-    expect(block).not.toBeNull()
-    expect(block![0]).toMatch(/return renderEmpty\(/)
+    expect(block, 'GPS off branch not found').not.toBeNull()
+    expect(block![0]).toMatch(ASSIGN)
   })
 
-  it('early return final (hasGeometry false fallback) usa renderEmpty', () => {
-    // Captura o último return antes do split global/post (linha que segue
-    // o "DRIFTs deste post ainda não têm tag location" body).
+  it('caminho hasGeometry false fallback usa renderEmpty', () => {
+    // Captura o branch que serve a copy genérica de "sem dados".
     expect(MAP).toMatch(
-      /DRIFTs deste post ainda não têm tag location[\s\S]{0,300}?return renderEmpty\(/,
+      /DRIFTs deste post ainda não têm tag location[\s\S]{0,300}?(?:return|content =) renderEmpty\(/,
     )
   })
 
@@ -94,6 +103,8 @@ describe('SpreadMap empty state — todos os early returns passam por renderEmpt
     // Em SpreadMap top-level, todo Placeholder vem dentro de renderEmpty(...)
     // — pattern `return <Placeholder` direto sinalizaria regressão.
     expect(body).not.toMatch(/return\s+<Placeholder/)
+    // E o assign também não pode escapar do helper.
+    expect(body).not.toMatch(/content\s*=\s*<Placeholder/)
   })
 })
 

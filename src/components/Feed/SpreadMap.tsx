@@ -137,6 +137,33 @@ export function SpreadMap({
 
   const hasGeometry = !!data && (!!data.origin || data.destinations.length > 0)
 
+  // Satoshi A2 mode badge — toast 2s ao alternar modo. Bug fix 2026-05-26:
+  // estado vivia em ModeToggle (linha 746-816 pré-fix), mas ModeToggle é
+  // remountado quando o SpreadMap passa de empty state → mapa (ou vice).
+  // Ex.: global (mapa) → network (empty "sua rede está vazia") desmonta
+  // ModeToggle dentro do MapShell e monta NOVO dentro de renderEmpty;
+  // novo componente inicia com ref de mode = 'network', badge nunca
+  // dispara. Hoist pro top-level resolve ambas causas:
+  //   (a) prevModeRef rastreia mode anterior (não apenas inicial), então
+  //       voltar pro mode inicial (global → network → global) também
+  //       dispara badge na 2ª transição;
+  //   (b) badge renderiza como sibling estável do conteúdo, indep de
+  //       empty state vs MapShell.
+  const [badgeMode, setBadgeMode] = useState<SpreadMapMode | null>(null)
+  const prevModeRef = useRef<SpreadMapMode | null>(null)
+  useEffect(() => {
+    if (prevModeRef.current === null) {
+      // Primeira render — registra mode atual sem disparar badge.
+      prevModeRef.current = mode
+      return
+    }
+    if (mode === prevModeRef.current) return
+    prevModeRef.current = mode
+    setBadgeMode(mode)
+    const t = setTimeout(() => setBadgeMode(null), 2000)
+    return () => clearTimeout(t)
+  }, [mode])
+
   // User feedback 2026-05-26: empty states escondiam o ModeToggle —
   // user clicava em network/global e ficava preso (única saída era
   // FECHAR no header do overlay). Agora cada Placeholder coexiste com
@@ -156,55 +183,49 @@ export function SpreadMap({
     </div>
   )
 
+  let content: React.ReactElement
   if (loading) {
-    return renderEmpty(
+    content = renderEmpty(
       <Placeholder className="h-full w-full" title="carregando mapa…" body="" />,
     )
-  }
-  if (error) {
-    return renderEmpty(
+  } else if (error) {
+    content = renderEmpty(
       <Placeholder className="h-full w-full" title="erro no mapa" body={error} />,
     )
-  }
-  // Network mode empty states (Satoshi+Ted 2026-05-21)
-  if (mode === 'network') {
-    if (!activeNpub) {
-      return renderEmpty(
-        <Placeholder
-          className="h-full w-full"
-          title="modo rede desativado"
-          body="Você precisa estar identificado pra ver sua rede no mapa. Sua identidade é local e privada (manifesto §3)."
-        />,
-      )
-    }
-    if (followsCount === 0) {
-      return renderEmpty(
-        <Placeholder
-          className="h-full w-full"
-          title="sua rede está vazia"
-          body="Você ainda não segue ninguém. Explore o feed global, abra posts que te interessam e siga autores — depois eles aparecem aqui."
-        />,
-      )
-    }
-  }
-  if (!hasGeometry) {
-    if (granularity === 'off' && mode === 'post') {
-      return renderEmpty(
-        <Placeholder
-          className="h-full w-full"
-          title="GPS desativado nas suas configurações"
-          body="Mapa de spreads precisa de location opt-in (manifesto §28 — default off por privacidade). Ative se quiser que seus spreads apareçam no mapa de outros posts."
-          // B3 fix 2026-05-22 (Robin): label antes era 'ativar GPS' — soava
-          // como toggle one-click. Botão na verdade só ABRE a tela de
-          // settings de location (user escolhe granularidade lá). User
-          // reportou: 'sem ativar GPS, só visualizou empty state, ícone
-          // passa a colorido' — provável misclick num radio dentro do
-          // LocationCard. Label novo explicita o destino → user vê tela
-          // e fecha sem mudar nada se quiser.
-          {...(onOpenLocationSettings ? { action: { label: 'abrir Configurações de GPS', onClick: onOpenLocationSettings } } : {})}
-        />,
-      )
-    }
+  } else if (mode === 'network' && !activeNpub) {
+    // Network mode empty states (Satoshi+Ted 2026-05-21)
+    content = renderEmpty(
+      <Placeholder
+        className="h-full w-full"
+        title="modo rede desativado"
+        body="Você precisa estar identificado pra ver sua rede no mapa. Sua identidade é local e privada (manifesto §3)."
+      />,
+    )
+  } else if (mode === 'network' && followsCount === 0) {
+    content = renderEmpty(
+      <Placeholder
+        className="h-full w-full"
+        title="sua rede está vazia"
+        body="Você ainda não segue ninguém. Explore o feed global, abra posts que te interessam e siga autores — depois eles aparecem aqui."
+      />,
+    )
+  } else if (!hasGeometry && granularity === 'off' && mode === 'post') {
+    content = renderEmpty(
+      <Placeholder
+        className="h-full w-full"
+        title="GPS desativado nas suas configurações"
+        body="Mapa de spreads precisa de location opt-in (manifesto §28 — default off por privacidade). Ative se quiser que seus spreads apareçam no mapa de outros posts."
+        // B3 fix 2026-05-22 (Robin): label antes era 'ativar GPS' — soava
+        // como toggle one-click. Botão na verdade só ABRE a tela de
+        // settings de location (user escolhe granularidade lá). User
+        // reportou: 'sem ativar GPS, só visualizou empty state, ícone
+        // passa a colorido' — provável misclick num radio dentro do
+        // LocationCard. Label novo explicita o destino → user vê tela
+        // e fecha sem mudar nada se quiser.
+        {...(onOpenLocationSettings ? { action: { label: 'abrir Configurações de GPS', onClick: onOpenLocationSettings } } : {})}
+      />,
+    )
+  } else if (!hasGeometry) {
     const title =
       mode === 'global'
         ? 'sem dados de localização globais'
@@ -217,17 +238,24 @@ export function SpreadMap({
         : mode === 'network'
         ? 'Ninguém que você segue driftou com GPS ativo ainda. Quando isso acontecer, aparece aqui.'
         : 'DRIFTs deste post ainda não têm tag location. Quando alguém com GPS ativo driftar, aparece aqui.'
-    return renderEmpty(
+    content = renderEmpty(
       <Placeholder className="h-full w-full" title={title} body={body} />,
     )
-  }
-
-  if (mode === 'global' || mode === 'network') {
+  } else if (mode === 'global' || mode === 'network') {
     // Network mode reusa GlobalModeMap (mesma estrutura de arcos/dots
     // animados — só a query upstream difere). Toggle no MapShell mostra
     // qual mode tá ativo.
-    return (
+    content = (
       <GlobalModeMap
+        data={data}
+        className={className}
+        mode={mode}
+        onModeChange={onModeChange}
+      />
+    )
+  } else {
+    content = (
+      <PostModeMap
         data={data}
         className={className}
         mode={mode}
@@ -236,13 +264,37 @@ export function SpreadMap({
     )
   }
 
+  // Satoshi A2 mode badge — toast 2s ao alternar modo. Renderizado como
+  // sibling do conteúdo (não dentro do ModeToggle nem do MapShell) pra
+  // sobreviver à transição empty state ↔ mapa. Posicionamento absolute
+  // top-3 centrado precisa do wrapper relative — a div .relative dentro
+  // de PostModeMap/GlobalModeMap/renderEmpty serve como ancestor. Aqui,
+  // como o badge vive fora do content, usamos um wrapper <div.relative>
+  // que envelopa ambos.
   return (
-    <PostModeMap
-      data={data}
-      className={className}
-      mode={mode}
-      onModeChange={onModeChange}
-    />
+    <div className="relative h-full w-full">
+      {content}
+      <AnimatePresence>
+        {badgeMode && (
+          <m.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
+            role="status"
+            aria-live="polite"
+            className="pointer-events-none absolute left-1/2 top-3 z-30 -translate-x-1/2 rounded-lg border border-drift-border/40 bg-drift-bg/95 px-3 py-1.5 font-mono text-[10px] uppercase tracking-meta text-drift-muted backdrop-blur-sm"
+          >
+            modo:{' '}
+            <span className="text-drift-text">
+              {badgeMode === 'post' && 'este post'}
+              {badgeMode === 'global' && 'rede inteira'}
+              {badgeMode === 'network' && 'sua rede (lente local §24)'}
+            </span>
+          </m.div>
+        )}
+      </AnimatePresence>
+    </div>
   )
 }
 
@@ -765,17 +817,9 @@ function ModeToggle({
   // MapExplainerCard com copy do modo. Tap continua trocando o modo.
   const [explainer, setExplainer] = useState<SpreadMapMode | null>(null)
 
-  // Satoshi A2 2026-05-22 (audit Gap #2): badge ao trocar modo. Toast
-  // ~2s pra educar user que network mode é "lente local" (não compete
-  // com feed canônico §24). Init false pra não exibir no mount.
-  const [badgeMode, setBadgeMode] = useState<SpreadMapMode | null>(null)
-  const initialModeRef = useRef(mode)
-  useEffect(() => {
-    if (mode === initialModeRef.current) return // ignora mount inicial
-    setBadgeMode(mode)
-    const t = setTimeout(() => setBadgeMode(null), 2000)
-    return () => clearTimeout(t)
-  }, [mode])
+  // Nota 2026-05-26: badge "modo: …" foi hoisted pro SpreadMap top-level
+  // (estado vivia aqui mas componente é remountado entre empty state ↔
+  // mapa, perdendo state). Ver comentário em SpreadMap acima.
 
   return (
     <>
@@ -814,29 +858,6 @@ function ModeToggle({
             context={explainer}
             onClose={() => setExplainer(null)}
           />
-        )}
-      </AnimatePresence>
-      {/* Satoshi A2 mode badge — toast 2s ao alternar modo. Posiciona
-          abaixo do ModeToggle (top-3 left-3 ocupado), centrado no top
-          do mapa pra leitura rápida. role=status pra SR. */}
-      <AnimatePresence>
-        {badgeMode && (
-          <m.div
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.2, ease: 'easeOut' }}
-            role="status"
-            aria-live="polite"
-            className="pointer-events-none absolute left-1/2 top-3 z-30 -translate-x-1/2 rounded-lg border border-drift-border/40 bg-drift-bg/95 px-3 py-1.5 font-mono text-[10px] uppercase tracking-meta text-drift-muted backdrop-blur-sm"
-          >
-            modo:{' '}
-            <span className="text-drift-text">
-              {badgeMode === 'post' && 'este post'}
-              {badgeMode === 'global' && 'rede inteira'}
-              {badgeMode === 'network' && 'sua rede (lente local §24)'}
-            </span>
-          </m.div>
         )}
       </AnimatePresence>
     </>
