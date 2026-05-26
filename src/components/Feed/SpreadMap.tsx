@@ -137,38 +137,61 @@ export function SpreadMap({
 
   const hasGeometry = !!data && (!!data.origin || data.destinations.length > 0)
 
+  // User feedback 2026-05-26: empty states escondiam o ModeToggle —
+  // user clicava em network/global e ficava preso (única saída era
+  // FECHAR no header do overlay). Agora cada Placeholder coexiste com
+  // o toggle quando o caller passa onModeChange (MapOverlay sim,
+  // mini-map embedded no PostViewer não). Approach: wrapper renderiza
+  // Placeholder ocupando o container + ModeToggle absolute por cima
+  // (mesma posição que o ModeToggle dentro de MapShell, mantém parity
+  // visual entre estado vazio e estado com mapa).
+  const renderEmpty = (
+    placeholder: React.ReactNode,
+  ): React.ReactElement => (
+    <div className={`relative ${className}`}>
+      {placeholder}
+      {onModeChange && (
+        <ModeToggle mode={mode} onModeChange={onModeChange} />
+      )}
+    </div>
+  )
+
   if (loading) {
-    return <Placeholder className={className} title="carregando mapa…" body="" />
+    return renderEmpty(
+      <Placeholder className="h-full w-full" title="carregando mapa…" body="" />,
+    )
   }
   if (error) {
-    return <Placeholder className={className} title="erro no mapa" body={error} />
+    return renderEmpty(
+      <Placeholder className="h-full w-full" title="erro no mapa" body={error} />,
+    )
   }
   // Network mode empty states (Satoshi+Ted 2026-05-21)
   if (mode === 'network') {
     if (!activeNpub) {
-      return (
+      return renderEmpty(
         <Placeholder
-          className={className}
+          className="h-full w-full"
           title="modo rede desativado"
           body="Você precisa estar identificado pra ver sua rede no mapa. Sua identidade é local e privada (manifesto §3)."
-        />
+        />,
       )
     }
     if (followsCount === 0) {
-      return (
+      return renderEmpty(
         <Placeholder
-          className={className}
+          className="h-full w-full"
           title="sua rede está vazia"
           body="Você ainda não segue ninguém. Explore o feed global, abra posts que te interessam e siga autores — depois eles aparecem aqui."
-        />
+        />,
       )
     }
   }
   if (!hasGeometry) {
     if (granularity === 'off' && mode === 'post') {
-      return (
+      return renderEmpty(
         <Placeholder
-          className={className}
+          className="h-full w-full"
           title="GPS desativado nas suas configurações"
           body="Mapa de spreads precisa de location opt-in (manifesto §28 — default off por privacidade). Ative se quiser que seus spreads apareçam no mapa de outros posts."
           // B3 fix 2026-05-22 (Robin): label antes era 'ativar GPS' — soava
@@ -179,7 +202,7 @@ export function SpreadMap({
           // LocationCard. Label novo explicita o destino → user vê tela
           // e fecha sem mudar nada se quiser.
           {...(onOpenLocationSettings ? { action: { label: 'abrir Configurações de GPS', onClick: onOpenLocationSettings } } : {})}
-        />
+        />,
       )
     }
     const title =
@@ -194,7 +217,9 @@ export function SpreadMap({
         : mode === 'network'
         ? 'Ninguém que você segue driftou com GPS ativo ainda. Quando isso acontecer, aparece aqui.'
         : 'DRIFTs deste post ainda não têm tag location. Quando alguém com GPS ativo driftar, aparece aqui.'
-    return <Placeholder className={className} title={title} body={body} />
+    return renderEmpty(
+      <Placeholder className="h-full w-full" title={title} body={body} />,
+    )
   }
 
   if (mode === 'global' || mode === 'network') {
