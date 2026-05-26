@@ -104,10 +104,14 @@ function makeEvent(opts: {
 }
 
 function makePost(): SignedEvent {
+  // Satoshi Gap C (bf76dda 2026-05-20): validatePostShape rejeita
+  // POST com subposts vazio (NOP farming guard). Fixture usa subpost
+  // dummy não-vazio pra exercer o pipeline persist completo. Audit:
+  // Docs/sessions/marshall-baseline-failures-audit-2026-05-26.md
   return makeEvent({
     kind: DRIFT_KIND.POST,
     tags: [['drift-version', '1']],
-    content: JSON.stringify({ subposts: [] }),
+    content: JSON.stringify({ subposts: [{ id: '1', text: 'hi' }] }),
     id: POST_ID,
     pubkey: POST_AUTHOR,
   })

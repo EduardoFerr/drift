@@ -92,10 +92,14 @@ describe('passesSchemaCheck', () => {
 
     it('NÃO exige tag d (regular event, NIP-01)', () => {
       // Drift v6+: posts.id é event.id, sem `d` tag.
+      // Satoshi Gap C (bf76dda 2026-05-20): subposts vazio rejeitado
+      // (NOP farming guard) — fixture usa subposts não-vazio pra
+      // isolar a invariante real do test ("sem `d`"). Audit:
+      // Docs/sessions/marshall-baseline-failures-audit-2026-05-26.md
       const ev = makeEvent(
         DRIFT_KIND.POST,
         [['drift-version', '1']],
-        JSON.stringify({ subposts: [] }),
+        JSON.stringify({ subposts: [{ id: 'a', text: 'x' }] }),
       )
       expect(passesSchemaCheck(ev)).toBe(true)
     })
