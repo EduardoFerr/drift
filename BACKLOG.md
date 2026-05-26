@@ -159,6 +159,71 @@ shipping prematuro).
   6.5 → 6.6). P2 (não bloqueia produção; quick wins já reduzem o
   pior overhead).
 
+- [ ] **NSFW scanner opt-in via lazy load + same-origin model (escape §25)** —
+  origem: Barney research `barney-nsfw-npm-research-2026-05-23.md`
+  (commit `8c278ae` bundled). User decidiu 2026-05-23 que self-host
+  é a única opção compatível com §17 + §28.
+
+  Manifesto §25 EXPLICITAMENTE permite scanner opt-in como escape
+  (plugin/cliente alternativo), desde que sempre OFF por default +
+  escolha consciente. Lazy load + feature flag = entrega isso sem
+  precisar de "plugin architecture" formal (Barney foi conservador
+  demais ao deferir pra Fase 6.5+).
+
+  Arquitetura proposta:
+  1. **Self-host modelo nsfwjs (`.bin` ~3.5MB)** em `public/models/`
+     (servido do mesmo origin Drift via Vercel) — NÃO usar default
+     CDN `nsfwjs.com` (vaza IP pro Infinite Red, §17/§28)
+  2. **SRI hash pin** (`integrity="sha384-..."`) — manifesto §32
+     supply chain; release re-pin se modelo mudar
+  3. **Lazy chunk** `src/lib/optional-scanners/nsfw.ts` — dynamic
+     `import('nsfwjs')` só ativado se `user_prefs.nsfw_scanner_optin
+     === true` (default false)
+  4. **Settings toggle** em Conteúdo → "scanner NSFW local (opcional)"
+     com copy honesta: "modelo da Infinite Red, roda no seu device,
+     imagem nunca sai. Você pode discordar do que o modelo classifica
+     — é só sugestão."
+  5. **Suggest-tag flow** (NÃO tag automática) — scanner sugere
+     `nsfw` se score > threshold no compose, autor CONFIRMA antes de
+     virar tag `content-warning`. Fortalece §27 (auto-classificação
+     voluntária) em vez de substituir
+  6. **LOCK_VIA_TEST anti-external-CDN** —
+     `tests/nsfw-scanner-isolation.test.ts`:
+     - grep no bundle final proíbe strings `nsfwjs.com`, `tensorflow.org`,
+       `cdn.jsdelivr` etc.
+     - grep `package.json` proíbe `nsfwjs` no `dependencies` (deve estar
+       em `devDependencies` OR como peer + lazy import documentado)
+     - postinstall scripts NULL (supply chain hygiene)
+  7. **Inference 100% local** confirmado — webgl/wasm via TF.js,
+     imagem fica em `<canvas>` em memória, zero network call por scan
+
+  **Trade-offs honestos:**
+  - + defesa em profundidade pro user que QUER (jornalista, criador
+    de muito conteúdo, etc.)
+  - + alinha §25 escape sem precisar plugin architecture
+  - − bundle inicial não infla mas release size cresce (~3.5MB
+    static asset extra em `dist/`)
+  - − Drift se compromete a pinar/versionar modelo (responsabilidade
+    de update vira nossa, não da Infinite Red)
+  - − §3 "identidade portável" — scanner local não funciona em
+    cliente alternativo Drift, mas isso é OK (§25 escape via plugin
+    aceita feature parity gap explicitamente)
+
+  Pré-requisitos antes de impl:
+  - Confirmar nsfwjs npm package sem `postinstall` (supply chain
+    §32) — Barney research não validou explicitamente
+  - Sondar TF.js por trafego silencioso (`tf.io`, telemetria oculta) —
+    LOCK_VIA_TEST cobre
+  - Decisão UX: scanner roda no upload da imagem OU só quando user
+    abre dropdown "marcar conteúdo"? (recomendo segundo — só roda
+    sob demanda)
+
+  Estimativa: spike 2-3h (validar isolation no wire) + impl 4-6h
+  (chunk + setting + LOCK + copy + suggest-tag flow). Total ~1d.
+  Prioridade P3 — não bloqueia produção, mas user explicitamente
+  topou a direção 2026-05-23. Reopener: dispatch spike quando user
+  quiser destravar.
+
 ---
 
 ## Pool de tarefas — gap audit Robin 2026-05-23
