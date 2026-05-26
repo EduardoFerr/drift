@@ -344,3 +344,30 @@ describe('MapOverlay — título dinâmico (item #6 fricção iniciante)', () =>
     expect(APP).toMatch(/title=\{mapTitle\}/)
   })
 })
+
+describe('MapOverlay — headerRight sem counter EV (user feedback 2026-05-26)', () => {
+  // LOCK_VIA_TEST 2026-05-26 — counter 'ev' no headerRight era ruído
+  // no contexto do mapa (header global do app já exibe). Diluía FECHAR
+  // como ação primária. headerRight agora é só o botão fechar.
+  const APP = readFileSync('src/App.tsx', 'utf8')
+
+  it('MapOverlay headerRight NÃO contém o counter eventsReceived', () => {
+    const overlayMatch = APP.match(/function MapOverlay\([\s\S]*?(?=\n\/\/\s*─)/m)
+    expect(overlayMatch, 'MapOverlay function not found').not.toBeNull()
+    const body = overlayMatch![0]
+    // Defesa contra regressão: events.toLocaleString não pode reaparecer
+    // dentro do MapOverlay (era o pattern do counter removido).
+    expect(body).not.toMatch(/events\.toLocaleString/)
+    // Defesa léxica: sufixo ' ev' no headerRight literal era a string
+    // user-facing — não pode voltar dentro de MapOverlay.
+    expect(body).not.toMatch(/\}\s*ev\s*</)
+  })
+
+  it('MapOverlay headerRight é apenas o botão fechar (sem wrapper div)', () => {
+    const overlayMatch = APP.match(/function MapOverlay\([\s\S]*?(?=\n\/\/\s*─)/m)
+    const body = overlayMatch![0]
+    // headerRight é construído como <button>...fechar</button> direto,
+    // não mais como <div className="flex"><span>...</span><button>...</button></div>.
+    expect(body).toMatch(/const headerRight = \(\s*<button/)
+  })
+})

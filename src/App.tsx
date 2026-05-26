@@ -1993,7 +1993,6 @@ function MapOverlay({
   currentPost?: Post | null
   onClose: () => void
 }) {
-  const events = useSyncStore((s) => s.eventsReceived)
   // Satoshi A1 2026-05-22 (audit satoshi-maps-audit Gap #3): default
   // `global` quando entry-point é NavBar — user pediu "ver o mapa" da
   // rede, não deste post específico. Mini-map embedded no PostViewer
@@ -2001,22 +2000,18 @@ function MapOverlay({
   // renderiza). Resolve "abro NavBar MAPA e vejo só este post".
   const [mapMode, setMapMode] = useState<SpreadMapMode>('global')
 
+  // User feedback 2026-05-26 (sessão H pós-revisão): counter 'ev' ao
+  // lado de FECHAR era ruído no contexto do mapa — header global do
+  // app já exibe esse counter. Duplicar dilui FECHAR como ação
+  // primária do overlay. headerRight agora é só o botão fechar.
   const headerRight = (
-    <div className="flex items-center gap-3">
-      <span
-        className="font-mono text-[10px] uppercase tracking-meta text-drift-muted"
-        title="eventos recebidos pelo subscribe"
-      >
-        {events.toLocaleString('pt-BR')} ev
-      </span>
-      <button
-        onClick={onClose}
-        className="rounded border border-drift-border px-3 py-[5px] font-mono text-[10px] uppercase tracking-[2px] text-drift-muted transition-colors hover:text-drift-text focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2"
-        aria-label="fechar mapa"
-      >
-        fechar
-      </button>
-    </div>
+    <button
+      onClick={onClose}
+      className="rounded border border-drift-border px-3 py-[5px] font-mono text-[10px] uppercase tracking-[2px] text-drift-muted transition-colors hover:text-drift-text focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2"
+      aria-label="fechar mapa"
+    >
+      fechar
+    </button>
   )
 
   const postId = mapMode === 'post' ? (currentPost?.id ?? null) : null
