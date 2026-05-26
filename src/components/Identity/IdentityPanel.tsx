@@ -648,10 +648,11 @@ function PasskeyTab({ npub }: { npub: string }) {
   async function handleDisable() {
     if (working) return
     const ok = await dialog.confirm(
-      'O cliente vai parar de pedir autenticação no boot. A identidade em si NÃO é afetada — só o gate local.',
+      'O cliente vai parar de pedir autenticação no boot. A identidade em si NÃO é afetada — só o gate local. ⚠ Se você não tem backup do nsec, perder este device = perder a conta (B-UX-6 / manifesto §3).',
       {
         title: 'desabilitar passkey',
         okLabel: 'desabilitar',
+        dangerous: true,
       },
     )
     if (!ok) return

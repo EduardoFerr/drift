@@ -69,4 +69,23 @@ describe('IdentityPanel — nsec security guards (manifesto §8)', () => {
     expect(PANEL).toMatch(/clipboardTtlMs/)
     expect(PANEL).toMatch(/limpa em.*\$\{?.*clipboardTtlMs/)
   })
+
+  // B-UX-6 — disablePasskey flow precisa do flag dangerous:true porque
+  // se user não tem backup do nsec, passkey é o único factor; remover
+  // sem warning = pode perder a conta no próximo device failure.
+  it('disablePasskey dialog.confirm tem dangerous:true (B-UX-6)', () => {
+    // Captura bloco da chamada de confirm pro disablePasskey
+    const disableSection = PANEL.match(
+      /'desabilitar passkey'[\s\S]{0,400}?dangerous:\s*true/,
+    )
+    expect(
+      disableSection,
+      'disablePasskey precisa de dangerous:true (B-UX-6 P1 threat — sem backup nsec, perder device = perder conta)',
+    ).not.toBeNull()
+  })
+
+  it('disablePasskey copy menciona risco de perder conta sem backup', () => {
+    // Mensagem do confirm deve explicitar tradeoff §3
+    expect(PANEL).toMatch(/(backup do nsec|sem backup|perder a conta|§3)/i)
+  })
 })
