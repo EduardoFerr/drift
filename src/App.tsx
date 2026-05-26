@@ -1756,6 +1756,21 @@ function HomeHeader({
       <div className="border-b border-drift-border">
         <FeedTabs {...(onActiveTabTap ? { onActiveTabTap } : {})} />
       </div>
+      {/* Item #3 fricção UX iniciante 2026-05-23: dots chartreuse
+          (○) ao lado dos labels de aba indicavam "posts novos" mas
+          sem legenda. HintChip first-time aparece logo abaixo das
+          tabs até o user dispensar. Pattern existente (mesmo padrão
+          do backup-after-post chip). HintChip auto-gates via
+          capabilities — some quando user dispensa permanentemente. */}
+      {(() => {
+        const tabDotsRule = getHintRule('tab-dots-meaning')
+        if (!tabDotsRule) return null
+        return (
+          <div className="mt-2 flex justify-end">
+            <HintChip rule={tabDotsRule} label="○ = posts novos" />
+          </div>
+        )
+      })()}
     </m.header>
   )
 }

@@ -15,7 +15,12 @@
 
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
-import { ONBOARDING_RULES, getOnboardingRule } from '../src/lib/guidance'
+import {
+  ONBOARDING_RULES,
+  HINT_RULES,
+  getOnboardingRule,
+  getHintRule,
+} from '../src/lib/guidance'
 
 const PANEL = readFileSync(
   'src/components/Onboarding/OnboardingOverlay.tsx',
@@ -96,6 +101,48 @@ describe('OnboardingOverlay.tsx — consumer puro de ONBOARDING_RULES', () => {
     // PR1 era ONBOARDING_RULES.map; PR2 (DAOP-001 2026-05-17) trocou pra
     // applicableRules = filterApplicableRules(ONBOARDING_RULES, caps).
     expect(PANEL).toMatch(/applicableRules\.map/)
+  })
+})
+
+describe('HINT_RULES — shape canônica (item #3 fricção iniciante 2026-05-25)', () => {
+  // LOCK_VIA_TEST — HINT_RULES ids estáveis. Adicionar novos requer
+  // ID único + body factory function. Mudar id quebra continuity
+  // (capabilities_dismissed CSV persiste IDs antigos).
+
+  const EXPECTED_HINT_IDS = ['tab-dots-meaning', 'backup-after-post'] as const
+
+  it('contém pelo menos os 2 hints canônicos', () => {
+    const ids = HINT_RULES.map((r) => r.id)
+    for (const expected of EXPECTED_HINT_IDS) {
+      expect(ids).toContain(expected)
+    }
+  })
+
+  it('cada hint tem id + title + body factory', () => {
+    for (const rule of HINT_RULES) {
+      expect(typeof rule.id).toBe('string')
+      expect(rule.id.length).toBeGreaterThan(0)
+      expect(typeof rule.title).toBe('string')
+      expect(typeof rule.body).toBe('function')
+    }
+  })
+
+  it('getHintRule retorna tab-dots-meaning + backup-after-post', () => {
+    expect(getHintRule('tab-dots-meaning')?.id).toBe('tab-dots-meaning')
+    expect(getHintRule('backup-after-post')?.id).toBe('backup-after-post')
+    expect(getHintRule('nonexistent-hint-xyz')).toBeUndefined()
+  })
+
+  it('tab-dots-meaning title contém símbolo "○" pra bater com chip render', () => {
+    // Pattern intencional: chip label começa com "○" pra user visualmente
+    // associar com dot nas tabs.
+    const rule = getHintRule('tab-dots-meaning')
+    expect(rule?.title).toMatch(/○/)
+  })
+
+  it('HomeHeader (App.tsx) renderiza HintChip pra tab-dots-meaning', () => {
+    const APP = readFileSync('src/App.tsx', 'utf8')
+    expect(APP).toMatch(/getHintRule\(['"]tab-dots-meaning['"]\)/)
   })
 })
 

@@ -232,6 +232,30 @@ export const ONBOARDING_RULES: readonly GuidanceRule[] = [
  */
 export const HINT_RULES: readonly GuidanceRule[] = [
   {
+    id: 'tab-dots-meaning',
+    title: '○ = posts novos',
+    // Hint body só usado se caller decidir abrir overlay/explanation.
+    // No header, renderizamos HintChip com `label='○ = posts novos'`
+    // sem onActivate (chip passive, X dispensa permanente).
+    body: () => (
+      <>
+        <p>
+          O ponto chartreuse nas abas (global · seguindo · em alta)
+          indica que tem post novo naquela aba — chegou via Nostr
+          enquanto você estava em outra.
+        </p>
+        <p className="text-drift-muted">
+          Toque na aba pra ver. Ou toque na aba que JÁ está ativa pra
+          atualizar + voltar pro topo.
+        </p>
+      </>
+    ),
+    // Aplica até o user dispensar (HintChip × button). Sem capability
+    // gate específico — todo user iniciante se beneficia. Após primeiro
+    // dismiss, nunca volta (CSV persiste em capabilities_dismissed).
+    // Item #3 fricção iniciante observada em 2026-05-23.
+  },
+  {
     id: 'backup-after-post',
     title: 'faça backup do nsec',
     body: ({ onOpenIdentity }) => (
