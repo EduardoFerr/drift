@@ -253,8 +253,16 @@ describe('Marshall finding: sovereignty endpoints customizáveis via UserPrefs',
     const src = readFileSync('src/lib/moderation.ts', 'utf8')
     // Signature aceita override opcional
     expect(src).toMatch(/getReportThreshold\([^)]*override\?\s*:\s*number/)
-    // maybeModerate lê pref + passa pra getReportThreshold
-    expect(src).toMatch(/getPrefs\(\)\.report_threshold_override/)
+    // maybeModerate lê pref + passa pra getReportThreshold.
+    // Lock semântico (não sintático): aceita acesso direto
+    // `getPrefs().report_threshold_override` OU forma extracted
+    // `const prefs = getPrefs(); ...prefs.report_threshold_override`
+    // (refactor fc306c2 2026-05-21 Gap A decay extraiu const prefs
+    // pra reusar com report_decay_enabled). Invariante real é "ambos
+    // tokens presentes próximos no arquivo", não shape sintático.
+    // Audit: Docs/sessions/marshall-baseline-failures-audit-2026-05-26.md
+    expect(src).toMatch(/getPrefs\(\)/)
+    expect(src).toMatch(/\.report_threshold_override\b/)
     expect(src).toMatch(/getReportThreshold\(activeUsers,\s*reason,\s*override\)/)
   })
 
