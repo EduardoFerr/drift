@@ -344,6 +344,11 @@ export function NetworkModeCard({ onClose }: CardProps) {
   const bootStep = useBootStore((s) => s.step)
   const degradedReasons = useBootStore((s) => s.degradedReasons)
   const tauriRuntime = isTauri()
+  // Item #5 fricção iniciante 2026-05-23: warning "REINICIA app" gerava
+  // ansiedade ao abrir a tela mesmo sem interação. Agora warning só
+  // aparece DEPOIS do user iniciar uma mudança (clique num radio
+  // diferente do atual). Confirmação do reload continua no dialog.
+  const [hasInteracted, setHasInteracted] = useState(false)
 
   // Anti-isolation: onion-only sem nenhum relay com alias .onion.
   const onionAvailable = (() => {
@@ -373,6 +378,10 @@ export function NetworkModeCard({ onClose }: CardProps) {
 
   async function changeMode(v: NetworkMode) {
     if (v === prefs.network_mode) return
+    // Marca interação ANTES de abrir o dialog — assim mesmo se user
+    // cancelar, o warning continua visível como contexto pro próximo
+    // clique. Item #5 fricção iniciante 2026-05-23.
+    setHasInteracted(true)
     const next = v === 'tor' || v === 'onion-only' ? 'Tor' : 'clearnet'
     const ok = await dialog.confirm(
       `Trocar para ${next} exige recarregar a aba para aplicar.`,
@@ -398,7 +407,13 @@ export function NetworkModeCard({ onClose }: CardProps) {
           description="O Drift se conecta a servidores Nostr (chamados relays) pra trocar posts com outras pessoas. Aqui você escolhe o caminho que esses dados tomam."
           impact="Internet normal (clearnet) é o padrão — funciona em qualquer dispositivo. Tor esconde seu IP, ótimo pra contornar bloqueios regionais, mas exige o app desktop. Em PWA navegador, escolher Tor NÃO faz nada — seu IP continua exposto."
           defaultExplained="Internet normal. Funciona universalmente; mudar pra Tor é decisão consciente de privacidade adicional."
-          warning="Mudar este setting REINICIA o app pra aplicar. Você vai perder qualquer ação não-publicada."
+          // Item #5 fricção iniciante 2026-05-23: warning só após interação.
+          // Antes: amber alert aparecia ao abrir a tela mesmo sem ter
+          // selecionado nada — gerava ansiedade. Dialog de confirmação já
+          // alerta sobre o reload no momento da ação destrutiva.
+          {...(hasInteracted
+            ? { warning: 'Mudar este setting REINICIA o app pra aplicar. Você vai perder qualquer ação não-publicada.' }
+            : {})}
           reversible
           reference="manifesto §15 — anti-censura por país"
         >

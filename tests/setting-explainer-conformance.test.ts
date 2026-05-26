@@ -213,3 +213,39 @@ describe('Settings cards — ratchet pendente', () => {
     expect(PENDING_REFACTOR_ALLOWLIST.size).toBe(0)
   })
 })
+
+describe('NetworkModeCard — warning gate (item #5 fricção iniciante)', () => {
+  // LOCK_VIA_TEST 2026-05-25 — warning "REINICIA app" só pode aparecer
+  // APÓS user interagir (clicar num radio diferente). Antes: warning
+  // renderizava sempre, gerando ansiedade ao abrir a tela. Dialog de
+  // confirmação já alerta sobre o reload no momento da ação destrutiva
+  // — warning estático no SettingExplainer era ruído duplicado pré-
+  // interação.
+  //
+  // Esse test é structural (source grep), não behavioral. Razão:
+  // SettingsCards.tsx tem 10+ cards inter-relacionados; setup de render
+  // isolado custaria muito. Pattern usado: tests/setting-explainer-
+  // conformance já checa source structure.
+
+  it('NetworkModeCard usa state hasInteracted', () => {
+    expect(CARDS_SRC).toMatch(/hasInteracted/)
+    expect(CARDS_SRC).toMatch(/setHasInteracted\(true\)/)
+  })
+
+  it('warning prop é gated por hasInteracted', () => {
+    // Pattern: `{...(hasInteracted ? { warning: '…' } : {})}` ou
+    // `warning={hasInteracted ? '…' : undefined}`. Aceita ambos.
+    const gatedSpread = /hasInteracted\s*\?\s*\{\s*warning\s*:/
+    const gatedTernary = /warning=\{hasInteracted\s*\?/
+    expect(
+      gatedSpread.test(CARDS_SRC) || gatedTernary.test(CARDS_SRC),
+      'NetworkModeCard deve gatear warning prop com hasInteracted state',
+    ).toBe(true)
+  })
+
+  it('warning string contém "REINICIA" (vocab esperado)', () => {
+    // Não muda copy sem atualizar este test — protege regressão de
+    // ofuscação acidental ("ATENÇÃO" genérico em vez de termo claro).
+    expect(CARDS_SRC).toMatch(/REINICIA o app/)
+  })
+})
