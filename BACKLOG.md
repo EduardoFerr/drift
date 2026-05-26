@@ -461,57 +461,63 @@ re-promovidos ao backlog raiz.)
 descobertos em 1 sessão. Padrão comum: signals visuais sem legenda
 acessível imediata + estados sutis demais pra discriminar.)
 
-- [ ] **"DERIVA 0.810" no header não é clicável / sem feedback** —
-  novo usuário vai querer saber o que esse número significa. Score
-  muda visualmente (vi de 0.000 → 0.810) mas sem explicação on-screen.
-  Possíveis fixes: (a) tap abre tooltip/popover com 2-3 linhas "O que
-  é DERIVA" + link pro GuideCard, (b) long-press 3s abre MapExplainer-
-  style (consistente com pattern recém-shipado). P1.
+Sessão Lily 2026-05-26: **todos os 7 fechados** em 6 commits serial
+(1f540db, 8c278ae, 909f953, 40a7196, 7712b64, 5410893). +14 tests
+LOCK_VIA_TEST novos (3 setting-explainer, 3 spread-map-network-mode,
+5 guidance-rules, +1 arquivo identity-switcher-create-preview com 5).
 
-- [ ] **"463 EV" opaco pra iniciante** — EV = Eventos. Status panel
-  explica mas user médio passa direto sem clicar. Possíveis fixes:
-  (a) tooltip on hover/long-press, (b) trocar copy "463 EV" → "463
-  eventos" (custa horizontal space — header já crowded P3 conhecido),
-  (c) primeiro tap abre painel status (já é o behavior — só faltou
-  affordance visual indicando que é tappable). P1.
+- [x] **"DERIVA 0.810" no header não é clicável / sem feedback** —
+  fechado 2026-05-26 em [1f540db] — wrap em `<button>` clicável que
+  abre GuideCard (já cobre score/weight/threshold com SettingExplainer).
+  Tooltip title cobre hover desktop; underline pontilhado discreto
+  sinaliza affordance visual. Rejeitada long-press-3s pattern porque
+  GuideCard direto é mais útil pra iniciante (long-press é discovery
+  oculta — viola affordance imediata visada).
 
-- [ ] **Tab dots (global•, seguindo•, em alta•) sem legenda** —
-  fechado em [6eeb2c2] o bug de "dot na ativa" + a11y `aria-label="N
-  novos"`. MAS visualmente a diferença laranja vs vermelho é sutil
-  e sem onboarding/affordance que dot = novidade. Fixes: (a) primeira
-  ocorrência mostra HintChip "○ indica posts novos" (dismissRule),
-  (b) hover/long-press tooltip "N novos posts em <tab>". P2.
+- [x] **"463 EV" opaco pra iniciante** — fechado 2026-05-26 em
+  [1f540db] — adicionado underline pontilhado on hover/focus +
+  tooltip enriquecido (`N eventos recebidos do Nostr · subscribe
+  ativo · toque pra detalhes`). aria-label trocado de "N ev" pra
+  "N eventos recebidos" (melhor pra screen readers). Comportamento
+  já era tappable — só faltou affordance + tooltip.
 
-- [ ] **Botão "◐ Prévia" disabled state muito sutil** — quando
-  textarea vazia, botão fica acinzentado mas visualmente parece
-  "fraco" não "inativo". User pode clicar sem feedback. Fixes:
-  (a) `cursor-not-allowed` + `opacity-50` + `pointer-events-none`,
-  (b) tooltip "Escreva algo antes" no disabled state, (c) trocar
-  copy disabled pra "✕ Prévia (escreva algo)". P2.
+- [x] **Tab dots (global•, seguindo•, em alta•) sem legenda** —
+  fechado 2026-05-26 em [7712b64] — nova GuidanceRule
+  `tab-dots-meaning` em HINT_RULES + HintChip renderizado no
+  HomeHeader logo abaixo das FeedTabs. Label "○ = posts novos"
+  bate visualmente com dot real. Dispensável permanente via
+  capabilities_dismissed CSV (manifesto §28 local-only). Pattern
+  reusou backup-after-post chip.
 
-- [ ] **Tela "Modo de Rede" mostra aviso amber "REINICIA app"
-  mesmo sem interação** — gera ansiedade desnecessária. Aviso
-  deveria aparecer só após user mudar a seleção. Fix: gate
-  `showRestartWarning` em `selectedMode !== currentMode`. P1.
+- [x] **Botão "◐ Prévia" disabled state muito sutil** —
+  fechado 2026-05-26 em [909f953] — border-dashed +
+  cursor-not-allowed + opacity efetiva (text-drift-muted/50) +
+  copy condicional (`✕ escreva algo` quando vazio, `◐ prévia`
+  quando pronto) + tooltip "escreva algo antes de pré-visualizar".
 
-- [ ] **Network mode no mapa: mental model fragmentado** —
-  header "propagação", nav "MAPA", abas internas POST/GLOBAL/NETWORK
-  com comportamentos distintos. User vê 3 nomenclaturas diferentes
-  pra "mapa". Convergência com Satoshi (`satoshi-maps-audit`) +
-  Ted (`ted-maps-review`) — já capturado parcialmente. Fixes
-  possíveis: (a) consolidar naming (escolher "MAPA" como label
-  primário em TODAS surfaces), (b) header overlay dinâmico
-  "MAPA · este post" / "MAPA · global" / "MAPA · sua rede"
-  (sub-header explicativo). P1.
+- [x] **Tela "Modo de Rede" mostra aviso amber "REINICIA app"
+  mesmo sem interação** — fechado 2026-05-26 em [8c278ae] —
+  state local `hasInteracted` vira true quando user clica num
+  radio diferente do atual (ANTES de abrir o dialog — assim
+  mesmo se cancelar, warning continua como contexto). Warning prop
+  passada via spread condicional. Dialog de confirmação preservado.
+  LOCK_VIA_TEST: +3 testes em setting-explainer-conformance.
 
-- [ ] **Identidades múltiplas — sem preview do fluxo de criação** —
-  submenu existe em Settings → Identidade → "identidades" mas não
-  é claro o que acontece ao criar uma segunda. Falta:
-  (a) preview dos passos antes de iniciar (1. gera nova nsec, 2.
-  backup obrigatório, 3. troca ativa requer reload), (b) warning
-  manifesto §3 "dispositivo descartável, identidade não — backup
-  ANTES de qualquer ação destrutiva", (c) example empty state com
-  call-to-action vs blank screen. P1.
+- [x] **Network mode no mapa: mental model fragmentado** —
+  fechado 2026-05-26 em [40a7196] — header FullPageCard agora
+  dinâmico baseado em mapMode: `mapa · este post` / `mapa · sua
+  rede` / `mapa · global`. Vocabulário convergido em "mapa"
+  (consistente com nav). aria-label preserva "propagação" pra
+  contexto a11y. LOCK_VIA_TEST: +3 testes em
+  spread-map-network-mode-conformance.
+
+- [x] **Identidades múltiplas — sem preview do fluxo de criação** —
+  fechado 2026-05-26 em [5410893] — card preview com 3 passos
+  numerados (gera chave local · entra na lista sem trocar ativa ·
+  trocar ativa exige reload + backup do nsec ANTES por manifesto §3)
+  inserido antes do input no mode 'create'. role='note' +
+  aria-label='passos da criação'. LOCK_VIA_TEST: novo arquivo
+  identity-switcher-create-preview-conformance.test.ts (+5 tests).
 
 ---
 
