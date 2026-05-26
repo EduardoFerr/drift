@@ -105,6 +105,24 @@ shipping prematuro).
   (b) leftover de session anterior. Já existe item B3 reopener
   registrado — confirmar se essa observação reabre o gap. P2.
 
+- [ ] **P2P aberto sem uso — auditar otimização (discovery idle cost)** —
+  user observou 2026-05-23 que algum componente P2P (Fase 6 — WebRTC
+  transport / peer discovery) está "aberto sem ser usado" durante uso
+  normal. Investigar: `src/lib/transport/webrtc/` — `discovery.ts`,
+  `peer.ts`, `boot.ts`, `peerLink.ts`. Hipóteses:
+  (a) `startProbe()` ou discovery loop rodando 24/7 mesmo sem peers
+      ativos → bandwidth/CPU waste;
+  (b) WebRTC `RTCPeerConnection` instances ficam abertas após
+      negotiation falhar (memory leak);
+  (c) Followers/follow discovery sub iniciada no boot e nunca encerrada;
+  (d) DataChannel sem traffic mas keepalive ping continua.
+  Fix expected: idle-state detection + close/teardown quando sem
+  atividade por N minutos (rehidrata sob demanda). Não quebrar §15
+  anti-censura nem §16 disponibilidade — apenas evitar overhead idle.
+  Bloqueio: confirmar com Lily se há instrumentação atual de "idle vs
+  active" no transport. Marshall/Lily/Satoshi audit dispatch — 2-3h.
+  P1.
+
 ---
 
 ## Pool de tarefas — gap audit Robin 2026-05-23
