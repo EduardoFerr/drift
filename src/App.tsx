@@ -2006,12 +2006,28 @@ function MapOverlay({
 
   const postId = mapMode === 'post' ? (currentPost?.id ?? null) : null
 
+  // Item #6 fricção UX iniciante 2026-05-23: user via 3 nomenclaturas
+  // diferentes pra mesma feature (header 'propagação', nav 'MAPA',
+  // abas internas POST/GLOBAL/NETWORK). Título dinâmico do FullPageCard
+  // agora reflete a aba ativa em formato 'MAPA · <contexto>':
+  //   - post    → 'MAPA · este post'
+  //   - global  → 'MAPA · global'
+  //   - network → 'MAPA · sua rede'
+  // Aba interna (POST/GLOBAL/NETWORK) preservada como controle de
+  // mudança; título narra qual está ativa em vocabulário user-facing.
+  const mapTitle =
+    mapMode === 'post'
+      ? 'mapa · este post'
+      : mapMode === 'network'
+      ? 'mapa · sua rede'
+      : 'mapa · global'
+
   return (
     <FullPageCard
       onClose={onClose}
-      title="propagação"
+      title={mapTitle}
       headerRight={headerRight}
-      ariaLabel="mapa de propagação"
+      ariaLabel={`mapa de propagação — ${mapMode}`}
     >
       <div className="relative h-full w-full">
         <LazyBoundary fallback={<DriftSkeleton variant="image" aspect="16/9" />}>

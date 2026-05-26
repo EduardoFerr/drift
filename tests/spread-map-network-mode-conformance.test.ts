@@ -318,3 +318,29 @@ describe('SpreadMap network mode — empty states', () => {
     expect(MAP).toMatch(/GPS desativado nas suas configurações/)
   })
 })
+
+describe('MapOverlay — título dinâmico (item #6 fricção iniciante)', () => {
+  // LOCK_VIA_TEST 2026-05-25 — header do MapOverlay deve refletir aba
+  // ativa em vocabulário user-facing 'mapa · <contexto>'. Antes: header
+  // estático 'propagação' enquanto nav dizia 'MAPA' e abas internas
+  // POST/GLOBAL/NETWORK — 3 nomenclaturas pra mesma feature, user
+  // iniciante perdia o mental model.
+  const APP = readFileSync('src/App.tsx', 'utf8')
+
+  it('MapOverlay computa title dinâmico baseado em mapMode', () => {
+    // Pattern: const mapTitle = mapMode === 'post' ? 'mapa · este post' : …
+    expect(APP).toMatch(/mapa\s*·\s*este post/)
+    expect(APP).toMatch(/mapa\s*·\s*sua rede/)
+    expect(APP).toMatch(/mapa\s*·\s*global/)
+  })
+
+  it('MapOverlay NÃO usa mais título estático "propagação" como header', () => {
+    // Allowlist: aria-label e comments podem mencionar propagação;
+    // mas title prop do FullPageCard deve ser dinâmico.
+    expect(APP).not.toMatch(/title="propagação"/)
+  })
+
+  it('FullPageCard recebe title={mapTitle} no MapOverlay', () => {
+    expect(APP).toMatch(/title=\{mapTitle\}/)
+  })
+})
