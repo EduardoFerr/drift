@@ -106,22 +106,58 @@ shipping prematuro).
   registrado — confirmar se essa observação reabre o gap. P2.
 
 - [ ] **P2P aberto sem uso — auditar otimização (discovery idle cost)** —
-  user observou 2026-05-23 que algum componente P2P (Fase 6 — WebRTC
-  transport / peer discovery) está "aberto sem ser usado" durante uso
-  normal. Investigar: `src/lib/transport/webrtc/` — `discovery.ts`,
-  `peer.ts`, `boot.ts`, `peerLink.ts`. Hipóteses:
-  (a) `startProbe()` ou discovery loop rodando 24/7 mesmo sem peers
-      ativos → bandwidth/CPU waste;
-  (b) WebRTC `RTCPeerConnection` instances ficam abertas após
-      negotiation falhar (memory leak);
-  (c) Followers/follow discovery sub iniciada no boot e nunca encerrada;
-  (d) DataChannel sem traffic mas keepalive ping continua.
-  Fix expected: idle-state detection + close/teardown quando sem
-  atividade por N minutos (rehidrata sob demanda). Não quebrar §15
-  anti-censura nem §16 disponibilidade — apenas evitar overhead idle.
-  Bloqueio: confirmar com Lily se há instrumentação atual de "idle vs
-  active" no transport. Marshall/Lily/Satoshi audit dispatch — 2-3h.
-  P1.
+  AUDIT FECHADO 2026-05-23: trio Marshall + Satoshi + Lily auditaram
+  (commits `aa39265` + `a3a951a`). Convergência tripla:
+  ✅ Manter PeerConnections abertos (não disconnect — viola §16 +
+     piora T-P3 ICE re-leak)
+  ✅ Pausar TIMERS (ping/random-walk/follows discovery) quando idle
+  ❌ NetworkInformation / Battery / IdleDetector APIs (chave-mestra §17)
+
+  **L2 confirmado é a raiz do "P2P aberto sem usar"**: boot eager do
+  signaling em modo mock — `startSync` boota BroadcastChannel +
+  randomWalkTimer + healthTimer + pagehide listener mesmo sem peer
+  jamais conectar em uso solo same-origin.
+
+  Quick wins shipados em sprint adjacente (ver task #49). RFC pra
+  Sprint N+4 — ver item separado abaixo. Item original fica
+  registrado pra historicidade. P1 → resolved.
+
+- [ ] **P2P idle-state full (Sprint N+4 RFC) — cold→warm→hot scheme** —
+  origem audit P2P idle 2026-05-23. Quick wins (QW1+QW2+QW3) shipados
+  em PR adjacente; RFC fica pra sprint dedicada com escopo arquitetural:
+
+  Componentes:
+  1. **`peer.lastTrafficAt: number | null`** (Marshall proposal) —
+     atualizado SÓ por eventos pós-verify Schnorr OK (inbound) e
+     `dc.send OK` (outbound). **NÃO atualizado por ping/pong**
+     (invariante M1). Local-only, não persistido (Trust Lens style).
+  2. **`peerActivityMode(peer, now): 'active' | 'idle' | 'unknown'`**
+     função pura derivada (limiar 10min).
+  3. **Hibernate-on-hidden** (Satoshi proposal) —
+     `document.visibilityState === 'hidden'` por ≥30s pausa timers.
+     Wake-up com **jitter ±5s** (anti exact-time fingerprint).
+  4. **Settings toggle** "Hibernar P2P em background" — default OFF
+     na 6.5, ON na 6.6 pós-telemetria.
+  5. **7 LOCK_VIA_TEST Marshall** (M1-M7):
+     - M1 ping/pong ≠ tráfego
+     - M2 terminais não regridem
+     - M3 signaling channel+unsub paired
+     - M4 getOrCreatePeer idempotente
+     - M5 registerTransport idempotente
+     - M6 connectTo sem cycle
+     - M7 orchestrator dedup cap
+  6. **Unificar com `helia.ts` idleWatcher pattern** — refactor R2
+     do relatório Lily (mesmo pattern já existe no IPFS pin).
+
+  Game-theoretic bonus (Satoshi): hibernate-on-hidden tem efeito
+  colateral defensivo — Sybil farms always-on destacam-se contra
+  população de devices reais que hibernam, melhora cluster detection
+  passivamente.
+
+  Bloqueio: agendar Sprint N+4 com escopo dedicado. Estimativa ~2-3d
+  (RFC + impl + 7 LOCK_VIA_TEST + telemetria opt-in pra default-flip
+  6.5 → 6.6). P2 (não bloqueia produção; quick wins já reduzem o
+  pior overhead).
 
 ---
 
