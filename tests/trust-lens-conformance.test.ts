@@ -218,9 +218,21 @@ describe('Trust Lens — conformance (LOCK_VIA_TEST §17 §22 §24 §25 §27)', 
     //
     // Bloqueado: texto entre `>...<` ou em prop string que aparente ser
     // user-facing copy ("Trust", "trust score", numérico de PPR exposto).
+    //
+    // Allow-list pedagógica (2026-05-26): GuideCard é hub explicativo
+    // que legitimamente expõe "Trust Lens" como sub-rótulo técnico de
+    // "Sua Lente" — Docs/guia-do-usuario.md §337 "Sua Lente (Trust
+    // Lens)" já permite o duplo-rótulo. Lock #7 mantém ban em
+    // componentes Feed/Lens/PostViewer onde label visível violaria §22.
+    // Fonte: Docs/sessions/marshall-baseline-failures-audit-2026-05-26.md
+    const PEDAGOGICAL_ALLOW = new Set<string>([
+      'src/components/Settings/GuideCard.tsx',
+    ])
     const violations: string[] = []
     const userFacingForbidden = /(?:>|"|')(?:[^<>"']*?\b)(Trust\s+(?:Lens|score)|trust\s+score)\b/gi
     for (const { file, content } of readJsxStrings()) {
+      const rel = file.replace(/\\/g, '/')
+      if (PEDAGOGICAL_ALLOW.has(rel)) continue
       // Remove block + line comments antes do match — sem dependência
       // de AST. Regex simples cobre os casos do repo.
       const stripped = content
