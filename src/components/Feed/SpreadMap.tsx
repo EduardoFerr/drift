@@ -29,6 +29,8 @@ import { pinColor, PIN_COLOR_DEFAULT } from '../../lib/trust/map-color'
 import { loadMapDeps } from './useMapDeps'
 import { useMapInstance } from './useMapInstance'
 import { usePrefsStore } from '../../lib/prefs'
+import { HintChip } from '../UI/HintChip'
+import { getHintRule } from '../../lib/guidance'
 import type { PropagationArc, SpreadMapData } from '../../types/drift'
 
 export interface SpreadMapProps {
@@ -37,6 +39,17 @@ export interface SpreadMapProps {
   mode?: SpreadMapMode
   onModeChange?: (mode: SpreadMapMode) => void
   onOpenLocationSettings?: () => void
+  /**
+   * Sprint N+4 P1.9 (Satoshi A4 follow-up 2026-05-26): callback pra
+   * abrir Settings → Soberania (tile server section). Quando provido,
+   * MapShell renderiza HintChip `carto-tile-sovereignty` ambient. CTA
+   * em chip → caller fecha overlay map + push sovereignty layer.
+   *
+   * Optional — quando ausente, hint não renderiza (mini-map embedded
+   * no PostViewer não tem caminho de saída pra Settings sem perder o
+   * contexto do post; MapOverlay full-screen sim).
+   */
+  onOpenTileSettings?: () => void
   /**
    * Em modo `global`, post atualmente em foco no overlay. Arcos/dots
    *  desse post são destacados visualmente (chartreuse), demais ficam
@@ -128,6 +141,7 @@ export function SpreadMap({
   mode = 'post',
   onModeChange,
   onOpenLocationSettings,
+  onOpenTileSettings,
   currentPostId,
 }: SpreadMapProps) {
   const { data, loading, error } = useSpreadMap(postId, mode, currentPostId)
@@ -251,6 +265,7 @@ export function SpreadMap({
         className={className}
         mode={mode}
         onModeChange={onModeChange}
+        {...(onOpenTileSettings ? { onOpenTileSettings } : {})}
       />
     )
   } else {
@@ -260,6 +275,7 @@ export function SpreadMap({
         className={className}
         mode={mode}
         onModeChange={onModeChange}
+        {...(onOpenTileSettings ? { onOpenTileSettings } : {})}
       />
     )
   }
@@ -305,6 +321,8 @@ interface ModeMapProps {
   className: string
   mode: SpreadMapMode
   onModeChange?: (m: SpreadMapMode) => void
+  /** Sprint N+4 P1.9: thread pra MapShell renderizar HintChip CARTO. */
+  onOpenTileSettings?: () => void
 }
 
 interface PointLayerProps { position: [number, number] }
@@ -317,7 +335,7 @@ interface AnimDotProps {
   isCurrent: boolean
 }
 
-function PostModeMap({ data, className, mode, onModeChange }: ModeMapProps) {
+function PostModeMap({ data, className, mode, onModeChange, onOpenTileSettings }: ModeMapProps) {
   const mapView = usePrefsStore((s) => s.map_view)
   // Sovereignty: tile template override pra usar self-hosted/OSM/mirror
   // anônimo em vez do default CARTO (que loga IP). Marshall NEEDS-FIX B.
@@ -422,6 +440,7 @@ function PostModeMap({ data, className, mode, onModeChange }: ModeMapProps) {
         onModeChange={onModeChange}
         stats={`${data.totalSpreads} drifts · ${data.countries.length} ${data.countries.length === 1 ? 'país' : 'países'}`}
         timelineEvents={data.destinations.map((d) => ({ created_at: d.createdAt }))}
+        {...(onOpenTileSettings ? { onOpenTileSettings } : {})}
       />
       {showK1Warning && (
         <SoloSpreaderWarning onDismiss={() => setK1WarningDismissed(true)} />
@@ -475,7 +494,7 @@ function SoloSpreaderWarning({ onDismiss }: { onDismiss: () => void }) {
 
 // ─── GlobalModeMap — linhas animadas de propagação ────────────────────
 
-function GlobalModeMap({ data, className, mode, onModeChange }: ModeMapProps) {
+function GlobalModeMap({ data, className, mode, onModeChange, onOpenTileSettings }: ModeMapProps) {
   const mapView = usePrefsStore((s) => s.map_view)
   const tileTemplate = usePrefsStore((s) => s.map_tile_url_template)
   // Trust Lens D 2026-05-21 — opt-in WoT colors. Default OFF (Satoshi
@@ -718,6 +737,7 @@ function GlobalModeMap({ data, className, mode, onModeChange }: ModeMapProps) {
             : `${data.totalSpreads} drifts · ${data.countries.length} ${data.countries.length === 1 ? 'país' : 'países'} · todos os posts`
         }
         timelineEvents={data.destinations.map((d) => ({ created_at: d.createdAt }))}
+        {...(onOpenTileSettings ? { onOpenTileSettings } : {})}
       />
       {lensHintVisible && (
         <div
@@ -741,6 +761,7 @@ function MapShell({
   onModeChange,
   stats,
   timelineEvents,
+  onOpenTileSettings,
 }: {
   containerRef: React.RefObject<HTMLDivElement>
   className: string
@@ -754,6 +775,8 @@ function MapShell({
    * renderiza (zero footprint).
    */
   timelineEvents?: Array<{ created_at: number }>
+  /** Sprint N+4 P1.9: caller injeta callback pra abrir tile settings. */
+  onOpenTileSettings?: () => void
 }) {
   // Satoshi A4: omite o nudge "tiles externos" quando user já configurou
   // template custom (sovereignty pref) — sinaliza que respeitamos a
@@ -763,11 +786,32 @@ function MapShell({
   const attributionHTML = usingCustomTiles
     ? MAP_ATTRIBUTION
     : MAP_ATTRIBUTION + CARTO_SOVEREIGNTY_NUDGE
+
+  // Sprint N+4 P1.9 (Satoshi A4 follow-up 2026-05-26): HintChip ambient
+  // sobre CARTO sovereignty. Render gate:
+  //   1. onOpenTileSettings provido (caller tem caminho pra Settings)
+  //   2. !usingCustomTiles (user ainda não escolheu sovereignty próprio)
+  //   3. HintChip auto-gates via dismissedRuleIds (× chip persiste)
+  // Posicionado top-center (não conflita com ModeToggle top-3 left-3
+  // nem com SoloSpreaderWarning top-3 right-3 do PostModeMap).
+  const cartoRule = getHintRule('carto-tile-sovereignty')
+  const showCartoHint =
+    !!onOpenTileSettings && !usingCustomTiles && !!cartoRule
   return (
     <div className={`relative overflow-hidden rounded-2xl border border-drift-border/40 ${className}`}>
       <div ref={containerRef} className="h-full w-full" />
 
       {onModeChange && <ModeToggle mode={mode} onModeChange={onModeChange} />}
+
+      {showCartoHint && cartoRule && (
+        <div className="pointer-events-auto absolute left-1/2 top-3 z-20 -translate-x-1/2">
+          <HintChip
+            rule={cartoRule}
+            label="🌐 tiles cortesia carto.com · trocar"
+            onActivate={onOpenTileSettings}
+          />
+        </div>
+      )}
 
       {/* V_2026-05-22 TimelineScrubber — barra acima de stats/attribution.
           Full-width (inset 3) pra noção do tempo decorrido entre os

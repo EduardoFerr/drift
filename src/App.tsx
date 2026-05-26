@@ -2050,6 +2050,14 @@ function MapOverlay({
               popLayer({ id: 'map' })
               pushLayer({ id: 'location', component: LocationCard })
             }}
+            onOpenTileSettings={() => {
+              // Sprint N+4 P1.9 (Satoshi A4 follow-up 2026-05-26):
+              // HintChip CARTO sovereignty CTA → fecha overlay map +
+              // abre Settings → Soberania (mesmo padrão de
+              // onOpenLocationSettings).
+              popLayer({ id: 'map' })
+              pushLayer({ id: 'sovereignty', component: SovereigntyCard })
+            }}
             {...(currentPost ? { currentPostId: currentPost.id } : {})}
           />
         </LazyBoundary>

@@ -285,6 +285,57 @@ export const HINT_RULES: readonly GuidanceRule[] = [
     // proxy razoável (reveal/copy/download log; Satoshi guard [b76245b]).
     appliesIf: (caps) => caps.hasFirstPost && !caps.hasBackup,
   },
+  {
+    // Sprint N+4 P1.9 (Satoshi A4 follow-up audit 2026-05-26): CARTO
+    // sovereignty banner. Footer attribution já discloseva "tiles
+    // externos" (commit c1a1f6c), mas era texto cinza pequeno em hover
+    // tooltip — quase ninguém vê. Chip ambient na primeira vez que user
+    // abre o mapa torna a escolha de sovereignty visível, com CTA pra
+    // Settings → Soberania → tile server. Dismiss permanente (× chip).
+    //
+    // Caller (SpreadMap MapShell) injeta gate adicional `appliesIf`
+    // efetivo: hides quando user já tem `map_tile_url_template` custom
+    // (sinaliza escolha consciente — não nag de novo). Aqui só o
+    // dismissedRuleIds gate auto-aplica via HintChip.
+    id: 'carto-tile-sovereignty',
+    title: '🌐 tiles cortesia carto.com',
+    body: () => (
+      <>
+        <p>
+          Os tiles do mapa vêm de <code className="text-drift-accent">carto.com</code> —
+          gratuitos, sem cadastro, mas cada pan/zoom loga seu IP lá.
+        </p>
+        <p className="text-drift-muted">
+          Você pode trocar pra OSM público, mirror Tor ou seu próprio
+          tile server em <em>Configurações → Soberania → tile server do mapa</em>.
+          Manifesto §17 (sem chave mestra) + §28 (privacy default).
+        </p>
+      </>
+    ),
+  },
+  {
+    // Sprint N+4 P1.10 (Satoshi A6 follow-up audit 2026-05-26): mini-map
+    // auto-close hint. Substitui localStorage-counter (drift.minimap.openCount,
+    // 2-shot non-persistent) por HintChip com dismiss explícito persistente.
+    // Razão: localStorage não unificado com capabilities_dismissed bag,
+    // sem opt-out user-visible (× chip torna o dismiss explícito).
+    //
+    // Caller (PostViewer) renderiza quando showMap=true. Sem appliesIf —
+    // dismiss × persistente cobre, não precisa contador externo.
+    id: 'mini-map-close',
+    title: 'tocar 🗺 de novo pra fechar',
+    body: () => (
+      <>
+        <p>
+          O mesmo botão 🗺 que abriu o mini-map fecha ele — toque de novo
+          pra voltar pro post.
+        </p>
+        <p className="text-drift-muted">
+          Toque no × deste hint pra não ver mais.
+        </p>
+      </>
+    ),
+  },
 ] as const
 
 /**

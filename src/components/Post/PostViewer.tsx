@@ -35,6 +35,8 @@ import {
 import ActionsFan, { FanIcon } from './ActionsFan'
 import { useLongPress, LONG_PRESS_MS as MAP_EXPLAINER_LONG_PRESS_MS } from '../../hooks/useLongPress'
 import { MapExplainerCard } from '../Feed/MapExplainerCard'
+import { HintChip } from '../UI/HintChip'
+import { getHintRule } from '../../lib/guidance'
 // `m` é o primitive leve do framer-motion (LazyMotion). Features via main.tsx.
 import { m, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { MOTION } from '../../lib/motion'
@@ -152,27 +154,18 @@ export function PostViewer({
   const mapLongPress = useLongPress({
     onLongPress: () => setShowMapExplainer(true),
   })
-  // Satoshi A6 2026-05-22 (audit E.1): mini-map persistente vira surface
-  // persuasiva. Hint discreto "tocar 🗺 de novo pra fechar" aparece nas
-  // primeiras 2 aberturas (counter localStorage). 3ª+ silencia.
-  // localStorage local-only (manifesto §28 — zero analytics export).
-  const [mapHintVisible, setMapHintVisible] = useState(false)
-  useEffect(() => {
-    if (!showMap) {
-      setMapHintVisible(false)
-      return
-    }
-    try {
-      const k = 'drift.minimap.openCount'
-      const n = Number(localStorage.getItem(k) ?? '0')
-      if (n < 2) {
-        localStorage.setItem(k, String(n + 1))
-        setMapHintVisible(true)
-        const t = setTimeout(() => setMapHintVisible(false), 4500)
-        return () => clearTimeout(t)
-      }
-    } catch { /* localStorage indisponível — silencia */ }
-  }, [showMap])
+  // Sprint N+4 P1.10 (Satoshi A6 follow-up 2026-05-26): mini-map close
+  // hint migrado de localStorage counter (2-shot non-persistent) pra
+  // HintChip via getHintRule('mini-map-close'). HintChip auto-gates via
+  // capabilities_dismissed bag — dismiss × persiste no SQLite (mesma
+  // surface dos outros hints, não fragmenta state). Manifesto §28 —
+  // zero analytics export (caps são SQLite local).
+  //
+  // Visibilidade no render: só monta enquanto showMap=true. Sem timer
+  // auto-dismiss; user dispensa com × ou apertando 🗺 de novo (fecha
+  // map → desmonta chip; reabertura mostra de novo até dismiss
+  // explícito, idêntico ao behavior original mas com persistência clara).
+  const miniMapCloseRule = getHintRule('mini-map-close')
   const [showReport, setShowReport] = useState(false)
   // V_2026-05-17 (user pedido): long-press 5s mudou semantics.
   //   - Antes: abria ModerationModal (block/mute/report)
@@ -548,11 +541,19 @@ export function PostViewer({
                     {...(onOpenLocationSettings ? { onOpenLocationSettings } : {})}
                   />
                 </LazyBoundary>
-                {/* Satoshi A6 — hint discreto. z-30 sobre o map mas
-                    pointer-events-none pra não bloquear gestures. */}
-                {mapHintVisible && (
-                  <div className="pointer-events-none absolute right-3 top-3 z-30 rounded-lg border border-drift-border/40 bg-drift-bg/95 px-2.5 py-1 font-mono text-[10px] text-drift-muted backdrop-blur-sm">
-                    tocar 🗺 de novo pra fechar
+                {/* Sprint N+4 P1.10 (Satoshi A6 follow-up 2026-05-26):
+                    HintChip mini-map-close. z-30 sobre o map. pointer-
+                    events-auto pra capturar × do chip; chip auto-some
+                    permanente quando user dispensa. Posicionado top-3
+                    right-3 (mesmo lugar do hint legacy, evita conflito
+                    com ModeToggle top-3 left-3 do MapShell wrapped pelo
+                    SpreadMap). */}
+                {miniMapCloseRule && (
+                  <div className="pointer-events-auto absolute right-3 top-3 z-30">
+                    <HintChip
+                      rule={miniMapCloseRule}
+                      label="tocar 🗺 de novo pra fechar"
+                    />
                   </div>
                 )}
               </m.div>
