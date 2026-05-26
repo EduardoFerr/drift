@@ -88,7 +88,7 @@ shipping prematuro).
 ## Bugs descobertos em re-verificação visual 2026-05-23
 
 - [x] **Mode badge (Satoshi A2) não renderiza** — fechado 2026-05-26 em
-  [pending-commit] — bug tinha 2 causas: (a) `initialModeRef` rastreava
+  [4da7a1e] — bug tinha 2 causas: (a) `initialModeRef` rastreava
   só mode inicial → retornar ao mode inicial (global → network → global)
   não disparava badge na 2ª transição; (b) badge vivia dentro de
   `ModeToggle`, que é remountado entre transições empty state ↔ mapa
