@@ -540,7 +540,7 @@ function SlimModeHint() {
           className="fixed left-4 top-4 z-40 flex items-center gap-2 rounded-full border border-drift-accent2 bg-drift-surface px-4 py-2 shadow-lg"
         >
           <span className="font-mono text-[11px] uppercase tracking-meta text-drift-accent2">
-            modo slim · segure 5s pra sair
+            modo slim · segure 2s pra sair
           </span>
           <button
             onClick={() => exitSlim()}

@@ -146,3 +146,55 @@
     animation-duration: 350ms; /* mais rápido + pulso simples */
   }
 }
+
+/*
+ * ─── Refração líquida real (useLiquidRipple) ───────────────────────
+ *
+ * V_2026-05-29 (user pedido: "refração líquida REAL no toque"). Spike
+ * GO A-scoped: Docs/sessions/ripple-refraction-spike-2026-05-29.md.
+ *
+ * Diferente de `.ripple-wave`/`.material-ripple` (overlays alpha — o
+ * pixel atrás NÃO se move): aqui o conteúdo do card sofre deslocamento
+ * FÍSICO de pixels via SVG `feDisplacementMap`. Cristas da onda =
+ * lente convexa (empurra fora), vales comprimem (puxam dentro). É o
+ * DOM dobrando, não um overlay.
+ *
+ * Física (modelo de gota num fluido — ver useLiquidRipple.tsx):
+ *   deslocamento(r) = A(t) · sin(k·r − ω·t) · falloff(r)
+ *     A(t)     = e^(−t/τ)  → energia dissipa (decay temporal)
+ *     falloff  = (1−r)^p   → onda enfraquece longe do epicentro
+ *   Luminância do displacement map codifica o offset; canal R→dx, G→dy.
+ *   128 = neutro (sem deslocamento). >128 crista, <128 vale.
+ *
+ * §1 trade-off: o filtro EXIGE RAF durante a animação (~750ms) pra
+ * variar `scale` + regenerar o radialGradient (raio dos anéis cresce,
+ * amplitude decai). RAF é cancelado na dissipação e o `filter` é
+ * REMOVIDO do elemento (volta plano) — idle = zero JS, sem filtro
+ * ativo ocioso. Scoped: o filtro vive só no container do card tocado,
+ * NÃO na tela inteira (evita re-render full-screen + quebra de
+ * position:fixed da NavBar — ver spike §1.A).
+ *
+ * O <filter id="drift-liquid-ripple"> é injetado uma vez por
+ * useLiquidRipple (defs SVG global, hidden). `feImage` href + o
+ * `scale` do feDisplacementMap são os ÚNICOS atributos animados.
+ *
+ * reduced-motion: o hook NUNCA monta o filtro nem inicia RAF; cai no
+ * ripple plano. A regra CSS abaixo é defesa em profundidade — se algo
+ * deixar o filtro ativo, força bypass visual (sem deslocamento).
+ * WCAG 2.3.3.
+ */
+.liquid-ripple-host {
+  /* GPU compositing hint só enquanto o efeito roda; o hook seta/limpa
+     inline `will-change: filter` no fire/cleanup. Esta classe marca o
+     elemento-alvo pra grep/teste e garante containment de stacking. */
+  isolation: isolate;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Bypass total: mesmo que o hook escape, nenhum filtro de
+     deslocamento é aplicado. O movimento radial + distorção são
+     exatamente o gatilho vestibular que 2.3.3 protege. */
+  .liquid-ripple-host {
+    filter: none !important;
+  }
+}

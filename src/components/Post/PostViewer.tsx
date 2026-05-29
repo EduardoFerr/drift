@@ -34,6 +34,7 @@ import {
 // também, este import pode ir junto.
 import ActionsFan, { FanIcon } from './ActionsFan'
 import { useLongPress, LONG_PRESS_MS as MAP_EXPLAINER_LONG_PRESS_MS } from '../../hooks/useLongPress'
+import { useLiquidRipple } from '../../hooks/useLiquidRipple'
 import { MapExplainerCard } from '../Feed/MapExplainerCard'
 // `m` é o primitive leve do framer-motion (LazyMotion). Features via main.tsx.
 import { m, AnimatePresence, useReducedMotion } from 'framer-motion'
@@ -172,9 +173,17 @@ export function PostViewer({
   const [pressing, setPressing] = useState(false)
   const [pressOrigin, setPressOrigin] = useState<{ x: number; y: number } | null>(null)
   const [moderationOpen, setModerationOpen] = useState(false)
+  // V_2026-05-29 (user pedido): refração líquida real no toque. O
+  // long-press já é o gesto mais significativo do card; reaproveitamos
+  // o epicentro pra nascer a onda no dedo. Gate por setting
+  // `liquid_ripple` (default ON) + bypass automático de reduced-motion
+  // dentro do hook (não toca a flag). O `.ripple-wave` (3 ondas
+  // concêntricas overlay) permanece como camada de feedback temporal
+  // do long-press; a refração é a camada física por baixo (DOM dobra).
+  const liquid = useLiquidRipple({ disabled: !prefs.liquid_ripple })
   const pressTimerRef = useRef<number | null>(null)
   const pressStartRef = useRef<{ x: number; y: number } | null>(null)
-  const LONG_PRESS_MS = 3000
+  const LONG_PRESS_MS = 2000
   const LONG_PRESS_SLOP_PX = 20
   // Acompanha slim mode pra label do progress bar feedback (mostra
   // "modo slim" quando entrando ou "modo padrão" quando saindo).
@@ -214,6 +223,16 @@ export function PostViewer({
       x: e.clientX - rect.left,
       y: e.clientY - rect.top,
     })
+    // Dispara a refração líquida no epicentro do toque (coord
+    // normalizada 0..1 do card). No-op sob reduced-motion / setting OFF
+    // — tratado dentro do hook. A onda dissipa em ~750ms e remove o
+    // filtro (idle zero-JS, §1).
+    if (rect.width > 0 && rect.height > 0) {
+      liquid.fire({
+        x: (e.clientX - rect.left) / rect.width,
+        y: (e.clientY - rect.top) / rect.height,
+      })
+    }
     setPressing(true)
     pressTimerRef.current = window.setTimeout(() => {
       pressTimerRef.current = null
@@ -760,7 +779,15 @@ export function PostViewer({
           }
           disableHorizontal={total <= 1}
         >
-          <div className="relative h-full w-full bg-drift-surface">
+          {/* V_2026-05-29: alvo da refração líquida. Os CHILDREN deste
+              container (SubpostCarousel) sofrem o deslocamento físico de
+              pixels via feDisplacementMap quando `liquid.fire()` roda.
+              `liquid-ripple-host` garante isolation + bypass CSS sob
+              reduced-motion (defesa em profundidade). */}
+          <div
+            ref={liquid.targetRef as React.RefObject<HTMLDivElement>}
+            className="liquid-ripple-host relative h-full w-full bg-drift-surface"
+          >
             <div
               className={`h-full w-full transition-[filter] duration-200 ${
                 !revealed ? 'pointer-events-none blur-xl' : ''

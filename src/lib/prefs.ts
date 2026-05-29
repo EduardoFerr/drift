@@ -141,6 +141,12 @@ function applyRow(target: UserPrefs, key: string, value: string): void {
       // pra user power que aceita custo de storage IPFS.
       target.auto_pin_enabled = value === '1'
       return
+    case 'liquid_ripple':
+      // Refração líquida real no long-press (useLiquidRipple). Default
+      // ON; bypass automático via prefers-reduced-motion no hook (não
+      // toca esta flag). User pode forçar OFF pra economizar bateria.
+      target.liquid_ripple = value === '1'
+      return
     case 'upload_endpoint':
       // Sovereignty (Marshall NEEDS-FIX A): URL https:// pra Blossom
       // server. Empty = unset (cai no default constante). Validation

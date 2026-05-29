@@ -27,6 +27,7 @@ interface CardProps {
 
 export function AppearanceCard({ onClose }: CardProps) {
   const current = usePrefsStore((s) => s.theme_id)
+  const liquidRipple = usePrefsStore((s) => s.liquid_ripple)
 
   function handleSelect(id: ThemeId) {
     if (id === current) return
@@ -87,6 +88,46 @@ export function AppearanceCard({ onClose }: CardProps) {
               </button>
             )
           })}
+        </div>
+
+        {/* V_2026-05-29: toggle de refração líquida real. Enhancement
+            progressivo — o long-press do card dobra os pixels como uma
+            lente convexa de água (feDisplacementMap). Default ON; OFF
+            cai no ripple plano. Desligado automaticamente sob
+            prefers-reduced-motion (WCAG 2.3.3), independente desta flag. */}
+        <div className="pt-2">
+          <SectionHeader title="movimento" />
+          <button
+            onClick={() => void setPref('liquid_ripple', !liquidRipple)}
+            role="switch"
+            aria-checked={liquidRipple}
+            className="mt-1 flex w-full items-start justify-between gap-3.5 rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3.5 text-left transition-colors hover:border-drift-accent2/25 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
+          >
+            <div className="min-w-0 flex-1">
+              <div className="font-mono text-[13px] text-drift-text">
+                refração líquida
+              </div>
+              <div className="mt-0.5 font-mono text-[10px] leading-relaxed text-drift-muted/50">
+                ao segurar um post, a superfície dobra a luz como água —
+                a onda nasce no dedo e dissipa. desliga sozinho se você
+                pediu menos movimento no sistema.
+              </div>
+            </div>
+            <div
+              className={`mt-1 flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
+                liquidRipple ? 'bg-drift-accent/25' : 'bg-drift-border/60'
+              }`}
+              aria-hidden="true"
+            >
+              <div
+                className={`h-5 w-5 rounded-full shadow-sm transition-transform ${
+                  liquidRipple
+                    ? 'translate-x-5 bg-drift-accent'
+                    : 'translate-x-0.5 bg-drift-muted'
+                }`}
+              />
+            </div>
+          </button>
         </div>
       </div>
     </FullPageCard>

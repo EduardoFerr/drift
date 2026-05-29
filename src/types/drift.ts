@@ -572,6 +572,24 @@ export interface UserPrefs {
    * central. Manifesto §28: local-only, zero export.
    */
   auto_pin_enabled: boolean
+  /**
+   * Refração líquida real no toque (long-press do card). Quando ON, a
+   * superfície do post sofre deslocamento físico de pixels via SVG
+   * `feDisplacementMap`: cristas de onda atuam como lente convexa,
+   * vales comprimem, a energia dissipa em ~750ms a partir do epicentro
+   * do dedo. Enhancement progressivo sobre o ripple `.material-ripple`
+   * base.
+   *
+   * Default ON: o efeito é scoped (só o card tocado), RAF roda só
+   * durante ~750ms e é cancelado na dissipação (idle = zero JS, §1).
+   * É desligado AUTOMATICAMENTE (sem tocar nesta flag) quando
+   * `prefers-reduced-motion: reduce` (WCAG 2.3.3) — o hook cai no
+   * ripple plano. User pode forçar OFF aqui pra economizar bateria
+   * em device fraco.
+   *
+   * Owner: `hooks/useLiquidRipple.tsx`. Manifesto §28: local-only.
+   */
+  liquid_ripple: boolean
 }
 
 /**
@@ -621,6 +639,7 @@ export const DEFAULT_USER_PREFS: UserPrefs = {
   menu_detail_show_algorithm: false,
   menu_detail_show_action_labels: true,
   auto_pin_enabled: false,
+  liquid_ripple: true,
 }
 
 // ─── Trust Lens (Phase 1 — manifesto §24 view-layer carve-out) ────
