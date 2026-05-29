@@ -235,11 +235,19 @@ async function doBootstrap(): Promise<void> {
     if (import.meta.env.DEV && wantsDevSeed) {
       try {
         const { seedDatabase, NAMED_NSECS } = await import('./dev-seed/seed')
+        // Modo do seed: `?dev-seed=lite` → subset ~200 eventos (boot <15s,
+        // validação visual rápida dos mapas). `?dev-seed=1`/`=full`/qualquer
+        // outro valor → conjunto completo (~2730). Default full preserva o
+        // comportamento histórico.
+        const seedMode =
+          new URLSearchParams(window.location.search).get('dev-seed') === 'lite'
+            ? 'lite'
+            : 'full'
         // step:'seed' + progresso honesto (bug #4): BootView mostra
         // "sincronizando N/M eventos…" em vez de "inicializando worker…"
-        // durante os ~segundos de catch-up das ~3000 fixtures.
+        // durante os ~segundos de catch-up das fixtures.
         setBoot((p) => ({ ...p, step: 'seed' }))
-        await seedDatabase(setSeedProgress)
+        await seedDatabase(seedMode, setSeedProgress)
 
         // E2E hook (Sprint N+5): expõe a API do `db` no window APENAS sob
         // dev-seed (DEV + ?dev-seed=1). As suites adversariais

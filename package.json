@@ -24,6 +24,7 @@
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
     "icons": "node scripts/gen-pwa-icons.mjs",
+    "gen:seed": "node scripts/gen-seed.mjs",
     "design:baseline:init": "node scripts/update-design-baseline.mjs --init",
     "design:baseline:check": "node scripts/update-design-baseline.mjs --check",
     "design:baseline:update": "node scripts/update-design-baseline.mjs",

@@ -28,7 +28,7 @@ import { onNostrEvent, recalcAllScores } from '../events'
 import { applyContactList } from '../follows'
 import { invalidateFeed } from '../feed'
 import { BOOT_BATCH_SIZE, drainInBatches } from '../scheduler'
-import { getSeedEvents } from './fixtures'
+import { getSeedEvents, type SeedMode } from './fixtures'
 
 // Re-export do contrato (fonte única em fixtures.ts). Lily/bootstrap
 // importam `NAMED_NSECS` daqui.
@@ -37,9 +37,16 @@ export { NAMED_NSECS } from './fixtures'
 let seeded = false
 
 /**
- * Popula o banco com o conjunto determinístico de fixtures (8 named +
- * 50 seed; cascata Alice→Bob→Carol→Dave; ~500 posts / ~2000 spreads /
- * ~200 buries / ~50 reports; timestamps base 1716000000).
+ * Popula o banco com o conjunto determinístico de fixtures.
+ *
+ *  - `mode='full'` (default, `?dev-seed=1`): 8 named + 50 seed; cascata
+ *    Alice→Bob→Carol→Dave; ~500 posts / ~2000 spreads / ~200 buries /
+ *    ~50 reports (~2730 eventos); drena em minutos. Timestamps base
+ *    1716000000.
+ *  - `mode='lite'` (`?dev-seed=lite`): subconjunto fixo (~200 eventos) —
+ *    boot em <15s pra validação visual rápida dos 3 mapas. Preserva a
+ *    cascata, geo variado (BR/EU/Ásia), spreads espalhados no tempo,
+ *    posts com imagem, buries + 3 alvos que cruzam threshold §26, follows.
  *
  * Processa eventos de domínio SEQUENCIALMENTE (ordem por created_at) —
  * preserva first-seen estável de `users.created_at` (antiguidade/peso
@@ -75,12 +82,13 @@ let seeded = false
  * verifies à toa). Idempotente, seguro pra chamar 2× no mesmo boot.
  */
 export async function seedDatabase(
+  mode: SeedMode = 'full',
   onProgress?: (done: number, total: number) => void,
 ): Promise<void> {
   if (seeded) return
   seeded = true
 
-  const { domain, contactLists } = getSeedEvents()
+  const { domain, contactLists } = getSeedEvents(mode)
 
   // Contact lists primeiro: follow-graph disponível antes do feed render.
   for (const ev of contactLists) {

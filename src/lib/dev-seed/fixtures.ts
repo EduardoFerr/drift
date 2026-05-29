@@ -395,21 +395,90 @@ export const CASCADE: readonly CascadeStep[] = Object.freeze([
 ])
 
 /**
- * Constrói o conjunto completo de eventos seed. Pura — sem I/O, sem
- * `Date.now()`. Chamada uma vez por `seedDatabase()`.
- *
- * Volume alvo (do plano):
- *  - ~500 posts, ~2000 spreads (pareto), ~200 buries (concentrado),
- *    ~50 reports (3 posts cruzam threshold §26).
- *  - created_at espalhado 4 semanas (temporal decay).
+ * Modo de geração do seed.
+ *  - `'full'` (default): ~2730 eventos — volume realista pra E2E/load.
+ *  - `'lite'`: ~200 eventos — subset fixo pra boot em segundos, validação
+ *    visual rápida dos 3 mapas. Preserva o que importa: cascata A→B→C→D,
+ *    geo variado (BR/EU/Ásia), spreads espalhados no tempo (cascata
+ *    temporal no scrubber), posts com imagem same-origin, buries + reports
+ *    que cruzam threshold §26, follows pra Trust Lens/network.
  */
-export function buildSeedEvents(): SeedEventSet {
+export type SeedMode = 'full' | 'lite'
+
+/**
+ * Caps de volume por modo. `lite` reduz os loops mantendo a MESMA lógica
+ * de geração (§7: lite é subconjunto determinístico, reproduzível — os
+ * primeiros N de cada categoria do build full). Counts lite escolhidos pra
+ * drenar em <15s (~200 eventos × ~50ms INSERT roundtrip).
+ */
+interface SeedCaps {
+  /** Identidades de conteúdo além das 8 named (full usa 50 seed). */
+  seedIdentities: number
+  /** Posts de conteúdo adicionais (full 442). */
+  contentPosts: number
+  /** Posts "hot" (cabeça da pareto de spreads). */
+  hotPosts: number
+  /** Total de spreads alvo (full 2000). */
+  targetSpreads: number
+  /** Total de buries alvo (full 200). */
+  targetBuries: number
+  /** Quantos posts distintos concentram buries (full 20). */
+  buryPosts: number
+}
+
+const CAPS: Readonly<Record<SeedMode, SeedCaps>> = Object.freeze({
+  full: {
+    seedIdentities: SEED_COUNT,
+    contentPosts: 442,
+    hotPosts: 22,
+    targetSpreads: 2000,
+    targetBuries: 200,
+    buryPosts: 20,
+  },
+  lite: {
+    // 8 named + 12 seed = 20 identidades (mantém clusters BR/EU/Ásia: bg-0..9
+    // Brasília LPA, bg-10/11 começo do cluster EU; named cobrem PT/DE/JP/US).
+    seedIdentities: 12,
+    // 40 posts de conteúdo (~geo variado p/ mapa global inflar). +20 genesis
+    // +P1 ≈ 61 posts no total.
+    contentPosts: 40,
+    hotPosts: 6,
+    // ~100 spreads espalhados no tempo (cascata temporal visível no scrubber).
+    targetSpreads: 100,
+    targetBuries: 20,
+    buryPosts: 5,
+  },
+})
+
+/**
+ * Constrói o conjunto de eventos seed. Pura — sem I/O, sem `Date.now()`.
+ * Chamada por `seedDatabase()`.
+ *
+ * Volume alvo:
+ *  - `full` (default): ~500 posts, ~2000 spreads (pareto), ~200 buries
+ *    (concentrado), ~50 reports (3 posts cruzam threshold §26).
+ *  - `lite`: ~60 posts, ~100 spreads, ~20 buries, ~24 reports (3 alvos
+ *    cruzam threshold). ~200 eventos totais → drena em <15s.
+ *
+ * `created_at` espalhado nas semanas (temporal decay) em ambos os modos.
+ *
+ * §7 determinismo: cada `mode` produz SEMPRE o mesmo conjunto (mesma seleção
+ * fixa). lite = subconjunto reproduzível (primeiros N de cada categoria).
+ */
+export function buildSeedEvents(mode: SeedMode = 'full'): SeedEventSet {
+  const caps = CAPS[mode]
+  // Identidades ativas neste modo: 8 named + os primeiros `seedIdentities`
+  // dos seed (subconjunto fixo → cascata/clusters preservados). full = todos.
+  const activeIdentities: readonly SeedIdentity[] =
+    caps.seedIdentities >= SEED_COUNT
+      ? ALL_IDENTITIES
+      : Object.freeze([...NAMED_IDENTITIES, ...SEED_IDENTITIES.slice(0, caps.seedIdentities)])
   const domain: SignedEvent[] = []
   const contactLists: SignedEvent[] = []
 
   // 1. Genesis POST por identidade — fixa first-seen = createdAt.
   //    (Alice genesis NÃO é P1 — P1 vem depois com geo Brasília explícito.)
-  for (const id of ALL_IDENTITIES) {
+  for (const id of activeIdentities) {
     domain.push(signPost(id, id.createdAt, { text: `genesis ${id.name}` }))
   }
 
@@ -433,16 +502,19 @@ export function buildSeedEvents(): SeedEventSet {
   //    created_at espalhado nas 4 semanas (base-28d .. base).
   //    Index global de post pra referência em spreads/buries/reports.
   const contentPosts: { event: SignedEvent; authorPub: string }[] = []
-  const TOTAL_CONTENT_POSTS = 442
+  const TOTAL_CONTENT_POSTS = caps.contentPosts
   // Drift é text-majority: só ~10 dos 442 posts carregam imagem (~2%),
   // o resto é texto. Determinístico (§7): post recebe imagem quando
   // `i % IMAGE_EVERY === 0`; qual das 9 imagens = `(i/IMAGE_EVERY) %
   // SEED_MEDIA_COUNT` (ciclo fixo, sem RNG). URL é same-origin relativa
   // (servida de public/dev-seed-media) — passa o COEP gate de dev-http.
   const SEED_MEDIA_COUNT = 9
-  const IMAGE_EVERY = 44 // 442/44 ≈ 10 posts com imagem
+  // ~1 imagem a cada (total/10) posts → ~10 posts com imagem em ambos os
+  // modos (full 442/44≈10; lite 40/4=10). Mantém o validador de image-render
+  // alimentado mesmo no subset lite. Mínimo 1 pra nunca dividir por zero.
+  const IMAGE_EVERY = Math.max(1, Math.floor(TOTAL_CONTENT_POSTS / 10))
   for (let i = 0; i < TOTAL_CONTENT_POSTS; i++) {
-    const author = ALL_IDENTITIES[i % ALL_IDENTITIES.length]!
+    const author = activeIdentities[i % activeIdentities.length]!
     // created_at: 28 dias atrás .. base, espalhado determinístico.
     const ageSec = Math.floor((i / TOTAL_CONTENT_POSTS) * 28 * DAY)
     const createdAt = TS_BASE - 28 * DAY + ageSec
@@ -465,16 +537,16 @@ export function buildSeedEvents(): SeedEventSet {
   // 5. Spreads (~2000) com distribuição pareto: ~5% dos posts pegam 80%.
   //    Hot set = primeiros 22 content posts (~5% de 442). Cada hot post
   //    recebe muitos spreaders; long tail recebe poucos.
-  const HOT_COUNT = 22
+  const HOT_COUNT = caps.hotPosts
   let spreadCount = 0
-  const TARGET_SPREADS = 2000
-  // 80% (~1600) pros hot posts, 20% (~400) pra long tail.
-  const hotSpreads = 1600
+  const TARGET_SPREADS = caps.targetSpreads
+  // 80% pros hot posts, 20% pra long tail (mesma pareto em ambos os modos).
+  const hotSpreads = Math.floor(TARGET_SPREADS * 0.8)
   const tailSpreads = TARGET_SPREADS - hotSpreads
   // Hot: distribui round-robin de spreaders entre os HOT_COUNT posts.
   for (let s = 0; s < hotSpreads; s++) {
     const post = contentPosts[s % HOT_COUNT]!
-    const spreader = ALL_IDENTITIES[(s * 7 + 3) % ALL_IDENTITIES.length]!
+    const spreader = activeIdentities[(s * 7 + 3) % activeIdentities.length]!
     if (spreader.pub === post.authorPub) continue // sem self-spread útil
     // Distribui linear nos 20 dias (s/total × janela). Antes: `s % (20*DAY)`
     // = no-op pq s≪1.7M → todos spreads em ~27min cluster → rede "já feita"
@@ -487,7 +559,7 @@ export function buildSeedEvents(): SeedEventSet {
   // Tail: posts além dos hot, poucos spreads cada.
   for (let s = 0; s < tailSpreads; s++) {
     const post = contentPosts[HOT_COUNT + (s % (TOTAL_CONTENT_POSTS - HOT_COUNT))]!
-    const spreader = ALL_IDENTITIES[(s * 11 + 5) % ALL_IDENTITIES.length]!
+    const spreader = activeIdentities[(s * 11 + 5) % activeIdentities.length]!
     if (spreader.pub === post.authorPub) continue
     // Idem hot: distribui linear nos 14 dias (era no-op `s % (14*DAY)`).
     const createdAt =
@@ -498,12 +570,15 @@ export function buildSeedEvents(): SeedEventSet {
 
   // 6. Buries (~200) concentradas em ~20 posts (valida threshold de
   //    julgamento estético — bury NÃO penaliza autor, mas afeta score).
-  const BURY_POSTS = 20
-  const TARGET_BURIES = 200
+  const BURY_POSTS = caps.buryPosts
+  const TARGET_BURIES = caps.targetBuries
   let buryCount = 0
+  // Bloco de bury distinto do hot set (que ocupa os primeiros HOT_COUNT).
+  // full: offset 100; lite: logo após o hot set (40 posts não chega a 100).
+  const buryOffset = mode === 'full' ? 100 : HOT_COUNT
   for (let b = 0; b < TARGET_BURIES; b++) {
-    const post = contentPosts[100 + (b % BURY_POSTS)]! // bloco distinto do hot
-    const burier = ALL_IDENTITIES[(b * 13 + 9) % ALL_IDENTITIES.length]!
+    const post = contentPosts[buryOffset + (b % BURY_POSTS)]!
+    const burier = activeIdentities[(b * 13 + 9) % activeIdentities.length]!
     if (burier.pub === post.authorPub) continue
     const createdAt = TS_BASE - 10 * DAY + (b % (10 * DAY))
     domain.push(signBury(burier, post.event.id, createdAt))
@@ -518,15 +593,30 @@ export function buildSeedEvents(): SeedEventSet {
   //    threshold mesmo com pesos baixos de reporters (getReportWeight
   //    mínimo 0.5 → 8×0.5 = 4 < 5; por isso usamos reporters antigos +
   //    'illegal' nos primeiros, garantindo cruzamento — ver test).
-  const reportTargets = [contentPosts[200]!, contentPosts[210]!, contentPosts[220]!]
+  // Alvos: 3 posts distintos, fora do hot/bury (índices crescentes). full
+  // usa 200/210/220; lite escolhe 3 posts perto do fim do bloco de conteúdo
+  // (ainda dentro de 0..contentPosts-1), distintos entre si.
+  const reportTargets =
+    mode === 'full'
+      ? [contentPosts[200]!, contentPosts[210]!, contentPosts[220]!]
+      : [
+          contentPosts[TOTAL_CONTENT_POSTS - 3]!,
+          contentPosts[TOTAL_CONTENT_POSTS - 2]!,
+          contentPosts[TOTAL_CONTENT_POSTS - 1]!,
+        ]
   let reportCount = 0
   // Reporters preferencialmente "pesados" (named + seeds antigos) pra
-  // garantir soma de pesos ≥ threshold. 10 reporters por alvo.
-  const heavyReporters: SeedIdentity[] = [
-    ...NAMED_IDENTITIES, // 8 named (antiguidade alta → peso ≥ 1.0)
-    SEED_IDENTITIES[35]!, // bg-35 (weeksOld = (35*7)%41 = 8) — médio
-    SEED_IDENTITIES[40]!, // bg-40 ((40*7)%41 = 28 wk) — alto
-  ]
+  // garantir soma de pesos ≥ threshold. Os 8 named bastam pra cruzar
+  // ('illegal'=3, 'spam'=5); seeds antigos só reforçam. lite usa só os
+  // named (seeds 35/40 não estão no subset ativo).
+  const heavyReporters: SeedIdentity[] =
+    mode === 'full'
+      ? [
+          ...NAMED_IDENTITIES, // 8 named (antiguidade alta → peso ≥ 1.0)
+          SEED_IDENTITIES[35]!, // bg-35 (weeksOld = (35*7)%41 = 8) — médio
+          SEED_IDENTITIES[40]!, // bg-40 ((40*7)%41 = 28 wk) — alto
+        ]
+      : [...NAMED_IDENTITIES] // 8 named: spam(5) cruza com 8 reporters ≥0.5
   for (let t = 0; t < reportTargets.length; t++) {
     const target = reportTargets[t]!
     // alvo 0 + 1 usam 'illegal' (threshold 3, cruza fácil); alvo 2 'spam'.
@@ -543,7 +633,7 @@ export function buildSeedEvents(): SeedEventSet {
 
   // 8. Contact lists (NIP-02 kind 3) — follows de todas as identidades
   //    que TÊM follows. Aplicados fora do pipeline de score (§24).
-  for (const id of ALL_IDENTITIES) {
+  for (const id of activeIdentities) {
     if (id.follows.length === 0) continue
     contactLists.push(signContactList(id, id.createdAt + 60))
   }
@@ -608,13 +698,22 @@ function loadGeneratedSeed(): SeedEventSet | null {
 }
 
 /**
- * Conjunto materializado uma vez (pure, cacheável). Fast path: carrega o
- * JSON committed se presente; senão constrói em memória (assina ~3000
- * eventos). Ambos os caminhos são bit-idênticos (§7 determinismo).
+ * Conjunto materializado uma vez por modo (pure, cacheável).
+ *
+ * `full` (default): fast path — carrega o JSON committed se presente; senão
+ * constrói em memória (assina ~2730 eventos, ~24s). Ambos bit-idênticos (§7).
+ *
+ * `lite`: SEMPRE constrói em memória (~200 eventos assinam em <2s; o artefato
+ * pré-serializado só cobre full). Cacheado separadamente.
  */
 let _cached: SeedEventSet | null = null
-export function getSeedEvents(): SeedEventSet {
-  if (!_cached) _cached = loadGeneratedSeed() ?? buildSeedEvents()
+let _cachedLite: SeedEventSet | null = null
+export function getSeedEvents(mode: SeedMode = 'full'): SeedEventSet {
+  if (mode === 'lite') {
+    if (!_cachedLite) _cachedLite = buildSeedEvents('lite')
+    return _cachedLite
+  }
+  if (!_cached) _cached = loadGeneratedSeed() ?? buildSeedEvents('full')
   return _cached
 }
 
@@ -623,8 +722,8 @@ export function getSeedEvents(): SeedEventSet {
 // sha256 sobre todos os event.id ordenados. Muda se: seeds mudam,
 // nostr-tools getEventHash muda, ou a composição dos eventos muda.
 
-export function computeSeedDigest(): string {
-  const set = getSeedEvents()
+export function computeSeedDigest(mode: SeedMode = 'full'): string {
+  const set = getSeedEvents(mode)
   const ids = [
     ...set.contactLists.map((e) => e.id),
     ...set.domain.map((e) => e.id),

@@ -375,3 +375,155 @@ describe('moderação §26 — 3 posts-alvo cruzam threshold', () => {
     expect(illegalTargets).toHaveLength(2)
   })
 })
+
+// ─── 8. Modo lite (subset rápido pra validação visual dos mapas) ────
+//
+// lite reduz contagens mantendo o que importa: cascata A→B→C→D, geo
+// variado (BR/EU/Ásia), spreads espalhados no tempo, posts com imagem,
+// buries + 3 alvos que cruzam threshold §26, follows. Deve drenar em <15s
+// (~200 eventos × ~50ms INSERT). §7: lite é subconjunto FIXO, reproduzível.
+
+describe('modo lite (boot rápido)', () => {
+  const lite = buildSeedEvents('lite')
+  const full = getSeedEvents('full')
+  const liteByKind = (k: number) => lite.domain.filter((e) => e.kind === k)
+
+  it('lite é MUITO menor que full (~200 vs ~2730 eventos)', () => {
+    const liteTotal = lite.domain.length + lite.contactLists.length
+    const fullTotal = full.domain.length + full.contactLists.length
+    expect(liteTotal).toBeLessThanOrEqual(250)
+    expect(liteTotal).toBeGreaterThanOrEqual(150)
+    expect(liteTotal).toBeLessThan(fullTotal / 5)
+  })
+
+  it('determinístico (§7): rebuild lite produz os MESMOS ids', () => {
+    const fresh = buildSeedEvents('lite')
+    expect(fresh.domain.map((e) => e.id)).toEqual(lite.domain.map((e) => e.id))
+    expect(fresh.contactLists.map((e) => e.id)).toEqual(
+      lite.contactLists.map((e) => e.id),
+    )
+    expect(fresh.cascadePostId).toBe(lite.cascadePostId)
+    // digest lite estável e distinto do full (conjuntos diferentes).
+    expect(computeSeedDigest('lite')).toBe(computeSeedDigest('lite'))
+    expect(computeSeedDigest('lite')).not.toBe(computeSeedDigest('full'))
+  })
+
+  it('todos os eventos lite passam Schnorr + schema', () => {
+    for (const ev of lite.domain) {
+      expect(verifyEvent({ ...ev }), `verify ${ev.id}`).toBe(true)
+      expect(passesSchemaCheck(ev), `schema ${ev.id}`).toBe(true)
+    }
+    for (const ev of lite.contactLists) {
+      expect(verifyEvent({ ...ev })).toBe(true)
+    }
+  })
+
+  it('domain lite ordenado por created_at ASC (first-seen estável)', () => {
+    for (let i = 1; i < lite.domain.length; i++) {
+      expect(lite.domain[i]!.created_at).toBeGreaterThanOrEqual(
+        lite.domain[i - 1]!.created_at,
+      )
+    }
+  })
+
+  it('cascata Alice→Bob→Carol→Dave preservada (propagation map)', () => {
+    const p1 = lite.domain.find((e) => e.id === lite.cascadePostId)!
+    expect(p1).toBeDefined()
+    expect(p1.pubkey).toBe(NAMED_BY_NAME.alice!.pub)
+    expect(p1.tags.find((t) => t[0] === 'location')![3]).toBe('Brasília')
+    const cascadeSpreads = lite.domain.filter(
+      (e) =>
+        e.kind === DRIFT_KIND.SPREAD &&
+        e.tags.some((t) => t[0] === 'e' && t[1] === lite.cascadePostId) &&
+        [
+          NAMED_BY_NAME.bob!.pub,
+          NAMED_BY_NAME.carol!.pub,
+          NAMED_BY_NAME.dave!.pub,
+        ].includes(e.pubkey),
+    )
+    const sorted = [...cascadeSpreads].sort((a, b) => a.created_at - b.created_at)
+    expect(sorted.map((s) => s.pubkey)).toEqual([
+      NAMED_BY_NAME.bob!.pub,
+      NAMED_BY_NAME.carol!.pub,
+      NAMED_BY_NAME.dave!.pub,
+    ])
+  })
+
+  it('geo variado pra mapa global (BR + EU + Ásia presentes)', () => {
+    const countries = new Set<string>()
+    for (const ev of liteByKind(DRIFT_KIND.POST)) {
+      const loc = ev.tags.find((t) => t[0] === 'location')
+      if (loc) countries.add(loc[4]!)
+    }
+    // named cobrem BR/PT/DE/JP/US; seeds bg-0..9 são Brasília (LPA).
+    expect(countries.has('BR')).toBe(true)
+    expect(countries.has('JP')).toBe(true) // Ásia (Tokyo)
+    expect([...countries].some((c) => ['PT', 'DE', 'FR'].includes(c))).toBe(true) // EU
+    expect(countries.size).toBeGreaterThanOrEqual(4)
+  })
+
+  it('spreads espalhados no tempo (cascata temporal no scrubber)', () => {
+    const spreadTs = liteByKind(DRIFT_KIND.SPREAD).map((e) => e.created_at)
+    expect(spreadTs.length).toBeGreaterThanOrEqual(60)
+    const span = Math.max(...spreadTs) - Math.min(...spreadTs)
+    // não pode ser um cluster instantâneo — precisa cobrir vários dias.
+    expect(span).toBeGreaterThan(5 * 24 * HOUR)
+  })
+
+  it('posts com imagem same-origin presentes (image-render)', () => {
+    const withImage = liteByKind(DRIFT_KIND.POST).filter((e) => {
+      const parsed = JSON.parse(e.content) as { subposts: { imageUrl: string | null }[] }
+      return parsed.subposts.some((s) => s.imageUrl?.startsWith('/dev-seed-media/'))
+    })
+    expect(withImage.length).toBeGreaterThanOrEqual(5)
+  })
+
+  it('buries presentes (julgamento estético)', () => {
+    expect(liteByKind(DRIFT_KIND.BURY).length).toBeGreaterThanOrEqual(15)
+  })
+
+  it('3 posts-alvo cruzam threshold §26 (moderação)', () => {
+    const reports = liteByKind(DRIFT_KIND.REPORT)
+    const ACTIVE_USERS = 20 // 8 named + 12 seed no subset lite
+    const byTarget = new Map<string, { reason: ReportReason; reporters: Set<string> }>()
+    for (const ev of reports) {
+      const tid = ev.tags.find((t) => t[0] === 'e')![1]!
+      const reason = ev.tags.find((t) => t[0] === 'reason')![1] as ReportReason
+      const cur = byTarget.get(tid) ?? { reason, reporters: new Set<string>() }
+      cur.reporters.add(ev.pubkey)
+      byTarget.set(tid, cur)
+    }
+    expect(byTarget.size).toBe(3)
+    // Reporters são os 8 named (antiguidade alta → weight ≥ 1.0 cada). Peso
+    // real de report ≥ getReportWeight(weight). Conferimos com o weight real
+    // calculado, não o lower-bound 0.5 (8 named cobrem spam=5 com folga).
+    const now = (TS_BASE + 1 * 24 * 3600) * 1000
+    for (const [tid, info] of byTarget) {
+      const threshold = getReportThreshold(ACTIVE_USERS, info.reason)
+      let sum = 0
+      for (const pub of info.reporters) {
+        const id = NAMED_IDENTITIES.find((n) => n.pub === pub)
+        const w = id
+          ? calculateWeight({
+              createdAt: id.createdAt * 1000,
+              spreadsReceived: 0,
+              lastActive: now,
+              now,
+            })
+          : 0
+        sum += getReportWeight(w)
+      }
+      expect(sum, `alvo ${tid} reason=${info.reason}: ${sum} < ${threshold}`).toBeGreaterThanOrEqual(
+        threshold,
+      )
+    }
+  })
+
+  it('follows presentes pra network/Trust Lens', () => {
+    expect(lite.contactLists.length).toBeGreaterThanOrEqual(8)
+    // named Bob..Heidi + seeds com follows.
+    for (const ev of lite.contactLists) {
+      expect(ev.kind).toBe(3)
+    }
+  })
+})
