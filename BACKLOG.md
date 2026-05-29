@@ -85,6 +85,41 @@ shipping prematuro).
 
 ---
 
+## E2E Fase B desbloqueado + 2 achados — 2026-05-29 (noite II)
+
+Rodando as suites E2E pela 1ª vez (antes nunca carregavam — header dizia
+"sandbox não roda Playwright"). Achados que só rodar pega:
+
+- [x] **E2E não carregava (2 blockers de loader)** — fechado 2026-05-29 em
+  `1847acf` — (1) `constants.ts: import pkg from '../../package.json'` sem
+  `with { type: 'json' }` → loader Node do Playwright barrava; (2)
+  `fixtures.ts: import.meta.glob` (Vite-only) no top-level → "glob is not a
+  function" fora do bundler. Fix: import attribute + try/catch no glob.
+- [x] **Anchor quebrava ground-truth do E2E** — fechado 2026-05-29 em
+  `1847acf` — specs buscavam P1/report-targets por id não-ancorado
+  (`getSeedEvents()`) ou `created_at=1716000000` hardcoded; o anchor muda ids
+  por boot. Fix: `seed.ts` publica `window.__driftSeedMeta` (cascadePostId +
+  reportedTargetIds + `drained` flag) com os ids REAIS ingeridos; specs leem
+  daí. Anchor-robusto.
+- [x] **E2E travava no drain floor (full > timeout)** — fechado 2026-05-29 em
+  `1847acf` — setupUser/propagation/p2p agora usam `?dev-seed=lite` + helper
+  `waitSeedSettled` (espera `__driftSeedMeta.drained`). **propagation-model
+  5/5 ✓** (bug #3 validado), **score-fidelity 5/7** (#2/#2b/#3/#4/#smoke).
+- [ ] **score-fidelity #1 + #5 falham por mock-mesh leak cross-context** — P1.
+  Os 2 boots isolados de `carol` (#5) dão count divergente DETERMINÍSTICO
+  (63 vs 61); #1 header oscila (0.048/0.257/1.234). Causa: mock-webrtc/helia
+  usam `CHANNEL_NAME` BroadcastChannel ESTÁTICO (`'drift-mock-webrtc'`) →
+  eventos vazam entre BrowserContexts. ANTES do anchor o leak era invisível
+  (ids iguais → INSERT OR IGNORE dedup); o anchor (ids por-boot) expôs:
+  eventos vazados viram posts NOVOS → count drift + recalc tardio mexe no
+  header. **Fix de raiz**: isolar o mock-mesh por BrowserContext (não por
+  origin) — o gap "mock-mesh orchestrator" já listado. NÃO uniquificar por
+  page (quebra o mesh intra-contexto que p2p/smoke precisam). Reabrir junto
+  com batch-INSERT (que libera full no E2E).
+- [ ] **boot-interactivity (storm full) > 45s** — P2. Spec mede interatividade
+  durante storm de 500 posts (dev-seed=1 full). Trava no drain floor (>45s).
+  Desbloqueio = batch-INSERT. Mantido em full de propósito (mede o pior caso).
+
 ## Slim perf + legenda mapa + anchor anti-staleness — 2026-05-29 (noite)
 
 - [x] **Slim mode pesado no celular** — fechado 2026-05-29 em `2edcedd` —
