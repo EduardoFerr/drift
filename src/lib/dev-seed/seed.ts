@@ -28,7 +28,7 @@ import { onNostrEvent, recalcAllScores } from '../events'
 import { applyContactList } from '../follows'
 import { invalidateFeed } from '../feed'
 import { BOOT_BATCH_SIZE, drainInBatches } from '../scheduler'
-import { getSeedEvents, type SeedMode } from './fixtures'
+import { buildSeedEvents, type SeedMode } from './fixtures'
 
 // Re-export do contrato (fonte única em fixtures.ts). Lily/bootstrap
 // importam `NAMED_NSECS` daqui.
@@ -88,7 +88,17 @@ export async function seedDatabase(
   if (seeded) return
   seeded = true
 
-  const { domain, contactLists } = getSeedEvents(mode)
+  // Âncora de tempo (anti-staleness): re-baseia a timeline do seed pra que o
+  // evento mais novo caia ~agora. Sem isso, TS_BASE (~mai/2024) congelado faz
+  // todo post envelhecer com o relógio real → ages de ~745d + score 0.000 +
+  // feed morto. `Date.now()` aqui é legítimo: seed.ts é a camada DEV de
+  // ingestão (já impura — chama onNostrEvent); fixtures.ts continua §7-puro
+  // (os LOCKs chamam buildSeedEvents() sem âncora). Trade-off conhecido: o
+  // conjunto ancorado re-assina a cada boot (não cacheável por timestamp),
+  // mas lite assina em ~2s. Determinismo cross-run NÃO é exigido pro seed
+  // ao vivo — só pros LOCK_VIA_TEST (que usam a forma pura).
+  const nowAnchorSec = Math.floor(Date.now() / 1000)
+  const { domain, contactLists } = buildSeedEvents(mode, nowAnchorSec)
 
   // Contact lists primeiro: follow-graph disponível antes do feed render.
   for (const ev of contactLists) {

@@ -300,6 +300,72 @@ describe('distribuição realista — geo metropolitano (sem smear oceânico)', 
   })
 })
 
+// ─── 4c. Anchor anti-staleness (bug DERIVA 0.000 / 745D 2026-05-29) ──
+//
+// TS_BASE absoluto (~mai/2024) congelado fazia a timeline do seed envelhecer
+// com o relógio real → em 2026 todo post tinha ~745 dias, temporal decay
+// esmagava o score pra 0.000, feed morto. seed.ts passa `nowAnchorSec`
+// (Date.now) pra re-basear a timeline; fixtures continua §7-puro (sem âncora
+// = byte-idêntico, garantido pelo rebuild determinístico acima).
+
+describe('anchor de tempo (anti-staleness)', () => {
+  it('sem âncora: timeline ancorada em TS_BASE (forma pura, LOCK §7)', () => {
+    const pure = buildSeedEvents('lite')
+    const maxTs = Math.max(...pure.domain.map((e) => e.created_at))
+    // forma pura → topo da timeline perto de TS_BASE (não do relógio real).
+    expect(maxTs).toBeLessThanOrEqual(TS_BASE + 10 * 24 * HOUR)
+    expect(maxTs).toBeGreaterThan(TS_BASE - 1)
+  })
+
+  it('com âncora: evento mais novo cai ~nowAnchor (timeline fresca)', () => {
+    const anchor = 1_900_000_000 // unix sec fixo (determinístico no test)
+    const anchored = buildSeedEvents('lite', anchor)
+    const maxTs = Math.max(...anchored.domain.map((e) => e.created_at))
+    // newest dentro de ~1 dia antes da âncora (nunca no futuro).
+    expect(maxTs).toBeLessThanOrEqual(anchor)
+    expect(maxTs).toBeGreaterThan(anchor - 1 * 24 * HOUR)
+  })
+
+  it('com âncora: ages realistas (post mais novo NÃO tem ~745 dias)', () => {
+    const anchor = 1_900_000_000
+    const anchored = buildSeedEvents('lite', anchor)
+    const newestPost = Math.max(
+      ...anchored.domain.filter((e) => e.kind === DRIFT_KIND.POST).map((e) => e.created_at),
+    )
+    const ageDays = (anchor - newestPost) / (24 * HOUR)
+    expect(ageDays).toBeLessThan(40) // não 745 — feed vivo
+  })
+
+  it('âncora preserva causalidade + ordem (shift uniforme)', () => {
+    const anchor = 1_900_000_000
+    const anchored = buildSeedEvents('lite', anchor)
+    const postTime = new Map<string, number>()
+    for (const e of anchored.domain) {
+      if (e.kind === DRIFT_KIND.POST) postTime.set(e.id, e.created_at)
+    }
+    for (const e of anchored.domain) {
+      if (e.kind === DRIFT_KIND.SPREAD || e.kind === DRIFT_KIND.BURY) {
+        const tid = e.tags.find((t) => t[0] === 'e')?.[1]
+        const pt = tid ? postTime.get(tid) : undefined
+        if (pt !== undefined) expect(e.created_at).toBeGreaterThanOrEqual(pt)
+      }
+    }
+  })
+
+  it(
+    'âncora muda os ids (timeline diferente → assinatura diferente)',
+    () => {
+      const pure = buildSeedEvents('lite')
+      const anchored = buildSeedEvents('lite', 1_900_000_000)
+      expect(anchored.domain.map((e) => e.id)).not.toEqual(pure.domain.map((e) => e.id))
+      // mas o MESMO anchor reproduz os MESMOS ids (determinístico por anchor).
+      const again = buildSeedEvents('lite', 1_900_000_000)
+      expect(again.domain.map((e) => e.id)).toEqual(anchored.domain.map((e) => e.id))
+    },
+    30_000,
+  )
+})
+
 // ─── 5. Cascata A→B→C→D (bug #3 ground-truth) ───────────────────────
 
 describe('cascata Alice→Bob→Carol→Dave', () => {

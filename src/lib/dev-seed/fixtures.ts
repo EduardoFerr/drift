@@ -527,7 +527,36 @@ function reactionDelaySec(n: number, meanHours: number, capDays: number): number
   return Math.floor(Math.min(hours, capDays * 24) * HOUR)
 }
 
-export function buildSeedEvents(mode: SeedMode = 'full'): SeedEventSet {
+/**
+ * Constrói o conjunto de eventos seed.
+ *
+ * Anchor de tempo (anti-staleness): TS_BASE é uma base ABSOLUTA congelada
+ * (~mai/2024). Sem âncora, a timeline do seed envelhece com o relógio real →
+ * em 2026 todo post tem ~745 dias, o temporal decay (§score) esmaga o score
+ * pra 0.000 e o feed parece morto.
+ *
+ *  - SEM `nowAnchorSec` (default): forma §7-PURA — timeline em TS_BASE, ids
+ *    determinísticos. Os LOCK_VIA_TEST chamam assim e re-derivam os MESMOS
+ *    ids. NUNCA usa Date.now.
+ *  - COM `nowAnchorSec` (seed.ts DEV, via Date.now): 2 passes. Pass 1 (puro)
+ *    descobre o topo REAL da timeline — o tail do burst varia por modo, então
+ *    estimar fixo erra (lite ~9h, full ~dias). Pass 2 desloca TODA a timeline
+ *    por `delta` exato pra que o evento mais novo caia ~1h antes de agora →
+ *    ages realistas, scores vivos. Determinístico POR âncora (mesma âncora →
+ *    mesmos ids); re-assina 2× (lite ~4s; full raro).
+ */
+export function buildSeedEvents(mode: SeedMode = 'full', nowAnchorSec?: number): SeedEventSet {
+  if (nowAnchorSec == null) return buildWithDelta(mode, 0)
+  const pure = buildWithDelta(mode, 0)
+  const maxTs = Math.max(
+    ...pure.domain.map((e) => e.created_at),
+    ...pure.contactLists.map((e) => e.created_at),
+  )
+  const delta = nowAnchorSec - maxTs - 3600 // newest ~1h antes de agora
+  return buildWithDelta(mode, delta)
+}
+
+function buildWithDelta(mode: SeedMode, delta: number): SeedEventSet {
   const caps = CAPS[mode]
   // Identidades ativas neste modo: 8 named + os primeiros `seedIdentities`
   // dos seed (subconjunto fixo → cascata/clusters preservados). full = todos.
@@ -541,12 +570,12 @@ export function buildSeedEvents(mode: SeedMode = 'full'): SeedEventSet {
   // 1. Genesis POST por identidade — fixa first-seen = createdAt.
   //    (Alice genesis NÃO é P1 — P1 vem depois com geo Brasília explícito.)
   for (const id of activeIdentities) {
-    domain.push(signPost(id, id.createdAt, { text: `genesis ${id.name}` }))
+    domain.push(signPost(id, id.createdAt + delta, { text: `genesis ${id.name}` }))
   }
 
   // 2. P1 — post de origem da cascata (Alice, Brasília, na base).
   const alice = NAMED_BY_NAME.alice!
-  const p1 = signPost(alice, TS_BASE, {
+  const p1 = signPost(alice, TS_BASE + delta, {
     category: 'noticias',
     text: 'cascata raiz — Alice em Brasília',
   })
@@ -556,7 +585,7 @@ export function buildSeedEvents(mode: SeedMode = 'full'): SeedEventSet {
   // 3. Cascata A→B→C→D pelo follow-graph (1 elo/hora). Bug #3 ground-truth.
   for (const step of CASCADE) {
     const spreader = NAMED_BY_NAME[step.spreaderName]!
-    domain.push(signSpread(spreader, cascadePostId, alice.pub, step.createdAt))
+    domain.push(signSpread(spreader, cascadePostId, alice.pub, step.createdAt + delta))
   }
 
   // 4. Posts de conteúdo (volume ~500): além dos 58 genesis, geramos
@@ -583,7 +612,7 @@ export function buildSeedEvents(mode: SeedMode = 'full'): SeedEventSet {
     const baseAge = (i / TOTAL_CONTENT_POSTS) * 28 * DAY
     const wobble = (hash01(i * 5.13 + 2.9) - 0.5) * 12 * HOUR
     const ageSec = Math.max(0, Math.min(28 * DAY, Math.floor(baseAge + wobble)))
-    const createdAt = TS_BASE - 28 * DAY + ageSec
+    const createdAt = TS_BASE - 28 * DAY + ageSec + delta
     const cw: ContentWarning | undefined =
       i % 17 === 0 ? 'nsfw' : i % 23 === 0 ? 'spoiler' : undefined
     const imageUrl =
@@ -709,7 +738,7 @@ export function buildSeedEvents(mode: SeedMode = 'full'): SeedEventSet {
   //    que TÊM follows. Aplicados fora do pipeline de score (§24).
   for (const id of activeIdentities) {
     if (id.follows.length === 0) continue
-    contactLists.push(signContactList(id, id.createdAt + 60))
+    contactLists.push(signContactList(id, id.createdAt + 60 + delta))
   }
 
   // ORDENAR domain por created_at ASC garante first-seen estável: o
