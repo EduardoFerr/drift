@@ -91,8 +91,9 @@ Timestamps fixos via fixture constants (base `1716000000`). Manifesto §7 + `Dat
 | `e2e/propagation-model.spec.ts` | #3 — arcs vs cascata esperada (Alice→Bob→Carol→Dave). Geográfico vs social? | ~1h | ~100K |
 | `e2e/p2p-helia.spec.ts` | P2P multi-peer + Helia pin redundância (§15/§16) | ~1h | ~100K |
 | `e2e/smoke-multi-user.spec.ts` | Alice publish → Bob/Carol/Dave veem no feed; 8 contexts boot | ~45min | ~70K |
+| `e2e/boot-interactivity.spec.ts` | **Bug #4** — CTAs responsivos durante boot/verify-storm. Mede: tempo até primeiro click processar; clica MAPA/CONFIG/+ ANTES de feed carregar → assert ação dispara (não enfileira). Com dev-seed 500 posts (storm pior) E sem seed. INP durante storm | ~45min | ~70K |
 
-**Total suites: ~1h paralelo (4 agents) · ~340K.**
+**Total suites: ~1h paralelo (5 agents) · ~410K.**
 
 ### Batch B3 — Fixes guiados por evidência (após B2 revelar)
 
@@ -102,6 +103,11 @@ Depende do que as suites acharem. Candidatos conhecidos:
 - **#3c** Post-mode chain linear enganoso (`d0→d1→d2`) → corrigir pra origin→cada-dest
 - **#1** Score fix se suite achar divergência render vs cálculo
 - **Zoom settle** minor (fit-bounds 1x no mount)
+- **#4** Boot interactivity — verify-storm trava main thread ~2s. Fix
+  Satoshi recomendado: (c) loading state honesto (disable CTA + spinner)
+  + (a) throttle verify N/frame com scheduler.yield. (b) verify em worker
+  defer N+6. Suite `boot-interactivity.spec.ts` mede ANTES (baseline storm)
+  e DEPOIS (fix). dev-seed 500 posts = storm amplificado, bom stress test.
 
 ---
 
@@ -110,9 +116,9 @@ Depende do que as suites acharem. Candidatos conhecidos:
 | Batch | ⏱ paralelo | 🔢 |
 |---|:---:|:---:|
 | B1 infra | ~2h | ~420K |
-| B2 suites | ~1h | ~340K |
-| B3 fixes | depende evidência | ~200-400K |
-| **Total** | **~4-5h wall-clock** | **~1M-1.2M tokens** |
+| B2 suites (5 — +boot-interactivity bug #4) | ~1h | ~410K |
+| B3 fixes (inclui #4 boot) | depende evidência | ~250-450K |
+| **Total** | **~4-5h wall-clock** | **~1.1M-1.3M tokens** |
 
 ROI: destrava #1+#3 (bugs profundos) + infra E2E permanente (previne regressão futura) + valida P2P/Helia (nunca testados end-to-end).
 
