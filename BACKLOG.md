@@ -85,6 +85,22 @@ shipping prematuro).
 
 ---
 
+## Findings verificação visual 2026-05-29 (pós B3 commits)
+
+- [ ] **Arc draw-on só GlobalModeMap, não PostModeMap** — P2. Fix
+  `aa0ed42` (LineLayer interp A→B) cobriu só global. Mini-map embedded
+  (post mode) ainda popa arc full. Estender draw-on pro PostModeMap.
+- [ ] **dev-seed drain lento (~3 ev/s, 2730 eventos)** — P2. #4 throttle
+  `fc024fb` não-bloqueante (BootView honesto ✓) MAS drain glacial:
+  100/2730 em ~35s. Per-event cost (verify+persist+recalc serializado),
+  não yield overhead. Boot real tem menos eventos; mas dev-seed sofre.
+  Tuning: batch maior, recalc deferido/batched, OU pre-serialize +
+  skip-recalc-até-fim. Marshall pre-serialize follow-up (gen-seed.mjs)
+  resolve signing mas não verify+persist.
+- [x] **#4 BootView honesto + V-1 hint removido + arc render** —
+  verificados ao vivo 2026-05-29 (BootView "sincronizando N/2730",
+  botões limpos, 39 arcs world-spread).
+
 ## Bugs visuais sweep Playwright 2026-05-29
 
 > **SYSTEMIC (Satoshi 2026-05-29):** topo do mapa é zona densa de
@@ -109,6 +125,14 @@ shipping prematuro).
   do toggle). SpreadMap badge `4da7a1e`. Fila pós-V-1.
 - [ ] **V-2 linha vermelha solta topo do card** — P2. Em investigação
   (agent a34b355).
+- [ ] **V-6 GPS-error banner intrusivo no feed** — P2. "Location
+  habilitado mas navegador bloqueou GPS. Post publicado sem location"
+  + como ajustar + X (GpsErrorBanner). Conteúdo CORRETO (graceful
+  degrade — post saiu sem location, user informado). Mas UX: empurra
+  feed (bloco reflow) + persiste até X manual. Fix: auto-dismiss N seg
+  + overlay flutuante (não reflow). Mesma classe transiente-intrusivo
+  dos toasts do mapa. Em dev/Playwright geolocation negada por default
+  → banner toda publish com GPS-on (esperado). NÃO-funcional.
 - [x] **V-3 imagem indisponível dominando** — NÃO-bug. Dev COEP bloqueia
   nostr.build CDN (known limitation). Fix real = seed-data realista
   (text-majority + imgs same-origin de Docs/imagens). P1 seed work.
