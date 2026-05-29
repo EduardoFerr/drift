@@ -108,6 +108,15 @@ Depende do que as suites acharem. Candidatos conhecidos:
   + (a) throttle verify N/frame com scheduler.yield. (b) verify em worker
   defer N+6. Suite `boot-interactivity.spec.ts` mede ANTES (baseline storm)
   e DEPOIS (fix). dev-seed 500 posts = storm amplificado, bom stress test.
+- **#5** Legenda do mapa — botão EXPLÍCITO ao lado de FECHAR (ícone mapa)
+  → abre legenda do que cada desenho significa (arco amarelo=ativo,
+  teal=passado, pin=spread location, cluster=densidade, cor WoT). User
+  2026-05-29: long-press 3s (MapExplainerCard) não é descobrível. Botão
+  visível resolve descoberta. **Forcing function pro #3b:** legenda honesta
+  obriga nomear o que arcs REALMENTE são (geográfico post→spreader, NÃO
+  cascata social). Se legenda mentir "A contaminou B", expõe #3. Escrever
+  legenda CONTRA a verdade medida por B2 `propagation-model.spec.ts`.
+  Reusar copy de MapExplainerCard `getMapExplainerCopy()` (single source).
 
 ---
 
