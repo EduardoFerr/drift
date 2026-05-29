@@ -476,7 +476,11 @@ export function buildSeedEvents(): SeedEventSet {
     const post = contentPosts[s % HOT_COUNT]!
     const spreader = ALL_IDENTITIES[(s * 7 + 3) % ALL_IDENTITIES.length]!
     if (spreader.pub === post.authorPub) continue // sem self-spread útil
-    const createdAt = TS_BASE - 20 * DAY + (s % (20 * DAY))
+    // Distribui linear nos 20 dias (s/total × janela). Antes: `s % (20*DAY)`
+    // = no-op pq s≪1.7M → todos spreads em ~27min cluster → rede "já feita"
+    // no mapa. Agora espalha → cascata temporal visível no scrubber.
+    const createdAt =
+      TS_BASE - 20 * DAY + Math.floor((s / Math.max(1, hotSpreads)) * 20 * DAY)
     domain.push(signSpread(spreader, post.event.id, post.authorPub, createdAt))
     spreadCount++
   }
@@ -485,7 +489,9 @@ export function buildSeedEvents(): SeedEventSet {
     const post = contentPosts[HOT_COUNT + (s % (TOTAL_CONTENT_POSTS - HOT_COUNT))]!
     const spreader = ALL_IDENTITIES[(s * 11 + 5) % ALL_IDENTITIES.length]!
     if (spreader.pub === post.authorPub) continue
-    const createdAt = TS_BASE - 14 * DAY + (s % (14 * DAY))
+    // Idem hot: distribui linear nos 14 dias (era no-op `s % (14*DAY)`).
+    const createdAt =
+      TS_BASE - 14 * DAY + Math.floor((s / Math.max(1, tailSpreads)) * 14 * DAY)
     domain.push(signSpread(spreader, post.event.id, post.authorPub, createdAt))
     spreadCount++
   }
