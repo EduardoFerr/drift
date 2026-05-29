@@ -27,6 +27,7 @@ import {
 } from '../../lib/lens/registry'
 import { FullPageCard } from '../UI/FullPageCard'
 import { DriftButton } from '../UI/DriftButton'
+import { Collapse } from '../UI/Collapse'
 import { EyeIcon } from '../UI/Icons'
 
 interface CardProps {
@@ -451,8 +452,11 @@ function ComoFuncionaCollapse() {
         <span>como funciona</span>
         <span aria-hidden="true">{open ? '−' : '+'}</span>
       </button>
-      {open && (
-        <div className="mt-3 space-y-2 font-mono text-[11px] leading-relaxed text-drift-body/85">
+      {/* Collapse (grid-rows + opacity) — expand/collapse suave em vez de
+          pop instantâneo. Respeita prefers-reduced-motion. pt-3 fica DENTRO
+          do Collapse pra não reservar espaço quando colapsado. */}
+      <Collapse open={open}>
+        <div className="space-y-2 pt-3 font-mono text-[11px] leading-relaxed text-drift-body/85">
           <p>
             <span className="text-drift-accent2">Grafo:</span> usa quem
             você acompanha + posts que você deu drift.
@@ -480,7 +484,7 @@ function ComoFuncionaCollapse() {
             </p>
           )}
         </div>
-      )}
+      </Collapse>
     </div>
   )
 }

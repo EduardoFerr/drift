@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 // sem terminal). Corta peso do vendor-identity chunk.
 import QRCode from 'qrcode/lib/browser'
 import { FullPageCard } from '../UI/FullPageCard'
+import { Collapse } from '../UI/Collapse'
 import { dialog } from '../../lib/dialog'
 import { setIdentityFromNsec } from '../../lib/identity'
 import {
@@ -342,10 +343,23 @@ function BackupTab({ identity }: { identity: DriftIdentity }) {
           </button>
         </div>
 
-        {reveal ? (
+        {/* Reveal/oculta com transição suave (Collapse — grid-rows + opacity,
+            respeita prefers-reduced-motion). Placeholder de dots e o painel
+            real coexistem em dois Collapse mutuamente exclusivos: um colapsa
+            enquanto o outro expande, sem pop. */}
+        <Collapse open={!reveal}>
+          <div className="min-w-0 break-all rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3 font-mono text-[12px] leading-relaxed text-drift-muted/40">
+            ••••••••••••••••••••••••••••••••••••••••••••••••••••••••
+          </div>
+        </Collapse>
+
+        <Collapse open={reveal}>
           <div className="space-y-3">
+            {/* §8: o nsec só entra no DOM quando reveal === true. O Collapse
+                mantém o wrapper montado (altura 0) pra animar, mas o segredo
+                em si some do DOM ao ocultar — não fica em nó aria-hidden. */}
             <div className="min-w-0 break-all rounded-xl border border-drift-danger/20 bg-drift-danger/5 px-4 py-3 font-mono text-[12px] text-drift-danger">
-              {identity.nsecBech32}
+              {reveal ? identity.nsecBech32 : ''}
             </div>
 
             {/* QR code — caminho primário (sem clipboard exposure).
@@ -418,14 +432,10 @@ function BackupTab({ identity }: { identity: DriftIdentity }) {
               </span>
             </button>
           </div>
-        ) : (
-          <div className="overflow-hidden break-all rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3 font-mono text-[12px] leading-relaxed text-drift-muted/40">
-            ••••••••••••••••••••••••••••••••••••••••••••••••••••••••
-          </div>
-        )}
+        </Collapse>
       </div>
 
-      {reveal && (
+      <Collapse open={reveal}>
         <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3.5 font-mono text-[12px] leading-relaxed text-drift-text transition-colors hover:border-drift-accent2/25 focus-within:ring-2 focus-within:ring-drift-accent2/40">
           <input
             type="checkbox"
@@ -440,7 +450,7 @@ function BackupTab({ identity }: { identity: DriftIdentity }) {
             permanentemente.
           </span>
         </label>
-      )}
+      </Collapse>
 
       <div className="rounded-xl border border-drift-warning/20 bg-drift-warning/5 px-4 py-3 font-mono text-[11px] leading-relaxed text-drift-warning">
         Esta é a sua identidade na rede Drift. Quem tiver acesso a ela

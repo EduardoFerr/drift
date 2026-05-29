@@ -20,8 +20,11 @@
  * em caps SQLite, nunca em analytics.
  */
 
+// `m` é o primitive leve do framer-motion (LazyMotion). Features via main.tsx.
+import { m, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { useCapabilitiesStore, dismissRule } from '../../lib/capabilities'
 import type { GuidanceRule } from '../../lib/guidance'
+import { MOTION } from '../../lib/motion'
 import { DriftChip } from './DriftChip'
 
 export interface HintChipProps {
@@ -43,11 +46,15 @@ export function HintChip({
   className,
 }: HintChipProps) {
   const caps = useCapabilitiesStore((s) => s.caps)
+  const reduced = useReducedMotion()
 
   // Gate: caps loaded + rule applies + não dispensada.
-  if (!caps) return null
-  if (rule.appliesIf && !rule.appliesIf(caps)) return null
-  if (caps.dismissedRuleIds.has(rule.id)) return null
+  // `visible` controla o AnimatePresence — quando vira false (dismiss
+  // persistido em caps), o chip sai com fade/scale em vez de pop.
+  const visible =
+    !!caps &&
+    (!rule.appliesIf || rule.appliesIf(caps)) &&
+    !caps.dismissedRuleIds.has(rule.id)
 
   function handleDismiss(e: React.MouseEvent) {
     e.stopPropagation()
@@ -57,25 +64,35 @@ export function HintChip({
   }
 
   return (
-    <div className={`inline-flex items-center gap-1 ${className ?? ''}`}>
-      <DriftChip
-        variant="accent"
-        size="sm"
-        onClick={onActivate}
-        ariaLabel={`hint: ${rule.title}`}
-      >
-        {label ?? rule.title}
-      </DriftChip>
-      {!hideDismiss && (
-        <button
-          type="button"
-          onClick={handleDismiss}
-          aria-label={`dispensar hint ${rule.title}`}
-          className="text-drift-muted hover:text-drift-text text-[14px] leading-none px-1 focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2 rounded-sm"
+    <AnimatePresence>
+      {visible && (
+        <m.div
+          initial={reduced ? false : { opacity: 0, scale: 0.92 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.92 }}
+          transition={reduced ? { duration: 0 } : MOTION.fast}
+          className={`inline-flex items-center gap-1 ${className ?? ''}`}
         >
-          ×
-        </button>
+          <DriftChip
+            variant="accent"
+            size="sm"
+            onClick={onActivate}
+            ariaLabel={`hint: ${rule.title}`}
+          >
+            {label ?? rule.title}
+          </DriftChip>
+          {!hideDismiss && (
+            <button
+              type="button"
+              onClick={handleDismiss}
+              aria-label={`dispensar hint ${rule.title}`}
+              className="text-drift-muted hover:text-drift-text text-[14px] leading-none px-1 focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2 rounded-sm"
+            >
+              ×
+            </button>
+          )}
+        </m.div>
       )}
-    </div>
+    </AnimatePresence>
   )
 }
