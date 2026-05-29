@@ -85,6 +85,28 @@ shipping prematuro).
 
 ---
 
+## Bug #4 — CTAs mortos no first load (verify-storm main thread) 2026-05-29
+
+- [ ] **First load: CTAs bloqueados até feed carregar** — P1.
+  Sintoma (user screenshot): primeiro load mostra shell (tabs, nav,
+  feed skeleton vazio) mas clicks não fazem nada; após feed carregar,
+  revivem.
+  **Root cause (Satoshi, read-only trace):** `bootstrap.ts:395-474`
+  seta `step:'ready'` imediato (UI paint rápido, otimização CWV), MAS
+  `startSync()` deferido pra idle dispara verify-storm — ~2000 eventos,
+  cada `verifyEvent` Schnorr ~1ms = ~2s **main thread BLOQUEADO**.
+  Clicks enfileiram durante storm, disparam tarde. Storm limpa → revive.
+  **Fix opções:** (a) throttle verify N/frame com `scheduler.yield`/idle,
+  (b) verify em worker (SQLite já em `db.worker.ts` — Sprint N+6 refactor),
+  (c) loading state honesto — disable CTA visível + spinner em vez de
+  "botão morto". Satoshi recomenda (c)+(a) combinados; (b) defer N+6.
+  **Bloqueio:** Lily B1.2 edita bootstrap.ts AGORA (dev-seed) — fix
+  espera B1 aterrissar. **Relevância N+5:** dev-seed semeia 500 posts
+  via onNostrEvent = storm PIOR. B2 deve medir boot time + CTA
+  responsividade durante seed.
+
+---
+
 ## Bugs descobertos em re-verificação visual 2026-05-23
 
 - [x] **Mode badge (Satoshi A2) não renderiza** — fechado 2026-05-26 em
