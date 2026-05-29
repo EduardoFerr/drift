@@ -260,3 +260,87 @@ describe('Integração TimelineScrubber em SpreadMap MapShell', () => {
     expect(SPREAD_MAP).toMatch(/timelineEvents=\{data\.destinations\.map\([\s\S]{0,80}createdAt/)
   })
 })
+
+// ─── Relógio compartilhado único (Ted+Lily 2026-05-29) ────────────────
+//
+// Bug fix: scrubber + arcos eram DOIS loops independentes. LOCK garante a
+// unificação num relógio só (useTimelineClock), com:
+//   - DURATION 30000ms (não mais ~8s)
+//   - 1 clock fonte única (1 RAF), não 2
+//   - arcos gated por currentTime (não por progresso interno p)
+//   - play/pause afeta o clock (logo arcos + scrubber juntos)
+//   - scrubber lê o mesmo clock (currentTime/paused/togglePaused)
+//   - reduced-motion estático (sem RAF)
+const CLOCK = readFileSync('src/hooks/useTimelineClock.ts', 'utf8')
+
+describe('Relógio compartilhado único — LOCK_VIA_TEST', () => {
+  it('DURATION canônica = 30000ms (30s, não mais ~8s)', () => {
+    expect(CLOCK).toMatch(/TIMELINE_DURATION_MS\s*=\s*30_?000/)
+  })
+
+  it('SpreadMap NÃO tem mais ANIM_DURATION/RAF próprio (loop eliminado)', () => {
+    // Aceita menção em comentário ("antes tinha ANIM_DURATION"), mas
+    // rejeita declaração ativa do antigo loop.
+    expect(SPREAD_MAP).not.toMatch(/const\s+ANIM_DURATION\s*=/)
+    expect(SPREAD_MAP).not.toMatch(/function\s+tick\s*\(/)
+  })
+
+  it('SpreadMap usa o relógio único useTimelineClock', () => {
+    expect(SPREAD_MAP).toMatch(/import\s*\{[^}]*useTimelineClock/)
+    expect(SPREAD_MAP).toMatch(/useTimelineClock\(\{\s*reducedMotion\s*\}\)/)
+  })
+
+  it('arcos são gated por currentTime do relógio (renderFrame recebe o cursor único)', () => {
+    // O único driver do desenho: effect em [currentTime] chama renderFrame.
+    expect(SPREAD_MAP).toMatch(/renderFrameRef\.current\?\.\(currentTime\)/)
+    expect(SPREAD_MAP).toMatch(/\}, \[currentTime\]\)/)
+  })
+
+  it('SpreadMap só tem 1 RAF (o do relógio) — sem requestAnimationFrame no componente', () => {
+    expect(SPREAD_MAP).not.toMatch(/requestAnimationFrame/)
+  })
+
+  it('o relógio único tem exatamente 1 requestAnimationFrame loop', () => {
+    const matches = CLOCK.match(/requestAnimationFrame\(tick\)/g) ?? []
+    // Arranque + re-agendamento dentro do tick = 2 chamadas à mesma fn tick.
+    expect(matches.length).toBeGreaterThanOrEqual(1)
+    // Garante um único nome de loop (tick), não múltiplos loops paralelos.
+    expect(CLOCK).toMatch(/const tick = \(ts: number\)/)
+  })
+
+  it('play/pause controla o clock (paused congela o RAF)', () => {
+    expect(CLOCK).toMatch(/if \(paused\)/)
+    expect(CLOCK).toMatch(/togglePaused/)
+  })
+
+  it('MapShell repassa o clock pro scrubber (currentTime/paused/onTogglePaused)', () => {
+    expect(SPREAD_MAP).toMatch(/clock\?:\s*TimelineClock/)
+    expect(SPREAD_MAP).toMatch(/currentTime:\s*clock\.currentTime/)
+    expect(SPREAD_MAP).toMatch(/paused:\s*clock\.paused/)
+    expect(SPREAD_MAP).toMatch(/onTogglePaused:\s*clock\.togglePaused/)
+  })
+
+  it('GlobalModeMap passa clock={{ currentTime, paused, togglePaused }} pro MapShell', () => {
+    expect(SPREAD_MAP).toMatch(/clock=\{\{\s*currentTime,\s*paused,\s*togglePaused\s*\}\}/)
+  })
+
+  it('scrubber lê o mesmo clock: currentTime normalizado dirige fill + caret', () => {
+    // controlled = currentTime !== undefined → fill width = cursor×100%.
+    expect(SCRUBBER).toMatch(/const controlled = currentTime !== undefined/)
+    expect(SCRUBBER).toMatch(/width:\s*`\$\{cursor \* 100\}%`/)
+  })
+
+  it('scrubber em modo controlled usa paused/onTogglePaused do clock', () => {
+    expect(SCRUBBER).toMatch(/paused:\s*pausedProp/)
+    expect(SCRUBBER).toMatch(/onTogglePaused\?:\s*\(\)\s*=>\s*void/)
+    expect(SCRUBBER).toMatch(/onClick=\{togglePaused\}/)
+  })
+
+  it('reduced-motion → estático (sem RAF; currentTime=1)', () => {
+    // No clock: reducedMotion early-return antes do requestAnimationFrame.
+    expect(CLOCK).toMatch(/if \(reducedMotion\)/)
+    expect(CLOCK).toMatch(/setCurrentTime\(1\)/)
+    // paused reportado como true sob reduced (toggle vira no-op).
+    expect(CLOCK).toMatch(/paused:\s*reducedMotion\s*\?\s*true\s*:\s*paused/)
+  })
+})

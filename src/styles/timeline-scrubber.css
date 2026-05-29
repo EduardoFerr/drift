@@ -4,10 +4,14 @@
  * V_2026-05-23 (user pedido): "a barra não está enchendo. Era para encher
  * da esquerda para a direita conforme o tempo passasse né?"
  *
- * Fill bar enche esquerda→direita ao longo de 8s (matching ANIM_DURATION
- * do GlobalModeMap em SpreadMap.tsx), pausa 2s, loop. Sincroniza
- * visualmente com pins do mapa que aparecem progressivamente via
- * `d.t <= p` no RAF tick (mesmo timing, fase 0).
+ * Estas keyframes são o FALLBACK legacy (PostModeMap sem clock). O modo
+ * principal (GlobalModeMap) agora usa o relógio compartilhado único
+ * `useTimelineClock` (30s) e dirige o fill via width inline — NÃO usa
+ * estas animações. Aqui mantemos o autoplay CSS só pro mapa de post, que
+ * não tem RAF de arcos pra sincronizar.
+ *
+ * Fill bar enche esquerda→direita, pausa, loop. Sincroniza visualmente
+ * com pins que aparecem progressivamente.
  *
  * Implementação: transform: scaleX(0→1) com transform-origin: left.
  * GPU-accelerated, zero setState 60fps. animation-play-state controla

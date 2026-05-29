@@ -19,6 +19,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useSpreadMap, isUserSoloSpreader, type SpreadMapMode } from '../../hooks/useSpreadMap'
 import { useLongPress, LONG_PRESS_MS } from '../../hooks/useLongPress'
+import { useTimelineClock, type TimelineClock } from '../../hooks/useTimelineClock'
 import { MapExplainerCard } from './MapExplainerCard'
 import { TimelineScrubber } from './TimelineScrubber'
 import { AnimatePresence, m, useReducedMotion } from 'framer-motion'
@@ -517,13 +518,33 @@ function GlobalModeMap({ data, className, mode, onModeChange }: ModeMapProps) {
   const reducedMotion = useReducedMotion() ?? false
   const containerRef = useRef<HTMLDivElement>(null)
 
+  // ─── Relógio compartilhado único (Ted+Lily 2026-05-29) ──────────────
+  //
+  // Bug fix: antes este componente tinha um RAF próprio (ANIM_DURATION 8s)
+  // e o TimelineScrubber tinha SUA própria animação CSS. Dois clocks
+  // independentes → play/pause da barra não pausava arcos; arcos
+  // desenhavam pelo tempo interno deles (não gated pela barra). Agora
+  // `useTimelineClock` é a FONTE ÚNICA: 1 RAF avança `currentTime` (0→1)
+  // sobre 30s. Os arcos LEEM currentTime (gating); o scrubber LÊ
+  // currentTime (fill). pausar congela AMBOS. reduced-motion → estático.
+  const { currentTime, paused, togglePaused } = useTimelineClock({ reducedMotion })
+
+  // renderFrame é construído dentro do effect de init do mapa (precisa do
+  // overlay deck.gl + layer ctors carregados async). Guardamos a função
+  // num ref pra que o effect de "draw on currentTime change" possa
+  // chamá-la sem reconstruir o mapa. NÃO há RAF aqui — o cursor vem do
+  // relógio único acima.
+  const renderFrameRef = useRef<((p: number) => void) | null>(null)
+  // Último cursor conhecido — lido pelo `map.once('load')` (que dispara
+  // async, depois do primeiro tick do relógio) sem precisar do currentTime
+  // nas deps do effect pesado de init. Mantido em sync pelo draw effect.
+  const latestTimeRef = useRef(currentTime)
+
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
 
     let cancelled = false
-    let rafId = 0
-    let pauseTimer: ReturnType<typeof setTimeout>
     let mapCleanup: (() => void) | null = null
     let overlay: OverlayInstance | null = null
 
@@ -589,20 +610,22 @@ function GlobalModeMap({ data, className, mode, onModeChange }: ModeMapProps) {
         overlay = inst
         map.addControl(inst)
 
-        // ─── Animation loop ────────────────────────────────────────
+        // ─── Render gated por currentTime (relógio único) ──────────
         //
         // Draw-on A→B (user 2026-05-28): "se a linha representa ponto A
-        // a ponto B, deveria ser desenhada de A até B". Antes os arcos
-        // POPAVAM full quando `s.t <= p` (só fade-in de alpha). Agora
-        // cada arco DESENHA progressivamente: o ponto de destino do
-        // segmento é interpolado de `from`→`to` conforme `drawProgress`,
-        // então a linha cresce do A até o B como um rastro.
+        // a ponto B, deveria ser desenhada de A até B". Cada arco DESENHA
+        // progressivamente: o ponto de destino do segmento é interpolado
+        // de `from`→`to` conforme `drawProgress`, então a linha cresce do
+        // A até o B como um rastro.
         //
-        // Sync com scrubber: `drawProgress` arranca quando o cursor
-        // temporal `p` (0→1 sobre ANIM_DURATION, igual ao fill do
-        // TimelineScrubber) cruza o `t` normalizado do arco. Arcos com
-        // `t` menor (eventos mais antigos) desenham primeiro → cascata
-        // temporal real, espelhando a ordem cronológica dos spreads.
+        // Sync com scrubber (Ted+Lily 2026-05-29): `renderFrame(p)` recebe
+        // `p = currentTime` do relógio ÚNICO (`useTimelineClock`, 0→1 sobre
+        // 30s) — o MESMO cursor que dirige o fill do TimelineScrubber. Não
+        // há mais RAF aqui. Arco só é visível quando `currentTime` cruza
+        // seu `t` normalizado; `drawProgress` arranca daí. Arcos com `t`
+        // menor (eventos mais antigos) desenham primeiro → INFLATE: poucos
+        // arcos cedo (currentTime baixo), muitos tarde → cascata temporal
+        // real espelhando a ordem cronológica dos spreads.
         //
         // ApproachDecision (Ted): LineLayer + target-interpolation, NÃO
         // TripsLayer. Razões: (a) LineLayer já está importado (zero peso
@@ -611,12 +634,7 @@ function GlobalModeMap({ data, className, mode, onModeChange }: ModeMapProps) {
         // mapa usa; (c) interp linear lng/lat é puro/determinístico e
         // dá rastro A→B limpo; (d) TripsLayer exige timestamps por
         // vértice (path), overkill pra segmentos de 2 pontos.
-        const ANIM_DURATION = 8000   // 8s pra percorrer toda a cadeia
-        const DRAW_FRAC = 0.14       // fração do ciclo pra desenhar 1 arco (~1.1s)
-        const PAUSE_MS = 2000        // pausa entre ciclos
-
-        let startTime: number | null = null
-        let pausing = false
+        const DRAW_FRAC = 0.14       // fração do ciclo pra desenhar 1 arco (~4.2s @30s)
 
         // Interpolação linear de [lng,lat] (flat map → linear é exato o
         // suficiente; pura/determinística, manifesto §7). easeOutCubic dá
@@ -738,34 +756,15 @@ function GlobalModeMap({ data, className, mode, onModeChange }: ModeMapProps) {
           })
         }
 
-        function tick(ts: number) {
-          if (pausing || cancelled) return
-          if (!startTime) startTime = ts
-          const p = Math.min((ts - startTime) / ANIM_DURATION, 1)
-          renderFrame(p)
-          if (p < 1) {
-            rafId = requestAnimationFrame(tick)
-          } else {
-            pausing = true
-            pauseTimer = setTimeout(() => {
-              if (!cancelled) {
-                startTime = null
-                pausing = false
-                rafId = requestAnimationFrame(tick)
-              }
-            }, PAUSE_MS)
-          }
-        }
-
+        // Publica renderFrame pro effect do relógio (NÃO arranca RAF aqui).
+        // O cursor (`currentTime`) é avançado pelo useTimelineClock; um
+        // effect separado chama renderFrameRef.current(currentTime) a cada
+        // mudança. Renderiza o frame atual já no load pra evitar mapa vazio
+        // até o primeiro tick do relógio.
+        renderFrameRef.current = renderFrame
         map.once('load', () => {
           if (cancelled) return
-          if (reducedMotion) {
-            // WCAG 2.3.3: sem draw-on. Renderiza um frame full estático
-            // (p=1 ⇒ todos os arcos com draw=1, tip=to) e NÃO arranca RAF.
-            renderFrame(1)
-            return
-          }
-          rafId = requestAnimationFrame(tick)
+          renderFrameRef.current?.(latestTimeRef.current)
         })
       } catch (err) {
         console.error('[SpreadMap global] init error:', err)
@@ -774,12 +773,22 @@ function GlobalModeMap({ data, className, mode, onModeChange }: ModeMapProps) {
 
     return () => {
       cancelled = true
-      cancelAnimationFrame(rafId)
-      clearTimeout(pauseTimer)
+      renderFrameRef.current = null
       mapCleanup?.()
       overlay = null
     }
   }, [data, mapView, reducedMotion])
+
+  // ─── Draw on clock tick (Ted+Lily 2026-05-29) ──────────────────────
+  // Único ponto que dirige o desenho dos arcos: sempre que `currentTime`
+  // avança (pelo RAF do relógio único), re-renderiza o frame gated por
+  // esse cursor. Sem RAF próprio aqui — 1 RAF total no sistema (o do
+  // useTimelineClock). reduced-motion → currentTime=1 estático, então
+  // este effect roda uma vez com p=1 (arcos full) e não mais.
+  useEffect(() => {
+    latestTimeRef.current = currentTime
+    renderFrameRef.current?.(currentTime)
+  }, [currentTime])
 
   // Ted polish #9 2026-05-22: hint discreto quando user habilitou WoT
   // colors mas cache PPR ainda vazio (primeira vez vendo lente). Evita
@@ -811,6 +820,7 @@ function GlobalModeMap({ data, className, mode, onModeChange }: ModeMapProps) {
             : `${data.totalSpreads} drifts · ${data.countries.length} ${data.countries.length === 1 ? 'país' : 'países'} · todos os posts`
         }
         timelineEvents={data.destinations.map((d) => ({ created_at: d.createdAt }))}
+        clock={{ currentTime, paused, togglePaused }}
       />
       {lensHintVisible && (
         <div
@@ -834,6 +844,7 @@ function MapShell({
   onModeChange,
   stats,
   timelineEvents,
+  clock,
 }: {
   containerRef: React.RefObject<HTMLDivElement>
   className: string
@@ -847,6 +858,14 @@ function MapShell({
    * renderiza (zero footprint).
    */
   timelineEvents?: Array<{ created_at: number }>
+  /**
+   * Relógio compartilhado único (Ted+Lily 2026-05-29). Quando presente, o
+   * scrubber LÊ `currentTime` (fill + caret) e controla `paused` via
+   * `togglePaused` — a MESMA fonte que dirige os arcos no mapa. Ausente
+   * (PostModeMap sem clock) → scrubber cai no fallback CSS autoplay
+   * histórico.
+   */
+  clock?: TimelineClock
 }) {
   // Satoshi A4: omite o nudge "tiles externos" quando user já configurou
   // template custom (sovereignty pref) — sinaliza que respeitamos a
@@ -874,7 +893,17 @@ function MapShell({
           mapa (pan/zoom). */}
       {timelineEvents && timelineEvents.length > 0 && (
         <div className="pointer-events-none absolute bottom-[44px] left-3 right-3 z-10">
-          <TimelineScrubber events={timelineEvents} mode={mode} />
+          <TimelineScrubber
+            events={timelineEvents}
+            mode={mode}
+            {...(clock
+              ? {
+                  currentTime: clock.currentTime,
+                  paused: clock.paused,
+                  onTogglePaused: clock.togglePaused,
+                }
+              : {})}
+          />
         </div>
       )}
 
