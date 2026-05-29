@@ -85,6 +85,25 @@ shipping prematuro).
 
 ---
 
+## Seed-perf saga + validação 3 mapas BLOQUEADA 2026-05-29
+
+- [ ] **dev-seed drain floor: SQLite INSERT roundtrip serializado** — P1.
+  Saga: deferSideEffects (`1e2e366`) removeu recalc, skipVerify
+  (`4f1dee7`) removeu verify Schnorr (~4x: 3.4→15 ev/s pico). MAS floor
+  persiste: INSERT roundtrip serializado por evento (db.run postMessage)
+  + rate cai pra ~3/s conforme tabelas crescem (provável table-scan no
+  persist/lookup escalando com volume). 2730 eventos = 3-6min inconsistente.
+  Fix real: **batch-INSERT** (1 db.run multi-row em vez de 2730 individuais)
+  OU **lite-seed** (`?dev-seed=lite` ~200 eventos) pra validação rápida.
+  Satoshi: lite-seed é o unblock pragmático; batch-INSERT é o fix de raiz.
+  signing (finalizeEvent 2730) também ~24-40s CPU-bound, não-afetado —
+  Marshall pre-serialize (gen-seed.mjs cached JSON, untracked) resolveria.
+- [ ] **Validação visual 3 mapas — DEFERIDA (bloqueada no seed-perf)** —
+  global (infla com timestamps distribuídos `5952959`), post mini-map
+  (arc draw-on não aplicado — confirmar popa), network (cascata
+  Alice→Bob→Carol→Dave). Bloqueada: seed 2730 leva minutos. Unblock:
+  lite-seed. Retomar quando lite-seed OU batch-INSERT shipar.
+
 ## Findings verificação visual 2026-05-29 (pós B3 commits)
 
 - [ ] **Arc draw-on só GlobalModeMap, não PostModeMap** — P2. Fix
