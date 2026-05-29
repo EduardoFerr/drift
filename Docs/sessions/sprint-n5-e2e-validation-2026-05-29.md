@@ -118,12 +118,29 @@ ROI: destrava #1+#3 (bugs profundos) + infra E2E permanente (previne regressão 
 
 ---
 
-## Decisões pendentes (user)
+## Decisões — RESOLVIDAS 2026-05-29
 
-1. **Roster:** 8 named + 50 seed confirmado? Ou ajustar?
-2. **Timestamps determinísticos** base `1716000000` — OK?
-3. **Dispatch B1 agora** OU revisar mais antes?
-4. **Modelo propagação (#3b)** — deliberar geográfico vs social-cascade ANTES de B1, OU deixar suite B2 revelar primeiro?
+1. ✅ **Roster:** 8 named + 50 seed CONFIRMADO. ("ainda não cobriu tudo, mas vamos em frente e incrementando")
+2. ✅ **Timestamps:** base `1716000000` determinístico, nsec derivado de seed string.
+3. ✅ **B1 dispatched** — 3 agents paralelos (Marshall seed / Lily boot+playwright / Ted helia+webrtc mock).
+4. ⏳ **Modelo propagação (#3b):** deixar B2 suite `propagation-model.spec.ts` revelar PRIMEIRO (evidência antes de deliberar geográfico-vs-social). Deliberação Ted+Satoshi só DEPOIS da suite mostrar o que arcs realmente desenham vs cascata conhecida A→B→C→D.
+
+## Status execução
+
+| Batch | Status | Agents |
+|---|---|---|
+| B1 infra | 🔄 EM VÔO | Marshall `adc2856` · Lily `a587a20` · Ted `acbbe53` |
+| B2 suites | ⏳ após B1 | score-fidelity, propagation-model, p2p-helia, smoke |
+| B3 fixes | ⏳ evidence-driven | scrubber sync, #3b modelo, score, zoom settle |
+
+## Incremento (escopo cresce conforme aparece — user 2026-05-29)
+Plano NÃO é fechado. Coberturas a adicionar conforme B2 revelar:
+- Score edge cases (bury>spread, última-ação-vale §23, comment contribution)
+- Moderação §26 multi-reporter threshold dinâmico
+- Trust Lens PPR reordenamento local com follow-graph conhecido
+- Multi-identidade switch (§4) sem vazar pipeline
+- Eviction §16 (não remove spreads do user)
+- Rebroadcast oportunista em addRelay
 
 ---
 
