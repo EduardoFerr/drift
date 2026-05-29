@@ -105,13 +105,75 @@ export async function setupUser(browser: Browser, name: string): Promise<UserSes
   const page = await context.newPage()
 
   // baseURL vem de playwright.config.ts (Ted). Path relativo + query.
-  await page.goto(`/?dev-seed=1&as=${canonical}`)
+  // dev-seed=lite (~200 eventos) em vez de =1 (~2730): o drain floor do
+  // INSERT serializado faz full levar minutos (> timeout 45s) → boot nunca
+  // fica interativo no E2E. lite drena em segundos e PRESERVA tudo que as
+  // suites de validação asseram: cascata A→B→C→D, 3 alvos §26, geo BR/EU/JP,
+  // ≥1 post moderado + ≥1 positivo, follows. Batch-INSERT (backlog) é o fix
+  // de raiz que libera full no E2E.
+  await page.goto(`/?dev-seed=lite&as=${canonical}`)
 
   // Boot ready = badge "DEV SEED" no header (devSeedActive=true). Espera
   // explícita evita race entre navegação e materialização do SQLite.
   await page.getByText('dev seed', { exact: true }).waitFor({ state: 'visible' })
 
+  // CRÍTICO: o badge aparece no INÍCIO do seed; o fix de bug #4 deixa a UI
+  // interativa DURANTE o drain (batches com yield). Os asserts leem o SQLite
+  // → precisam do seed ASSENTADO: drain completo + recalcAllScores +
+  // invalidateFeed. Sem isto, contagens/scores variam por boot (race).
+  await waitSeedSettled(page)
+
   return { context, page, name: canonical, nsec, npub }
+}
+
+/**
+ * Espera o dev-seed ASSENTAR completamente: drain de todos os eventos +
+ * recalcAllScores + invalidateFeed. Sinal robusto = COUNT(*) de posts ESTÁVEL
+ * entre leituras consecutivas (drain terminou de inserir) + um buffer pro
+ * recalc/feed-resort que rodam logo após o drain. Sem depender de elemento da
+ * UI (a UI fica interativa antes do drain terminar — bug #4 fix).
+ */
+export async function waitSeedSettled(page: Page): Promise<void> {
+  // Sinal DETERMINÍSTICO de fim do seed: seed.ts marca
+  // `window.__driftSeedMeta.drained = true` SÓ após drain + recalcAllScores +
+  // invalidateFeed. Contagem de posts engana — o drain rende entre batches
+  // (yield) e um stall >1s faz leituras iguais parecerem "estável" no meio do
+  // caminho (causa de 63 vs 61 entre boots). Esperar a flag elimina o race.
+  await page.waitForFunction(
+    () =>
+      (window as unknown as { __driftSeedMeta?: { drained?: boolean } }).__driftSeedMeta
+        ?.drained === true,
+    undefined,
+    { timeout: 60_000 },
+  )
+  // Buffer curto pro feed store re-ordenar por score após o invalidateFeed.
+  await page.waitForTimeout(300)
+}
+
+/**
+ * Ground-truth do seed ATUAL (ancorado), publicado por `seed.ts` em
+ * `window.__driftSeedMeta`. Como a timeline é ancorada ao Date.now do boot,
+ * os event ids variam por boot — as suites leem os ids REAIS daqui em vez de
+ * recomputá-los da forma pura (`getSeedEvents()`, ids não-ancorados). §7: a
+ * forma pura segue determinística pros LOCK_VIA_TEST; este hook é só o mapa
+ * ground-truth do que foi ingerido neste boot.
+ */
+export interface SeedMeta {
+  cascadePostId: string
+  reportedTargetIds: string[]
+  anchorSec: number
+  mode: string
+}
+
+export async function getSeedMeta(page: Page): Promise<SeedMeta> {
+  await page.waitForFunction(
+    () => (window as unknown as { __driftSeedMeta?: unknown }).__driftSeedMeta != null,
+    undefined,
+    { timeout: 30_000 },
+  )
+  return page.evaluate(
+    () => (window as unknown as { __driftSeedMeta: SeedMeta }).__driftSeedMeta,
+  )
 }
 
 /**

@@ -71,7 +71,9 @@ interface DriftWindow {
  */
 async function openUserPage(context: BrowserContext, name: string): Promise<Page> {
   const page = await context.newPage()
-  await page.goto(`/?dev-seed=1&as=${name}`)
+  // dev-seed=lite: boot em segundos (full = drain floor > timeout). P2P/Helia
+  // mesh independe do volume — lite tem eventos suficientes pra propagar.
+  await page.goto(`/?dev-seed=lite&as=${name}`)
   await page.getByText('dev seed', { exact: true }).waitFor({ state: 'visible' })
   // Os hooks são wired via import() async em main.tsx — espera resolverem.
   await page.waitForFunction(() => {

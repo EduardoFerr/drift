@@ -98,7 +98,34 @@ export async function seedDatabase(
   // mas lite assina em ~2s. Determinismo cross-run NÃO é exigido pro seed
   // ao vivo — só pros LOCK_VIA_TEST (que usam a forma pura).
   const nowAnchorSec = Math.floor(Date.now() / 1000)
-  const { domain, contactLists } = buildSeedEvents(mode, nowAnchorSec)
+  const { domain, contactLists, cascadePostId } = buildSeedEvents(mode, nowAnchorSec)
+
+  // Ground-truth pro E2E (Sprint N+5): como a timeline é ancorada ao Date.now
+  // do boot, os event ids mudam por boot — as suites NÃO podem recomputá-los
+  // de `getSeedEvents()` (forma pura, ids não-ancorados) nem buscar por
+  // `created_at` absoluto. Publicamos aqui os ids REAIS que foram ingeridos.
+  // DEV-only (mesmo gate de window.__driftDb). Anchor-robusto.
+  if (typeof window !== 'undefined') {
+    const reportedTargetIds = Array.from(
+      new Set(
+        domain
+          .filter((e) => e.kind === 9081) // REPORT
+          .map((e) => e.tags.find((t) => t[0] === 'e')?.[1])
+          .filter((id): id is string => typeof id === 'string'),
+      ),
+    )
+    ;(window as unknown as { __driftSeedMeta?: unknown }).__driftSeedMeta = {
+      cascadePostId,
+      reportedTargetIds,
+      anchorSec: nowAnchorSec,
+      mode,
+      // `drained` vira true só no FIM de seedDatabase (após recalc +
+      // invalidateFeed). Sinal determinístico de "seed assentou" pro E2E —
+      // contagem de posts engana (drain rende entre batches; um stall faz a
+      // contagem parecer estável no meio). Ver e2e/fixtures/users.ts.
+      drained: false,
+    }
+  }
 
   // Contact lists primeiro: follow-graph disponível antes do feed render.
   for (const ev of contactLists) {
@@ -133,6 +160,14 @@ export async function seedDatabase(
   // determinismo §7 idêntico, drain ~26× mais rápido.
   await recalcAllScores()
   invalidateFeed()
+
+  // Seed totalmente assentado (drain + recalc + invalidateFeed). Marca o
+  // ground-truth pro E2E esperar de forma determinística (ver users.ts).
+  if (typeof window !== 'undefined') {
+    const meta = (window as unknown as { __driftSeedMeta?: { drained?: boolean } })
+      .__driftSeedMeta
+    if (meta) meta.drained = true
+  }
 }
 
 /** Reset do guard de sessão — útil em tests / re-seed manual. */

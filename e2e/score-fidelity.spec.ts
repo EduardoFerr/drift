@@ -62,14 +62,10 @@
  */
 
 import { test, expect } from '@playwright/test'
-import { setupUser } from './fixtures/users'
+import { setupUser, getSeedMeta } from './fixtures/users'
 import { calculateScore } from '../src/lib/scoring'
 import { calculateWeight } from '../src/lib/weight'
-import {
-  getSeedEvents,
-  NAMED_BY_NAME,
-  CASCADE,
-} from '../src/lib/dev-seed/fixtures'
+import { NAMED_BY_NAME, CASCADE } from '../src/lib/dev-seed/fixtures'
 
 // ─── Tipos das linhas lidas via window.__driftDb (read-only) ─────────
 
@@ -130,8 +126,6 @@ async function readHeaderDeriva(page: import('@playwright/test').Page): Promise<
   return m[1]!
 }
 
-const cascadePostId = getSeedEvents().cascadePostId
-
 // ─────────────────────────────────────────────────────────────────────
 // Spec #1 — Header DERIVA é fiel a posts.score do post visível
 // ─────────────────────────────────────────────────────────────────────
@@ -184,6 +178,7 @@ test('#2 P1 cascata: card ↑N == COUNT de spreaders, divergente do score float'
 }) => {
   const alice = await setupUser(browser, 'alice')
   try {
+    const { cascadePostId } = await getSeedMeta(alice.page)
     const p1 = await dbGet<PostRow>(
       alice.page,
       `SELECT id, score, spreads, buries, created_at, author_pub
@@ -240,6 +235,7 @@ test('#2b score de P1 segue a fórmula ponderada (não COUNT) — re-derivação
 }) => {
   const alice = await setupUser(browser, 'alice')
   try {
+    const { cascadePostId } = await getSeedMeta(alice.page)
     const p1 = await dbGet<PostRow>(
       alice.page,
       `SELECT id, score, created_at FROM posts WHERE id = ?`,
@@ -320,6 +316,7 @@ test('#3 §23 última-ação-vale: spread→bury do mesmo user conta só bury', 
   // deve sobreviver no recalc (events.ts:selectLatestActionByUser).
   const bob = await setupUser(browser, 'bob')
   try {
+    const { cascadePostId } = await getSeedMeta(bob.page)
     // Estado inicial de P1 (cascata já tem Bob como spreader pelo seed).
     const before = await dbGet<PostRow>(
       bob.page,
@@ -423,14 +420,8 @@ test('#4 §26: 3 posts-alvo escondidos (score = -999) e fora do feed', async ({
 }) => {
   const alice = await setupUser(browser, 'alice')
   try {
-    // IDs dos 3 alvos de report no seed (ground-truth das fixtures).
-    const reportedTargets = Array.from(
-      new Set(
-        getSeedEvents()
-          .domain.filter((e) => e.kind === 9081)
-          .map((e) => e.tags.find((t) => t[0] === 'e')![1]!),
-      ),
-    )
+    // IDs dos 3 alvos de report no seed ANCORADO (ground-truth via hook).
+    const { reportedTargetIds: reportedTargets } = await getSeedMeta(alice.page)
     expect(reportedTargets.length, 'seed deve ter exatamente 3 alvos').toBe(3)
 
     // Cada alvo deve estar com score = -999 no DB materializado.
@@ -490,11 +481,18 @@ test('#5 §7: 2 boots dev-seed convergem (counts + sinal de score idênticos)', 
   const a = await setupUser(browser, 'carol')
   const b = await setupUser(browser, 'carol')
   try {
-    const SQL = `SELECT id, spreads, buries,
+    // NOTA (anchor 2026-05-29): a timeline é ancorada ao Date.now de CADA
+    // boot → event ids E created_at são boot-relativos (2 boots em instantes
+    // diferentes → ids diferentes). Por isso §7 aqui é a ESTRUTURA
+    // materializada — contagens (spreads/buries) + sinal do score por post —
+    // NÃO os ids absolutos. Ordenamos pelos campos estruturais (não por id) e
+    // comparamos o multiset. A determinismo POR-âncora (mesma âncora → mesmos
+    // ids) é coberta em tests/dev-seed-fixtures (unidade, forma pura).
+    const SQL = `SELECT spreads, buries,
                         CASE WHEN score = -999 THEN -1
                              WHEN score > 0 THEN 1 ELSE 0 END AS score_sign
-                   FROM posts ORDER BY id`
-    type Row = { id: string; spreads: number; buries: number; score_sign: number }
+                   FROM posts ORDER BY spreads, buries, score_sign`
+    type Row = { spreads: number; buries: number; score_sign: number }
 
     const rowsA = await dbExec<Row>(a.page, SQL)
     const rowsB = await dbExec<Row>(b.page, SQL)
@@ -505,9 +503,8 @@ test('#5 §7: 2 boots dev-seed convergem (counts + sinal de score idênticos)', 
       `contagem de posts divergente entre boots: A=${rowsA.length} B=${rowsB.length}`,
     ).toBe(rowsB.length)
 
-    // Comparação exata por post: id, spreads, buries, sinal do score.
-    // QUALQUER divergência mata o determinismo §7 → hipótese de
-    // não-determinismo vence.
+    // Comparação exata da ESTRUTURA por post (spreads, buries, sinal). QUALQUER
+    // divergência mata o determinismo §7 → hipótese de não-determinismo vence.
     expect(rowsB).toEqual(rowsA)
 
     // Sanidade: pelo menos um post moderado (-1) e um positivo (1) — senão
@@ -528,6 +525,7 @@ test('#5 §7: 2 boots dev-seed convergem (counts + sinal de score idênticos)', 
 test('#smoke P1 é da Alice (sanidade ground-truth)', async ({ browser }) => {
   const alice = await setupUser(browser, 'alice')
   try {
+    const { cascadePostId } = await getSeedMeta(alice.page)
     const p1 = await dbGet<PostRow>(
       alice.page,
       `SELECT author_pub FROM posts WHERE id = ?`,

@@ -47,11 +47,8 @@
  */
 
 import { test, expect, type Page } from '@playwright/test'
-import {
-  CASCADE,
-  NAMED_BY_NAME,
-  TS_BASE,
-} from '../src/lib/dev-seed/fixtures'
+import { getSeedMeta, waitSeedSettled } from './fixtures/users'
+import { CASCADE, NAMED_BY_NAME } from '../src/lib/dev-seed/fixtures'
 
 // ─── Coordenadas conhecidas da cascata (espelham fixtures.ts) ─────────
 
@@ -233,24 +230,25 @@ let cascadePostId: string
 test.beforeAll(async ({ browser }) => {
   const ctx = await browser.newContext()
   page = await ctx.newPage()
-  await page.goto('/?dev-seed=1&as=alice')
+  // dev-seed=lite: drain em segundos (full = minutos > timeout, drain floor).
+  // Preserva a cascata A→B→C→D que esta suite valida.
+  await page.goto('/?dev-seed=lite&as=alice')
   await page.getByText('dev seed', { exact: true }).waitFor({ state: 'visible', timeout: 30_000 })
   await waitForDb(page)
+  await waitSeedSettled(page) // drain + recalc completos antes de inventariar a cascata
 
-  // cascadePostId é determinístico (mesmo nsec/timestamps → mesmo id),
-  // mas confirmamos contra o banco pra falhar cedo se o fixture mudar.
-  const found = await page.evaluate(async () => {
+  // cascadePostId vem do hook ground-truth do seed ANCORADO (a timeline é
+  // ancorada ao Date.now do boot → id/created_at boot-relativos; não dá pra
+  // buscar por timestamp absoluto nem recomputar da forma pura).
+  const meta = await getSeedMeta(page)
+  cascadePostId = meta.cascadePostId
+  const exists = await page.evaluate(async (id: string) => {
     interface DbApi { get: <T>(sql: string, params?: unknown[]) => Promise<T | null> }
     const db = (window as unknown as { __driftDb: DbApi }).__driftDb
-    // P1 = post de Alice em TS_BASE com category 'noticias'.
-    const row = await db.get<{ id: string }>(
-      `SELECT id FROM posts WHERE created_at = ? AND category = 'noticias' LIMIT 1`,
-      [1716000000],
-    )
+    const row = await db.get<{ id: string }>(`SELECT id FROM posts WHERE id = ?`, [id])
     return row?.id ?? null
-  })
-  expect(found, 'P1 (cascade root) deve existir no SQLite seeded').not.toBeNull()
-  cascadePostId = found!
+  }, cascadePostId)
+  expect(exists, 'P1 (cascade root) deve existir no SQLite seeded').toBe(cascadePostId)
 })
 
 test.afterAll(async () => {

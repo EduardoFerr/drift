@@ -784,9 +784,21 @@ interface SerializedSeedEventSet {
   cascadePostId: string
 }
 
-const _generatedModules = import.meta.glob('./seed-events.generated.json', {
-  eager: true,
-}) as Record<string, { default: SerializedSeedEventSet }>
+// `import.meta.glob` é API do Vite — resolvida estaticamente em build/dev
+// (browser + vitest). O loader Node do Playwright (E2E) NÃO a tem → chamar
+// lançaria "glob is not a function" no top-level e derrubaria todo o módulo
+// (as suites importam CASCADE/NAMED_BY_NAME daqui). try/catch torna fixtures
+// carregável em AMBOS: no Vite a call vira literal (não lança); no Node o
+// catch cai pro build in-memory (sem fast-path, comportamento correto fora
+// do bundler).
+let _generatedModules: Record<string, { default: SerializedSeedEventSet }> = {}
+try {
+  _generatedModules = import.meta.glob('./seed-events.generated.json', {
+    eager: true,
+  }) as Record<string, { default: SerializedSeedEventSet }>
+} catch {
+  _generatedModules = {}
+}
 
 /** Carrega o artefato pré-serializado, ou `null` se não foi gerado. */
 function loadGeneratedSeed(): SeedEventSet | null {

@@ -74,7 +74,7 @@ export const DRIFT_VERSION = '1'
  * of truth). Vite resolve esse import como JSON em build/dev. User-facing
  * em SettingsRoot ("sobre" group) + DiagnosticPanel (status técnico).
  */
-import pkg from '../../package.json'
+import pkg from '../../package.json' with { type: 'json' }
 export const CLIENT_VERSION = pkg.version
 
 /**
