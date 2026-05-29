@@ -236,14 +236,29 @@ export function SuaLenteCard({ onClose }: CardProps) {
         </div>
         )}
 
-        {/* PR-5 (2026-05-20): toggle opt-in pra indicador visual de
-            reorder. Default OFF — chip "lente" já cobre quem quer
-            investigar. Apenas exposto quando lente ativa (isActive).
-            Sprint N+2 P0.2: gateado também por showStrengthControls —
+        {/* PR-5 (2026-05-20): toggles opt-in (indicador de reorder, decay
+            de follows, cor no mapa). Default OFF.
+
+            Lily CLS fix (2026-05-28): toggles SEMPRE no DOM quando a
+            estratégia usa strength (showStrengthControls), nunca gateados
+            por `isActive`. Antes: `isActive && <Toggle/>` montava/desmontava
+            ao mover o slider 0→>0, empurrando o conteúdo abaixo (reflow =
+            layout shift). Manifesto perf CLS < 0.1.
+            Quando strength === 0 (lente off) os toggles ficam `disabled`
+            + dimmed com hint "ative a lente pra usar" — espaço reservado
+            constante, zero CLS, e semanticamente correto (estes ajustes só
+            têm efeito com a lente reordenando).
+            LOCK_VIA_TEST: tests/sua-lente-cls-conformance.test.ts — toggles
+            não podem voltar a ser gateados por strength/isActive.
+            Sprint N+2 P0.2: showStrengthControls gateia a estratégia —
             sub-toggles PPR-específicos não fazem sentido em Chronological. */}
-        {showStrengthControls && isActive && <ReorderIndicatorToggle />}
-        {showStrengthControls && isActive && <PprDecayToggle />}
-        {showStrengthControls && isActive && <MapColorsToggle />}
+        {showStrengthControls && (
+          <div className="space-y-0">
+            <ReorderIndicatorToggle disabled={!isActive} />
+            <PprDecayToggle disabled={!isActive} />
+            <MapColorsToggle disabled={!isActive} />
+          </div>
+        )}
 
         {/* CTA "ver feed agora" — só aparece quando lens ativa */}
         {isActive && (
@@ -276,30 +291,26 @@ export function SuaLenteCard({ onClose }: CardProps) {
  * + glyph ↕) pra marcar explicitamente posts afetados pelo reorder.
  * Útil pra user power validar comportamento da lente; novice user
  * prefere o chip discreto default.
+ *
+ * `disabled` (Lily CLS fix 2026-05-28): renderizado SEMPRE no DOM; quando
+ * a lente está off (strength 0) fica desabilitado + dimmed. Espaço
+ * reservado constante = zero layout shift ao mover o slider.
  */
-function ReorderIndicatorToggle() {
+function ReorderIndicatorToggle({ disabled }: { disabled: boolean }) {
   const enabled = usePrefsStore((s) => s.lens_show_reorder_indicator)
   return (
-    <label className="flex cursor-pointer items-start justify-between gap-3 border-t border-drift-border/30 pt-3">
-      <div className="space-y-0.5">
-        <span className="block font-mono text-[12px] text-drift-text">
-          mostrar quando a lente reordenou
-        </span>
-        <span className="block font-mono text-[10px] leading-relaxed text-drift-muted">
-          chip "lente" fica preenchido + glyph ↕ pra marcar posts
-          afetados. opt-in.
-        </span>
-      </div>
-      <input
-        type="checkbox"
-        checked={enabled}
-        onChange={(e) => {
-          void setPref('lens_show_reorder_indicator', e.target.checked)
-        }}
-        aria-label="mostrar indicador quando a lente reordenou posts"
-        className="mt-1 h-4 w-4 cursor-pointer accent-drift-accent2"
-      />
-    </label>
+    <ToggleRow
+      disabled={disabled}
+      title="mostrar quando a lente reordenou"
+      description={
+        'chip "lente" fica preenchido + glyph ↕ pra marcar posts afetados. opt-in.'
+      }
+      checked={enabled}
+      ariaLabel="mostrar indicador quando a lente reordenou posts"
+      onChange={(checked) => {
+        void setPref('lens_show_reorder_indicator', checked)
+      }}
+    />
   )
 }
 
@@ -312,30 +323,22 @@ function ReorderIndicatorToggle() {
  *
  * Aplicado APENAS no walk-time — `lens_edges.influence` no SQLite
  * permanece bit-exact (writer não muda).
+ *
+ * `disabled` (Lily CLS fix 2026-05-28): ver ReorderIndicatorToggle.
  */
-function PprDecayToggle() {
+function PprDecayToggle({ disabled }: { disabled: boolean }) {
   const enabled = usePrefsStore((s) => s.lens_ppr_decay_enabled)
   return (
-    <label className="flex cursor-pointer items-start justify-between gap-3 border-t border-drift-border/30 pt-3">
-      <div className="space-y-0.5">
-        <span className="block font-mono text-[12px] text-drift-text">
-          esquecer follows antigos
-        </span>
-        <span className="block font-mono text-[10px] leading-relaxed text-drift-muted">
-          follows + drifts sem atividade ≥ 30 dias pesam menos. half-life
-          30d. opt-in.
-        </span>
-      </div>
-      <input
-        type="checkbox"
-        checked={enabled}
-        onChange={(e) => {
-          void setPref('lens_ppr_decay_enabled', e.target.checked)
-        }}
-        aria-label="aplicar decay temporal a follows antigos"
-        className="mt-1 h-4 w-4 cursor-pointer accent-drift-accent2"
-      />
-    </label>
+    <ToggleRow
+      disabled={disabled}
+      title="esquecer follows antigos"
+      description="follows + drifts sem atividade ≥ 30 dias pesam menos. half-life 30d. opt-in."
+      checked={enabled}
+      ariaLabel="aplicar decay temporal a follows antigos"
+      onChange={(checked) => {
+        void setPref('lens_ppr_decay_enabled', checked)
+      }}
+    />
   )
 }
 
@@ -349,28 +352,73 @@ function PprDecayToggle() {
  * sem edge → cor default (preserva privacy quem não está na rede).
  *
  * Manifesto §24 view-layer + §28 zero novo dado vazado.
+ *
+ * `disabled` (Lily CLS fix 2026-05-28): ver ReorderIndicatorToggle.
  */
-function MapColorsToggle() {
+function MapColorsToggle({ disabled }: { disabled: boolean }) {
   const enabled = usePrefsStore((s) => s.lens_show_in_map)
   return (
-    <label className="flex cursor-pointer items-start justify-between gap-3 border-t border-drift-border/30 pt-3">
+    <ToggleRow
+      disabled={disabled}
+      title="mostrar confiança no mapa"
+      description="pins no spread-map ganham cor por nível de confiança local (azul/amarelo/laranja). visível apenas pra você. opt-in."
+      checked={enabled}
+      ariaLabel="colorir pins do mapa por confiança local"
+      onChange={(checked) => {
+        void setPref('lens_show_in_map', checked)
+      }}
+    />
+  )
+}
+
+/**
+ * ToggleRow — linha de sub-toggle opt-in da lente (Lily CLS fix 2026-05-28).
+ *
+ * Extraído dos 3 sub-toggles (reorder/decay/mapa) pra centralizar o
+ * handling de `disabled`: quando a lente está off (strength 0) a linha
+ * fica dimmed, o checkbox `disabled` (não-clicável), e um hint discreto
+ * "ative a lente pra usar" aparece no lugar onde antes não havia nada —
+ * mantendo a altura aproximadamente constante e evitando layout shift.
+ *
+ * O `opacity`/`color` transita suavemente, mas respeita
+ * prefers-reduced-motion (motion-reduce:transition-none).
+ */
+function ToggleRow({
+  disabled,
+  title,
+  description,
+  checked,
+  ariaLabel,
+  onChange,
+}: {
+  disabled: boolean
+  title: string
+  description: string
+  checked: boolean
+  ariaLabel: string
+  onChange: (checked: boolean) => void
+}) {
+  return (
+    <label
+      className={`flex items-start justify-between gap-3 border-t border-drift-border/30 pt-3 transition-opacity duration-200 motion-reduce:transition-none ${
+        disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer opacity-100'
+      }`}
+    >
       <div className="space-y-0.5">
         <span className="block font-mono text-[12px] text-drift-text">
-          mostrar confiança no mapa
+          {title}
         </span>
         <span className="block font-mono text-[10px] leading-relaxed text-drift-muted">
-          pins no spread-map ganham cor por nível de confiança local
-          (azul/amarelo/laranja). visível apenas pra você. opt-in.
+          {disabled ? 'ative a lente pra usar — ajuste a intensidade acima.' : description}
         </span>
       </div>
       <input
         type="checkbox"
-        checked={enabled}
-        onChange={(e) => {
-          void setPref('lens_show_in_map', e.target.checked)
-        }}
-        aria-label="colorir pins do mapa por confiança local"
-        className="mt-1 h-4 w-4 cursor-pointer accent-drift-accent2"
+        checked={checked}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.checked)}
+        aria-label={ariaLabel}
+        className="mt-1 h-4 w-4 cursor-pointer accent-drift-accent2 disabled:cursor-not-allowed"
       />
     </label>
   )
