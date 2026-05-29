@@ -4,10 +4,11 @@
  * Dois modos:
  *   post   — heatmap estático dos spreads de um único post (comportamento
  *            histórico). Origem amber, destinos heatmap verde.
- *   global — linhas animadas de propagação cross-post. Para cada post com
- *            spreads com location, traça a cadeia cronológica
- *            origin→spread₁→spread₂→... com animação RAF 8s + loop.
- *            Usa LineLayer (2D flat) + ScatterplotLayer, não ArcLayer 3D.
+ *   global — arcos curvos animados de propagação cross-post. Para cada
+ *            post com spreads com location, traça a cadeia cronológica
+ *            origin→spread₁→spread₂→... gated pelo relógio único
+ *            (useTimelineClock, 30s + loop). Usa ArcLayer (curva GPU +
+ *            gradiente + taper + glow aditivo) + ScatterplotLayer.
  *
  * MapLibre GL + Deck.gl. Tiles CARTO Dark Matter (OSS, sem API key).
  * Lazy import de ~400kb gzip — só carrega quando há geometria pra mostrar.
@@ -120,6 +121,45 @@ declare namespace maplibregl {
 
 type LayerCtor = new (props: Record<string, unknown>) => unknown
 type OverlayInstance = { setProps: (p: { layers: unknown[] }) => void }
+
+// ─── Paleta dos arcos (pura, determinística — manifesto §7) ───────────
+//
+// Embelezamento 2026-05-29 (Ted+Lily). Cores RGBA literais (WebGL não lê
+// CSS vars). Família mantida do design histórico: arco do post corrente =
+// chartreuse [232,255,90]; demais = mint [52,211,153] (mesma do dot +
+// PIN_COLOR_DEFAULT). O refino é em ALPHA/gradiente/recência, não em hue:
+//   - drawing (draw<1): cabeça viva (alpha alto) → leitura de "frente".
+//   - source mais opaco que target: gradiente direcional A→B.
+//   - recency multiplica o alpha: arcos velhos recuam, recentes brilham.
+type ArcShade = { isCurrent?: boolean; draw: number; recency: number }
+type RGBA = [number, number, number, number]
+
+const ARC_HUE_CURRENT: [number, number, number] = [232, 255, 90] // chartreuse
+const ARC_HUE_OTHER: [number, number, number] = [52, 211, 153] // mint
+
+/** Cor do corpo do arco num endpoint ('source' = origem, 'target' = tip).
+ *  Source mais opaco que target → gradiente direcional. */
+function arcColor(d: ArcShade, end: 'source' | 'target'): RGBA {
+  const [r, g, b] = d.isCurrent ? ARC_HUE_CURRENT : ARC_HUE_OTHER
+  const drawing = d.draw < 1
+  // Alpha base por estado: corrente vive mais alto que os demais.
+  const headBase = d.isCurrent ? 255 : 165
+  const bodyBase = d.isCurrent ? 205 : 95
+  const base = drawing ? headBase : bodyBase
+  // Target levemente mais translúcido que source (sensação de fluxo).
+  const endFactor = end === 'source' ? 1 : 0.62
+  const a = Math.round(base * endFactor * d.recency)
+  return [r, g, b, a]
+}
+
+/** Cor do glow underlay — mesma hue, alpha baixo modulado por recência.
+ *  Aditivo: cruzamentos somam luz. */
+function glowColor(d: ArcShade): RGBA {
+  const [r, g, b] = d.isCurrent ? ARC_HUE_CURRENT : ARC_HUE_OTHER
+  const drawing = d.draw < 1
+  const base = d.isCurrent ? (drawing ? 90 : 60) : drawing ? 55 : 32
+  return [r, g, b, Math.round(base * d.recency)]
+}
 
 // ─── Public component ─────────────────────────────────────────────────
 
@@ -549,7 +589,7 @@ function GlobalModeMap({ data, className, mode, onModeChange }: ModeMapProps) {
     let overlay: OverlayInstance | null = null
 
     // Layer constructors — cached after async import (DRY via loadMapDeps)
-    let LineLayer: LayerCtor
+    let ArcLayer: LayerCtor
     let ScatterplotLayer: LayerCtor
 
     // Precompute animation points from destinations.
@@ -580,7 +620,7 @@ function GlobalModeMap({ data, className, mode, onModeChange }: ModeMapProps) {
         const { maplibregl, MapboxOverlay, layers } = await loadMapDeps()
         if (cancelled) return
 
-        LineLayer = layers.LineLayer
+        ArcLayer = layers.ArcLayer
         ScatterplotLayer = layers.ScatterplotLayer
 
         const centerPt = data.destinations[0]?.point ?? null
@@ -627,18 +667,30 @@ function GlobalModeMap({ data, className, mode, onModeChange }: ModeMapProps) {
         // arcos cedo (currentTime baixo), muitos tarde → cascata temporal
         // real espelhando a ordem cronológica dos spreads.
         //
-        // ApproachDecision (Ted): LineLayer + target-interpolation, NÃO
-        // TripsLayer. Razões: (a) LineLayer já está importado (zero peso
-        // novo no bundle — TripsLayer puxaria @deck.gl/geo-layers, chunk
-        // extra fora do hard ratchet 250KB); (b) flat 2D já é o que o
-        // mapa usa; (c) interp linear lng/lat é puro/determinístico e
-        // dá rastro A→B limpo; (d) TripsLayer exige timestamps por
-        // vértice (path), overkill pra segmentos de 2 pontos.
+        // ApproachDecision v2 (Ted+Lily 2026-05-29 — embelezar ondas): trocado
+        // LineLayer (reta 2D, hard-edge, "teia de aranha crua" — user) por
+        // ArcLayer. Razões: (a) ArcLayer mora no MESMO @deck.gl/layers já
+        // importado — só adiciona shaders do arc ao chunk lazy spreadMapLayers,
+        // fora do entry e do ratchet maplibre-gl; NÃO é TripsLayer (que puxaria
+        // @deck.gl/geo-layers, chunk novo); (b) curva great-circle GPU nativa
+        // (getHeight) elimina o visual reto cru; (c) gradiente source→target
+        // (getSourceColor/getTargetColor) + taper de largura (getWidth) são
+        // nativos — fluxo direcional bonito de graça; (d) AA GPU = sem jaggies.
+        //
+        // Draw-on PRESERVADO (contrato unified-clock 879d868 intacto): o gating
+        // continua `draw = (currentTime - arc.t) / DRAW_FRAC`, reduced-motion →
+        // draw=1. A diferença: o target do arco é o `tip` interpolado de
+        // from→to por `draw`, então o arco CRESCE curvando-se em direção ao
+        // destino (efeito "reaching out"). O bow (getHeight) também escala com
+        // draw pra a curva nascer rasa e abrir conforme estende — leitura
+        // orgânica de rastro, não de linha pop-in.
         const DRAW_FRAC = 0.14       // fração do ciclo pra desenhar 1 arco (~4.2s @30s)
 
         // Interpolação linear de [lng,lat] (flat map → linear é exato o
         // suficiente; pura/determinística, manifesto §7). easeOutCubic dá
-        // sensação de "rastro acelerando e desacelerando" no desenho.
+        // sensação de "rastro acelerando e desacelerando" no desenho. A curva
+        // visível vem do getHeight da ArcLayer, não daqui — este tip é só o
+        // ENDPOINT até onde o arco já desenhou.
         function lerpPos(
           from: [number, number],
           to: [number, number],
@@ -654,16 +706,38 @@ function GlobalModeMap({ data, className, mode, onModeChange }: ModeMapProps) {
           // Cada arco visível ganha `draw` ∈ (0,1]. reducedMotion → 1
           // (aparece full estático, sem crescer). Arco ainda não disparado
           // (draw <= 0) é omitido.
-          type DrawArc = PropagationArc & { draw: number; tip: [number, number] }
+          //
+          // `recency` ∈ (0,1]: arcos mais antigos (t baixo, já assentados há
+          // tempo no ciclo) afinam e desbotam; recentes ficam vivos. Reduz a
+          // poluição visual da "teia" — o olho segue a frente da propagação,
+          // não o emaranhado completo. Medido como quão recentemente o arco
+          // TERMINOU de desenhar, normalizado por uma janela de fade.
+          const FADE_WINDOW = 0.5 // após terminar, leva ~50% do ciclo p/ assentar
+          type DrawArc = PropagationArc & {
+            draw: number
+            tip: [number, number]
+            recency: number
+          }
           const visSegs: DrawArc[] = []
           for (const s of data.arcs) {
             const draw = reducedMotion ? 1 : (p - s.t) / DRAW_FRAC
             if (draw <= 0) continue
             const clamped = Math.min(draw, 1)
+            // age = quanto tempo (em frações de ciclo) desde que o arco
+            // COMPLETOU o desenho. <0 enquanto desenha → recency=1 (frente
+            // viva). Depois decai linearmente até um piso (não some — §16,
+            // o arco persiste; só recua visualmente).
+            const age = p - s.t - DRAW_FRAC
+            const recency = reducedMotion
+              ? 1
+              : age <= 0
+              ? 1
+              : Math.max(0.35, 1 - age / FADE_WINDOW)
             visSegs.push({
               ...s,
               draw: clamped,
               tip: clamped >= 1 ? s.to : lerpPos(s.from, s.to, clamped),
+              recency,
             })
           }
 
@@ -704,30 +778,73 @@ function GlobalModeMap({ data, className, mode, onModeChange }: ModeMapProps) {
                     }),
                   ]
                 : []),
-              // Corpo do rastro: desenha de `from` até o tip interpolado.
-              // Quando draw=1, tip=to → linha completa. Cabeça (desenhando)
-              // mais brilhante; corpo já completo assenta na cor base.
-              new LineLayer({
-                id: 'prop-lines',
+              // ─── Rastro curvo (ArcLayer) — duas camadas pra glow ────────
+              //
+              // GLOW UNDERLAY: arco largo, translúcido, blend ADITIVO. Onde
+              // dois rastros se cruzam o aditivo SOMA luz → cruzamento brilha
+              // (bonito) em vez de empilhar opacidade suja (a "teia crua"
+              // antiga). Largura ~3.5× a do corpo; alpha baixo modulado por
+              // recency. Mesma geometria (from→tip, getHeight) do corpo.
+              new ArcLayer({
+                id: 'prop-arcs-glow',
                 data: visSegs,
                 getSourcePosition: (d: DrawArc) => d.from,
                 getTargetPosition: (d: DrawArc) => d.tip,
-                // Arco do post corrente: linha mais grossa (2.5px) +
-                // chartreuse drift-accent. Demais: mint atenuado fino.
-                getWidth: (d: DrawArc) => (d.isCurrent ? 2.5 : 1.5),
-                // Cabeça brilhante enquanto desenha (draw<1), corpo
-                // assenta no alpha base quando completo.
-                // isCurrent → chartreuse [232,255,90]; outros → mint
-                // [52,211,153] atenuado.
-                getColor: (d: DrawArc) => {
-                  const drawing = d.draw < 1
-                  if (d.isCurrent) {
-                    return [232, 255, 90, drawing ? 255 : 200]
-                  }
-                  return [52, 211, 153, drawing ? 150 : 90]
-                },
+                // Bow cresce com o desenho: curva nasce rasa e abre conforme
+                // estende → "reaching out". Determinístico por draw.
+                getHeight: (d: DrawArc) => 0.35 * d.draw,
+                greatCircle: false,
+                getWidth: (d: DrawArc) => (d.isCurrent ? 9 : 6),
                 widthUnits: 'pixels',
-                updateTriggers: { getColor: p, getWidth: 1, getTargetPosition: p },
+                // Glow tinge na cor do arco com alpha baixo × recency.
+                getSourceColor: (d: DrawArc) => glowColor(d),
+                getTargetColor: (d: DrawArc) => glowColor(d),
+                // Blend ADITIVO (luma.gl v9 string params — deck.gl 9.3):
+                // src-alpha × ONE soma a luz onde rastros se cruzam. depthTest
+                // off pra glow não auto-ocluir. NÃO usar os GL numéricos
+                // antigos (blendFunc:[770,1]) — v9 só aceita os strings abaixo.
+                parameters: {
+                  blend: true,
+                  blendColorOperation: 'add',
+                  blendColorSrcFactor: 'src-alpha',
+                  blendColorDstFactor: 'one',
+                  blendAlphaOperation: 'add',
+                  blendAlphaSrcFactor: 'src-alpha',
+                  blendAlphaDstFactor: 'one',
+                  depthTest: false,
+                },
+                updateTriggers: {
+                  getSourceColor: p,
+                  getTargetColor: p,
+                  getWidth: 1,
+                  getHeight: p,
+                  getTargetPosition: p,
+                },
+              }),
+              // CORPO: arco fino e nítido, gradiente source→target + taper.
+              // getSourceColor brilhante (origem do fluxo) → getTargetColor
+              // mais translúcido (destino) = sensação direcional A→B. Cabeça
+              // (desenhando, draw<1) mais viva; corpo assenta + recency fade.
+              new ArcLayer({
+                id: 'prop-arcs',
+                data: visSegs,
+                getSourcePosition: (d: DrawArc) => d.from,
+                getTargetPosition: (d: DrawArc) => d.tip,
+                getHeight: (d: DrawArc) => 0.35 * d.draw,
+                greatCircle: false,
+                // Taper: mais grosso na origem, afina no destino → fluxo
+                // direcional. ArcLayer interpola width source→target.
+                getWidth: (d: DrawArc) => (d.isCurrent ? 3 : 1.75),
+                widthUnits: 'pixels',
+                getSourceColor: (d: DrawArc) => arcColor(d, 'source'),
+                getTargetColor: (d: DrawArc) => arcColor(d, 'target'),
+                updateTriggers: {
+                  getSourceColor: p,
+                  getTargetColor: p,
+                  getWidth: 1,
+                  getHeight: p,
+                  getTargetPosition: p,
+                },
               }),
               new ScatterplotLayer({
                 id: 'prop-dots',

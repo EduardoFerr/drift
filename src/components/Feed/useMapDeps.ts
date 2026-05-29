@@ -33,6 +33,7 @@ export interface MapDeps {
     ScatterplotLayer: LayerCtor
     HeatmapLayer: LayerCtor
     LineLayer: LayerCtor
+    ArcLayer: LayerCtor
   }
 }
 
@@ -53,6 +54,7 @@ export async function loadMapDeps(): Promise<MapDeps> {
       ScatterplotLayer: layersWrapper.ScatterplotLayer as unknown as LayerCtor,
       HeatmapLayer: layersWrapper.HeatmapLayer as unknown as LayerCtor,
       LineLayer: layersWrapper.LineLayer as unknown as LayerCtor,
+      ArcLayer: layersWrapper.ArcLayer as unknown as LayerCtor,
     },
   }
 }

@@ -17,4 +17,11 @@
 // não os expõe, e Rollup ESM strict rejeita os subpaths.
 
 export { HeatmapLayer } from '@deck.gl/aggregation-layers'
-export { ScatterplotLayer, LineLayer } from '@deck.gl/layers'
+// ArcLayer adicionado 2026-05-29 (Ted+Lily — embelezar ondas globais):
+// curva GPU nativa (great-circle bow) + gradiente source→target +
+// taper de largura, substituindo o LineLayer reto/cru no GlobalModeMap.
+// Mesmo pacote @deck.gl/layers já importado (LineLayer/ScatterplotLayer)
+// → adiciona só shaders do arc ao chunk lazy spreadMapLayers, fora do
+// entry chunk e do ratchet maplibre-gl. LineLayer mantido (ainda
+// re-exportado) caso PostMode ou futuros usos precisem de reta.
+export { ScatterplotLayer, LineLayer, ArcLayer } from '@deck.gl/layers'
