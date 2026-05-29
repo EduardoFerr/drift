@@ -124,6 +124,53 @@ describe('Manifesto §7 / CLAUDE.md #3: funções puras críticas não usam rel�
   })
 })
 
+describe('CLAUDE.md #5 / §29: skipVerify é DEV-seed-only, gated por import.meta.env.DEV', () => {
+  // Ted+Marshall 2026-05-29: dev-seed pula verify Schnorr (passo CARO) pra
+  // fixtures self-signed. Risco: skip de verify em PROD = aceitar evento
+  // forjado da rede sem checar assinatura (catástrofe §29). Estes locks
+  // estáticos garantem que o skip seja DEV-only e que NENHUM caller de
+  // produção (sync real, WebRTC) passe a flag.
+
+  it('events.ts: skipVerify SÓ é honrado sob import.meta.env.DEV (gate duro)', () => {
+    const src = readFileSync(join(SRC, 'lib', 'events.ts'), 'utf8')
+    const stripped = stripComments(src)
+    // A condição efetiva de skip DEVE conjugar skipVerify com import.meta.env.DEV.
+    // Sem o gate, prod poderia pular verify de evento untrusted.
+    expect(
+      /skipVerify[^\n]*&&[^\n]*import\.meta\.env\.DEV/.test(stripped),
+      'skipVerify deve ser AND import.meta.env.DEV (DEV-gate duro) em events.ts',
+    ).toBe(true)
+  })
+
+  it('apenas dev-seed/seed.ts passa skipVerify a onNostrEvent (sync real intacto)', () => {
+    // Callers de produção: sync.ts (relays), webrtc bundle, App.tsx,
+    // comments.ts, profiles.ts. NENHUM pode passar skipVerify — eventos
+    // da rede são UNTRUSTED e sempre verificados (invariante #5).
+    const productionCallers = [
+      join(SRC, 'lib', 'sync.ts'),
+      join(SRC, 'lib', 'comments.ts'),
+      join(SRC, 'lib', 'profiles.ts'),
+      join(SRC, 'lib', 'transport', 'webrtc', 'bundle.ts'),
+      join(SRC, 'App.tsx'),
+    ]
+    for (const file of productionCallers) {
+      const src = readFileSync(file, 'utf8')
+      expect(
+        /skipVerify/.test(src),
+        `${file} NÃO pode mencionar skipVerify — eventos de rede são untrusted (invariante #5)`,
+      ).toBe(false)
+    }
+  })
+
+  it('dev-seed/seed.ts passa skipVerify: true (fixtures trusted self-signed)', () => {
+    const src = readFileSync(join(SRC, 'lib', 'dev-seed', 'seed.ts'), 'utf8')
+    expect(
+      /skipVerify:\s*true/.test(src),
+      'seed.ts deve passar skipVerify: true no drain do dev-seed',
+    ).toBe(true)
+  })
+})
+
 describe('Manifesto §23: "Bury não pune"', () => {
   it('ENGAGEMENT_POINTS.POST_BURIED === 0 (autor não é penalizado por bury)', () => {
     const src = readFileSync(join(SRC, 'config', 'constants.ts'), 'utf8')

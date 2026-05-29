@@ -377,6 +377,67 @@ describe('deferSideEffects — persist roda, side-effects são adiados', () => {
   })
 })
 
+// ─── LOCK_VIA_TEST — skipVerify (dev-seed trusted self-signed) ────────
+//
+// Ted+Marshall 2026-05-29: mesmo após deferSideEffects, o dev-seed drenava
+// ~2730 eventos a ~3.4 ev/s — custo dominante era o verify Schnorr round-trip
+// SERIALIZADO ao worker (~20ms/evento). Fixtures são self-signed (finalizeEvent
+// em fixtures.ts) → verify é desperdício puro. `skipVerify: true` pula o passo
+// CARO (verify) MAS preserva os cheap checks (kind/schema, invariante #5).
+//
+// DEV-gate: o teste roda sob Vitest com import.meta.env.DEV === true, então
+// skipVerify é honrado aqui. Em prod (DEV === false) o gate IGNORA a flag e
+// verify sempre roda — coberto pela asserção de que o default ainda verifica.
+// Sync real (sync.ts/WebRTC) NUNCA passa skipVerify → eventos da rede sempre
+// verificados (lock: nenhum caller de produção passa a flag).
+
+describe('skipVerify — pula verify CARO mas mantém cheap checks (DEV-seed)', () => {
+  it('SPREAD com skipVerify: true → verify NÃO roda, mas INSERT roda', async () => {
+    await onNostrEvent(makeSpread(), { skipVerify: true, deferSideEffects: true })
+    expect(verifyMock).not.toHaveBeenCalled() // passo CARO pulado
+    expect(runCallsMatching(/INSERT OR IGNORE INTO spreads\b/i).length).toBe(1)
+  })
+
+  it('POST com skipVerify: true → verify NÃO roda, INSERT roda', async () => {
+    await onNostrEvent(makePost(), { skipVerify: true, deferSideEffects: true })
+    expect(verifyMock).not.toHaveBeenCalled()
+    expect(runCallsMatching(/INSERT OR IGNORE INTO posts\b/i).length).toBe(1)
+  })
+
+  it('cheap checks PERMANECEM com skipVerify: schema inválido → nenhum INSERT', async () => {
+    // SPREAD com tag `e` em formato UUID (não hex64) — schema check (passo 2)
+    // deve rejeitar ANTES do persist, mesmo com verify pulado. Defesa contra
+    // fixture malformada (invariante #5: cheap checks não são opcionais).
+    const bad = makeEvent({
+      kind: DRIFT_KIND.SPREAD,
+      tags: [['e', '550e8400-e29b-41d4-a716-446655440000']],
+    })
+    await onNostrEvent(bad, { skipVerify: true, deferSideEffects: true })
+    expect(verifyMock).not.toHaveBeenCalled()
+    expect(runCallsMatching(/INSERT/i).length).toBe(0)
+  })
+
+  it('cheap kind check PERMANECE com skipVerify: kind desconhecido → noop', async () => {
+    await onNostrEvent(makeEvent({ kind: 1, content: 'hello' }), {
+      skipVerify: true,
+      deferSideEffects: true,
+    })
+    expect(verifyMock).not.toHaveBeenCalled()
+    expect(runCallsMatching(/INSERT/i).length).toBe(0)
+  })
+
+  it('default (sem skipVerify) ainda VERIFICA — sync real intacto', async () => {
+    await onNostrEvent(makeSpread())
+    expect(verifyMock).toHaveBeenCalledTimes(1)
+    expect(runCallsMatching(/INSERT OR IGNORE INTO spreads\b/i).length).toBe(1)
+  })
+
+  it('skipVerify: false explícito ainda VERIFICA', async () => {
+    await onNostrEvent(makeSpread(), { skipVerify: false })
+    expect(verifyMock).toHaveBeenCalledTimes(1)
+  })
+})
+
 describe('recalcAllScores — bulk pass (dev-seed)', () => {
   it('recalcula todos os posts + modera reportados (recalc antes de moderação §26)', async () => {
     const POST_A = HEX('a')

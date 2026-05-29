@@ -43,19 +43,32 @@ let seeded = false
  *
  * Processa eventos de domínio SEQUENCIALMENTE (ordem por created_at) —
  * preserva first-seen estável de `users.created_at` (antiguidade/peso
- * conhecidos) e evita rajada concorrente no verify worker. Cada evento
- * passa pelo pipeline real: kind → schema → verify Schnorr → persist.
+ * conhecidos). Cada evento passa pelo pipeline real: kind → schema →
+ * persist (verify Schnorr SKIPADO no seed — ver abaixo).
  *
- * Performance (Ted+Lily 2026-05-28): cada evento é ingerido com
- * `deferSideEffects: true` — o persist (INSERT, invariante #1) roda
- * normal, mas os side-effects pós-persist (`scheduleScoreRecalc` +
- * `invalidateFeed`) são SUPRIMIDOS. Sem isso, ~2730 eventos disparavam
- * ~500 timers de recalc avulsos (1 por post) + invalidate thrash → drain
- * de ~13min (~280ms/evento). Com defer, o drain vira só INSERT+verify
- * (~1ms/evento worker), e o score é materializado UMA vez no fim via
- * `recalcAllScores()` + 1 `invalidateFeed()`. Determinismo §7 intacto:
- * scoring é agregação idempotente do estado persistido, não acumulação
- * incremental — bulk no fim = mesmo resultado que recalc por evento.
+ * Performance (Ted+Lily 2026-05-28 → Ted+Marshall 2026-05-29):
+ *
+ *  1. `deferSideEffects: true` — o persist (INSERT, invariante #1) roda
+ *     normal, mas os side-effects pós-persist (`scheduleScoreRecalc` +
+ *     `invalidateFeed`) são SUPRIMIDOS. Sem isso, ~2730 eventos disparavam
+ *     ~500 timers de recalc avulsos (1 por post) + invalidate thrash. O
+ *     score é materializado UMA vez no fim via `recalcAllScores()` + 1
+ *     `invalidateFeed()`.
+ *
+ *  2. `skipVerify: true` — pula o verify Schnorr, o passo CARO do
+ *     pipeline. Mesmo após o defer (1), o drain ainda travava em ~13min
+ *     (~3.4 ev/s): o custo dominante não era recalc, era o postMessage
+ *     round-trip SERIALIZADO ao `verify.worker` (~20ms/evento × 2730).
+ *     Os fixtures são SELF-SIGNED (`finalizeEvent` em fixtures.ts) —
+ *     verificar Schnorr de evento que nós mesmos assinamos é desperdício
+ *     puro. DEV-gate duro no `onNostrEvent`: em prod skipVerify é ignorado
+ *     (verify sempre roda); sync real da rede NUNCA passa a flag.
+ *     Invariante #5 protege contra eventos UNTRUSTED — seed DEV é trusted.
+ *
+ * Resultado: drain vira só kind/schema check + INSERT (~13min → poucos
+ * segundos). Determinismo §7 intacto: nem verify nem o ponto de recalc
+ * tocam os dados persistidos — scoring é agregação idempotente do estado,
+ * bulk no fim = mesmo resultado que recalc por evento com verify.
  *
  * Guard de sessão: re-chamadas no mesmo runtime são noop (o pipeline já
  * é idempotente via INSERT OR IGNORE, mas evitamos reprocessar ~3000
@@ -89,7 +102,7 @@ export async function seedDatabase(
   let done = 0
   onProgress?.(0, total)
   await drainInBatches(domain, async (ev) => {
-    await onNostrEvent(ev, { deferSideEffects: true })
+    await onNostrEvent(ev, { deferSideEffects: true, skipVerify: true })
     done++
     // Reporta no boundary do batch (a cada BOOT_BATCH_SIZE) ou no fim, pra
     // não floodar a store Zustand com ~3000 setStates.

@@ -108,9 +108,29 @@ interface KindHandler {
 /**
  * Opções de `onNostrEvent`. `deferSideEffects` adia recalc + invalidate
  * (ver `KindHandler.persist`). Default false — sync real intacto.
+ *
+ * `skipVerify` (default false) — pula APENAS o passo 3 do pipeline
+ * (verify Schnorr, o ÚNICO passo caro). Os cheap checks (kind/schema,
+ * passos 1-2) PERMANECEM como defesa contra fixture malformada. Usado
+ * EXCLUSIVAMENTE pelo dev-seed (`lib/dev-seed/seed.ts`): seus eventos são
+ * self-signed por `finalizeEvent` nos próprios fixtures — verificar
+ * Schnorr de evento que NÓS acabamos de assinar é desperdício puro
+ * (cada verify = postMessage round-trip ao verify.worker ~20ms; ×2730
+ * eventos seriais ≈ minutos de boot dev). Invariante #5 existe pra
+ * proteger contra eventos UNTRUSTED da rede; seed DEV é trusted input.
+ *
+ * **DEV-gate duro (segurança)**: `skipVerify` só é honrado se
+ * `import.meta.env.DEV`. Em produção é IGNORADO — verify SEMPRE roda,
+ * mesmo que algum caller passe `skipVerify: true`. Sync real (relays,
+ * WebRTC) NUNCA passa skipVerify → eventos da rede são sempre
+ * verificados. LOCK_VIA_TEST em `tests/events-dispatch.test.ts`.
+ *
+ * Determinismo §7 intacto: verify não toca os dados persistidos —
+ * skip = mesmo resultado materializado, só sem o round-trip.
  */
 export interface OnNostrEventOptions {
   deferSideEffects?: boolean
+  skipVerify?: boolean
 }
 
 const KIND_DISPATCH: Readonly<Record<number, KindHandler>> = {
@@ -177,7 +197,16 @@ export async function onNostrEvent(
   //    2026-05 + Barney threat model 2026-05-16. Pipeline cheap→caro
   //    preservado: o `await` aqui só dispara após kind+schema sync.
   //    Worker init falha lança Error (Barney P1.5, sem fallback sync).
-  if (!(await verifyEventAsync(event))) return
+  //
+  //    EXCEÇÃO DEV-seed-only (Ted+Marshall 2026-05-28): `skipVerify`
+  //    pula este passo CARO pra fixtures self-signed do dev-seed. DEV-gate
+  //    DURO `import.meta.env.DEV` — em prod o skip é IGNORADO e verify
+  //    SEMPRE roda, mesmo se o caller passar a flag. Eventos da rede
+  //    (sync.ts/WebRTC) NUNCA passam skipVerify → sempre verificados.
+  //    Os cheap checks (kind/schema, passos 1-2) acima PERMANECEM mesmo
+  //    com skip — defesa contra fixture malformada. Invariante #5.
+  const skipVerify = (options?.skipVerify ?? false) && import.meta.env.DEV
+  if (!skipVerify && !(await verifyEventAsync(event))) return
 
   // 4. Persist (handler decide INSERT + invalidateFeed + recalc).
   //    Pipeline preservado: invariantes #1, #5, #6 do CLAUDE.md.
