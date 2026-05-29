@@ -510,6 +510,11 @@ function GlobalModeMap({ data, className, mode, onModeChange }: ModeMapProps) {
   // pós-recomputeLens; zero query extra).
   const lensShowInMap = usePrefsStore((s) => s.lens_show_in_map)
   const pprScores = useLensStore((s) => s.pprScores)
+  // WCAG 2.3.3 (user pedido 2026-05-28 "linha desenha de A→B"): com
+  // reduced-motion, arcos aparecem full estáticos (sem draw-on que
+  // cresce). Sem reduced, cada arco DESENHA progressivamente do ponto
+  // de origem ao destino quando o cursor temporal cruza seu `t`.
+  const reducedMotion = useReducedMotion() ?? false
   const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -585,19 +590,71 @@ function GlobalModeMap({ data, className, mode, onModeChange }: ModeMapProps) {
         map.addControl(inst)
 
         // ─── Animation loop ────────────────────────────────────────
+        //
+        // Draw-on A→B (user 2026-05-28): "se a linha representa ponto A
+        // a ponto B, deveria ser desenhada de A até B". Antes os arcos
+        // POPAVAM full quando `s.t <= p` (só fade-in de alpha). Agora
+        // cada arco DESENHA progressivamente: o ponto de destino do
+        // segmento é interpolado de `from`→`to` conforme `drawProgress`,
+        // então a linha cresce do A até o B como um rastro.
+        //
+        // Sync com scrubber: `drawProgress` arranca quando o cursor
+        // temporal `p` (0→1 sobre ANIM_DURATION, igual ao fill do
+        // TimelineScrubber) cruza o `t` normalizado do arco. Arcos com
+        // `t` menor (eventos mais antigos) desenham primeiro → cascata
+        // temporal real, espelhando a ordem cronológica dos spreads.
+        //
+        // ApproachDecision (Ted): LineLayer + target-interpolation, NÃO
+        // TripsLayer. Razões: (a) LineLayer já está importado (zero peso
+        // novo no bundle — TripsLayer puxaria @deck.gl/geo-layers, chunk
+        // extra fora do hard ratchet 250KB); (b) flat 2D já é o que o
+        // mapa usa; (c) interp linear lng/lat é puro/determinístico e
+        // dá rastro A→B limpo; (d) TripsLayer exige timestamps por
+        // vértice (path), overkill pra segmentos de 2 pontos.
         const ANIM_DURATION = 8000   // 8s pra percorrer toda a cadeia
-        const FADE_IN = 0.06         // segmento aparece em 6% do ciclo
+        const DRAW_FRAC = 0.14       // fração do ciclo pra desenhar 1 arco (~1.1s)
         const PAUSE_MS = 2000        // pausa entre ciclos
 
         let startTime: number | null = null
         let pausing = false
 
+        // Interpolação linear de [lng,lat] (flat map → linear é exato o
+        // suficiente; pura/determinística, manifesto §7). easeOutCubic dá
+        // sensação de "rastro acelerando e desacelerando" no desenho.
+        function lerpPos(
+          from: [number, number],
+          to: [number, number],
+          k: number,
+        ): [number, number] {
+          const e = 1 - Math.pow(1 - k, 3) // easeOutCubic
+          return [from[0] + (to[0] - from[0]) * e, from[1] + (to[1] - from[1]) * e]
+        }
+
         function renderFrame(p: number) {
           if (!overlay) return
 
-          // Só mostra segmentos cujo "disparo" já ocorreu
-          const visSegs = data.arcs.filter((s) => s.t <= p)
-          const visPts = destPoints.filter((d) => d.t <= p)
+          // Cada arco visível ganha `draw` ∈ (0,1]. reducedMotion → 1
+          // (aparece full estático, sem crescer). Arco ainda não disparado
+          // (draw <= 0) é omitido.
+          type DrawArc = PropagationArc & { draw: number; tip: [number, number] }
+          const visSegs: DrawArc[] = []
+          for (const s of data.arcs) {
+            const draw = reducedMotion ? 1 : (p - s.t) / DRAW_FRAC
+            if (draw <= 0) continue
+            const clamped = Math.min(draw, 1)
+            visSegs.push({
+              ...s,
+              draw: clamped,
+              tip: clamped >= 1 ? s.to : lerpPos(s.from, s.to, clamped),
+            })
+          }
+
+          // Dots: destino aparece só quando o arco correspondente terminou
+          // de desenhar (drawProgress = 1 ⇔ p - t >= DRAW_FRAC). reduced →
+          // todos visíveis. Pulse no instante em que o rastro "chega".
+          const visPts = destPoints.filter(
+            (d) => reducedMotion || p - d.t >= DRAW_FRAC,
+          )
 
           overlay.setProps({
             layers: [
@@ -629,27 +686,30 @@ function GlobalModeMap({ data, className, mode, onModeChange }: ModeMapProps) {
                     }),
                   ]
                 : []),
+              // Corpo do rastro: desenha de `from` até o tip interpolado.
+              // Quando draw=1, tip=to → linha completa. Cabeça (desenhando)
+              // mais brilhante; corpo já completo assenta na cor base.
               new LineLayer({
                 id: 'prop-lines',
                 data: visSegs,
-                getSourcePosition: (d: PropagationArc) => d.from,
-                getTargetPosition: (d: PropagationArc) => d.to,
+                getSourcePosition: (d: DrawArc) => d.from,
+                getTargetPosition: (d: DrawArc) => d.tip,
                 // Arco do post corrente: linha mais grossa (2.5px) +
                 // chartreuse drift-accent. Demais: mint atenuado fino.
-                getWidth: (d: PropagationArc) => (d.isCurrent ? 2.5 : 1.5),
-                // Fade-in suave: alpha sobe de 0→max em FADE_IN do ciclo.
-                // isCurrent → chartreuse [232, 255, 90] alpha 220.
-                // Outros → mint [52, 211, 153] alpha 90 (atenuado).
-                getColor: (d: PropagationArc) => {
-                  const age = p - d.t
-                  const fade = Math.min(age / FADE_IN, 1)
+                getWidth: (d: DrawArc) => (d.isCurrent ? 2.5 : 1.5),
+                // Cabeça brilhante enquanto desenha (draw<1), corpo
+                // assenta no alpha base quando completo.
+                // isCurrent → chartreuse [232,255,90]; outros → mint
+                // [52,211,153] atenuado.
+                getColor: (d: DrawArc) => {
+                  const drawing = d.draw < 1
                   if (d.isCurrent) {
-                    return [232, 255, 90, Math.round(fade * 220)]
+                    return [232, 255, 90, drawing ? 255 : 200]
                   }
-                  return [52, 211, 153, Math.round(fade * 90)]
+                  return [52, 211, 153, drawing ? 150 : 90]
                 },
                 widthUnits: 'pixels',
-                updateTriggers: { getColor: p, getWidth: 1 },
+                updateTriggers: { getColor: p, getWidth: 1, getTargetPosition: p },
               }),
               new ScatterplotLayer({
                 id: 'prop-dots',
@@ -657,22 +717,22 @@ function GlobalModeMap({ data, className, mode, onModeChange }: ModeMapProps) {
                 getPosition: (d: AnimDotProps) => d.pos,
                 // isCurrent → chartreuse (mesma do arco) + raio maior.
                 getFillColor: (d: AnimDotProps) => {
-                  const age = p - d.t
-                  const fade = Math.min(age / FADE_IN, 1)
-                  if (d.isCurrent) {
-                    return [232, 255, 90, Math.round(fade * 240)]
-                  }
-                  return [52, 211, 153, Math.round(fade * 130)]
+                  if (d.isCurrent) return [232, 255, 90, 240]
+                  return [52, 211, 153, 130]
                 },
                 getRadius: (d: AnimDotProps) => {
-                  const age = p - d.t
-                  // Pulse: starts big, settles. isCurrent maior baseline.
-                  const pulse = age < FADE_IN ? 1 + (1 - age / FADE_IN) * 4 : 1
+                  // Pulse no momento em que o rastro CHEGA (draw acabou de
+                  // completar): grande → assenta. age medido pós-chegada.
+                  const arrived = p - d.t - DRAW_FRAC
+                  const pulse =
+                    !reducedMotion && arrived >= 0 && arrived < DRAW_FRAC
+                      ? 1 + (1 - arrived / DRAW_FRAC) * 4
+                      : 1
                   const baseR = d.isCurrent ? 4 : 3
                   return baseR * pulse
                 },
                 radiusUnits: 'pixels',
-                updateTriggers: { getFillColor: p, getRadius: p },
+                updateTriggers: { getFillColor: 1, getRadius: p },
               }),
             ],
           })
@@ -698,7 +758,14 @@ function GlobalModeMap({ data, className, mode, onModeChange }: ModeMapProps) {
         }
 
         map.once('load', () => {
-          if (!cancelled) rafId = requestAnimationFrame(tick)
+          if (cancelled) return
+          if (reducedMotion) {
+            // WCAG 2.3.3: sem draw-on. Renderiza um frame full estático
+            // (p=1 ⇒ todos os arcos com draw=1, tip=to) e NÃO arranca RAF.
+            renderFrame(1)
+            return
+          }
+          rafId = requestAnimationFrame(tick)
         })
       } catch (err) {
         console.error('[SpreadMap global] init error:', err)
@@ -712,7 +779,7 @@ function GlobalModeMap({ data, className, mode, onModeChange }: ModeMapProps) {
       mapCleanup?.()
       overlay = null
     }
-  }, [data, mapView])
+  }, [data, mapView, reducedMotion])
 
   // Ted polish #9 2026-05-22: hint discreto quando user habilitou WoT
   // colors mas cache PPR ainda vazio (primeira vez vendo lente). Evita
