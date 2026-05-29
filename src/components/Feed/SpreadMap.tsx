@@ -23,7 +23,7 @@ import { useLongPress, LONG_PRESS_MS } from '../../hooks/useLongPress'
 import { useTimelineClock, type TimelineClock } from '../../hooks/useTimelineClock'
 import { MapExplainerCard } from './MapExplainerCard'
 import { TimelineScrubber } from './TimelineScrubber'
-import { AnimatePresence, m, useReducedMotion } from 'framer-motion'
+import { AnimatePresence, useReducedMotion } from 'framer-motion'
 import { useBootStore } from '../../lib/bootstrap'
 import { useFollowsStore } from '../../lib/follows'
 import { useLensStore } from '../../lib/trust-lens'
@@ -178,38 +178,6 @@ export function SpreadMap({
 
   const hasGeometry = !!data && (!!data.origin || data.destinations.length > 0)
 
-  // Satoshi A2 mode badge — toast 2s ao alternar modo. Bug fix 2026-05-26:
-  // estado vivia em ModeToggle (linha 746-816 pré-fix), mas ModeToggle é
-  // remountado quando o SpreadMap passa de empty state → mapa (ou vice).
-  // Ex.: global (mapa) → network (empty "sua rede está vazia") desmonta
-  // ModeToggle dentro do MapShell e monta NOVO dentro de renderEmpty;
-  // novo componente inicia com ref de mode = 'network', badge nunca
-  // dispara. Hoist pro top-level resolve ambas causas:
-  //   (a) prevModeRef rastreia mode anterior (não apenas inicial), então
-  //       voltar pro mode inicial (global → network → global) também
-  //       dispara badge na 2ª transição;
-  //   (b) badge renderiza como sibling estável do conteúdo, indep de
-  //       empty state vs MapShell.
-  const [badgeMode, setBadgeMode] = useState<SpreadMapMode | null>(null)
-  const prevModeRef = useRef<SpreadMapMode | null>(null)
-  // WCAG 2.3.3 (manifesto §1 beleza + WCAG): respeita prefers-reduced-motion.
-  // Framer honra parcialmente, mas o pattern do projeto é guard explícito
-  // (SlideUpOverlay/PostViewer/SwipeHandler). reduced → só fade, sem
-  // scale/translate (evita movimento que pode desencadear vertigem).
-  const reducedMotion = useReducedMotion() ?? false
-  useEffect(() => {
-    if (prevModeRef.current === null) {
-      // Primeira render — registra mode atual sem disparar badge.
-      prevModeRef.current = mode
-      return
-    }
-    if (mode === prevModeRef.current) return
-    prevModeRef.current = mode
-    setBadgeMode(mode)
-    const t = setTimeout(() => setBadgeMode(null), 2000)
-    return () => clearTimeout(t)
-  }, [mode])
-
   // User feedback 2026-05-26: empty states escondiam o ModeToggle —
   // user clicava em network/global e ficava preso (única saída era
   // FECHAR no header do overlay). Agora cada Placeholder coexiste com
@@ -310,59 +278,10 @@ export function SpreadMap({
     )
   }
 
-  // Satoshi A2 mode badge — toast 2s ao alternar modo. Renderizado como
-  // sibling do conteúdo (não dentro do ModeToggle nem do MapShell) pra
-  // sobreviver à transição empty state ↔ mapa.
-  //
-  // Satoshi systemic fix 2026-05-28 (V-5 → V-6): o TOPO do mapa é zona densa
-  // de controle permanente — ModeToggle (top-left), action buttons (top-right),
-  // FECHAR (header). O BOTTOM também: scrubber (bottom-[44px]) com labels
-  // "5D ATRÁS / 3 DRIFTS" + stats/attribution (bottom-3). bottom-[80px]
-  // ainda COLIDIA com os labels do scrubber (user 2026-05-28). Diagnóstico:
-  // o mapa não tem zona fixa livre no topo NEM no bottom — a única zona
-  // genuinamente vazia (só tiles CARTO, sem UI fixa) é o CENTRO. Solução de
-  // raiz: SAFE TOAST ZONE no centro absoluto do mapa. Como toast transiente
-  // (2s, pointer-events-none), não compete com nenhum controle permanente e
-  // não tampa texto. Estilo de toast flutuante (rounded-xl + backdrop-blur-md
-  // + shadow) reforça que é overlay temporário, não chrome fixo.
-  return (
-    <div className="relative h-full w-full">
-      {content}
-      {/* SAFE TOAST ZONE — CENTRO do mapa (única zona sem UI fixa). */}
-      <div className="pointer-events-none absolute left-1/2 top-1/2 z-30 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-2">
-        <AnimatePresence>
-          {badgeMode && (
-            <m.div
-              initial={
-                reducedMotion
-                  ? { opacity: 0 }
-                  : { opacity: 0, scale: 0.9, y: 4 }
-              }
-              animate={
-                reducedMotion
-                  ? { opacity: 1 }
-                  : { opacity: 1, scale: 1, y: 0 }
-              }
-              exit={
-                reducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.95 }
-              }
-              transition={{ duration: reducedMotion ? 0.15 : 0.25, ease: 'easeOut' }}
-              role="status"
-              aria-live="polite"
-              className="rounded-xl border border-drift-border/40 bg-drift-bg/90 px-4 py-2.5 font-mono text-[10px] uppercase tracking-meta text-drift-muted shadow-lg backdrop-blur-md"
-            >
-              modo:{' '}
-              <span className="text-drift-text">
-                {badgeMode === 'post' && 'este post'}
-                {badgeMode === 'global' && 'rede inteira'}
-                {badgeMode === 'network' && 'sua rede (lente local §24)'}
-              </span>
-            </m.div>
-          )}
-        </AnimatePresence>
-      </div>
-    </div>
-  )
+  // Mode badge "modo: …" removido 2026-05-29 (user: toast ruído). A aba
+  // POST/GLOBAL/NETWORK (ModeToggle) já mostra qual modo está ativo via
+  // estado visual selecionado — o toast era redundante.
+  return <div className="relative h-full w-full">{content}</div>
 }
 
 // ─── PostModeMap — heatmap estático (comportamento histórico) ─────────
