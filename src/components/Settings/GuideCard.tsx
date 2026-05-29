@@ -142,6 +142,7 @@ function MapsTopics() {
 
       <div className="mt-3">
         <AccordionGroup defaultOpen="none">
+          <div className="space-y-2">
           <SettingExplainer
             accordionId="guia-map-post"
             label="mapa do post (mini-map no card)"
@@ -226,6 +227,7 @@ function MapsTopics() {
               card. Útil pra escanear rapidamente sem abrir overlay full.
             </P>
           </SettingExplainer>
+          </div>
         </AccordionGroup>
       </div>
     </>
@@ -245,6 +247,7 @@ function AcoesTopics() {
 
       <div className="mt-3">
         <AccordionGroup defaultOpen="none">
+          <div className="space-y-2">
           <SettingExplainer
             accordionId="guia-acao-drift"
             label="DRIFT (↑) — amplificar"
@@ -351,6 +354,7 @@ function AcoesTopics() {
               disponibilidade via mecânica social).
             </Responsibility>
           </SettingExplainer>
+          </div>
         </AccordionGroup>
       </div>
     </>
@@ -368,6 +372,7 @@ function AlgosTopics() {
 
       <div className="mt-3">
         <AccordionGroup defaultOpen="none">
+          <div className="space-y-2">
           <SettingExplainer
             accordionId="guia-algo-score"
             label="score (popularidade do post)"
@@ -472,6 +477,7 @@ function AlgosTopics() {
               continua determinístico pra todo mundo.
             </P>
           </SettingExplainer>
+          </div>
         </AccordionGroup>
       </div>
     </>
@@ -488,6 +494,7 @@ function PrivacyTopics() {
 
       <div className="mt-3">
         <AccordionGroup defaultOpen="none">
+          <div className="space-y-2">
           <SettingExplainer
             accordionId="guia-privacy-nsec"
             label="sua chave (nsec) nunca sai do dispositivo"
@@ -557,6 +564,7 @@ function PrivacyTopics() {
               conveniente.
             </P>
           </SettingExplainer>
+          </div>
         </AccordionGroup>
       </div>
     </>
