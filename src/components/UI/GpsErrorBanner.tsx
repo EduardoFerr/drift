@@ -47,9 +47,15 @@ export function GpsErrorBanner({ reason, onDismiss }: GpsErrorBannerProps) {
        * privacy: post publicou sem location, não é falha catastrófica).
        */}
       {/* design-system: ok reason=layout-horizontal-icon-leading-aguarda-DriftAlert-extension */}
+      {/* V-6 (2026-05-29, Lily): banner agora flutua como overlay absolute
+          dentro de <main> (App.tsx) em vez de sibling no fluxo — não empurra
+          mais o card pra baixo. Sem `mb-4` (não há stack vertical agora);
+          bg sólido (era /5) + shadow pra contraste garantido sobre o topo
+          do card. Fade/slide de entrada+saída vive no m.div de App.tsx
+          (driver único, reduced-motion safe). */}
       <div
         role="status"
-        className="mb-4 flex items-center gap-3 rounded-xl border border-drift-warning/20 border-l-[3px] border-l-drift-warning bg-drift-warning/5 px-4 py-3"
+        className="flex items-center gap-3 rounded-xl border border-drift-warning/20 border-l-[3px] border-l-drift-warning bg-drift-surface px-4 py-3 shadow-lg"
       >
         <span className="text-base" aria-hidden="true">
           📍

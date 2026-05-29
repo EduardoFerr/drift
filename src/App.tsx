@@ -1,6 +1,6 @@
 ﻿import { lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
-import { AnimatePresence, m } from 'framer-motion'
+import { AnimatePresence, m, useReducedMotion } from 'framer-motion'
 import { OPTIMISTIC_TIMEOUT_MS, CLIENT_VERSION, FEED_SNAPSHOT_STALE_MS } from './config/constants'
 import { db } from './lib/db'
 import {
@@ -586,6 +586,9 @@ function App() {
   // Slim mode (2026-05-17): toggled via long-press 5s no PostViewer.
   // Esconde NavBar bottom + HomeHeader top, card ocupa toda viewport.
   const slimMode = useViewModeStore((s) => s.slim)
+  // V-6 (2026-05-29): reduced-motion pro fade do GpsErrorBanner flutuante
+  // (WCAG 2.3.3 — suprime slide-y, mantém opacity curta).
+  const gpsBannerReducedMotion = useReducedMotion() ?? false
 
   // V10b — install vira modal. Auto-abre 1x quando disponível (ainda
   // não dismissed nem instalado). User dispensa via X ou via botão
@@ -1280,31 +1283,14 @@ function App() {
       />
 
       {/* Banners empilhados acima do stack. Layout flex-shrink-0 garante
-          que stack pega o resto do espaço. */}
-      <div className="shrink-0 px-4">
-        {(() => {
-          if (locationGranularity === 'off') return null
-          if (gpsBannerDismissed) return null
-          if (gpsFailedAt === null || gpsFailReason === null) return null
-          if (Date.now() - gpsFailedAt > 60_000) return null
-          return (
-            <LazyBoundary fallback={null}>
-              <GpsErrorBanner
-                reason={gpsFailReason}
-                onDismiss={() => {
-                  setGpsBannerDismissed(true)
-                  if (typeof window !== 'undefined') {
-                    window.sessionStorage.setItem(
-                      'drift:gps-banner-dismissed',
-                      '1',
-                    )
-                  }
-                }}
-              />
-            </LazyBoundary>
-          )
-        })()}
+          que stack pega o resto do espaço.
 
+          V-6 (2026-05-29, Lily): GpsErrorBanner SAIU daqui. Renderizava
+          neste sibling-no-fluxo ANTES de <main>, consumindo altura e
+          empurrando o card pra baixo (reflow visível pós-publish com GPS
+          negado). Agora flutua como overlay absolute DENTRO de <main>
+          (ver abaixo) — sobrepõe o topo do card sem reflow. */}
+      <div className="shrink-0 px-4">
         {/* V9.2e: DiagnosticPanel não renderiza mais inline aqui —
             agora é card próprio (StatusCard) acionado via SettingsRoot. */}
 
@@ -1349,6 +1335,61 @@ function App() {
           slimMode ? 'p-0' : 'px-4 pt-3 pb-[88px]'
         }`}
       >
+        {/* V-6 (2026-05-29, Lily): GPS-error banner FLUTUANTE. Overlay
+            absolute (não reflow) ancorado ao topo de <main> — como <main>
+            fica ABAIXO do header/tabs, top-3 aqui = logo abaixo das tabs,
+            sem cobri-las. pointer-events-none no wrapper deixa swipes do
+            card passarem; só o banner em si captura toque. Escondido em
+            slim (card fullscreen, banner transiente não deve atrapalhar).
+            Fade in/out via m.div keyed direto sob AnimatePresence (driver
+            único de animação; reduced-motion suprime o slide-y). Todas as
+            condições da IIFE original preservadas. */}
+        <AnimatePresence>
+          {!slimMode &&
+          locationGranularity !== 'off' &&
+          !gpsBannerDismissed &&
+          gpsFailedAt !== null &&
+          gpsFailReason !== null &&
+          Date.now() - gpsFailedAt <= 60_000 ? (
+            <m.div
+              key="gps-error-banner"
+              initial={
+                gpsBannerReducedMotion
+                  ? { opacity: 0 }
+                  : { opacity: 0, y: -8 }
+              }
+              animate={{ opacity: 1, y: 0 }}
+              exit={
+                gpsBannerReducedMotion
+                  ? { opacity: 0 }
+                  : { opacity: 0, y: -8 }
+              }
+              transition={{
+                duration: gpsBannerReducedMotion ? 0.15 : 0.25,
+                ease: 'easeOut',
+              }}
+              className="pointer-events-none absolute inset-x-0 top-3 z-20 px-4"
+            >
+              <div className="pointer-events-auto">
+                <LazyBoundary fallback={null}>
+                  <GpsErrorBanner
+                    reason={gpsFailReason}
+                    onDismiss={() => {
+                      setGpsBannerDismissed(true)
+                      if (typeof window !== 'undefined') {
+                        window.sessionStorage.setItem(
+                          'drift:gps-banner-dismissed',
+                          '1',
+                        )
+                      }
+                    }}
+                  />
+                </LazyBoundary>
+              </div>
+            </m.div>
+          ) : null}
+        </AnimatePresence>
+
         {posts.length === 0 ? (
           // Barney+Robin Hyp #2 fix 2026-05-20: durante first-load, posts=[]
           // E feedLoaded=false simultaneamente. Sem este branch, mostrava
