@@ -85,6 +85,50 @@ shipping prematuro).
 
 ---
 
+## Slim perf + legenda mapa + anchor anti-staleness — 2026-05-29 (noite)
+
+- [x] **Slim mode pesado no celular** — fechado 2026-05-29 em `2edcedd` —
+  `<main>` animava `transition-[padding]` = reflow+repaint da árvore do card
+  a cada frame (60fps×300ms ≈ 18 reflows). Agora padding SNAPA (1 reflow);
+  movimento vem 100% de transform GPU (NavBar/header spring translateY). Padrão
+  "chrome revela conteúdo". [ABERTO opcional: card-grow suave via FLIP se o
+  snap ficar seco — user decide.]
+- [x] **Legenda do mapa via botão "?" visível** — fechado 2026-05-29 em
+  `2edcedd` — MapExplainerCard já existia mas só via long-press 3s (ninguém
+  descobre). "?" ao lado de FECHAR abre legenda no contexto do modo ativo.
+  Validado ao vivo (eval): título "rede geográfica" + §28. LOCK atualizado.
+- [x] **Feed morto: DERIVA 0.000 + todo post "745D"** — fechado 2026-05-29 em
+  `3453b04` — raiz: TS_BASE absoluto (~mai/2024) congelado → timeline do seed
+  envelhece com relógio real → temporal decay esmaga score. Fix: seed.ts passa
+  Date.now como `nowAnchorSec`; buildSeedEvents faz 2-pass (puro descobre topo
+  real → shift exato, newest ≈ 1h antes de agora). fixtures continua §7-puro
+  (LOCKs usam forma sem âncora). LOCK: 5 testes anchor (newest≈now, ages<40d,
+  causalidade, determinístico-por-âncora). [Validação visual ao vivo pendente:
+  drain floor + contexto preview flaky.]
+
+## Toasts ruído + seed realista + 2 mapas — 2026-05-29 (tarde)
+
+- [x] **Remover toasts de ruído (SlimModeHint + mode badge do mapa)** —
+  fechado 2026-05-29 em `56c2e92` — user: "modo slim · segure 2s" e
+  "modo rede inteira" eram redundantes (ModeToggle já mostra modo ativo
+  via estado selecionado). LOCK: `spread-map-network-mode-conformance`
+  "Mode badge REMOVIDO" (regression guard: badgeMode/prevModeRef/SAFE
+  TOAST ZONE não voltam).
+- [x] **Ícone 🗺 do card vs MAPA›POST — mesma perspectiva?** — fechado
+  2026-05-29 (decisão, sem commit de código) — SIM, mesma (ambos
+  `<SpreadMap mode='post'>`, geografia de quem drift-ou o post). Decisão
+  user: **MANTER OS 2** — embedded = espiada rápida no card, overlay =
+  detalhe fullscreen. Redundância intencional como atalho. NÃO consolidar.
+- [x] **Seeds irreais em tempo + geo** — fechado 2026-05-29 em `10e8af8`
+  — (1) tempo: spreads/buries/reports agora `post.created_at + delay`
+  exponencial (burst causal, decai) em vez de `s % (N*DAY)` no-op
+  (cluster instantâneo + reação ANTES do post). Hot posts espalhados na
+  timeline (não só os mais antigos) → bursts distribuídos no scrubber.
+  (2) geo: cidades reais (EU/Ásia/mundo) + jitter metropolitano polar
+  (dezenas de km) em vez de smear ±6-10° que caía no oceano. LOCK:
+  `dev-seed-fixtures` "distribuição realista" (causalidade: 0 reações
+  precedem post; Brasília ≤0.35°; ≥10 cidades; span>20d).
+
 ## Seed-perf saga + validação 3 mapas BLOQUEADA 2026-05-29
 
 - [ ] **dev-seed drain floor: SQLite INSERT roundtrip serializado** — P1.
