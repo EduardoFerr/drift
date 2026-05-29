@@ -76,20 +76,25 @@ export function DiscoverRelaysCard({ onClose }: CardProps) {
           de cada relay no badge antes de adicionar.
         </div>
 
-        {/* Tabs segmentadas */}
-        <div className="flex gap-1 overflow-x-auto rounded-2xl border border-drift-border/40 bg-drift-surface/50 p-1.5">
+        {/* Tabs segmentadas — flex-wrap pra não estourar em 375px (sem scroll horizontal) */}
+        <div
+          role="tablist"
+          aria-label="filtrar relays por política"
+          className="flex flex-wrap gap-1 rounded-2xl border border-drift-border/40 bg-drift-surface/50 p-1.5"
+        >
           {TAB_ORDER.map((tab) => {
             const isActive = activeTab === tab
             return (
               <button
                 key={tab}
+                role="tab"
                 onClick={() => setActiveTab(tab)}
-                className={`shrink-0 rounded-xl px-3 py-2 font-mono text-[11px] uppercase tracking-meta transition-colors ${
+                className={`grow basis-[28%] rounded-xl px-3 py-2 font-mono text-[11px] uppercase tracking-meta transition-colors ${
                   isActive
                     ? 'bg-drift-accent2 text-drift-bg'
                     : 'text-drift-muted/70 hover:text-drift-text'
                 }`}
-                aria-pressed={isActive}
+                aria-selected={isActive}
               >
                 {TAB_SHORT_LABELS[tab]}
               </button>
