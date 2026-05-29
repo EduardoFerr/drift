@@ -63,10 +63,14 @@ export function DotsIndicator({
       >
         {Array.from({ length: total }, (_, i) => {
           const isActive = i === clampedActive
+          // V-2 (2026-05-28): inativo bumpado /25 → /40 pra os segmentos
+          // não-ativos permanecerem visíveis sobre conteúdo escuro. Sem
+          // isso, só o segmento ativo (bg-drift-accent) aparecia, lendo
+          // como uma linha vermelha solta em vez de uma barra de paginação.
           const segmentBar = (
             <span
               className={`block h-[3px] w-full rounded-full transition-colors duration-200 ${
-                isActive ? 'bg-drift-accent' : 'bg-drift-text/25'
+                isActive ? 'bg-drift-accent' : 'bg-drift-text/40'
               }`}
             />
           )

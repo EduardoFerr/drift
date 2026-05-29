@@ -59,6 +59,7 @@ export type BootStep =
   | 'idle'
   | 'isolation'
   | 'db'
+  | 'seed'
   | 'identity'
   | 'sync'
   | 'relays'
@@ -102,6 +103,14 @@ export interface BootState {
    */
   devSeedActive: boolean
   /**
+   * Progresso do dev-seed (bug #4): { done, total } enquanto o pipeline
+   * processa as ~3000 fixtures. BootView mostra "sincronizando N/M
+   * eventos…" em vez de uma tela morta ("inicializando worker…") durante
+   * os ~segundos de catch-up. `null` quando não há seed em andamento.
+   * Só relevante em DEV + ?dev-seed=1.
+   */
+  seedProgress: { done: number; total: number } | null
+  /**
    * Falhas non-fatal que aconteceram durante o boot mas não impediram
    * `step === 'ready'`. UI usa pra mostrar indicador "modo degradado"
    * sem bloquear o app. Sprint 6 do roadmap pós-auditoria.
@@ -127,7 +136,14 @@ const INITIAL: BootState = {
   identity: null,
   relays: null,
   devSeedActive: false,
+  seedProgress: null,
   degradedReasons: [],
+}
+
+/** Reporter de progresso do dev-seed — chamado pelo seed loop pra UI
+ *  honesta durante o catch-up (bug #4). Exportado pra `seedDatabase`. */
+export function setSeedProgress(done: number, total: number): void {
+  setBoot((p) => ({ ...p, step: 'seed', seedProgress: { done, total } }))
 }
 
 // ─── Store Zustand ────────────────────────────────────────────────────
@@ -219,7 +235,11 @@ async function doBootstrap(): Promise<void> {
     if (import.meta.env.DEV && wantsDevSeed) {
       try {
         const { seedDatabase, NAMED_NSECS } = await import('./dev-seed/seed')
-        await seedDatabase()
+        // step:'seed' + progresso honesto (bug #4): BootView mostra
+        // "sincronizando N/M eventos…" em vez de "inicializando worker…"
+        // durante os ~segundos de catch-up das ~3000 fixtures.
+        setBoot((p) => ({ ...p, step: 'seed' }))
+        await seedDatabase(setSeedProgress)
 
         // E2E hook (Sprint N+5): expõe a API do `db` no window APENAS sob
         // dev-seed (DEV + ?dev-seed=1). As suites adversariais

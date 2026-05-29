@@ -9,12 +9,13 @@
 // Os asserts de P1.9 viraram anti-regressão (garantem que o chip NÃO
 // volta). Ver tests `bug2-hint-noise-cleanup` abaixo.
 //
-// Item 1.10 — mini-map close hint via HintChip (mantido):
-//   - HINT_RULES contém 'mini-map-close' (id estável)
-//   - PostViewer renderiza HintChip via getHintRule (não localStorage)
-//   - Sem fragmentação de state — dismiss × persistente em
-//     capabilities_dismissed bag (manifesto §28: SQLite local)
-//   - Anti-regressão: localStorage 'drift.minimap.openCount' removido
+// V-1 (Satoshi sweep 2026-05-28): o chip 'mini-map-close' também foi
+// REMOVIDO — renderizava top-right do mini-map embedded (PostViewer)
+// colidindo ilegível com os 3 action buttons (⋮/💬/🗺 em top-4). O botão
+// 🗺 já é toggle auto-explicativo (aria-pressed + aria-label "fechar mapa
+// de spread"). Reincidência do bug #2 (hints viram ruído sobreposto).
+// Os asserts do item 1.10 invertem-se em anti-regressão: garantem que a
+// rule + o HintChip mini-map NÃO voltam ao código.
 
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
@@ -46,32 +47,26 @@ describe('bug #2 (2026-05-28) — CARTO sovereignty HintChip removido', () => {
   })
 })
 
-describe('Sprint N+4 P1.10 — mini-map close hint via HintChip', () => {
-  it('HINT_RULES contém "mini-map-close" com shape canônica', () => {
-    const rule = getHintRule('mini-map-close')
-    expect(rule).toBeDefined()
-    expect(rule?.id).toBe('mini-map-close')
-    expect(typeof rule?.title).toBe('string')
-    expect(rule?.title.length).toBeGreaterThan(0)
-    expect(typeof rule?.body).toBe('function')
+describe('V-1 (2026-05-28) — mini-map close HintChip removido (colisão)', () => {
+  it('HINT_RULES NÃO contém "mini-map-close" (chip colidia com action buttons)', () => {
+    expect(getHintRule('mini-map-close')).toBeUndefined()
+    expect(HINT_RULES.map((r) => r.id)).not.toContain('mini-map-close')
   })
 
-  it('rule.title contém símbolo 🗺 (associação visual com botão)', () => {
-    const rule = getHintRule('mini-map-close')
-    expect(rule?.title).toMatch(/🗺/)
+  it('PostViewer NÃO renderiza HintChip mini-map nem usa getHintRule/miniMapCloseRule', () => {
+    const stripped = POSTVIEWER
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/^\s*\/\/.*$/gm, '')
+    expect(stripped).not.toMatch(/miniMapCloseRule/)
+    expect(stripped).not.toMatch(/getHintRule/)
+    expect(stripped).not.toMatch(/<HintChip\b/)
   })
 
-  it('PostViewer importa HintChip + getHintRule', () => {
-    expect(POSTVIEWER).toMatch(/from\s+['"]\.\.\/UI\/HintChip['"]/)
-    expect(POSTVIEWER).toMatch(/from\s+['"]\.\.\/\.\.\/lib\/guidance['"]/)
-    expect(POSTVIEWER).toMatch(/getHintRule\(['"]mini-map-close['"]\)/)
-  })
-
-  it('PostViewer renderiza <HintChip ... /> pra mini-map-close', () => {
-    expect(POSTVIEWER).toMatch(/<HintChip\b/)
-    // Render condicional — só quando showMap=true (chip dentro do
-    // showMap AnimatePresence block).
-    expect(POSTVIEWER).toMatch(/miniMapCloseRule/)
+  it('botão 🗺 segue sendo toggle auto-explicativo (aria-pressed + aria-label fechar)', () => {
+    // Substitui o chip: o estado de toggle é comunicado por a11y no
+    // próprio botão, sem chip flutuante colidindo.
+    expect(POSTVIEWER).toMatch(/aria-pressed=\{showMap\}/)
+    expect(POSTVIEWER).toMatch(/fechar mapa de spread/)
   })
 
   it('anti-regressão: localStorage drift.minimap.openCount removido', () => {
@@ -85,16 +80,16 @@ describe('Sprint N+4 P1.10 — mini-map close hint via HintChip', () => {
 })
 
 describe('Sprint N+4 — HINT_RULES extensibility preservada', () => {
-  it('mantém os hints canônicos vivos (backup-after-post + mini-map-close)', () => {
+  it('mantém o hint canônico vivo (backup-after-post)', () => {
     const ids = HINT_RULES.map((r) => r.id)
     expect(ids).toContain('backup-after-post')
-    expect(ids).toContain('mini-map-close')
   })
 
-  it('hints removidos em bug #2 não estão mais presentes', () => {
+  it('hints removidos (bug #2 + V-1) não estão mais presentes', () => {
     const ids = HINT_RULES.map((r) => r.id)
     expect(ids).not.toContain('tab-dots-meaning')
     expect(ids).not.toContain('carto-tile-sovereignty')
+    expect(ids).not.toContain('mini-map-close')
   })
 
   it('cada hint vivo segue shape canônica (id slug + title non-empty + body factory)', () => {

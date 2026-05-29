@@ -35,8 +35,6 @@ import {
 import ActionsFan, { FanIcon } from './ActionsFan'
 import { useLongPress, LONG_PRESS_MS as MAP_EXPLAINER_LONG_PRESS_MS } from '../../hooks/useLongPress'
 import { MapExplainerCard } from '../Feed/MapExplainerCard'
-import { HintChip } from '../UI/HintChip'
-import { getHintRule } from '../../lib/guidance'
 // `m` é o primitive leve do framer-motion (LazyMotion). Features via main.tsx.
 import { m, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { MOTION } from '../../lib/motion'
@@ -154,18 +152,12 @@ export function PostViewer({
   const mapLongPress = useLongPress({
     onLongPress: () => setShowMapExplainer(true),
   })
-  // Sprint N+4 P1.10 (Satoshi A6 follow-up 2026-05-26): mini-map close
-  // hint migrado de localStorage counter (2-shot non-persistent) pra
-  // HintChip via getHintRule('mini-map-close'). HintChip auto-gates via
-  // capabilities_dismissed bag — dismiss × persiste no SQLite (mesma
-  // surface dos outros hints, não fragmenta state). Manifesto §28 —
-  // zero analytics export (caps são SQLite local).
-  //
-  // Visibilidade no render: só monta enquanto showMap=true. Sem timer
-  // auto-dismiss; user dispensa com × ou apertando 🗺 de novo (fecha
-  // map → desmonta chip; reabertura mostra de novo até dismiss
-  // explícito, idêntico ao behavior original mas com persistência clara).
-  const miniMapCloseRule = getHintRule('mini-map-close')
+  // V-1 (Satoshi sweep 2026-05-28): mini-map close HintChip REMOVIDO.
+  // O chip 'mini-map-close' renderizava top-3 right-3 sobre os 3 action
+  // buttons (⋮/💬/🗺 em top-4) — colisão ilegível. O botão 🗺 já é toggle
+  // auto-explicativo (aria-pressed + aria-label "fechar mapa de spread");
+  // tap-abre/tap-fecha é padrão conhecido. Reincidência do bug #2 (hints
+  // viram ruído sobreposto) — removido em vez de reposicionado.
   const [showReport, setShowReport] = useState(false)
   // V_2026-05-17 (user pedido): long-press 5s mudou semantics.
   //   - Antes: abria ModerationModal (block/mute/report)
@@ -541,21 +533,10 @@ export function PostViewer({
                     {...(onOpenLocationSettings ? { onOpenLocationSettings } : {})}
                   />
                 </LazyBoundary>
-                {/* Sprint N+4 P1.10 (Satoshi A6 follow-up 2026-05-26):
-                    HintChip mini-map-close. z-30 sobre o map. pointer-
-                    events-auto pra capturar × do chip; chip auto-some
-                    permanente quando user dispensa. Posicionado top-3
-                    right-3 (mesmo lugar do hint legacy, evita conflito
-                    com ModeToggle top-3 left-3 do MapShell wrapped pelo
-                    SpreadMap). */}
-                {miniMapCloseRule && (
-                  <div className="pointer-events-auto absolute right-3 top-3 z-30">
-                    <HintChip
-                      rule={miniMapCloseRule}
-                      label="tocar 🗺 de novo pra fechar"
-                    />
-                  </div>
-                )}
+                {/* V-1 (Satoshi sweep 2026-05-28): HintChip mini-map-close
+                    removido daqui — colidia com os action buttons top-right
+                    (z-30 top-3 vs botões top-4). O 🗺 toggle é
+                    auto-explicativo via aria-pressed/aria-label. */}
               </m.div>
             </m.div>
           )}

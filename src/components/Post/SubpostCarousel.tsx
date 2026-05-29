@@ -127,15 +127,24 @@ function SubpostCarouselComponent({
     <div className="relative h-full w-full overflow-hidden">
       {/* Barra Instagram-style no topo do card — absolute pra ficar
           acima do conteúdo (gradient overlay tem z-[2], dots z-[5]).
-          Mostra só com 2+ subposts (DotsIndicator retorna null caso 1). */}
+          Mostra só com 2+ subposts (DotsIndicator retorna null caso 1).
+
+          V-2 (Satoshi sweep 2026-05-28): o segmento ativo (bg-drift-accent
+          terracota) lia como "linha vermelha solta" no topo — os segmentos
+          inativos (text/25) sumiam sobre conteúdo escuro, deixando só o
+          stub vermelho. Scrim gradient top→transparent ancora a barra como
+          elemento de UI intencional (não linha flutuante) e garante
+          contraste dos segmentos inativos sobre qualquer conteúdo. */}
       {subposts.length > 1 && (
-        <div className="absolute inset-x-0 top-0 z-[5]">
-          <DotsIndicator
-            variant="segmented"
-            total={subposts.length}
-            active={clampedIdx}
-            {...(onSelect ? { onSelect } : {})}
-          />
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-[5] bg-gradient-to-b from-black/35 to-transparent pb-2">
+          <div className="pointer-events-auto">
+            <DotsIndicator
+              variant="segmented"
+              total={subposts.length}
+              active={clampedIdx}
+              {...(onSelect ? { onSelect } : {})}
+            />
+          </div>
         </div>
       )}
 

@@ -2583,6 +2583,25 @@ function BootView({ state }: { state: BootState }) {
   // que falhou — usuário comum encontra mitigação no contexto.
   const reloadPage = () => window.location.reload()
 
+  // Bug #4 (loading honesto): em vez de uma tela estática durante o
+  // catch-up de eventos, mostramos o que está acontecendo. `syncEvents`
+  // é o contador live do subscribe; `bootBusy` indica trabalho em curso
+  // (qualquer step antes de 'ready'/'error') pra animar o indicador.
+  const syncEvents = useSyncStore((s) => s.eventsReceived)
+  const bootBusy = state.step !== 'ready' && state.step !== 'error'
+  const phaseLabel =
+    state.step === 'error'
+      ? 'interrompido'
+      : state.step === 'seed'
+      ? state.seedProgress && state.seedProgress.done < state.seedProgress.total
+        ? `sincronizando ${state.seedProgress.done}/${state.seedProgress.total} eventos…`
+        : 'preparando dados locais…'
+      : state.step === 'sync'
+      ? syncEvents > 0
+        ? `sincronizando ${syncEvents} eventos…`
+        : 'conectando aos relays…'
+      : 'iniciando…'
+
   /**
    * Force-update path: bootstrap interrompido frequentemente é causado
    * por **service worker stale** — o SW serve `index.html` em cache que
@@ -2681,9 +2700,28 @@ function BootView({ state }: { state: BootState }) {
           <h1 className="font-display text-[25px] font-extrabold leading-none tracking-[-0.5px] text-drift-text">
             dri<em className="not-italic text-drift-accent">ft</em>
           </h1>
-          <p className="mt-2 text-xs uppercase tracking-widest text-drift-muted">
-            Bootstrap · {state.step}
+          <p className="mt-2 flex items-center gap-2 text-xs uppercase tracking-widest text-drift-muted">
+            {bootBusy && (
+              <span
+                aria-hidden
+                className="inline-block h-2.5 w-2.5 animate-pulse rounded-full bg-drift-accent"
+              />
+            )}
+            <span>Bootstrap · {state.step}</span>
           </p>
+          {/* Bug #4: loading honesto — comunica o que está acontecendo em
+              vez de deixar o user diante de uma tela aparentemente morta.
+              A verify-storm de eventos é trabalho real; mostramos o
+              progresso (contagem live) pra que a espera tenha contexto. */}
+          {bootBusy && (
+            <p
+              className="mt-3 text-[13px] text-drift-text"
+              role="status"
+              aria-live="polite"
+            >
+              {phaseLabel}
+            </p>
+          )}
         </header>
 
         <Check
@@ -2738,6 +2776,28 @@ function BootView({ state }: { state: BootState }) {
               : undefined
           }
         />
+        {/* Dev-seed progress (bug #4): só aparece sob ?dev-seed=1. Mostra
+            catch-up honesto ("sincronizando N/M eventos…") em vez de
+            deixar o user olhando "inicializando worker…" por segundos. */}
+        {(state.step === 'seed' || state.seedProgress) && (
+          <Check
+            label="dev seed → sqlite"
+            state={
+              state.step === 'seed' && state.seedProgress?.done !== state.seedProgress?.total
+                ? 'pending'
+                : state.seedProgress
+                ? 'ok'
+                : 'idle'
+            }
+            detail={
+              state.seedProgress
+                ? state.seedProgress.done >= state.seedProgress.total
+                  ? `${state.seedProgress.total} eventos processados (fixtures)`
+                  : `sincronizando ${state.seedProgress.done}/${state.seedProgress.total} eventos…`
+                : 'preparando fixtures…'
+            }
+          />
+        )}
         <Check
           label="identidade nostr"
           state={state.identity ? 'ok' : state.step === 'identity' ? 'pending' : 'idle'}
@@ -2760,9 +2820,13 @@ function BootView({ state }: { state: BootState }) {
           }
           detail={
             ['relays', 'ready'].includes(state.step)
-              ? 'subscribe ativo'
+              ? syncEvents > 0
+                ? `subscribe ativo · ${syncEvents} eventos recebidos`
+                : 'subscribe ativo'
               : state.step === 'sync'
-              ? 'iniciando…'
+              ? syncEvents > 0
+                ? `recebendo eventos (${syncEvents})…`
+                : 'iniciando…'
               : 'aguardando'
           }
         />
@@ -2817,6 +2881,7 @@ function BootView({ state }: { state: BootState }) {
                     idle: '0/5 · inicialização',
                     isolation: '1/5 · cross-origin isolation',
                     db: '2/5 · sqlite wasm',
+                    seed: '2/5 · dev seed',
                     identity: '3/5 · identidade nostr',
                     sync: '4/5 · sync nostr',
                     relays: '5/5 · relays nostr',

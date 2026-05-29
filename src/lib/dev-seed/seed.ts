@@ -27,6 +27,7 @@
 import { onNostrEvent } from '../events'
 import { applyContactList } from '../follows'
 import { invalidateFeed } from '../feed'
+import { BOOT_BATCH_SIZE, drainInBatches } from '../scheduler'
 import { getSeedEvents } from './fixtures'
 
 // Re-export do contrato (fonte única em fixtures.ts). Lily/bootstrap
@@ -50,7 +51,9 @@ let seeded = false
  * é idempotente via INSERT OR IGNORE, mas evitamos reprocessar ~3000
  * verifies à toa). Idempotente, seguro pra chamar 2× no mesmo boot.
  */
-export async function seedDatabase(): Promise<void> {
+export async function seedDatabase(
+  onProgress?: (done: number, total: number) => void,
+): Promise<void> {
   if (seeded) return
   seeded = true
 
@@ -61,10 +64,27 @@ export async function seedDatabase(): Promise<void> {
     await applyContactList(ev)
   }
 
-  // Domain events em ordem cronológica (first-seen estável).
-  for (const ev of domain) {
+  // Domain events em ordem cronológica (first-seen estável). Processados
+  // em batches com yield ao main thread entre eles (bug #4): ~3000 eventos
+  // num `for` apertado bloqueavam o boot ~2s, atrasando `step:'ready'` e o
+  // primeiro paint dos CTAs. drainInBatches preserva a ORDEM (first-seen
+  // estável) e o pipeline cheap→caro de cada evento (invariante #5) — o
+  // yield acontece só no boundary entre batches. §7 intacto: INSERT OR
+  // IGNORE + scoring puro → score final idêntico independente do
+  // espaçamento temporal.
+  //
+  // `onProgress` (opcional) reporta done/total pra BootView mostrar
+  // progresso honesto durante o catch-up em vez de uma tela morta.
+  const total = domain.length
+  let done = 0
+  onProgress?.(0, total)
+  await drainInBatches(domain, async (ev) => {
     await onNostrEvent(ev)
-  }
+    done++
+    // Reporta no boundary do batch (a cada BOOT_BATCH_SIZE) ou no fim, pra
+    // não floodar a store Zustand com ~3000 setStates.
+    if (done % BOOT_BATCH_SIZE === 0 || done === total) onProgress?.(done, total)
+  })
 
   // Recalc de score é debounced (100ms) por postId em events.ts; janela
   // curta pra drenar antes do invalidateFeed final, garantindo que o feed

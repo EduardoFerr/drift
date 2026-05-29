@@ -270,29 +270,12 @@ export const HINT_RULES: readonly GuidanceRule[] = [
   // mapa, redundante com o footer attribution (que já disclosa "tiles
   // externos" + tooltip apontando Configurações ▸ Mapa). Obrigação legal
   // + awareness §17/§28 ficam cobertos pelo rodapé sem chip extra.
-  {
-    // Sprint N+4 P1.10 (Satoshi A6 follow-up audit 2026-05-26): mini-map
-    // auto-close hint. Substitui localStorage-counter (drift.minimap.openCount,
-    // 2-shot non-persistent) por HintChip com dismiss explícito persistente.
-    // Razão: localStorage não unificado com capabilities_dismissed bag,
-    // sem opt-out user-visible (× chip torna o dismiss explícito).
-    //
-    // Caller (PostViewer) renderiza quando showMap=true. Sem appliesIf —
-    // dismiss × persistente cobre, não precisa contador externo.
-    id: 'mini-map-close',
-    title: 'tocar 🗺 de novo pra fechar',
-    body: () => (
-      <>
-        <p>
-          O mesmo botão 🗺 que abriu o mini-map fecha ele — toque de novo
-          pra voltar pro post.
-        </p>
-        <p className="text-drift-muted">
-          Toque no × deste hint pra não ver mais.
-        </p>
-      </>
-    ),
-  },
+  //
+  // Removida 2026-05-28 (V-1, Satoshi sweep): a regra 'mini-map-close'
+  // renderizava um HintChip no mini-map embedded (PostViewer) top-right,
+  // colidindo ilegível com os 3 action buttons (⋮/💬/🗺). O botão 🗺 já é
+  // toggle auto-explicativo (aria-pressed + aria-label "fechar mapa de
+  // spread"); chip flutuante era ruído sobreposto — reincidência do bug #2.
 ] as const
 
 /**

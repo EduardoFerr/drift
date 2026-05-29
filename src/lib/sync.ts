@@ -23,6 +23,7 @@ import { db } from './db'
 import { DRIFT_KIND } from '../config/constants'
 import { activeReadRelays } from './relays'
 import { orchestrator } from './transport/orchestrator'
+import { BOOT_BATCH_SIZE, yieldToMain } from './scheduler'
 import type { Unsubscribe } from './transport'
 import type { SignedEvent } from '../types/nostr'
 
@@ -131,6 +132,58 @@ function setStatus(updater: (s: SyncStatus) => SyncStatus): void {
 let subscription: Unsubscribe | null = null
 let flushTimer: ReturnType<typeof setInterval> | null = null
 
+// ─── Fila de processamento com yield (bug #4) ─────────────────────────
+//
+// O subscribe entrega eventos via `onevent` per-evento. No boot inicial,
+// relays despejam até ~2000 eventos stored num burst (SUBSCRIBE_LIMIT ×
+// relays). Se cada `onevent` `await onNostrEvent` direto, o trabalho de
+// main-thread (setStatus → Zustand notify, handler.persist → SQLite +
+// scheduleScoreRecalc + invalidateFeed) roda back-to-back sem ceder o
+// thread — CTAs e renders ficam presos ~2s até a rajada drenar.
+//
+// Solução: enfileiramos os eventos e drenamos num único loop que cede o
+// main thread (`yieldToMain`) a cada BOOT_BATCH_SIZE eventos. A ordem de
+// chegada é preservada (fila FIFO); o pipeline cheap→caro de cada evento
+// (invariante #5) fica intacto — o yield é SÓ no boundary entre batches.
+// §7 (determinismo) preservado: INSERT OR IGNORE + scoring puro → score
+// final idêntico, só o espaçamento temporal muda.
+const eventQueue: SignedEvent[] = []
+let draining = false
+
+async function drainEventQueue(): Promise<void> {
+  if (draining) return
+  draining = true
+  try {
+    let sinceYield = 0
+    while (eventQueue.length > 0) {
+      // shift() em vez de iterar pra processar eventos que cheguem DURANTE
+      // o drain (real-time pós-EOSE) na mesma passada, sem re-entrar.
+      const event = eventQueue.shift()
+      if (!event) break
+      try {
+        await onNostrEvent(event)
+      } catch (err) {
+        console.error('[sync] onNostrEvent failed:', err)
+      }
+      sinceYield++
+      // Boundary entre batches: cede o thread pra pintar/responder input.
+      if (sinceYield >= BOOT_BATCH_SIZE && eventQueue.length > 0) {
+        sinceYield = 0
+        await yieldToMain()
+      }
+    }
+  } finally {
+    draining = false
+  }
+}
+
+function enqueueEvent(event: SignedEvent): void {
+  eventQueue.push(event)
+  // Fire-and-forget: o guard `draining` garante um único loop ativo. Novos
+  // pushes durante o drain são consumidos pelo while sem reiniciar o loop.
+  void drainEventQueue()
+}
+
 // V9.34 — bfcache guard. WebSocket aberto impede o browser de colocar
 // a página no back/forward cache (Lighthouse bf-cache audit FAIL,
 // 2026-05-15). Pagehide: fechamos sub + WS pra que o browser possa
@@ -212,18 +265,18 @@ export async function startSync(): Promise<SyncStatus> {
       limit: SUBSCRIBE_LIMIT,
     },
     {
-      onevent: async (event: SignedEvent) => {
+      onevent: (event: SignedEvent) => {
         setStatus((s) => ({
           ...s,
           eventsReceived: s.eventsReceived + 1,
           cursor: Math.max(s.cursor, event.created_at),
           recent: pushRecent(s.recent, event),
         }))
-        try {
-          await onNostrEvent(event)
-        } catch (err) {
-          console.error('[sync] onNostrEvent failed:', err)
-        }
+        // Enfileira em vez de `await onNostrEvent` direto: drena em batches
+        // com yield ao main thread (bug #4). `eventsReceived` ainda
+        // incrementa na chegada — BootView/Diagnostic mostram progresso
+        // honesto do catch-up enquanto a fila drena.
+        enqueueEvent(event)
       },
       oneose: () => {
         // EOSE = end of stored events. Daqui em diante é tempo real.
@@ -358,7 +411,7 @@ export async function rebuildIdentityHistory(npub: string): Promise<void> {
         authors: [npub],
       },
       {
-        onevent: async (event: SignedEvent) => {
+        onevent: (event: SignedEvent) => {
           received++
           setStatus((s) => ({
             ...s,
@@ -366,11 +419,9 @@ export async function rebuildIdentityHistory(npub: string): Promise<void> {
             cursor: Math.max(s.cursor, event.created_at),
             recent: pushRecent(s.recent, event),
           }))
-          try {
-            await onNostrEvent(event)
-          } catch (err) {
-            console.error('[sync] onNostrEvent (rebuild) failed:', err)
-          }
+          // Mesma fila com yield do subscribe principal (bug #4): rebuild
+          // de histórico também pode trazer rajada. Drain único compartilhado.
+          enqueueEvent(event)
         },
         oneose: () => {
           eoseCount++
