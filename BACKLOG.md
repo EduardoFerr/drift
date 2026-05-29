@@ -87,6 +87,15 @@ shipping prematuro).
 
 ## Bugs visuais sweep Playwright 2026-05-29
 
+> **SYSTEMIC (Satoshi 2026-05-29):** topo do mapa é zona densa de
+> controle (FECHAR + ModeToggle top-left + action buttons 🗺/💬/⋮
+> top-right + CARTO + mode badge + mini-map hint). TODO transiente
+> top-positioned colide. Fix raiz = **safe toast zone única**
+> (bottom-center, acima scrubber, pointer-events-none, stacking
+> vertical). Mode badge + hints usam ela. V-1/V-4/V-5 consolidam
+> nesse fix, não patches isolados. Topo só controles permanentes.
+
+
 - [ ] **V-1 mini-map close HintChip colide com action buttons** — P0.
   Mini-map embedded (card 🗺), hint "tocar 🗺 de novo pra fechar"
   (`bb4330a`) top-center sobrepõe 🗺/💬/⋮. Em fix (agent a34b355).
