@@ -59,7 +59,14 @@ describe('GuideCard — cobertura de tópicos', () => {
 
   describe('responsabilidade — "cultivar a rede"', () => {
     it('seção de responsabilidade existe', () => {
-      expect(GUIDE_SRC).toMatch(/aria-labelledby=["']guia-responsabilidade["']/)
+      // Refactor 2026-05-28 (Lily): navegação drill-down 2-níveis. A
+      // seção "responsabilidade" agora é uma entrada no registry SECTIONS
+      // (nível 1 do hub) e o `aria-labelledby` do nível 2 é derivado via
+      // template literal `guia-${section.id}`. Validamos o id no registry
+      // — fonte-de-verdade da navegação — em vez do literal antigo.
+      expect(GUIDE_SRC).toMatch(/id:\s*['"]responsabilidade['"]/)
+      // Render component dos tópicos da seção continua existindo.
+      expect(GUIDE_SRC).toMatch(/function ResponsabilidadeTopics\b/)
     })
 
     it('tem 3 verdades (3 <article> dentro da seção)', () => {
@@ -75,6 +82,34 @@ describe('GuideCard — cobertura de tópicos', () => {
 
     it('caixa "sua responsabilidade" aparece pelo menos 1x', () => {
       expect(GUIDE_SRC).toMatch(/sua responsabilidade/i)
+    })
+  })
+
+  describe('navegação drill-down 2-níveis (refactor 2026-05-28)', () => {
+    // User feedback: "em alguns casos subníveis do menu funcionam
+    // melhor". GuideCard migrou de 5 AccordionGroups empilhados pra hub
+    // drill-down (nível 1 = 5 seções clicáveis; nível 2 = tópicos). Este
+    // bloco trava a estrutura pra não regredir pro scroll-de-sanfonas.
+    const SECTION_IDS = ['maps', 'acoes', 'algos', 'privacy', 'responsabilidade'] as const
+
+    it('registry SECTIONS define as 5 seções por id', () => {
+      for (const id of SECTION_IDS) {
+        expect(GUIDE_SRC).toMatch(new RegExp(`id:\\s*['"]${id}['"]`))
+      }
+    })
+
+    it('hub (nível 1) renderiza seções como botões clicáveis, não accordion', () => {
+      expect(GUIDE_SRC).toMatch(/function HubLevel\b/)
+      expect(GUIDE_SRC).toMatch(/onOpen\(s\.id\)/)
+    })
+
+    it('nível 2 tem botão "voltar" pro hub', () => {
+      expect(GUIDE_SRC).toMatch(/function SectionLevel\b/)
+      expect(GUIDE_SRC).toMatch(/voltar ao guia/i)
+    })
+
+    it('transição entre níveis respeita prefers-reduced-motion', () => {
+      expect(GUIDE_SRC).toMatch(/useReducedMotion/)
     })
   })
 
