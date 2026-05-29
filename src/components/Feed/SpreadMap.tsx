@@ -21,7 +21,7 @@ import { useSpreadMap, isUserSoloSpreader, type SpreadMapMode } from '../../hook
 import { useLongPress, LONG_PRESS_MS } from '../../hooks/useLongPress'
 import { MapExplainerCard } from './MapExplainerCard'
 import { TimelineScrubber } from './TimelineScrubber'
-import { AnimatePresence, m } from 'framer-motion'
+import { AnimatePresence, m, useReducedMotion } from 'framer-motion'
 import { useBootStore } from '../../lib/bootstrap'
 import { useFollowsStore } from '../../lib/follows'
 import { useLensStore } from '../../lib/trust-lens'
@@ -151,6 +151,11 @@ export function SpreadMap({
   //       empty state vs MapShell.
   const [badgeMode, setBadgeMode] = useState<SpreadMapMode | null>(null)
   const prevModeRef = useRef<SpreadMapMode | null>(null)
+  // WCAG 2.3.3 (manifesto §1 beleza + WCAG): respeita prefers-reduced-motion.
+  // Framer honra parcialmente, mas o pattern do projeto é guard explícito
+  // (SlideUpOverlay/PostViewer/SwipeHandler). reduced → só fade, sem
+  // scale/translate (evita movimento que pode desencadear vertigem).
+  const reducedMotion = useReducedMotion() ?? false
   useEffect(() => {
     if (prevModeRef.current === null) {
       // Primeira render — registra mode atual sem disparar badge.
@@ -266,34 +271,55 @@ export function SpreadMap({
 
   // Satoshi A2 mode badge — toast 2s ao alternar modo. Renderizado como
   // sibling do conteúdo (não dentro do ModeToggle nem do MapShell) pra
-  // sobreviver à transição empty state ↔ mapa. Posicionamento absolute
-  // top-3 centrado precisa do wrapper relative — a div .relative dentro
-  // de PostModeMap/GlobalModeMap/renderEmpty serve como ancestor. Aqui,
-  // como o badge vive fora do content, usamos um wrapper <div.relative>
-  // que envelopa ambos.
+  // sobreviver à transição empty state ↔ mapa.
+  //
+  // Satoshi systemic fix 2026-05-28 (V-5 → V-6): o TOPO do mapa é zona densa
+  // de controle permanente — ModeToggle (top-left), action buttons (top-right),
+  // FECHAR (header). O BOTTOM também: scrubber (bottom-[44px]) com labels
+  // "5D ATRÁS / 3 DRIFTS" + stats/attribution (bottom-3). bottom-[80px]
+  // ainda COLIDIA com os labels do scrubber (user 2026-05-28). Diagnóstico:
+  // o mapa não tem zona fixa livre no topo NEM no bottom — a única zona
+  // genuinamente vazia (só tiles CARTO, sem UI fixa) é o CENTRO. Solução de
+  // raiz: SAFE TOAST ZONE no centro absoluto do mapa. Como toast transiente
+  // (2s, pointer-events-none), não compete com nenhum controle permanente e
+  // não tampa texto. Estilo de toast flutuante (rounded-xl + backdrop-blur-md
+  // + shadow) reforça que é overlay temporário, não chrome fixo.
   return (
     <div className="relative h-full w-full">
       {content}
-      <AnimatePresence>
-        {badgeMode && (
-          <m.div
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.2, ease: 'easeOut' }}
-            role="status"
-            aria-live="polite"
-            className="pointer-events-none absolute left-1/2 top-3 z-30 -translate-x-1/2 rounded-lg border border-drift-border/40 bg-drift-bg/95 px-3 py-1.5 font-mono text-[10px] uppercase tracking-meta text-drift-muted backdrop-blur-sm"
-          >
-            modo:{' '}
-            <span className="text-drift-text">
-              {badgeMode === 'post' && 'este post'}
-              {badgeMode === 'global' && 'rede inteira'}
-              {badgeMode === 'network' && 'sua rede (lente local §24)'}
-            </span>
-          </m.div>
-        )}
-      </AnimatePresence>
+      {/* SAFE TOAST ZONE — CENTRO do mapa (única zona sem UI fixa). */}
+      <div className="pointer-events-none absolute left-1/2 top-1/2 z-30 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-2">
+        <AnimatePresence>
+          {badgeMode && (
+            <m.div
+              initial={
+                reducedMotion
+                  ? { opacity: 0 }
+                  : { opacity: 0, scale: 0.9, y: 4 }
+              }
+              animate={
+                reducedMotion
+                  ? { opacity: 1 }
+                  : { opacity: 1, scale: 1, y: 0 }
+              }
+              exit={
+                reducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.95 }
+              }
+              transition={{ duration: reducedMotion ? 0.15 : 0.25, ease: 'easeOut' }}
+              role="status"
+              aria-live="polite"
+              className="rounded-xl border border-drift-border/40 bg-drift-bg/90 px-4 py-2.5 font-mono text-[10px] uppercase tracking-meta text-drift-muted shadow-lg backdrop-blur-md"
+            >
+              modo:{' '}
+              <span className="text-drift-text">
+                {badgeMode === 'post' && 'este post'}
+                {badgeMode === 'global' && 'rede inteira'}
+                {badgeMode === 'network' && 'sua rede (lente local §24)'}
+              </span>
+            </m.div>
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   )
 }

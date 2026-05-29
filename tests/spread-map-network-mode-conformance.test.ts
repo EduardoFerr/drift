@@ -363,6 +363,70 @@ describe('Mode badge — bug fix re-verificação visual 2026-05-26', () => {
   })
 })
 
+describe('Mode badge — safe toast zone (Satoshi systemic fix 2026-05-28, V-4/V-6)', () => {
+  // V-6: nem topo nem bottom do mapa têm zona fixa livre. Topo = controle
+  // permanente (ModeToggle top-left, action buttons top-right, FECHAR).
+  // Bottom = scrubber (bottom-[44px], labels "5D ATRÁS / 3 DRIFTS") +
+  // stats/attribution (bottom-3). bottom-[80px] (V-5) ainda colidia com os
+  // labels do scrubber (user 2026-05-28). Única zona genuinamente livre =
+  // CENTRO (só tiles CARTO). Fix de raiz: SAFE TOAST ZONE no centro absoluto
+  // (top-1/2 left-1/2 -translate). Toast transiente (2s, pointer-events-none)
+  // não compete com controle fixo. Estilo de toast flutuante (rounded-xl +
+  // backdrop-blur-md + shadow) sinaliza overlay temporário.
+  //
+  // V-4: typo §74 → §24 (sem afinidade no feed; Drift tem 34 princípios,
+  // §74 não existe; lente local é layer de visualização local — §24).
+
+  it('badge texto usa §24 (lente local), NUNCA §74 (princípio inexistente)', () => {
+    expect(MAP).toMatch(/lente local §24/)
+    expect(MAP).not.toMatch(/§74/)
+  })
+
+  it('safe toast zone existe: CENTRO do mapa (top-1/2 left-1/2 -translate, pointer-events-none)', () => {
+    expect(MAP).toMatch(
+      /pointer-events-none absolute left-1\/2 top-1\/2 z-30 flex -translate-x-1\/2 -translate-y-1\/2 flex-col/,
+    )
+  })
+
+  it('badge é toast flutuante realista (rounded-xl + backdrop-blur-md + shadow)', () => {
+    const spreadMatch = MAP.match(/export function SpreadMap\([\s\S]*?(?=\n\/\/ ─{3,} PostModeMap)/m)
+    expect(spreadMatch).not.toBeNull()
+    const zone = spreadMatch![0].match(/SAFE TOAST ZONE[\s\S]*?<\/AnimatePresence>/)
+    expect(zone, 'safe toast zone block not found').not.toBeNull()
+    expect(zone![0]).toMatch(/rounded-xl/)
+    expect(zone![0]).toMatch(/backdrop-blur-md/)
+    expect(zone![0]).toMatch(/shadow-lg/)
+  })
+
+  it('badge anima entrada/saída suave + respeita reduced-motion (WCAG 2.3.3)', () => {
+    const spreadMatch = MAP.match(/export function SpreadMap\([\s\S]*?(?=\n\/\/ ─{3,} PostModeMap)/m)
+    const zone = spreadMatch![0].match(/SAFE TOAST ZONE[\s\S]*?<\/AnimatePresence>/)!
+    // exit suave via AnimatePresence
+    expect(zone[0]).toMatch(/exit=/)
+    // reduced-motion guard: fade-only sem scale/translate
+    expect(MAP).toMatch(/useReducedMotion/)
+    expect(zone[0]).toMatch(/reducedMotion/)
+  })
+
+  it('badge NÃO está no topo (anti-colisão ModeToggle) NEM no bottom-80 (anti-colisão scrubber)', () => {
+    const spreadMatch = MAP.match(/export function SpreadMap\([\s\S]*?(?=\n\/\/ ─{3,} PostModeMap)/m)
+    expect(spreadMatch).not.toBeNull()
+    const body = spreadMatch![0]
+    const zone = body.match(/SAFE TOAST ZONE[\s\S]*?<\/AnimatePresence>/)
+    expect(zone, 'safe toast zone block not found').not.toBeNull()
+    expect(zone![0], 'badge não pode ficar no topo (top-3 colide com ModeToggle)').not.toMatch(/\btop-3\b/)
+    expect(zone![0], 'badge não pode ficar em bottom-80 (colide com labels do scrubber)').not.toMatch(/\bbottom-\[80px\]\b/)
+    expect(zone![0], 'badge fica no centro vertical do mapa').toMatch(/-translate-y-1\/2/)
+  })
+
+  it('topo limpo: ModeToggle é o único controle top-left (badge não compete)', () => {
+    // ModeToggle ancora em top-3 left-3 (controle permanente). Garante que
+    // o badge transiente não reintroduz top-3 left-1/2 (centro do topo).
+    expect(MAP).not.toMatch(/left-1\/2 top-3/)
+    expect(MAP).not.toMatch(/top-3 left-1\/2/)
+  })
+})
+
 describe('MapOverlay default mode (Satoshi A1 2026-05-22)', () => {
   it('App.tsx MapOverlay default mapMode = "global" (não "post")', () => {
     const APP = readFileSync('src/App.tsx', 'utf8')
