@@ -170,6 +170,41 @@
     outline-offset: 2px;
     border-radius: 2px;
   }
+
+  /*
+   * Scrollbar global — substitui a barra nativa (cinza grossa) por uma
+   * versão fina e temática em TODOS os scrolls (overlays DiscoverRelays,
+   * SuaLenteCard, Settings, feed, etc.). Fix systemic, não por-componente
+   * (user feedback 2026-05-28: "o problema não era o scroll, mas a barra
+   * de scroll feia").
+   *
+   * Tokens drift, não cor hardcoded → adapta aos 3 temas automaticamente:
+   *   thumb       = --drift-border  (mid-tone sutil, visível mas discreto:
+   *                 Cinder #5e5e72 / Rosenholz #6a6582 / Velatura #8a7e69)
+   *   thumb:hover = --drift-muted   (escurece/realça no hover em todos os temas)
+   *   track       = transparent     (deixa o bg do container aparecer)
+   *
+   * Thin (6px), rounded full. Firefox via scrollbar-width/color;
+   * WebKit (Chrome/Safari/Edge) via ::-webkit-scrollbar pseudo-els.
+   */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--drift-border) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: var(--drift-border);
+    border-radius: 9999px;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: var(--drift-muted);
+  }
 }
 
 /*
