@@ -231,30 +231,10 @@ export const ONBOARDING_RULES: readonly GuidanceRule[] = [
  * `capabilities_dismissed` bag — uma vez dispensado, nunca volta.
  */
 export const HINT_RULES: readonly GuidanceRule[] = [
-  {
-    id: 'tab-dots-meaning',
-    title: '○ = posts novos',
-    // Hint body só usado se caller decidir abrir overlay/explanation.
-    // No header, renderizamos HintChip com `label='○ = posts novos'`
-    // sem onActivate (chip passive, X dispensa permanente).
-    body: () => (
-      <>
-        <p>
-          O ponto chartreuse nas abas (global · seguindo · em alta)
-          indica que tem post novo naquela aba — chegou via Nostr
-          enquanto você estava em outra.
-        </p>
-        <p className="text-drift-muted">
-          Toque na aba pra ver. Ou toque na aba que JÁ está ativa pra
-          atualizar + voltar pro topo.
-        </p>
-      </>
-    ),
-    // Aplica até o user dispensar (HintChip × button). Sem capability
-    // gate específico — todo user iniciante se beneficia. Após primeiro
-    // dismiss, nunca volta (CSV persiste em capabilities_dismissed).
-    // Item #3 fricção iniciante observada em 2026-05-23.
-  },
+  // Removida 2026-05-28 (bug #2 excesso de hints no boot): a regra
+  // 'tab-dots-meaning' renderizava um HintChip permanente no topo do
+  // feed que nunca sumia (sem auto-dismiss) — ruído puro. Os dots têm
+  // aria-label nas abas; legenda ambient fixa não se justificava.
   {
     id: 'backup-after-post',
     title: 'faça backup do nsec',
@@ -285,34 +265,11 @@ export const HINT_RULES: readonly GuidanceRule[] = [
     // proxy razoável (reveal/copy/download log; Satoshi guard [b76245b]).
     appliesIf: (caps) => caps.hasFirstPost && !caps.hasBackup,
   },
-  {
-    // Sprint N+4 P1.9 (Satoshi A4 follow-up audit 2026-05-26): CARTO
-    // sovereignty banner. Footer attribution já discloseva "tiles
-    // externos" (commit c1a1f6c), mas era texto cinza pequeno em hover
-    // tooltip — quase ninguém vê. Chip ambient na primeira vez que user
-    // abre o mapa torna a escolha de sovereignty visível, com CTA pra
-    // Settings → Soberania → tile server. Dismiss permanente (× chip).
-    //
-    // Caller (SpreadMap MapShell) injeta gate adicional `appliesIf`
-    // efetivo: hides quando user já tem `map_tile_url_template` custom
-    // (sinaliza escolha consciente — não nag de novo). Aqui só o
-    // dismissedRuleIds gate auto-aplica via HintChip.
-    id: 'carto-tile-sovereignty',
-    title: '🌐 tiles cortesia carto.com',
-    body: () => (
-      <>
-        <p>
-          Os tiles do mapa vêm de <code className="text-drift-accent">carto.com</code> —
-          gratuitos, sem cadastro, mas cada pan/zoom loga seu IP lá.
-        </p>
-        <p className="text-drift-muted">
-          Você pode trocar pra OSM público, mirror Tor ou seu próprio
-          tile server em <em>Configurações → Soberania → tile server do mapa</em>.
-          Manifesto §17 (sem chave mestra) + §28 (privacy default).
-        </p>
-      </>
-    ),
-  },
+  // Removida 2026-05-28 (bug #2 excesso de hints no boot): a regra
+  // 'carto-tile-sovereignty' renderizava um HintChip ambient no topo do
+  // mapa, redundante com o footer attribution (que já disclosa "tiles
+  // externos" + tooltip apontando Configurações ▸ Mapa). Obrigação legal
+  // + awareness §17/§28 ficam cobertos pelo rodapé sem chip extra.
   {
     // Sprint N+4 P1.10 (Satoshi A6 follow-up audit 2026-05-26): mini-map
     // auto-close hint. Substitui localStorage-counter (drift.minimap.openCount,

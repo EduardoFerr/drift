@@ -1756,21 +1756,10 @@ function HomeHeader({
       <div className="border-b border-drift-border">
         <FeedTabs {...(onActiveTabTap ? { onActiveTabTap } : {})} />
       </div>
-      {/* Item #3 fricção UX iniciante 2026-05-23: dots chartreuse
-          (○) ao lado dos labels de aba indicavam "posts novos" mas
-          sem legenda. HintChip first-time aparece logo abaixo das
-          tabs até o user dispensar. Pattern existente (mesmo padrão
-          do backup-after-post chip). HintChip auto-gates via
-          capabilities — some quando user dispensa permanentemente. */}
-      {(() => {
-        const tabDotsRule = getHintRule('tab-dots-meaning')
-        if (!tabDotsRule) return null
-        return (
-          <div className="mt-2 flex justify-end">
-            <HintChip rule={tabDotsRule} label="○ = posts novos" />
-          </div>
-        )
-      })()}
+      {/* Removido 2026-05-28 (bug #2 excesso de hints no boot): o chip
+          "○ = posts novos" era permanente no topo do feed (sem auto-
+          dismiss, ocupando espaço). Os dots já têm aria-label nas abas
+          — chip ambient fixo era ruído puro. */}
     </m.header>
   )
 }
@@ -2049,14 +2038,6 @@ function MapOverlay({
             onOpenLocationSettings={() => {
               popLayer({ id: 'map' })
               pushLayer({ id: 'location', component: LocationCard })
-            }}
-            onOpenTileSettings={() => {
-              // Sprint N+4 P1.9 (Satoshi A4 follow-up 2026-05-26):
-              // HintChip CARTO sovereignty CTA → fecha overlay map +
-              // abre Settings → Soberania (mesmo padrão de
-              // onOpenLocationSettings).
-              popLayer({ id: 'map' })
-              pushLayer({ id: 'sovereignty', component: SovereigntyCard })
             }}
             {...(currentPost ? { currentPostId: currentPost.id } : {})}
           />

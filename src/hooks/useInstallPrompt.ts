@@ -41,16 +41,41 @@ export interface InstallPromptState {
 
 const DISMISS_KEY = 'drift-install-dismissed'
 
+/**
+ * Detecção pura (testável em node) — recebe UA + maxTouchPoints em vez
+ * de ler globals. Decide se o browser é iOS Safari real (único que
+ * precisa das instruções manuais "Compartilhar → Adicionar à Tela").
+ *
+ * Bug #2.2 (2026-05-28): a versão anterior usava `'ontouchend' in
+ * document` como proxy de iPad. Chromium desktop define a API touch
+ * independente de hardware → o card iOS aparecia errado em desktop.
+ * Fix: iPadOS só é reconhecido por UA "Macintosh" + maxTouchPoints > 1
+ * (Mac/Chromium desktop têm 0), e `isSafari` exige "Safari" no UA e
+ * exclui explicitamente Chrome/Chromium (cujo UA não contém CriOS no
+ * desktop).
+ */
+export function isIosSafariUA(ua: string, maxTouchPoints: number): boolean {
+  // iPad moderno (iPadOS 13+) reporta UA de Mac. Distingue de um Mac
+  // desktop real exigindo multi-touch (maxTouchPoints > 1); só iPad reporta.
+  const isIpadOS = ua.includes('Macintosh') && maxTouchPoints > 1
+
+  // iOS clássico: UA contém o device explicitamente.
+  const isIOS = /iPad|iPhone|iPod/.test(ua) || isIpadOS
+
+  // Safari real (não Chrome/Firefox/Edge/Opera). Browsers de terceiros
+  // em iOS têm seu próprio sufixo; presença de Chrome/Chromium descarta.
+  const isSafari =
+    /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS|Chrome|Chromium/.test(ua)
+
+  return isIOS && isSafari
+}
+
 function detectIosSafari(): boolean {
   if (typeof window === 'undefined') return false
-  const ua = window.navigator.userAgent
-  // iOS = iPhone | iPad | iPod, OU iPad moderno reportando como Mac com
-  // touch (iPadOS 13+). Safari = não-Chrome (CriOS), não-Firefox (FxiOS).
-  const isIOS =
-    /iPad|iPhone|iPod/.test(ua) ||
-    (ua.includes('Mac') && 'ontouchend' in document)
-  const isSafari = !/CriOS|FxiOS|EdgiOS|OPiOS/.test(ua)
-  return isIOS && isSafari
+  return isIosSafariUA(
+    window.navigator.userAgent,
+    window.navigator.maxTouchPoints ?? 0,
+  )
 }
 
 function isStandalone(): boolean {

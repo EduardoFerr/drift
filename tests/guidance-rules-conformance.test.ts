@@ -109,9 +109,12 @@ describe('HINT_RULES — shape canônica (item #3 fricção iniciante 2026-05-25
   // ID único + body factory function. Mudar id quebra continuity
   // (capabilities_dismissed CSV persiste IDs antigos).
 
-  const EXPECTED_HINT_IDS = ['tab-dots-meaning', 'backup-after-post'] as const
+  // backup-after-post é o hint canônico vivo. 'tab-dots-meaning' foi
+  // removido em 2026-05-28 (bug #2: chip permanente no topo do feed era
+  // ruído — dots já têm aria-label nas abas).
+  const EXPECTED_HINT_IDS = ['backup-after-post'] as const
 
-  it('contém pelo menos os 2 hints canônicos', () => {
+  it('contém os hints canônicos vivos', () => {
     const ids = HINT_RULES.map((r) => r.id)
     for (const expected of EXPECTED_HINT_IDS) {
       expect(ids).toContain(expected)
@@ -127,22 +130,18 @@ describe('HINT_RULES — shape canônica (item #3 fricção iniciante 2026-05-25
     }
   })
 
-  it('getHintRule retorna tab-dots-meaning + backup-after-post', () => {
-    expect(getHintRule('tab-dots-meaning')?.id).toBe('tab-dots-meaning')
+  it('getHintRule retorna backup-after-post; lookup inexistente = undefined', () => {
     expect(getHintRule('backup-after-post')?.id).toBe('backup-after-post')
     expect(getHintRule('nonexistent-hint-xyz')).toBeUndefined()
   })
 
-  it('tab-dots-meaning title contém símbolo "○" pra bater com chip render', () => {
-    // Pattern intencional: chip label começa com "○" pra user visualmente
-    // associar com dot nas tabs.
-    const rule = getHintRule('tab-dots-meaning')
-    expect(rule?.title).toMatch(/○/)
-  })
-
-  it('HomeHeader (App.tsx) renderiza HintChip pra tab-dots-meaning', () => {
+  it('anti-regressão: tab-dots-meaning removido (não renderiza chip fixo)', () => {
+    expect(getHintRule('tab-dots-meaning')).toBeUndefined()
     const APP = readFileSync('src/App.tsx', 'utf8')
-    expect(APP).toMatch(/getHintRule\(['"]tab-dots-meaning['"]\)/)
+    const stripped = APP
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/^\s*\/\/.*$/gm, '')
+    expect(stripped).not.toMatch(/getHintRule\(['"]tab-dots-meaning['"]\)/)
   })
 })
 
