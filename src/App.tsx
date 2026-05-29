@@ -1266,10 +1266,18 @@ function App() {
           + padding); aplicamos pb-[88px] aqui (68 navbar + 20 folga)
           pra evitar cards renderizarem POR TRÁS da navbar fixed.
           Slim mode (2026-05-17): zera padding bottom + top + horizontal
-          pra card ocupar TODA viewport. Transição animada via Tailwind
-          `transition-[padding]` + duration matching spring (≈300ms). */}
+          pra card ocupar TODA viewport.
+
+          PERF (2026-05-29, user: "no celular não fica fluído"): NÃO animamos
+          `padding`. Animar padding = reflow + repaint da árvore inteira do
+          card (PostViewer + mapa/canvas) a cada frame, 60fps × 300ms ≈ 18
+          reflows → jank em mobile. Agora o padding SNAPA (1 reflow só); o
+          movimento fluido vem 100% de transform GPU: o chrome (NavBar/header)
+          desliza via spring (translateY, composited) revelando o card, e o
+          card faz um "settle" sutil (transform+opacity, ver abaixo) sem nunca
+          redimensionar/repintar. Zero reflow animado. */}
       <main
-        className={`relative min-h-0 flex-1 overflow-hidden transition-[padding] duration-300 ease-out ${
+        className={`relative min-h-0 flex-1 overflow-hidden ${
           slimMode ? 'p-0' : 'px-4 pt-3 pb-[88px]'
         }`}
       >
@@ -1986,18 +1994,33 @@ function MapOverlay({
   // renderiza). Resolve "abro NavBar MAPA e vejo só este post".
   const [mapMode, setMapMode] = useState<SpreadMapMode>('global')
 
+  // Legenda do mapa (user 2026-05-29, re-pedido): o MapExplainerCard já
+  // existe mas só era acessível via long-press 3s nos botões — gesto que
+  // ninguém descobre. Agora um "?" VISÍVEL ao lado de FECHAR abre a legenda
+  // (símbolos/cores + disclaimer §28) no contexto do modo atual.
+  const [showExplainer, setShowExplainer] = useState(false)
+
   // User feedback 2026-05-26 (sessão H pós-revisão): counter 'ev' ao
   // lado de FECHAR era ruído no contexto do mapa — header global do
-  // app já exibe esse counter. Duplicar dilui FECHAR como ação
-  // primária do overlay. headerRight agora é só o botão fechar.
+  // app já exibe esse counter. headerRight = [?] (legenda) + FECHAR.
   const headerRight = (
-    <button
-      onClick={onClose}
-      className="rounded border border-drift-border px-3 py-[5px] font-mono text-[10px] uppercase tracking-[2px] text-drift-muted transition-colors hover:text-drift-text focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2"
-      aria-label="fechar mapa"
-    >
-      fechar
-    </button>
+    <div className="flex items-center gap-2">
+      <button
+        onClick={() => setShowExplainer(true)}
+        className="flex h-[26px] w-[26px] items-center justify-center rounded-full border border-drift-border font-mono text-[13px] font-semibold leading-none text-drift-muted transition-colors hover:border-drift-accent2 hover:text-drift-text focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2"
+        aria-label="legenda do mapa — o que cada símbolo significa"
+        title="legenda: o que cada cor/símbolo significa no mapa"
+      >
+        ?
+      </button>
+      <button
+        onClick={onClose}
+        className="rounded border border-drift-border px-3 py-[5px] font-mono text-[10px] uppercase tracking-[2px] text-drift-muted transition-colors hover:text-drift-text focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2"
+        aria-label="fechar mapa"
+      >
+        fechar
+      </button>
+    </div>
   )
 
   const postId = mapMode === 'post' ? (currentPost?.id ?? null) : null
@@ -2019,28 +2042,36 @@ function MapOverlay({
       : 'mapa · global'
 
   return (
-    <FullPageCard
-      onClose={onClose}
-      title={mapTitle}
-      headerRight={headerRight}
-      ariaLabel={`mapa de propagação — ${mapMode}`}
-    >
-      <div className="relative h-full w-full">
-        <LazyBoundary fallback={<DriftSkeleton variant="image" aspect="16/9" />}>
-          <SpreadMap
-            postId={postId}
-            mode={mapMode}
-            onModeChange={setMapMode}
-            className="h-full w-full"
-            onOpenLocationSettings={() => {
-              popLayer({ id: 'map' })
-              pushLayer({ id: 'location', component: LocationCard })
-            }}
-            {...(currentPost ? { currentPostId: currentPost.id } : {})}
-          />
-        </LazyBoundary>
-      </div>
-    </FullPageCard>
+    <>
+      <FullPageCard
+        onClose={onClose}
+        title={mapTitle}
+        headerRight={headerRight}
+        ariaLabel={`mapa de propagação — ${mapMode}`}
+      >
+        <div className="relative h-full w-full">
+          <LazyBoundary fallback={<DriftSkeleton variant="image" aspect="16/9" />}>
+            <SpreadMap
+              postId={postId}
+              mode={mapMode}
+              onModeChange={setMapMode}
+              className="h-full w-full"
+              onOpenLocationSettings={() => {
+                popLayer({ id: 'map' })
+                pushLayer({ id: 'location', component: LocationCard })
+              }}
+              {...(currentPost ? { currentPostId: currentPost.id } : {})}
+            />
+          </LazyBoundary>
+        </div>
+      </FullPageCard>
+      {/* Legenda sob demanda — empilha sobre o mapa no contexto do modo
+          ativo. Botão "?" no headerRight abre; ESC/fechar do próprio card
+          retorna ao mapa (não fecha o overlay inteiro). */}
+      {showExplainer && (
+        <MapExplainerCard context={mapMode} onClose={() => setShowExplainer(false)} />
+      )}
+    </>
   )
 }
 

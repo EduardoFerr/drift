@@ -376,11 +376,18 @@ describe('MapOverlay — headerRight sem counter EV (user feedback 2026-05-26)',
     expect(body).not.toMatch(/\}\s*ev\s*</)
   })
 
-  it('MapOverlay headerRight é apenas o botão fechar (sem wrapper div)', () => {
+  it('MapOverlay headerRight = botão "?" (legenda) + FECHAR (user 2026-05-29)', () => {
+    // O counter 'ev' continua removido (test acima). headerRight agora tem
+    // 2 ações: "?" abre o MapExplainerCard (legenda visível, antes só via
+    // long-press 3s) + FECHAR. NÃO pode reintroduzir o counter de eventos.
     const overlayMatch = APP.match(/function MapOverlay\([\s\S]*?(?=\n\/\/\s*─)/m)
     const body = overlayMatch![0]
-    // headerRight é construído como <button>...fechar</button> direto,
-    // não mais como <div className="flex"><span>...</span><button>...</button></div>.
-    expect(body).toMatch(/const headerRight = \(\s*<button/)
+    // botão de legenda: abre o explainer.
+    expect(body).toMatch(/setShowExplainer\(true\)/)
+    expect(body).toMatch(/aria-label="legenda do mapa/)
+    // explainer renderizado no contexto do modo ativo.
+    expect(body).toMatch(/<MapExplainerCard context=\{mapMode\}/)
+    // FECHAR continua presente como ação primária.
+    expect(body).toMatch(/aria-label="fechar mapa"/)
   })
 })
