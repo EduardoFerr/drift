@@ -263,6 +263,17 @@ interface PostOpts {
   contentWarning?: ContentWarning
   geoOverride?: GeoPoint | null
   text?: string
+  /**
+   * URL same-origin relativa (`/dev-seed-media/seed-N.jpg`) pra validar o
+   * render path de imagem (Image.tsx + lightbox + blur de content-warning).
+   * Same-origin é deliberado: COEP `require-corp` em dev-http bloqueia
+   * fetch cross-origin (nostr.build https) → placeholder "indisponível".
+   * Asset estático servido pelo mesmo host passa o gate. Só populado em
+   * dev-seed (browser ?dev-seed=1); prod nunca referencia esses arquivos.
+   * Quando presente, o subpost vira `layout:'landscape'` (as imagens
+   * curadas HIMYM/Ted são wide 1400×800 / fotos).
+   */
+  imageUrl?: string
 }
 
 function signPost(author: SeedIdentity, createdAt: number, opts: PostOpts = {}): SignedEvent {
@@ -276,15 +287,16 @@ function signPost(author: SeedIdentity, createdAt: number, opts: PostOpts = {}):
   if (loc) tags.push(loc)
 
   const text = opts.text ?? `seed post by ${author.name} @ ${createdAt}`
+  const hasImage = opts.imageUrl != null
   const content = JSON.stringify({
     subposts: [
       {
         id: `${author.name}-${createdAt}`,
-        type: 'text',
+        type: hasImage ? 'text+image' : 'text',
         text,
-        imageUrl: null,
+        imageUrl: opts.imageUrl ?? null,
         order: 0,
-        layout: 'text',
+        layout: hasImage ? 'landscape' : 'text',
       },
     ],
   })
@@ -422,6 +434,13 @@ export function buildSeedEvents(): SeedEventSet {
   //    Index global de post pra referência em spreads/buries/reports.
   const contentPosts: { event: SignedEvent; authorPub: string }[] = []
   const TOTAL_CONTENT_POSTS = 442
+  // Drift é text-majority: só ~10 dos 442 posts carregam imagem (~2%),
+  // o resto é texto. Determinístico (§7): post recebe imagem quando
+  // `i % IMAGE_EVERY === 0`; qual das 9 imagens = `(i/IMAGE_EVERY) %
+  // SEED_MEDIA_COUNT` (ciclo fixo, sem RNG). URL é same-origin relativa
+  // (servida de public/dev-seed-media) — passa o COEP gate de dev-http.
+  const SEED_MEDIA_COUNT = 9
+  const IMAGE_EVERY = 44 // 442/44 ≈ 10 posts com imagem
   for (let i = 0; i < TOTAL_CONTENT_POSTS; i++) {
     const author = ALL_IDENTITIES[i % ALL_IDENTITIES.length]!
     // created_at: 28 dias atrás .. base, espalhado determinístico.
@@ -429,9 +448,14 @@ export function buildSeedEvents(): SeedEventSet {
     const createdAt = TS_BASE - 28 * DAY + ageSec
     const cw: ContentWarning | undefined =
       i % 17 === 0 ? 'nsfw' : i % 23 === 0 ? 'spoiler' : undefined
+    const imageUrl =
+      i % IMAGE_EVERY === 0
+        ? `/dev-seed-media/seed-${(Math.floor(i / IMAGE_EVERY) % SEED_MEDIA_COUNT) + 1}.jpg`
+        : undefined
     const ev = signPost(author, createdAt, {
       category: i % 5 === 0 ? 'arte' : i % 3 === 0 ? 'tech' : undefined,
       ...(cw ? { contentWarning: cw } : {}),
+      ...(imageUrl ? { imageUrl } : {}),
       text: `conteúdo #${i} por ${author.name}`,
     })
     contentPosts.push({ event: ev, authorPub: author.pub })
@@ -538,10 +562,53 @@ export function buildSeedEvents(): SeedEventSet {
   }
 }
 
-/** Conjunto materializado uma vez (pure, cacheável). */
+// ─── Fast path opt-in: artefato JSON pré-serializado ────────────────
+//
+// Gerar ~3000 eventos via finalizeEvent custa ~24s (signing ~8ms/evento).
+// A suite E2E (Sprint N+5) sobe 8 BrowserContexts isolados, cada um
+// navega `?dev-seed=1` → 8×24s de CPU re-assinando o MESMO conjunto.
+//
+// `npm run gen:seed` (scripts/gen-seed.mjs) chama `buildSeedEvents()` e
+// serializa o SignedEvent[] + cascadePostId pra `seed-events.generated.json`.
+// Artefato committed + determinístico (§7) → CONFIAMOS nele (sem re-assinar,
+// sem re-verificar): mesma seed string → mesma Schnorr → mesmos ids. O test
+// `dev-seed-fixtures.test.ts` re-deriva tudo e falha se o JSON divergir do
+// código (guard anti-drift — regenerar após mexer nas fixtures).
+//
+// `import.meta.glob` é estático (browser + vitest + ssrLoadModule), e
+// retorna `{}` quando o arquivo não existe — sem gerar, cai pro build
+// in-memory. Sem erro de build na ausência do artefato.
+
+interface SerializedSeedEventSet {
+  contactLists: SignedEvent[]
+  domain: SignedEvent[]
+  cascadePostId: string
+}
+
+const _generatedModules = import.meta.glob('./seed-events.generated.json', {
+  eager: true,
+}) as Record<string, { default: SerializedSeedEventSet }>
+
+/** Carrega o artefato pré-serializado, ou `null` se não foi gerado. */
+function loadGeneratedSeed(): SeedEventSet | null {
+  const mod = _generatedModules['./seed-events.generated.json']
+  if (!mod) return null
+  const { contactLists, domain, cascadePostId } = mod.default
+  return {
+    contactLists: Object.freeze(contactLists),
+    domain: Object.freeze(domain),
+    cascadePostId,
+  }
+}
+
+/**
+ * Conjunto materializado uma vez (pure, cacheável). Fast path: carrega o
+ * JSON committed se presente; senão constrói em memória (assina ~3000
+ * eventos). Ambos os caminhos são bit-idênticos (§7 determinismo).
+ */
 let _cached: SeedEventSet | null = null
 export function getSeedEvents(): SeedEventSet {
-  if (!_cached) _cached = buildSeedEvents()
+  if (!_cached) _cached = loadGeneratedSeed() ?? buildSeedEvents()
   return _cached
 }
 
