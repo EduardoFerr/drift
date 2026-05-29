@@ -24,7 +24,7 @@
  * out-of-band pro ranking (§24), exatamente como `sync.ts` faz.
  */
 
-import { onNostrEvent } from '../events'
+import { onNostrEvent, recalcAllScores } from '../events'
 import { applyContactList } from '../follows'
 import { invalidateFeed } from '../feed'
 import { BOOT_BATCH_SIZE, drainInBatches } from '../scheduler'
@@ -44,8 +44,18 @@ let seeded = false
  * Processa eventos de domínio SEQUENCIALMENTE (ordem por created_at) —
  * preserva first-seen estável de `users.created_at` (antiguidade/peso
  * conhecidos) e evita rajada concorrente no verify worker. Cada evento
- * passa pelo pipeline real: kind → schema → verify Schnorr → persist →
- * scheduleScoreRecalc → invalidateFeed.
+ * passa pelo pipeline real: kind → schema → verify Schnorr → persist.
+ *
+ * Performance (Ted+Lily 2026-05-28): cada evento é ingerido com
+ * `deferSideEffects: true` — o persist (INSERT, invariante #1) roda
+ * normal, mas os side-effects pós-persist (`scheduleScoreRecalc` +
+ * `invalidateFeed`) são SUPRIMIDOS. Sem isso, ~2730 eventos disparavam
+ * ~500 timers de recalc avulsos (1 por post) + invalidate thrash → drain
+ * de ~13min (~280ms/evento). Com defer, o drain vira só INSERT+verify
+ * (~1ms/evento worker), e o score é materializado UMA vez no fim via
+ * `recalcAllScores()` + 1 `invalidateFeed()`. Determinismo §7 intacto:
+ * scoring é agregação idempotente do estado persistido, não acumulação
+ * incremental — bulk no fim = mesmo resultado que recalc por evento.
  *
  * Guard de sessão: re-chamadas no mesmo runtime são noop (o pipeline já
  * é idempotente via INSERT OR IGNORE, mas evitamos reprocessar ~3000
@@ -79,17 +89,18 @@ export async function seedDatabase(
   let done = 0
   onProgress?.(0, total)
   await drainInBatches(domain, async (ev) => {
-    await onNostrEvent(ev)
+    await onNostrEvent(ev, { deferSideEffects: true })
     done++
     // Reporta no boundary do batch (a cada BOOT_BATCH_SIZE) ou no fim, pra
     // não floodar a store Zustand com ~3000 setStates.
     if (done % BOOT_BATCH_SIZE === 0 || done === total) onProgress?.(done, total)
   })
 
-  // Recalc de score é debounced (100ms) por postId em events.ts; janela
-  // curta pra drenar antes do invalidateFeed final, garantindo que o feed
-  // inicial já reflita scores materializados.
-  await new Promise((r) => setTimeout(r, 200))
+  // Side-effects adiados: materializa TODOS os scores de uma vez (recalc
+  // bulk + moderação §26 na ordem correta) e dispara 1 invalidateFeed.
+  // Substitui o antigo `setTimeout(200)` + N timers de recalc avulsos —
+  // determinismo §7 idêntico, drain ~26× mais rápido.
+  await recalcAllScores()
   invalidateFeed()
 }
 

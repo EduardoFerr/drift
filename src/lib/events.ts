@@ -36,6 +36,7 @@ import { bumpCommentCount } from './comment-counts'
 import { addCommentToStore } from './comments'
 import { parseImetaTags } from './nip94'
 import { bumpProfileVersion } from './profiles'
+import { yieldToMain } from './scheduler'
 import type { CommentRecord, ContentWarning, ReportReason } from '../types/drift'
 
 /**
@@ -91,8 +92,25 @@ interface KindHandler {
    * `invalidateFeed()` e `scheduleScoreRecalc(postId)` quando aplicável
    * (cada handler decide a semântica — REPORT chama `maybeModerate`,
    * COMMENT propaga score do post recebedor, etc.).
+   *
+   * `deferSideEffects` (default false): quando true, o handler PERSISTE
+   * normalmente (INSERT + updateUserActivity) mas SUPRIME os side-effects
+   * pós-persist `scheduleScoreRecalc(postId)` + `invalidateFeed()`. Usado
+   * pelo dev-seed (`lib/dev-seed/seed.ts`) pra drenar milhares de eventos
+   * sem disparar uma storm de recalc/invalidate por evento — o caller faz
+   * 1 `recalcAllScores()` + 1 `invalidateFeed()` no fim. Determinismo §7
+   * preservado: bulk recalc no fim = mesmo score (scoring puro + INSERT OR
+   * IGNORE idempotente). O persist em si (invariante #1) NUNCA é adiado.
    */
-  persist(event: SignedEvent): Promise<void>
+  persist(event: SignedEvent, deferSideEffects: boolean): Promise<void>
+}
+
+/**
+ * Opções de `onNostrEvent`. `deferSideEffects` adia recalc + invalidate
+ * (ver `KindHandler.persist`). Default false — sync real intacto.
+ */
+export interface OnNostrEventOptions {
+  deferSideEffects?: boolean
 }
 
 const KIND_DISPATCH: Readonly<Record<number, KindHandler>> = {
@@ -140,7 +158,10 @@ const KIND_DISPATCH: Readonly<Record<number, KindHandler>> = {
   },
 }
 
-export async function onNostrEvent(event: SignedEvent): Promise<void> {
+export async function onNostrEvent(
+  event: SignedEvent,
+  options?: OnNostrEventOptions,
+): Promise<void> {
   // 1. Cheap: kind check (Record lookup, O(1)). Kinds desconhecidos
   //    (incluindo qualquer non-Drift, non-NIP-22-comment) são noop.
   //    SYNC — antes do primeiro `await` pra preservar invariante #5
@@ -160,7 +181,9 @@ export async function onNostrEvent(event: SignedEvent): Promise<void> {
 
   // 4. Persist (handler decide INSERT + invalidateFeed + recalc).
   //    Pipeline preservado: invariantes #1, #5, #6 do CLAUDE.md.
-  await handler.persist(event)
+  //    `deferSideEffects` (default false) adia recalc/invalidate pós-persist
+  //    — caller bulk-aware (dev-seed) consolida no fim.
+  await handler.persist(event, options?.deferSideEffects ?? false)
 }
 
 // ─── Schema check (cheap, before verify) ─────────────────────────────
@@ -398,7 +421,7 @@ export function passesNip22SchemaCheck(event: SignedEvent): boolean {
 const SEEN_POST_IDS_CAP = 10_000
 const seenPostIds = new Set<string>()
 
-async function persistPost(event: SignedEvent): Promise<void> {
+async function persistPost(event: SignedEvent, deferSideEffects: boolean): Promise<void> {
   // posts.id = event.id (hex 64). Antes usávamos uma UUID na tag `d`,
   // mas isso violava NIP-01 quando o id era referenciado em `e` por
   // SPREAD/BURY/REPORT (tag `e` exige hex 64). Agora `event.id` é a
@@ -432,11 +455,12 @@ async function persistPost(event: SignedEvent): Promise<void> {
   }
   await updateUserActivity(event.pubkey, event.created_at)
   // post novo: feed precisa aparecer no topo (score 0 + recente)
+  if (deferSideEffects) return // dev-seed: bulk recalc + invalidate no fim
   invalidateFeed()
   scheduleScoreRecalc(postId)
 }
 
-async function persistSpread(event: SignedEvent): Promise<void> {
+async function persistSpread(event: SignedEvent, deferSideEffects: boolean): Promise<void> {
   const postId = getTag(event, 'e')!
   await db.run(
     `INSERT OR IGNORE INTO spreads
@@ -455,6 +479,7 @@ async function persistSpread(event: SignedEvent): Promise<void> {
   // até o post chegar (eventualmente). Invalidar aqui garante que
   // quando o getMyAction do useEffect roda, encontra o spread persistido
   // e limpa o pending optimistic. Manifesto §6 (Verdade por Eventos).
+  if (deferSideEffects) return // dev-seed: bulk recalc + invalidate no fim
   invalidateFeed()
   scheduleScoreRecalc(postId)
   // Track B.2 — "favorito = mirror automático" (RFC §5.3, manifesto §16).
@@ -499,7 +524,7 @@ async function maybeAutoPinBlobs(spreaderPub: string, postId: string): Promise<v
   }
 }
 
-async function persistBury(event: SignedEvent): Promise<void> {
+async function persistBury(event: SignedEvent, deferSideEffects: boolean): Promise<void> {
   const postId = getTag(event, 'e')!
   await db.run(
     `INSERT OR IGNORE INTO buries
@@ -508,6 +533,7 @@ async function persistBury(event: SignedEvent): Promise<void> {
     [postId, event.pubkey, event.created_at, event.id, JSON.stringify(event)],
   )
   await updateUserActivity(event.pubkey, event.created_at)
+  if (deferSideEffects) return // dev-seed: bulk recalc + invalidate no fim
   invalidateFeed() // mesmo motivo de persistSpread — race spread-antes-do-post
   scheduleScoreRecalc(postId)
   // bury NÃO penaliza o autor — diferença filosófica central
@@ -538,7 +564,7 @@ async function persistBury(event: SignedEvent): Promise<void> {
  * Reject silently (não lança) — manifesto §29 (cliente não fala com
  * atacante; só descarta).
  */
-async function persistCommentRow(event: SignedEvent): Promise<void> {
+async function persistCommentRow(event: SignedEvent, deferSideEffects: boolean): Promise<void> {
   const parsed = parseNip22Comment(event)
   if (!parsed) return // schema check já rejeitou, defesa em camada
 
@@ -571,6 +597,7 @@ async function persistCommentRow(event: SignedEvent): Promise<void> {
     ],
   )
   await updateUserActivity(event.pubkey, event.created_at)
+  if (deferSideEffects) return // dev-seed: bulk recalc + invalidate no fim
   // Track C.6.1: count prefetch. Idempotente cross-relay via dedup
   // interno por commentId. UI consome via `useCommentCountsStore`.
   bumpCommentCount(parsed.rootEventId, event.id)
@@ -609,7 +636,7 @@ async function persistCommentRow(event: SignedEvent): Promise<void> {
   scheduleScoreRecalc(parsed.rootEventId)
 }
 
-async function persistReport(event: SignedEvent): Promise<void> {
+async function persistReport(event: SignedEvent, deferSideEffects: boolean): Promise<void> {
   const postId = getTag(event, 'e')!
   const reasonTag = getTag(event, 'reason')
   const reason = isValidReason(reasonTag) ? reasonTag : 'spam'
@@ -653,6 +680,11 @@ async function persistReport(event: SignedEvent): Promise<void> {
 
   await updateUserActivity(event.pubkey, event.created_at)
 
+  // dev-seed: a moderação §26 (maybeModerate) e o invalidateFeed são
+  // adiados pro bulk pass (`recalcAllScores`), que aplica recalc DEPOIS
+  // o threshold de moderação na ordem correta (-999 vence o último write).
+  if (deferSideEffects) return
+
   // Após inserir, verifica threshold. Se atingido, post.score = -999 e
   // some do feed default. Manifesto §26.
   try {
@@ -694,7 +726,7 @@ function isValidReason(v: string | null): v is ReportReason {
 // agora pra ficar simétrico com persistReport. Trade-off documentado
 // em Docs/sessions/relay-moderation-himym-research-2026-05-17.md.
 
-async function persistNip56Report(event: SignedEvent): Promise<void> {
+async function persistNip56Report(event: SignedEvent, deferSideEffects: boolean): Promise<void> {
   const { mapNip56ToDrift } = await import('./nip56-mapping')
 
   const postId = getTag(event, 'e')!
@@ -737,6 +769,9 @@ async function persistNip56Report(event: SignedEvent): Promise<void> {
 
   await updateUserActivity(event.pubkey, event.created_at)
 
+  // dev-seed: moderação + invalidate adiados pro bulk pass (ver persistReport).
+  if (deferSideEffects) return
+
   try {
     await maybeModerate(postId, Date.now())
   } catch (err) {
@@ -761,7 +796,7 @@ async function persistNip56Report(event: SignedEvent): Promise<void> {
 // — defesa contra eventos kind 0 mal-formados ou de clientes que
 // inventam campos. raw_event preservado pra re-broadcast §16.
 
-async function persistUserMetadata(event: SignedEvent): Promise<void> {
+async function persistUserMetadata(event: SignedEvent, deferSideEffects: boolean): Promise<void> {
   let parsed: Record<string, unknown>
   try {
     parsed = JSON.parse(event.content) as Record<string, unknown>
@@ -805,6 +840,7 @@ async function persistUserMetadata(event: SignedEvent): Promise<void> {
       now,
     ],
   )
+  if (deferSideEffects) return // dev-seed: bulk invalidate no fim re-query o JOIN
   // Notify reactive consumers (useUserMetadata hook) — re-query.
   bumpProfileVersion(event.pubkey)
   // D3 Sprint N+3 Batch A — kind 0 metadata feeds `users_metadata` JOIN
@@ -882,6 +918,61 @@ function scheduleScoreRecalc(postId: string): void {
       )
     }, SCORE_RECALC_DEBOUNCE_MS),
   )
+}
+
+/**
+ * Recalc bulk — recalcula o score de TODOS os posts em um único loop
+ * sequencial, sem o debounce-per-postId de `scheduleScoreRecalc`. Pensado
+ * pro dev-seed (`lib/dev-seed/seed.ts`), que ingere milhares de eventos
+ * com `deferSideEffects: true` e precisa materializar scores UMA vez no
+ * fim em vez de disparar uma storm de N timers + N recalcs avulsos.
+ *
+ * Determinismo (manifesto §7): `recalculateScore` é puro em cima do estado
+ * SQLite — rodar 1× por post no fim do drain dá EXATAMENTE o mesmo score
+ * que o caminho normal (recalc incremental por evento), porque scoring é
+ * agregação idempotente das ações persistidas, não acumulação incremental.
+ *
+ * Ordem crítica (manifesto §26): recalc PRIMEIRO, moderação DEPOIS. Posts
+ * que cruzam o threshold de reports recebem `score = -999` via
+ * `maybeModerate` — esse write precisa ser o ÚLTIMO, senão o recalc
+ * sobrescreveria o -999 com um score real. Por isso a moderação roda num
+ * segundo passo, após todos os recalcs.
+ *
+ * Cede o main thread a cada `yieldEvery` posts (default igual ao boot
+ * batch) pra não travar o paint durante o bulk. `recalculateScore` chama
+ * `invalidateFeed()` internamente, mas ele é debounced (early-return se já
+ * há timer) — durante o bulk vira no máximo 1 refresh, e o caller
+ * (`seedDatabase`) garante 1 invalidate final consistente após o bulk.
+ */
+export async function recalcAllScores(yieldEvery: number = 50): Promise<void> {
+  const postRows = await db.exec<{ id: string }>(`SELECT id FROM posts`)
+  let processed = 0
+  for (const { id } of postRows) {
+    await recalculateScore(id)
+    processed++
+    if (processed % yieldEvery === 0) await yieldToMain()
+  }
+  // 2º passo — moderação §26 por post reportado. Roda DEPOIS do recalc pra
+  // que o -999 (quando threshold é cruzado) seja o último write e vença.
+  const reportedRows = await db.exec<{ post_id: string }>(
+    `SELECT DISTINCT post_id FROM reports`,
+  )
+  const moderationNow = Date.now()
+  processed = 0
+  for (const { post_id } of reportedRows) {
+    try {
+      await maybeModerate(post_id, moderationNow)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      if (msg.includes('no such column') && msg.includes('reason')) {
+        console.warn('[events] recalcAllScores: maybeModerate skip — schema antigo.')
+      } else {
+        throw err
+      }
+    }
+    processed++
+    if (processed % yieldEvery === 0) await yieldToMain()
+  }
 }
 
 interface PostRow {

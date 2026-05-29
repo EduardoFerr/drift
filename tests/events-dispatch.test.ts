@@ -55,9 +55,12 @@ vi.mock('../src/lib/comment-counts', () => ({
 import {
   onNostrEvent,
   passesSchemaCheck,
+  recalcAllScores,
   NIP22_COMMENT_KIND,
 } from '../src/lib/events'
 import { db } from '../src/lib/db'
+import { invalidateFeed } from '../src/lib/feed'
+import { maybeModerate } from '../src/lib/moderation'
 import { verifyEventAsync } from '../src/lib/verify'
 import { DRIFT_KIND } from '../src/config/constants'
 import type { SignedEvent } from '../src/types/nostr'
@@ -68,6 +71,8 @@ const dbMock = db as unknown as {
   get: ReturnType<typeof vi.fn>
 }
 const verifyMock = verifyEventAsync as unknown as ReturnType<typeof vi.fn>
+const invalidateFeedMock = invalidateFeed as unknown as ReturnType<typeof vi.fn>
+const maybeModerateMock = maybeModerate as unknown as ReturnType<typeof vi.fn>
 
 const HEX = (c: string) => c.repeat(64)
 const POST_ID = HEX('a')
@@ -83,6 +88,9 @@ beforeEach(() => {
   dbMock.get.mockResolvedValue(null)
   verifyMock.mockReset()
   verifyMock.mockResolvedValue(true)
+  invalidateFeedMock.mockReset()
+  maybeModerateMock.mockReset()
+  maybeModerateMock.mockResolvedValue(undefined)
 })
 
 function makeEvent(opts: {
@@ -318,5 +326,83 @@ describe('KIND_DISPATCH — fonte única de verdade (sem dois switches paralelos
       const ev = makeEvent({ kind })
       expect(() => passesSchemaCheck(ev)).not.toThrow()
     }
+  })
+})
+
+// ─── LOCK_VIA_TEST — deferSideEffects (dev-seed bulk mode) ────────────
+//
+// Ted+Lily 2026-05-28: dev-seed drenava ~2730 eventos a ~280ms/evento
+// (~13min) porque cada onNostrEvent disparava scheduleScoreRecalc (1 timer
+// por post) + invalidateFeed. `deferSideEffects: true` suprime esses
+// side-effects pós-persist (mantendo INSERT — invariante #1), e o seed faz
+// 1 recalcAllScores() + 1 invalidateFeed no fim. Estes locks garantem que
+// o defer NÃO persista menos, NEM dispare os side-effects adiados, e que o
+// bulk recalc rode recalc-antes-de-moderação (§26 -999 vence o último write).
+
+describe('deferSideEffects — persist roda, side-effects são adiados', () => {
+  it('POST com deferSideEffects: true → INSERT roda, invalidateFeed NÃO', async () => {
+    await onNostrEvent(makePost(), { deferSideEffects: true })
+    expect(runCallsMatching(/INSERT OR IGNORE INTO posts\b/i).length).toBe(1)
+    expect(invalidateFeedMock).not.toHaveBeenCalled()
+  })
+
+  it('SPREAD com deferSideEffects: true → INSERT roda, invalidateFeed NÃO', async () => {
+    await onNostrEvent(makeSpread(), { deferSideEffects: true })
+    expect(runCallsMatching(/INSERT OR IGNORE INTO spreads\b/i).length).toBe(1)
+    expect(invalidateFeedMock).not.toHaveBeenCalled()
+  })
+
+  it('BURY com deferSideEffects: true → INSERT roda, invalidateFeed NÃO', async () => {
+    await onNostrEvent(makeBury(), { deferSideEffects: true })
+    expect(runCallsMatching(/INSERT OR IGNORE INTO buries\b/i).length).toBe(1)
+    expect(invalidateFeedMock).not.toHaveBeenCalled()
+  })
+
+  it('REPORT com deferSideEffects: true → INSERT roda, maybeModerate + invalidateFeed NÃO', async () => {
+    await onNostrEvent(makeReport(), { deferSideEffects: true })
+    expect(runCallsMatching(/INSERT OR IGNORE INTO reports\b/i).length).toBe(1)
+    expect(maybeModerateMock).not.toHaveBeenCalled() // adiado pro bulk pass
+    expect(invalidateFeedMock).not.toHaveBeenCalled()
+  })
+
+  it('COMMENT com deferSideEffects: true → INSERT roda (side-effects de store adiados)', async () => {
+    await onNostrEvent(makeComment(), { deferSideEffects: true })
+    expect(runCallsMatching(/INSERT OR IGNORE INTO comments\b/i).length).toBe(1)
+  })
+
+  it('default (sem options) preserva comportamento normal — invalidateFeed roda', async () => {
+    await onNostrEvent(makePost())
+    expect(runCallsMatching(/INSERT OR IGNORE INTO posts\b/i).length).toBe(1)
+    expect(invalidateFeedMock).toHaveBeenCalled()
+  })
+})
+
+describe('recalcAllScores — bulk pass (dev-seed)', () => {
+  it('recalcula todos os posts + modera reportados (recalc antes de moderação §26)', async () => {
+    const POST_A = HEX('a')
+    const POST_B = HEX('b')
+    // exec #1: SELECT id FROM posts → 2 posts.
+    // recalc de cada post chama exec (UNION actions) → [] (sem ações).
+    // exec final: SELECT DISTINCT post_id FROM reports → 1 reportado.
+    dbMock.exec.mockImplementation(async (sql: string) => {
+      if (/SELECT id FROM posts/i.test(sql)) return [{ id: POST_A }, { id: POST_B }]
+      if (/DISTINCT post_id FROM reports/i.test(sql)) return [{ post_id: POST_A }]
+      return [] // UNION de ações + comments → vazio
+    })
+    dbMock.get.mockResolvedValue({ created_at: 1714000000, author_pub: HEX('f') })
+
+    await recalcAllScores()
+
+    // Cada post recebeu UPDATE de score (recalc).
+    expect(runCallsMatching(/UPDATE posts SET score/i).length).toBe(2)
+    // Post reportado passou por moderação — DEPOIS do recalc (§26 -999 último).
+    expect(maybeModerateMock).toHaveBeenCalledTimes(1)
+    expect(maybeModerateMock).toHaveBeenCalledWith(POST_A, expect.any(Number))
+  })
+
+  it('banco vazio → noop sem throw', async () => {
+    dbMock.exec.mockResolvedValue([])
+    await expect(recalcAllScores()).resolves.toBeUndefined()
+    expect(maybeModerateMock).not.toHaveBeenCalled()
   })
 })
