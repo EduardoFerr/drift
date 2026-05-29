@@ -95,6 +95,13 @@ export interface BootState {
   identity: DriftIdentity | null
   relays: RelayHealth[] | null
   /**
+   * Dev-seed ativo (Sprint N+5): banco populado por fixtures
+   * determinísticos via `?dev-seed=1` (só DEV). UI mostra badge "DEV
+   * SEED" no header pra não confundir dados de teste com reais.
+   * Sempre `false` em produção — guard duro em `doBootstrap`.
+   */
+  devSeedActive: boolean
+  /**
    * Falhas non-fatal que aconteceram durante o boot mas não impediram
    * `step === 'ready'`. UI usa pra mostrar indicador "modo degradado"
    * sem bloquear o app. Sprint 6 do roadmap pós-auditoria.
@@ -119,6 +126,7 @@ const INITIAL: BootState = {
   storage: null,
   identity: null,
   relays: null,
+  devSeedActive: false,
   degradedReasons: [],
 }
 
@@ -191,6 +199,63 @@ async function doBootstrap(): Promise<void> {
     setBoot((p) => ({ ...p, step: 'db' }))
     const { hasOpfs, storage } = await initDb()
     setBoot((p) => ({ ...p, hasOpfs, storage }))
+
+    // ─── Dev-seed (Sprint N+5 E2E) ─────────────────────────────────
+    //
+    // Popula o SQLite com fixtures determinísticos pra validação
+    // multi-user (score #1, propagação #3, P2P/Helia). Roda ANTES de
+    // subscribe (startSync, agendado pós-ready) pra que o feed já
+    // renderize dados conhecidos no primeiro paint.
+    //
+    // GUARD DURO (segurança): só em DEV (`import.meta.env.DEV`) E com
+    // `?dev-seed=1` na URL. Build de produção tem `import.meta.env.DEV
+    // === false` — o branch inteiro é dead-code-eliminado pelo Vite e o
+    // `seedDatabase` (dynamic import) nunca entra no bundle prod.
+    // Manifesto §7: fixtures usam timestamps fixos, não Date.now().
+    const wantsDevSeed =
+      typeof window !== 'undefined' &&
+      typeof window.location?.search === 'string' &&
+      new URLSearchParams(window.location.search).has('dev-seed')
+    if (import.meta.env.DEV && wantsDevSeed) {
+      try {
+        const { seedDatabase, NAMED_NSECS } = await import('./dev-seed/seed')
+        await seedDatabase()
+
+        // `?as=<name>` (ex: `?dev-seed=1&as=alice`) — assume a identidade
+        // determinística de um named user. A fixture Playwright usa isto
+        // pra dar a cada BrowserContext isolado o nsec correto SEM
+        // pre-seedar IndexedDB/crypto manualmente. Resolvido via
+        // `setIdentityFromNsec` (mesma porta que import nsec1 da UI),
+        // antes de `getOrCreateIdentity` rodar logo abaixo no step
+        // 'identity' — daí o boot adota o npub seeded em vez de gerar um.
+        const asName = new URLSearchParams(window.location.search)
+          .get('as')
+          ?.toLowerCase()
+        if (asName) {
+          const nsec = NAMED_NSECS[asName]
+          if (nsec) {
+            const { setIdentityFromNsec } = await import('./identity')
+            await setIdentityFromNsec(nsec)
+          } else {
+            console.warn(
+              `[bootstrap] dev-seed ?as=${asName} sem nsec em NAMED_NSECS — ` +
+                'usando identidade gerada (Marshall ainda não preencheu?).',
+            )
+          }
+        }
+
+        setBoot((p) => ({ ...p, devSeedActive: true }))
+        // eslint-disable-next-line no-console
+        console.warn(
+          '[bootstrap] DEV SEED ativo — banco populado com fixtures ' +
+            'determinísticos. NÃO são dados reais.',
+        )
+      } catch (err) {
+        // Seed é best-effort: falha não trava o boot (app segue com
+        // banco vazio/real). Log explícito pra dev investigar.
+        console.error('[bootstrap] dev-seed falhou:', err)
+      }
+    }
 
     // Carrega preferências locais cedo — UI já consulta show_nsfw_default
     // etc. assim que o feed renderiza. Manifesto §27.

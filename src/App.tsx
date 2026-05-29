@@ -1253,6 +1253,7 @@ function App() {
       <HomeHeader
         identity={boot.identity}
         userWeight={userWeight}
+        devSeedActive={boot.devSeedActive}
         currentScore={currentPost?.score ?? null}
         locationGranularity={locationGranularity}
         onOpenLocation={() => pushLayer({ id: 'location', component: LocationCard })}
@@ -1657,6 +1658,7 @@ function StatusIndicators({
 function HomeHeader({
   identity,
   userWeight,
+  devSeedActive,
   currentScore,
   locationGranularity,
   onOpenLocation,
@@ -1669,6 +1671,9 @@ function HomeHeader({
 }: {
   identity: DriftIdentity | null
   userWeight: { weight: number; engagement: number; antiquity: number; maxSubposts: number }
+  /** Dev-seed ativo (Sprint N+5): mostra badge "DEV SEED" pra distinguir
+   *  dados de fixture de dados reais. Sempre false em produção. */
+  devSeedActive: boolean
   /** Score do post atualmente visível (manifesto §22). null = feed vazio. */
   currentScore: number | null
   locationGranularity: LocationGranularity
@@ -1714,9 +1719,22 @@ function HomeHeader({
       }}
     >
       <div className="mb-[14px] flex items-center justify-between gap-3">
-        <h1 className="font-display text-[25px] font-extrabold leading-none tracking-[-0.5px] text-drift-text">
-          dri<em className="not-italic text-drift-accent">ft</em>
-        </h1>
+        <div className="flex items-center gap-2">
+          <h1 className="font-display text-[25px] font-extrabold leading-none tracking-[-0.5px] text-drift-text">
+            dri<em className="not-italic text-drift-accent">ft</em>
+          </h1>
+          {/* DEV SEED badge (Sprint N+5): só aparece quando o banco foi
+              populado por fixtures determinísticos (?dev-seed=1, DEV-only).
+              Sinaliza pro dev/QA que os dados NÃO são reais. */}
+          {devSeedActive && (
+            <span
+              className="rounded-full border border-drift-warning/40 bg-drift-warning/15 px-2 py-[2px] font-mono text-[9px] font-medium uppercase tracking-meta text-drift-warning"
+              title="Banco populado por fixtures de teste (dev-seed). Estes dados não são reais."
+            >
+              dev seed
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-3">
           <StatusIndicators
             onOpenStatus={onOpenStatus}
