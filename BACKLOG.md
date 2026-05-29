@@ -85,6 +85,27 @@ shipping prematuro).
 
 ---
 
+## Bugs visuais sweep Playwright 2026-05-29
+
+- [ ] **V-1 mini-map close HintChip colide com action buttons** — P0.
+  Mini-map embedded (card 🗺), hint "tocar 🗺 de novo pra fechar"
+  (`bb4330a`) top-center sobrepõe 🗺/💬/⋮. Em fix (agent a34b355).
+- [ ] **V-4 mode badge typo "§74"** — P1. "MODO: SUA REDE (LENTE LOCAL
+  §74)" deveria ser **§24** (sem afinidade no feed). §74 não existe
+  (Drift tem 34 princípios). SpreadMap badge `4da7a1e`. Fila pós-V-1
+  (mesmo arquivo SpreadMap.tsx).
+- [ ] **V-5 mode badge sobrepõe ModeToggle** — P0. Badge "MODO: SUA
+  REDE..."/"MODO: ESTE POST" top-position colide com POST/GLOBAL/
+  NETWORK row. Mesma classe V-1/CARTO. Reposicionar (bottom ou abaixo
+  do toggle). SpreadMap badge `4da7a1e`. Fila pós-V-1.
+- [ ] **V-2 linha vermelha solta topo do card** — P2. Em investigação
+  (agent a34b355).
+- [x] **V-3 imagem indisponível dominando** — NÃO-bug. Dev COEP bloqueia
+  nostr.build CDN (known limitation). Fix real = seed-data realista
+  (text-majority + imgs same-origin de Docs/imagens). P1 seed work.
+
+---
+
 ## Bug #4 — CTAs mortos no first load (verify-storm main thread) 2026-05-29
 
 - [ ] **First load: CTAs bloqueados até feed carregar** — P1.
