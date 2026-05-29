@@ -419,7 +419,7 @@ function BackupTab({ identity }: { identity: DriftIdentity }) {
             </button>
           </div>
         ) : (
-          <div className="rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3 font-mono text-[12px] text-drift-muted/40">
+          <div className="overflow-hidden break-all rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3 font-mono text-[12px] leading-relaxed text-drift-muted/40">
             ••••••••••••••••••••••••••••••••••••••••••••••••••••••••
           </div>
         )}
