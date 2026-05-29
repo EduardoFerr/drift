@@ -208,6 +208,98 @@ describe('volume gerado', () => {
   })
 })
 
+// ─── 4b. Distribuição realista (tempo + geo) — bug 2026-05-29 ───────
+//
+// User 2026-05-29: "seeds muito ruins em tempo e geolocalização, não
+// refletem distribuição real". Causas: (1) spreads/buries com created_at
+// INDEPENDENTE do post (no-op `s % (20*DAY)`) → cluster instantâneo + podiam
+// PRECEDER o post (causalidade quebrada); (2) jitter geográfico ±6-10° →
+// pontos no oceano, longe da cidade rotulada. Fix: reação = post.created_at +
+// delay exponencial (burst causal); geo = cidade real + jitter metropolitano
+// (dezenas de km). Estes locks impedem a regressão.
+
+describe('distribuição realista — causalidade temporal', () => {
+  const { domain } = getSeedEvents()
+
+  it('NENHUMA reação (spread/bury/report) precede o post-alvo', () => {
+    const postTime = new Map<string, number>()
+    for (const e of domain) {
+      if (e.kind === DRIFT_KIND.POST) postTime.set(e.id, e.created_at)
+    }
+    let checked = 0
+    for (const e of domain) {
+      if (
+        e.kind !== DRIFT_KIND.SPREAD &&
+        e.kind !== DRIFT_KIND.BURY &&
+        e.kind !== DRIFT_KIND.REPORT
+      )
+        continue
+      const targetId = e.tags.find((t) => t[0] === 'e')?.[1]
+      if (!targetId) continue
+      const pt = postTime.get(targetId)
+      if (pt === undefined) continue // alvo fora do seed (não deve ocorrer)
+      expect(
+        e.created_at,
+        `reação kind ${e.kind} (${e.id.slice(0, 8)}) precede o post-alvo`,
+      ).toBeGreaterThanOrEqual(pt)
+      checked++
+    }
+    expect(checked).toBeGreaterThan(1000) // cobertura real, não vacuosa
+  })
+
+  it('spreads NÃO são um cluster instantâneo (burst espalhado por dias)', () => {
+    const ts = domain.filter((e) => e.kind === DRIFT_KIND.SPREAD).map((e) => e.created_at)
+    const span = Math.max(...ts) - Math.min(...ts)
+    expect(span).toBeGreaterThan(20 * 24 * HOUR) // cobre as ~4 semanas de posts
+    // muitos timestamps distintos (não todos no mesmo instante).
+    expect(new Set(ts).size).toBeGreaterThan(500)
+  })
+})
+
+describe('distribuição realista — geo metropolitano (sem smear oceânico)', () => {
+  const { domain } = getSeedEvents()
+
+  function parseLoc(e: (typeof domain)[number]): { lat: number; lng: number; city: string } | null {
+    const t = e.tags.find((tag) => tag[0] === 'location')
+    if (!t) return null
+    return { lat: Number(t[1]), lng: Number(t[2]), city: t[3] ?? '' }
+  }
+
+  it('cluster Brasília fica APERTADO (≤0.35° do centro — metro, não continente)', () => {
+    const BR = { lat: -15.79, lng: -47.88 }
+    let count = 0
+    for (const e of domain) {
+      const loc = parseLoc(e)
+      if (!loc || loc.city !== 'Brasília') continue
+      const d = Math.max(Math.abs(loc.lat - BR.lat), Math.abs(loc.lng - BR.lng))
+      expect(d, `Brasília ${loc.lat},${loc.lng} a ${d.toFixed(2)}° do centro`).toBeLessThan(0.35)
+      count++
+    }
+    expect(count).toBeGreaterThan(0)
+  })
+
+  it('todo ponto geo cai em coordenadas plausíveis (lat∈[-60,70], lng∈[-180,180])', () => {
+    for (const e of domain) {
+      const loc = parseLoc(e)
+      if (!loc) continue
+      expect(loc.lat).toBeGreaterThanOrEqual(-60)
+      expect(loc.lat).toBeLessThanOrEqual(70)
+      expect(loc.lng).toBeGreaterThanOrEqual(-180)
+      expect(loc.lng).toBeLessThanOrEqual(180)
+      expect(loc.city.length).toBeGreaterThan(0) // label sempre presente
+    }
+  })
+
+  it('geo diverso: ≥10 cidades distintas no agregado (não 1 borrão)', () => {
+    const cities = new Set<string>()
+    for (const e of domain) {
+      const loc = parseLoc(e)
+      if (loc) cities.add(loc.city)
+    }
+    expect(cities.size).toBeGreaterThanOrEqual(10)
+  })
+})
+
 // ─── 5. Cascata A→B→C→D (bug #3 ground-truth) ───────────────────────
 
 describe('cascata Alice→Bob→Carol→Dave', () => {

@@ -158,55 +158,102 @@ export const NAMED_NSECS: Readonly<Record<string, string>> = Object.freeze(
   Object.fromEntries(NAMED_IDENTITIES.map((id) => [id.name, nip19.nsecEncode(id.sk)])),
 )
 
-// ─── 50 background seed identities ───────────────────────────────────
+// ─── Hash determinístico [0,1) (§7 — sem RNG, sem Date.now) ──────────
 //
-// Clusters geográficos: 10 Brasília (LPA — Local Privacy Aggregation),
-// 10 EU, 10 Ásia, 20 espalhado. createdAt variado (antiguidade espalhada)
-// pra pesos não-triviais no agregado.
+// `fract(sin(n)·k)` clássico (GLSL): distribuição ~uniforme e reproduzível
+// por índice. Usado pra geo (disco metropolitano) e timing (burst). Salts
+// distintos por dimensão evitam correlação entre lat/lng/delay.
 
-interface GeoCluster {
-  base: GeoPoint
-  /** jitter determinístico aplicado por índice. */
-  spread: number
+function hash01(n: number): number {
+  const x = Math.sin(n * 127.1 + 311.7) * 43758.5453123
+  return x - Math.floor(x)
 }
 
-const CLUSTER_BRASILIA: GeoCluster = { base: geo(-15.79, -47.88, 'Brasília', 'BR'), spread: 0.4 }
-const CLUSTER_EU: GeoCluster = { base: geo(48.85, 2.35, 'Paris', 'FR'), spread: 6 }
-const CLUSTER_ASIA: GeoCluster = { base: geo(35.68, 139.69, 'Tokyo', 'JP'), spread: 10 }
+// ─── 50 background seed identities ───────────────────────────────────
+//
+// Geo realista = usuários concentrados em METRÓPOLES reais distintas, com
+// scatter intra-cidade de dezenas de km — NÃO um borrão continental que
+// derrama pontos no oceano (bug do jitter ±6-10° anterior). Clusters:
+// 10 Brasília (LPA — Local Privacy Aggregation / k-anon §K=1), 10 metros
+// EU, 10 metros Ásia, 20 espalhado mundo (~30% GPS off, §27).
 
-const WORLD_SPREAD: readonly GeoPoint[] = Object.freeze([
-  geo(40.71, -74.0, 'New York', 'US'),
-  geo(51.51, -0.13, 'London', 'GB'),
-  geo(-33.87, 151.21, 'Sydney', 'AU'),
-  geo(19.43, -99.13, 'Mexico City', 'MX'),
-  geo(-34.6, -58.38, 'Buenos Aires', 'AR'),
-  geo(28.61, 77.21, 'New Delhi', 'IN'),
-  geo(55.75, 37.62, 'Moscow', 'RU'),
-  geo(-26.2, 28.04, 'Johannesburg', 'ZA'),
-  geo(1.35, 103.82, 'Singapore', 'SG'),
-  geo(37.77, -122.42, 'San Francisco', 'US'),
+const KM_PER_DEG_LAT = 111
+
+const BRASILIA: GeoPoint = geo(-15.79, -47.88, 'Brasília', 'BR')
+
+/** Metrópoles reais por região (geo discreto plausível, não smear). */
+const EU_CITIES: readonly GeoPoint[] = Object.freeze([
+  geo(48.85, 2.35, 'Paris', 'FR'),
+  geo(52.52, 13.4, 'Berlin', 'DE'),
+  geo(40.42, -3.7, 'Madrid', 'ES'),
+  geo(41.9, 12.5, 'Roma', 'IT'),
+  geo(52.37, 4.9, 'Amsterdam', 'NL'),
+  geo(38.72, -9.13, 'Lisboa', 'PT'),
+  geo(52.23, 21.01, 'Varsóvia', 'PL'),
+  geo(59.33, 18.06, 'Estocolmo', 'SE'),
+  geo(48.21, 16.37, 'Viena', 'AT'),
+  geo(53.35, -6.26, 'Dublin', 'IE'),
 ])
 
-/** Jitter determinístico pequeno (sem RNG) — espalha o cluster. */
-function jitter(cluster: GeoCluster, i: number): GeoPoint {
-  // offsets pseudo-espalhados mas determinísticos (seno de índice).
-  const dLat = Math.sin(i * 12.9898) * cluster.spread
-  const dLng = Math.cos(i * 78.233) * cluster.spread
+const ASIA_CITIES: readonly GeoPoint[] = Object.freeze([
+  geo(35.68, 139.69, 'Tokyo', 'JP'),
+  geo(37.57, 126.98, 'Seul', 'KR'),
+  geo(1.35, 103.82, 'Singapura', 'SG'),
+  geo(13.76, 100.5, 'Bangkok', 'TH'),
+  geo(-6.21, 106.85, 'Jacarta', 'ID'),
+  geo(14.6, 120.98, 'Manila', 'PH'),
+  geo(19.08, 72.88, 'Mumbai', 'IN'),
+  geo(25.03, 121.57, 'Taipé', 'TW'),
+  geo(3.14, 101.69, 'Kuala Lumpur', 'MY'),
+  geo(10.82, 106.63, 'Ho Chi Minh', 'VN'),
+])
+
+const WORLD_CITIES: readonly GeoPoint[] = Object.freeze([
+  geo(40.71, -74.0, 'New York', 'US'),
+  geo(51.51, -0.13, 'Londres', 'GB'),
+  geo(-33.87, 151.21, 'Sydney', 'AU'),
+  geo(19.43, -99.13, 'Cidade do México', 'MX'),
+  geo(-34.6, -58.38, 'Buenos Aires', 'AR'),
+  geo(28.61, 77.21, 'Nova Délhi', 'IN'),
+  geo(6.52, 3.38, 'Lagos', 'NG'),
+  geo(-26.2, 28.04, 'Joanesburgo', 'ZA'),
+  geo(37.77, -122.42, 'San Francisco', 'US'),
+  geo(43.65, -79.38, 'Toronto', 'CA'),
+  geo(30.04, 31.24, 'Cairo', 'EG'),
+  geo(41.01, 28.98, 'Istambul', 'TR'),
+])
+
+/**
+ * Espalha um ponto dentro de um raio metropolitano (km) ao redor da cidade.
+ * Disco UNIFORME via (ângulo, √raio) — não uma linha correlacionada como o
+ * seno-de-índice anterior. Longitude escalada por cos(lat) pra manter o raio
+ * métrico ~constante longe do equador. Raio pequeno (dezenas de km) → o ponto
+ * fica dentro da metrópole e o label de cidade continua válido. Determinístico.
+ */
+function metroJitter(base: GeoPoint, radiusKm: number, i: number): GeoPoint {
+  const ang = hash01(i * 2.17 + 0.5) * Math.PI * 2
+  const rKm = Math.sqrt(hash01(i * 3.71 + 9.2)) * radiusKm
+  const dLat = (rKm / KM_PER_DEG_LAT) * Math.sin(ang)
+  const cosLat = Math.max(0.2, Math.cos((base.lat * Math.PI) / 180))
+  const dLng = (rKm / (KM_PER_DEG_LAT * cosLat)) * Math.cos(ang)
   return {
-    lat: Number((cluster.base.lat + dLat).toFixed(4)),
-    lng: Number((cluster.base.lng + dLng).toFixed(4)),
-    city: cluster.base.city,
-    country: cluster.base.country,
+    lat: Number((base.lat + dLat).toFixed(4)),
+    lng: Number((base.lng + dLng).toFixed(4)),
+    city: base.city,
+    country: base.country,
   }
 }
 
 function seedGeo(i: number): GeoPoint | null {
-  if (i < 10) return jitter(CLUSTER_BRASILIA, i) // 0..9 Brasília (LPA)
-  if (i < 20) return jitter(CLUSTER_EU, i) // 10..19 EU
-  if (i < 30) return jitter(CLUSTER_ASIA, i) // 20..29 Ásia
+  // 0..9 — cluster Brasília apertado (LPA / k-anon §K=1): ~18km (raio do DF).
+  if (i < 10) return metroJitter(BRASILIA, 18, i)
+  // 10..19 — metrópoles europeias distintas + jitter metro (~15km).
+  if (i < 20) return metroJitter(EU_CITIES[(i - 10) % EU_CITIES.length]!, 15, i)
+  // 20..29 — metrópoles asiáticas distintas + jitter metro (~15km).
+  if (i < 30) return metroJitter(ASIA_CITIES[(i - 20) % ASIA_CITIES.length]!, 15, i)
   // 30..49 espalhado mundo. ~30% GPS off (anonimato §27 — geo opcional).
   if (i % 3 === 0) return null
-  return WORLD_SPREAD[i % WORLD_SPREAD.length]!
+  return metroJitter(WORLD_CITIES[(i - 30) % WORLD_CITIES.length]!, 12, i)
 }
 
 export const SEED_COUNT = 50
@@ -465,6 +512,21 @@ const CAPS: Readonly<Record<SeedMode, SeedCaps>> = Object.freeze({
  * §7 determinismo: cada `mode` produz SEMPRE o mesmo conjunto (mesma seleção
  * fixa). lite = subconjunto reproduzível (primeiros N de cada categoria).
  */
+/**
+ * Delay realista (segundos) de uma reação (spread/bury/report) APÓS a criação
+ * do post. Viralização real é um BURST: pico logo depois do post, cauda longa
+ * que decai — não um chuvisco em intervalos regulares (bug anterior: spreads
+ * distribuídos linearmente, independentes do post, podiam até PRECEDER o post).
+ * Modelo = inversa da exponencial: `delay = -mean·ln(1-u)`, `u∈[0,1)` hash
+ * determinístico. ~63% reage dentro de `meanHours`; cauda até `capDays`. NUNCA
+ * negativo → causalidade preservada (a reação é sempre posterior ao post).
+ */
+function reactionDelaySec(n: number, meanHours: number, capDays: number): number {
+  const u = hash01(n * 2.399 + 0.71) * 0.999 // *0.999 evita ln(0)
+  const hours = -meanHours * Math.log(1 - u)
+  return Math.floor(Math.min(hours, capDays * 24) * HOUR)
+}
+
 export function buildSeedEvents(mode: SeedMode = 'full'): SeedEventSet {
   const caps = CAPS[mode]
   // Identidades ativas neste modo: 8 named + os primeiros `seedIdentities`
@@ -515,8 +577,12 @@ export function buildSeedEvents(mode: SeedMode = 'full'): SeedEventSet {
   const IMAGE_EVERY = Math.max(1, Math.floor(TOTAL_CONTENT_POSTS / 10))
   for (let i = 0; i < TOTAL_CONTENT_POSTS; i++) {
     const author = activeIdentities[i % activeIdentities.length]!
-    // created_at: 28 dias atrás .. base, espalhado determinístico.
-    const ageSec = Math.floor((i / TOTAL_CONTENT_POSTS) * 28 * DAY)
+    // created_at: últimos 28 dias. Base linear (fluxo de posts ao longo do
+    // mês) + perturbação determinística ±~6h pra não virar um metrônomo
+    // perfeito. Clamp na janela; o sort final reordena trocas locais.
+    const baseAge = (i / TOTAL_CONTENT_POSTS) * 28 * DAY
+    const wobble = (hash01(i * 5.13 + 2.9) - 0.5) * 12 * HOUR
+    const ageSec = Math.max(0, Math.min(28 * DAY, Math.floor(baseAge + wobble)))
     const createdAt = TS_BASE - 28 * DAY + ageSec
     const cw: ContentWarning | undefined =
       i % 17 === 0 ? 'nsfw' : i % 23 === 0 ? 'spoiler' : undefined
@@ -535,35 +601,38 @@ export function buildSeedEvents(mode: SeedMode = 'full'): SeedEventSet {
   }
 
   // 5. Spreads (~2000) com distribuição pareto: ~5% dos posts pegam 80%.
-  //    Hot set = primeiros 22 content posts (~5% de 442). Cada hot post
-  //    recebe muitos spreaders; long tail recebe poucos.
   const HOT_COUNT = caps.hotPosts
   let spreadCount = 0
   const TARGET_SPREADS = caps.targetSpreads
   // 80% pros hot posts, 20% pra long tail (mesma pareto em ambos os modos).
   const hotSpreads = Math.floor(TARGET_SPREADS * 0.8)
   const tailSpreads = TARGET_SPREADS - hotSpreads
-  // Hot: distribui round-robin de spreaders entre os HOT_COUNT posts.
+  // Hot posts ESPALHADOS na timeline (não os primeiros = mais antigos). Posts
+  // virais ocorrem ao longo do mês inteiro; cada um gera um burst de spreads
+  // num momento distinto → bursts distribuídos no scrubber, não amontoados no
+  // início (bug "tudo disparado logo no começo"). Índices uniformemente
+  // espaçados no array de conteúdo.
+  const hotPosts: { event: SignedEvent; authorPub: string }[] = []
+  for (let h = 0; h < HOT_COUNT; h++) {
+    hotPosts.push(contentPosts[Math.floor((h / HOT_COUNT) * TOTAL_CONTENT_POSTS)]!)
+  }
+  // Hot: round-robin de spreaders; cada spread cai num BURST após a criação
+  // do seu post (causalidade + decaimento). mean 9h, cauda até 6 dias.
   for (let s = 0; s < hotSpreads; s++) {
-    const post = contentPosts[s % HOT_COUNT]!
+    const post = hotPosts[s % HOT_COUNT]!
     const spreader = activeIdentities[(s * 7 + 3) % activeIdentities.length]!
     if (spreader.pub === post.authorPub) continue // sem self-spread útil
-    // Distribui linear nos 20 dias (s/total × janela). Antes: `s % (20*DAY)`
-    // = no-op pq s≪1.7M → todos spreads em ~27min cluster → rede "já feita"
-    // no mapa. Agora espalha → cascata temporal visível no scrubber.
-    const createdAt =
-      TS_BASE - 20 * DAY + Math.floor((s / Math.max(1, hotSpreads)) * 20 * DAY)
+    const createdAt = post.event.created_at + reactionDelaySec(s * 1.3 + 11, 9, 6)
     domain.push(signSpread(spreader, post.event.id, post.authorPub, createdAt))
     spreadCount++
   }
-  // Tail: posts além dos hot, poucos spreads cada.
+  // Tail: posts além dos hot, poucos spreads cada. Burst mais lento (mean 14h)
+  // — long tail engaja mais devagar que conteúdo viral.
   for (let s = 0; s < tailSpreads; s++) {
     const post = contentPosts[HOT_COUNT + (s % (TOTAL_CONTENT_POSTS - HOT_COUNT))]!
     const spreader = activeIdentities[(s * 11 + 5) % activeIdentities.length]!
     if (spreader.pub === post.authorPub) continue
-    // Idem hot: distribui linear nos 14 dias (era no-op `s % (14*DAY)`).
-    const createdAt =
-      TS_BASE - 14 * DAY + Math.floor((s / Math.max(1, tailSpreads)) * 14 * DAY)
+    const createdAt = post.event.created_at + reactionDelaySec(s * 1.7 + 101, 14, 8)
     domain.push(signSpread(spreader, post.event.id, post.authorPub, createdAt))
     spreadCount++
   }
@@ -580,7 +649,9 @@ export function buildSeedEvents(mode: SeedMode = 'full'): SeedEventSet {
     const post = contentPosts[buryOffset + (b % BURY_POSTS)]!
     const burier = activeIdentities[(b * 13 + 9) % activeIdentities.length]!
     if (burier.pub === post.authorPub) continue
-    const createdAt = TS_BASE - 10 * DAY + (b % (10 * DAY))
+    // Burst após o post (antes: `b % (10*DAY)` = no-op, b≪864k → todas as
+    // buries num cluster em TS_BASE-10d). Bury reage mais devagar (mean 18h).
+    const createdAt = post.event.created_at + reactionDelaySec(b * 2.1 + 53, 18, 9)
     domain.push(signBury(burier, post.event.id, createdAt))
     buryCount++
   }
@@ -625,7 +696,10 @@ export function buildSeedEvents(mode: SeedMode = 'full'): SeedEventSet {
     for (let r = 0; r < reportersForTarget; r++) {
       const reporter = heavyReporters[r % heavyReporters.length]!
       if (reporter.pub === target.authorPub) continue
-      const createdAt = TS_BASE - 5 * DAY + r * HOUR + t * DAY
+      // Reports chegam APÓS o post-alvo (causalidade), escalonados por hora
+      // (denúncias pingam ao longo de ~1 dia, não num instante).
+      const createdAt =
+        target.event.created_at + reactionDelaySec(r * 4.1 + t * 31 + 17, 6, 3) + r * HOUR
       domain.push(signReport(reporter, target.event.id, target.authorPub, reason, createdAt))
       reportCount++
     }
