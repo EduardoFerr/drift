@@ -221,6 +221,17 @@ async function doBootstrap(): Promise<void> {
         const { seedDatabase, NAMED_NSECS } = await import('./dev-seed/seed')
         await seedDatabase()
 
+        // E2E hook (Sprint N+5): expõe a API do `db` no window APENAS sob
+        // dev-seed (DEV + ?dev-seed=1). As suites adversariais
+        // (`e2e/propagation-model.spec.ts`) rodam as MESMAS queries que
+        // `useSpreadMap` usa, contra o SQLite real materializado pelo
+        // pipeline, pra MEDIR o modelo de propagação (geográfico estrela
+        // vs cascata social) sem depender de introspecção WebGL do
+        // deck.gl. Nunca entra no bundle prod (branch DEV-only é
+        // dead-code-eliminado). Não é superfície de domínio — só leitura.
+        const { db } = await import('./db')
+        ;(window as unknown as { __driftDb?: typeof db }).__driftDb = db
+
         // `?as=<name>` (ex: `?dev-seed=1&as=alice`) — assume a identidade
         // determinística de um named user. A fixture Playwright usa isto
         // pra dar a cada BrowserContext isolado o nsec correto SEM
