@@ -303,7 +303,7 @@ export function ComposeOverlay({
     const subposts: Subpost[] = nonEmpty.map((d, i) => draftToSubpost(d, i))
     if (subposts.length === 0) return
 
-    // Hard-confirm (regra 6): postar como OUTRA persona COM localização
+    // Confirmação dura [regra 6]: postar como OUTRA persona COM localização
     // pode ligar essa persona ao seu local físico (deanon cruzado GPS×id).
     // Bloqueia o publish se o user cancelar. Só dispara quando AMBOS:
     // gpsScope !== 'off' E a identidade escolhida ≠ ativa.
