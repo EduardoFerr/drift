@@ -150,6 +150,14 @@ export const db = {
   /** INSERT/UPDATE/DELETE. Não retorna linhas. */
   run: (sql: string, params?: unknown[]) => call<void>('run', { sql, params }),
 
+  /**
+   * Executa N writes numa ÚNICA transação + 1 roundtrip postMessage.
+   * Colapsa o custo serializado de muitos `run()` (cada um = 1 roundtrip).
+   * Usado pelo dev-seed drain. Atômico (BEGIN/COMMIT no worker).
+   */
+  batch: (ops: Array<{ sql: string; params?: unknown[] }>) =>
+    call<void>('batch', { ops }),
+
   /** SELECT que retorna a primeira linha ou null. */
   get: <T = Record<string, unknown>>(sql: string, params?: unknown[]) =>
     call<T | null>('get', { sql, params }),

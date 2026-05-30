@@ -178,6 +178,38 @@ const KIND_DISPATCH: Readonly<Record<number, KindHandler>> = {
   },
 }
 
+// ─── Write sink (dev-seed batch) ─────────────────────────────────────
+//
+// Por default, cada write de domínio (`runWrite`) vai DIRETO ao worker via
+// `db.run` (1 postMessage/roundtrip). O dev-seed drena ~2730 eventos × ~2
+// writes = ~5500 roundtrips serializados → minutos (drain floor). Quando
+// `writeSink` é setado (só pelo seed, DEV), os writes são DESVIADOS pra um
+// buffer; o seed os flusha em lotes via `db.batch` (1 transação, 1 roundtrip
+// por lote). Mesmas statements, mesma ordem → estado idêntico (invariante #1
+// preservado: writes ainda nascem de onNostrEvent→persist*). Sync real
+// (relays/WebRTC) NUNCA seta sink → comportamento direto intacto.
+//
+// CUIDADO: persist* que LEEM antes de escrever (ex: persistReport →
+// calculateUserWeight) dependem dos writes anteriores já estarem flushados.
+// O seed flusha no boundary de cada batch; como o domain é ordenado por
+// created_at ASC e reports vêm por último, os users dos reporters (genesis,
+// primeiros) já foram flushados quando os reports são processados.
+let writeSink: ((sql: string, params: unknown[]) => void) | null = null
+
+/** Liga/desliga o desvio de writes pro buffer do seed (DEV). null = direto. */
+export function setWriteSink(fn: ((sql: string, params: unknown[]) => void) | null): void {
+  writeSink = fn
+}
+
+/** Write de domínio: bufferiza (seed) ou vai direto ao worker (default). */
+function runWrite(sql: string, params: unknown[]): Promise<void> {
+  if (writeSink) {
+    writeSink(sql, params)
+    return Promise.resolve()
+  }
+  return db.run(sql, params)
+}
+
 export async function onNostrEvent(
   event: SignedEvent,
   options?: OnNostrEventOptions,
@@ -457,7 +489,7 @@ async function persistPost(event: SignedEvent, deferSideEffects: boolean): Promi
   // identidade canônica do post — local e na rede.
   const postId = event.id
   const isFirstSeen = !seenPostIds.has(postId)
-  await db.run(
+  await runWrite(
     `INSERT OR IGNORE INTO posts
      (id, author_pub, content, created_at, category, location, client, content_warning, raw_event, score, spreads, buries)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0)`,
@@ -491,7 +523,7 @@ async function persistPost(event: SignedEvent, deferSideEffects: boolean): Promi
 
 async function persistSpread(event: SignedEvent, deferSideEffects: boolean): Promise<void> {
   const postId = getTag(event, 'e')!
-  await db.run(
+  await runWrite(
     `INSERT OR IGNORE INTO spreads
      (post_id, spreader_pub, created_at, location, event_id, raw_event)
      VALUES (?, ?, ?, ?, ?, ?)`,
@@ -555,7 +587,7 @@ async function maybeAutoPinBlobs(spreaderPub: string, postId: string): Promise<v
 
 async function persistBury(event: SignedEvent, deferSideEffects: boolean): Promise<void> {
   const postId = getTag(event, 'e')!
-  await db.run(
+  await runWrite(
     `INSERT OR IGNORE INTO buries
      (post_id, burier_pub, created_at, event_id, raw_event)
      VALUES (?, ?, ?, ?, ?)`,
@@ -677,7 +709,7 @@ async function persistReport(event: SignedEvent, deferSideEffects: boolean): Pro
   const reporterWeight = getReportWeight(reporterWeightCalc.weight)
 
   try {
-    await db.run(
+    await runWrite(
       `INSERT OR IGNORE INTO reports
        (post_id, reporter_pub, reason, weight, created_at)
        VALUES (?, ?, ?, ?, ?)`,
@@ -899,7 +931,7 @@ async function persistUserMetadata(event: SignedEvent, deferSideEffects: boolean
 // do nosso cliente conhecer ele, mas é aproximação aceitável.
 
 async function updateUserActivity(authorPub: string, eventCreatedAt: number): Promise<void> {
-  await db.run(
+  await runWrite(
     `INSERT INTO users (npub, created_at, last_active)
      VALUES (?, ?, ?)
      ON CONFLICT(npub) DO UPDATE SET

@@ -24,9 +24,10 @@
  * out-of-band pro ranking (§24), exatamente como `sync.ts` faz.
  */
 
-import { onNostrEvent, recalcAllScores } from '../events'
+import { onNostrEvent, recalcAllScores, setWriteSink } from '../events'
 import { applyContactList } from '../follows'
 import { invalidateFeed } from '../feed'
+import { db } from '../db'
 import { BOOT_BATCH_SIZE, drainInBatches } from '../scheduler'
 import { buildSeedEvents, type SeedMode } from './fixtures'
 
@@ -146,13 +147,35 @@ export async function seedDatabase(
   const total = domain.length
   let done = 0
   onProgress?.(0, total)
-  await drainInBatches(domain, async (ev) => {
-    await onNostrEvent(ev, { deferSideEffects: true, skipVerify: true })
-    done++
-    // Reporta no boundary do batch (a cada BOOT_BATCH_SIZE) ou no fim, pra
-    // não floodar a store Zustand com ~3000 setStates.
-    if (done % BOOT_BATCH_SIZE === 0 || done === total) onProgress?.(done, total)
-  })
+
+  // batch-INSERT (user 2026-05-29): desvia os writes de domínio pra um buffer
+  // e flusha em TRANSAÇÃO (db.batch) no boundary de cada batch. Colapsa
+  // ~5500 postMessages serializados (2 writes × ~2730 eventos) em ~dezenas →
+  // full drena em segundos (era minutos no drain floor). setWriteSink é
+  // SEMPRE desligado no finally (sync real volta a escrever direto). Flush no
+  // boundary garante que reads de persist* (persistReport → calculateUserWeight)
+  // vejam writes anteriores — reporters (genesis, primeiros no sort ASC) já
+  // estão no DB quando os reports (últimos) são processados.
+  const writeBuf: Array<{ sql: string; params?: unknown[] }> = []
+  setWriteSink((sql, params) => writeBuf.push({ sql, params }))
+  const flushWrites = async (): Promise<void> => {
+    if (writeBuf.length === 0) return
+    await db.batch(writeBuf.splice(0, writeBuf.length))
+  }
+  try {
+    await drainInBatches(domain, async (ev) => {
+      await onNostrEvent(ev, { deferSideEffects: true, skipVerify: true })
+      done++
+      if (done % BOOT_BATCH_SIZE === 0) {
+        await flushWrites()
+        onProgress?.(done, total)
+      }
+    })
+    await flushWrites() // resto do último batch parcial
+  } finally {
+    setWriteSink(null)
+  }
+  onProgress?.(total, total)
 
   // Side-effects adiados: materializa TODOS os scores de uma vez (recalc
   // bulk + moderação §26 na ordem correta) e dispara 1 invalidateFeed.

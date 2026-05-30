@@ -52,9 +52,11 @@ let storageMode: StorageMode = 'memory'
 
 interface InMessage {
   id: number
-  type: 'init' | 'exec' | 'run' | 'get' | 'rebuild'
+  type: 'init' | 'exec' | 'run' | 'get' | 'rebuild' | 'batch'
   sql?: string
   params?: unknown[]
+  /** Para 'batch': lista de writes executados numa única transação. */
+  ops?: Array<{ sql: string; params?: unknown[] }>
   // V10.11 — `schema` field removido. Schema é importado direto no
   // worker via `import schema from './schema.sql?raw'` no topo do
   // arquivo. Antes db.ts mandava via postMessage, deixando o string
@@ -605,6 +607,32 @@ self.onmessage = async (e: MessageEvent<InMessage>) => {
       // "redefinir cache local"). Drop + recreate dos domain tables;
       // identity + user_prefs intactos. Schema vem do import top-level.
       rebuildDomainSchema(schema)
+      reply({ id, ok: true })
+      return
+    }
+
+    if (type === 'batch') {
+      // N writes (INSERT/UPDATE) numa ÚNICA transação + 1 roundtrip. Usado
+      // pelo dev-seed pra colapsar ~5500 postMessages (2 por evento × ~2730)
+      // em ~dezenas. As mesmas statements que `persist*` rodariam — só
+      // agrupadas (invariante #1 preservado: writes vêm de onNostrEvent →
+      // persist → buffer → batch). Transação garante atomicidade + é MUITO
+      // mais rápida que N execs avulsos (1 fsync no fim, não N).
+      const ops = e.data.ops ?? []
+      db.exec({ sql: 'BEGIN' })
+      try {
+        for (const op of ops) {
+          db.exec({ sql: op.sql, bind: (op.params ?? []) as BindingSpec })
+        }
+        db.exec({ sql: 'COMMIT' })
+      } catch (err) {
+        try {
+          db.exec({ sql: 'ROLLBACK' })
+        } catch {
+          // ignore — transação já abortada
+        }
+        throw err
+      }
       reply({ id, ok: true })
       return
     }
