@@ -42,6 +42,26 @@ import type { Event as SignedEvent } from 'nostr-tools'
 import { DRIFT_KIND, DRIFT_VERSION, CLIENT_ID } from '../../config/constants'
 import type { GeoPoint, ContentWarning, ReportReason } from '../../types/drift'
 
+// ─── Assinatura swappable (1-pass anchor probe) ─────────────────────
+//
+// O anchor precisa do MAIOR created_at da timeline pra calcular o shift
+// (delta). Antes: 2-pass = build+assina TUDO 2× (~48s no full). Agora: o
+// pass-1 (probe) usa um STUB que NÃO assina (só carrega created_at) →
+// barato; o pass-2 assina 1× com o delta certo. Reusa o MESMO código de
+// timestamps (zero duplicação/drift). `finalizeEvent` real é o default —
+// o caminho sem-âncora (LOCK_VIA_TEST) nunca toca o stub.
+type FinalizeFn = typeof finalizeEvent
+// Stub: NÃO assina (só carrega created_at/tags pro probe de maxTs). Cast da
+// função inteira pra bypassar o tipo VerifiedEvent (o probe descarta tudo
+// exceto created_at).
+const STUB_FINALIZE = ((template: Parameters<FinalizeFn>[0]) => ({
+  ...template,
+  id: '',
+  pubkey: '',
+  sig: '',
+})) as unknown as FinalizeFn
+let activeFinalize: FinalizeFn = finalizeEvent
+
 // ─── Constantes de tempo (§7 determinismo) ──────────────────────────
 
 /** Base de timestamp fixa (unix seconds) — ~2024-05-18. Manifesto §7. */
@@ -347,7 +367,7 @@ function signPost(author: SeedIdentity, createdAt: number, opts: PostOpts = {}):
       },
     ],
   })
-  return finalizeEvent(
+  return activeFinalize(
     { kind: DRIFT_KIND.POST, created_at: createdAt, tags, content },
     author.sk,
   )
@@ -366,14 +386,14 @@ function signSpread(
   ]
   const loc = withGeo ? locationTag(spreader.geo) : null
   if (loc) tags.push(loc)
-  return finalizeEvent(
+  return activeFinalize(
     { kind: DRIFT_KIND.SPREAD, created_at: createdAt, tags, content: '' },
     spreader.sk,
   )
 }
 
 function signBury(burier: SeedIdentity, postId: string, createdAt: number): SignedEvent {
-  return finalizeEvent(
+  return activeFinalize(
     { kind: DRIFT_KIND.BURY, created_at: createdAt, tags: [['e', postId]], content: '' },
     burier.sk,
   )
@@ -386,7 +406,7 @@ function signReport(
   reason: ReportReason,
   createdAt: number,
 ): SignedEvent {
-  return finalizeEvent(
+  return activeFinalize(
     {
       kind: DRIFT_KIND.REPORT,
       created_at: createdAt,
@@ -404,7 +424,7 @@ function signReport(
 /** Evento NIP-02 (kind 3) com a lista de follows da identidade. */
 function signContactList(id: SeedIdentity, createdAt: number): SignedEvent {
   const tags = id.follows.map((p) => ['p', p])
-  return finalizeEvent({ kind: 3, created_at: createdAt, tags, content: '' }, id.sk)
+  return activeFinalize({ kind: 3, created_at: createdAt, tags, content: '' }, id.sk)
 }
 
 // ─── Montagem do conjunto de eventos ────────────────────────────────
@@ -547,11 +567,19 @@ function reactionDelaySec(n: number, meanHours: number, capDays: number): number
  */
 export function buildSeedEvents(mode: SeedMode = 'full', nowAnchorSec?: number): SeedEventSet {
   if (nowAnchorSec == null) return buildWithDelta(mode, 0)
-  const pure = buildWithDelta(mode, 0)
-  const maxTs = Math.max(
-    ...pure.domain.map((e) => e.created_at),
-    ...pure.contactLists.map((e) => e.created_at),
-  )
+  // Pass 1 (probe): descobre o topo real da timeline SEM assinar (stub) —
+  // barato. Pass 2: assina 1× com o delta exato. ~48s → ~24s no full.
+  let maxTs: number
+  activeFinalize = STUB_FINALIZE
+  try {
+    const probe = buildWithDelta(mode, 0)
+    maxTs = Math.max(
+      ...probe.domain.map((e) => e.created_at),
+      ...probe.contactLists.map((e) => e.created_at),
+    )
+  } finally {
+    activeFinalize = finalizeEvent // restaura SEMPRE (próximo build assina real)
+  }
   const delta = nowAnchorSec - maxTs - 3600 // newest ~1h antes de agora
   return buildWithDelta(mode, delta)
 }
