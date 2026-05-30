@@ -18,7 +18,7 @@ import { create } from 'zustand'
 import type { DriftIdentity } from '../types/drift'
 import { initDb, type StorageMode } from './db'
 import { getOrCreateIdentity } from './identity'
-import { checkRelayConnectivity, type RelayHealth } from './nostr'
+import { checkRelayConnectivity, setHermeticPublish, type RelayHealth } from './nostr'
 import { startSync } from './sync'
 import { loadPrefs, usePrefsStore } from './prefs'
 import { applyTheme, DEFAULT_THEME_ID, isThemeId } from './theme'
@@ -233,6 +233,13 @@ async function doBootstrap(): Promise<void> {
       typeof window.location?.search === 'string' &&
       new URLSearchParams(window.location.search).has('dev-seed')
     if (import.meta.env.DEV && wantsDevSeed) {
+      // Modo hermético: dev-seed NUNCA toca relays públicos. Fixtures são
+      // locais (onNostrEvent), mas ações disparadas em suites E2E
+      // (spreadPost/buryPost/reportPost → publishToRelays) vazariam pra
+      // relay.damus.io etc. setHermeticPublish(true) torna publishToRelays
+      // no-op; startSync/startProbe abaixo são pulados sob dev-seed. Achado
+      // 2026-05-29 (user): score-fidelity #3 publicou em relays reais.
+      setHermeticPublish(true)
       try {
         const { seedDatabase, NAMED_NSECS } = await import('./dev-seed/seed')
         // Modo do seed: `?dev-seed=lite` → subset ~200 eventos (boot <15s,
@@ -512,9 +519,16 @@ async function doBootstrap(): Promise<void> {
       // ~2s do main thread no Schnorr verify dos primeiros eventos
       // entregues pelos relays. Agora: fire-and-forget após paint. O
       // `pageshow(persisted=true)` em sync.ts:174 cuida do caso bfcache.
-      void startSync().catch((err) => {
-        console.error('[bootstrap] startSync (deferred) falhou:', err)
-      })
+      //
+      // HERMÉTICO (dev-seed): NÃO conectar relays clearnet sob dev-seed/E2E.
+      // O DB já está populado pelas fixtures locais; subscrever relays reais
+      // poluiria o boot de teste com eventos da rede + abriria WS desnecessários
+      // (e foi por aqui que eventos de teste tocaram a rede). Achado 2026-05-29.
+      if (!wantsDevSeed) {
+        void startSync().catch((err) => {
+          console.error('[bootstrap] startSync (deferred) falhou:', err)
+        })
+      }
     })
 
     // checkRelayConnectivity abre WebSockets DEDICADOS por relay
@@ -522,14 +536,16 @@ async function doBootstrap(): Promise<void> {
     // Com 4 relays seed, são +4 WS além das ~4 que `startSync` já
     // abriu via SimplePool — dobra connections no boot crítico.
     // Health probe roda em idle pra não competir com o subscribe de
-    // sync que acabou de ser agendado.
-    scheduleIdle(() => {
-      void checkRelayConnectivity()
-        .then((relays) => setBoot((p) => ({ ...p, relays })))
-        .catch((err) => {
-          console.warn('[bootstrap] relay health check falhou:', err)
-        })
-    })
+    // sync que acabou de ser agendado. Pulado sob dev-seed (hermético).
+    if (!wantsDevSeed) {
+      scheduleIdle(() => {
+        void checkRelayConnectivity()
+          .then((relays) => setBoot((p) => ({ ...p, relays })))
+          .catch((err) => {
+            console.warn('[bootstrap] relay health check falhou:', err)
+          })
+      })
+    }
 
     // Schedule eviction. Idempotente — só roda se contagem ultrapassou
     // SOFT_LIMIT em cache.ts. Primeira corrida acontece após 6h (não
@@ -540,8 +556,9 @@ async function doBootstrap(): Promise<void> {
     scheduleEviction(identity.npub)
 
     // Probe anti-eclipse periódico — manifesto §20. Idem `scheduleEviction`:
-    // só seta `setInterval`, primeira execução real é em +30min.
-    startProbe()
+    // só seta `setInterval`, primeira execução real é em +30min. Pulado sob
+    // dev-seed (hermético — não fala com relays reais).
+    if (!wantsDevSeed) startProbe()
   } catch (err) {
     // Multi-aba: OPFS permite só 1 SyncAccessHandle por arquivo. Quando
     // a 2ª aba do mesmo origin tenta abrir, db.worker propaga

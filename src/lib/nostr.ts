@@ -87,7 +87,24 @@ export function verifyDriftEvent(event: NostrEvent): boolean {
  * Comportamento idêntico ao publish-direto-WSS quando só WSS está
  * registrado — orchestrator é compatível por design.
  */
+/**
+ * Modo hermético (DEV/E2E): quando true, `publishToRelays` é no-op — NÃO toca
+ * a rede. Ativado por `bootstrap.ts` sob `?dev-seed` pra que fixtures de teste
+ * e ações disparadas em suites E2E (spreadPost/buryPost/reportPost) NUNCA
+ * vazem pra relays Nostr públicos (relay.damus.io etc). Achado 2026-05-29: o
+ * boot dev-seed conectava clearnet + score-fidelity #3 publicava eventos
+ * assinados pelas nsec determinísticas em relays reais. Gate só liga em DEV.
+ */
+let hermetic = false
+export function setHermeticPublish(on: boolean): void {
+  hermetic = on
+}
+
 export async function publishToRelays(event: NostrEvent): Promise<PublishResult> {
+  if (hermetic) {
+    // Não publica. Retorna resultado vazio (nenhum relay contatado).
+    return { ok: 0, failed: 0, perRelay: [] }
+  }
   return orchestrator.publish(event)
 }
 
