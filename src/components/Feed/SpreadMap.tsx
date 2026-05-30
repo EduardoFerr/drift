@@ -1,14 +1,15 @@
 ﻿/**
  * SpreadMap — visualização geográfica do espalhamento.
  *
- * Dois modos:
- *   post   — heatmap estático dos spreads de um único post (comportamento
- *            histórico). Origem amber, destinos heatmap verde.
- *   global — arcos curvos animados de propagação cross-post. Para cada
- *            post com spreads com location, traça a cadeia cronológica
- *            origin→spread₁→spread₂→... gated pelo relógio único
- *            (useTimelineClock, 30s + loop). Usa ArcLayer (curva GPU +
- *            gradiente + taper + glow aditivo) + ScatterplotLayer.
+ * Três modos:
+ *   post    — cascata viral HONESTA de UM post: arcos da árvore inferida
+ *             (origin→spreader literal mint; spreader→spreader estimado
+ *             slate, §28) + origem amber + dots. Gated pelo relógio único.
+ *   global  — arcos curvos animados de propagação cross-post agregada.
+ *             Usa ArcLayer (curva GPU + gradiente + taper + glow aditivo).
+ *   network — global filtrado por follows (NIP-02) + lente PPR + pontes K=1.
+ *
+ * Arcos compartilham buildVisSegs/makeArcLayers (helpers module-level).
  *
  * MapLibre GL + Deck.gl. Tiles CARTO Dark Matter (OSS, sem API key).
  * Lazy import de ~400kb gzip — só carrega quando há geometria pra mostrar.
