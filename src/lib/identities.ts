@@ -31,7 +31,8 @@ import { create } from 'zustand'
 import { generateSecretKey, getPublicKey } from 'nostr-tools/pure'
 import * as nip19 from 'nostr-tools/nip19'
 import { db } from './db'
-import { encrypt } from './crypto'
+import { encrypt, decrypt } from './crypto'
+import { nsecHexToBytes } from './identity'
 
 // ─── Tipos ───────────────────────────────────────────────────────────
 
@@ -241,6 +242,50 @@ export async function removeIdentity(npub: string): Promise<void> {
   }
   await db.run(`DELETE FROM identities WHERE npub = ?`, [npub])
   await refresh()
+}
+
+// ─── Sign-as-chosen-identity (per-post picker, manifesto §4) ─────────
+
+/**
+ * Retorna os bytes do nsec de UMA identidade específica (por npub) pra
+ * assinar UM evento sem trocar a identidade ativa (invariante #15: NÃO
+ * mexe em `user_prefs.active_identity` nem na tabela `identity` singular).
+ *
+ * Segurança (blockers da review):
+ *  - **NO-CACHE**: decifra fresco a cada chamada. Cachear N nsecs em RAM
+ *    aumentaria o blast radius do heap. Caller (signDriftEvent) é
+ *    responsável por `bytes.fill(0)` logo após `finalizeEvent`.
+ *  - **Assert pubkey**: `getPublicKey(bytes) === npub` antes de retornar.
+ *    Uma row corrompida/trocada assinaria sob um pubkey que o user nunca
+ *    viu = deanon silencioso. Mismatch → throw.
+ *  - **Mensagens de erro só com o npub (público)**: NUNCA incluir hex
+ *    decifrado, bytes ou ciphertext — `err.message` sobe pra UI (App.tsx).
+ *
+ * @param npub - pubkey hex 64 da identidade desejada.
+ * @returns Uint8Array(32) do secret key. Caller deve zerar após usar.
+ * @throws Se o npub não existe, ou se a chave decifrada não casa com ele.
+ */
+export async function getIdentitySecretKey(npub: string): Promise<Uint8Array> {
+  const row = await db.get<{ nsec_encrypted: string }>(
+    `SELECT nsec_encrypted FROM identities WHERE npub = ?`,
+    [npub],
+  )
+  if (!row) {
+    throw new Error(`Identidade não encontrada: ${npub}`)
+  }
+
+  const nsecHex = await decrypt(row.nsec_encrypted)
+  const bytes = nsecHexToBytes(nsecHex)
+
+  // Defesa contra row corrompida/trocada: jamais assinar sob um pubkey
+  // diferente do que o user escolheu (deanon silencioso). Mensagem só com
+  // o npub público — sem hex/bytes.
+  if (getPublicKey(bytes) !== npub) {
+    bytes.fill(0)
+    throw new Error(`Chave da identidade ${npub} não confere com o npub`)
+  }
+
+  return bytes
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────

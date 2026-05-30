@@ -36,23 +36,59 @@ export interface DriftEventInput {
 }
 
 /**
+ * Opções de assinatura. `signWithNpub` (per-post identity picker,
+ * manifesto §4) permite assinar UM evento como uma identidade escolhida
+ * SEM trocar a ativa (invariante #15 — sem reload, sem mexer em
+ * `active_identity`).
+ */
+export interface SignDriftEventOpts {
+  /** npub hex 64 da identidade que deve assinar este evento. */
+  signWithNpub?: string
+}
+
+/**
  * Assina um evento Drift com o nsec do usuário.
  *
  * Injeta `created_at` (unix seconds, agora) e `pubkey` automaticamente
  * — chamadores passam apenas `kind`, `tags` e `content`.
  *
+ * Por padrão assina com a identidade ATIVA (path inalterado). Quando
+ * `opts.signWithNpub` é passado, assina com aquela identidade específica
+ * via `getIdentitySecretKey` e ZERA os bytes emprestados logo após
+ * `finalizeEvent` (a chave da ativa, cacheada, NUNCA é tocada).
+ *
  * @param input - Evento sem assinatura, sem timestamp, sem pubkey.
+ * @param opts - Opcional. `signWithNpub` pra assinar como outra identidade.
  * @returns Evento Nostr completo com `id`, `sig`, `pubkey`, `created_at`.
  */
-export async function signDriftEvent(input: DriftEventInput): Promise<NostrEvent> {
-  const identity = await getOrCreateIdentity()
-  const nsecBytes = nsecHexToBytes(identity.nsec)
+export async function signDriftEvent(
+  input: DriftEventInput,
+  opts?: SignDriftEventOpts,
+): Promise<NostrEvent> {
   const template: EventTemplate = {
     kind: input.kind,
     tags: input.tags,
     content: input.content,
     created_at: Math.floor(Date.now() / 1000),
   }
+
+  if (opts?.signWithNpub) {
+    // Lazy import: mantém `identities.ts` (zustand store etc) fora do
+    // eager bundle de `nostr.ts` e evita qualquer risco de ciclo de import.
+    const { getIdentitySecretKey } = await import('./identities')
+    const borrowed = await getIdentitySecretKey(opts.signWithNpub)
+    try {
+      return finalizeEvent(template, borrowed)
+    } finally {
+      // Defesa em profundidade (§8): a chave emprestada some do heap
+      // logo após o ato de assinar. Só zera o buffer emprestado — a
+      // chave da identidade ATIVA é cacheada noutro lugar, intocada.
+      borrowed.fill(0)
+    }
+  }
+
+  const identity = await getOrCreateIdentity()
+  const nsecBytes = nsecHexToBytes(identity.nsec)
   return finalizeEvent(template, nsecBytes)
 }
 
