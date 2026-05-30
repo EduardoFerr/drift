@@ -65,6 +65,8 @@ interface ArcOut {
   t: number
   isCurrent?: boolean
   postId?: string
+  /** Aresta inferida (spreader→spreader estimado). origem→spreader = false. */
+  inferred?: boolean
 }
 interface ProbeResult {
   cascadePostId: string
@@ -121,6 +123,7 @@ async function probePropagation(page: Page, cascadePostId: string): Promise<Prob
       t: number
       isCurrent?: boolean
       postId?: string
+      inferred?: boolean
     }
     const db = (window as unknown as { __driftDb: DbApi }).__driftDb
 
@@ -146,7 +149,10 @@ async function probePropagation(page: Page, cascadePostId: string): Promise<Prob
       [postId],
     )
 
-    // ── POST mode (buildPostData): chain linear origin→d0→d1→... ──
+    // ── POST mode (buildPostData): árvore de cascata HONESTA via a função
+    //    REAL `inferCascadeTree` (lib/cascade.ts) — não mais cadeia linear.
+    //    Importamos o módulo do app (Vite serve em runtime) pra medir o
+    //    comportamento REAL, não uma re-implementação.
     const postRow = await db.get<{ location: string | null; created_at: number }>(
       `SELECT location, created_at FROM posts WHERE id = ?`,
       [postId],
@@ -161,17 +167,26 @@ async function probePropagation(page: Page, cascadePostId: string): Promise<Prob
       [postId],
     )
     const origin = parseLoc(postRow?.location ?? null)
-    const chain: Array<{ pos: [number, number]; ts: number }> = []
-    if (origin && postRow?.created_at) chain.push({ pos: [origin.lng, origin.lat], ts: postRow.created_at })
-    for (const r of postSpreadRows) {
-      const loc = parseLoc(r.location)
-      if (loc) chain.push({ pos: [loc.lng, loc.lat], ts: r.created_at })
-    }
-    const postArcs: ArcOutLocal[] = []
-    for (let i = 0; i < chain.length - 1; i++) {
-      const next = chain[i + 1]!
-      postArcs.push({ from: chain[i]!.pos, to: next.pos, t: 0 })
-    }
+    // @ts-expect-error -- módulo runtime do Vite, não resolvível por tsc
+    const cascade = await import('/src/lib/cascade.ts')
+    const originNode =
+      origin && postRow?.created_at
+        ? { lng: origin.lng, lat: origin.lat, ts: postRow.created_at }
+        : null
+    const cnodes = postSpreadRows
+      .map((r) => {
+        const loc = parseLoc(r.location)
+        return loc ? { lng: loc.lng, lat: loc.lat, ts: r.created_at } : null
+      })
+      .filter((n: unknown): n is { lng: number; lat: number; ts: number } => n !== null)
+    const postArcs: ArcOutLocal[] = cascade
+      .inferCascadeTree(originNode, cnodes, (ts: number) => ts)
+      .map((a: { from: [number, number]; to: [number, number]; inferred?: boolean }) => ({
+        from: a.from,
+        to: a.to,
+        t: 0,
+        inferred: a.inferred,
+      }))
 
     // ── GLOBAL mode (buildGlobalData): post.location→spread.location ──
     const globalRows = await db.exec<{
@@ -330,41 +345,38 @@ test('SPEC2 global model = ESTRELA a partir do autor, NÃO cascata Bob→Carol�
 })
 
 // ─────────────────────────────────────────────────────────────────────
-// SPEC 3 — POST mode: chain linear ENGANOSA (origin→d0→d1)
+// SPEC 3 — POST mode: árvore de cascata HONESTA (fix 2026-05-30)
+// Antes desenhava cadeia linear origin→d0→d1 (implicava Carol→Dave falso).
+// Agora inferCascadeTree: arestas origem→spreader LITERAIS, spreader→spreader
+// marcadas `inferred` (estimadas, render tracejado + rótulo §28).
 // ─────────────────────────────────────────────────────────────────────
 
-test('SPEC3 post model = chain linear Brasília→SP→Rio, sugere Carol→Dave falso', async () => {
+test('SPEC3 post = árvore honesta: origem→spreader literal, spreader→spreader inferred', async () => {
   const r = await probePropagation(page, cascadePostId)
 
   // Origin = Brasília (autor Alice).
   expect(r.postOrigin, 'post origin presente').not.toBeNull()
   expect(near(r.postOrigin![0], ALICE_GEO.lng) && near(r.postOrigin![1], ALICE_GEO.lat), 'origin = Brasília').toBe(true)
 
-  // Chain linear: [Brasília, SP, Rio] → 2 arcs consecutivos.
-  // (Bob excluído por GPS off → não entra na chain.)
-  expect(r.postArcs.length, 'post chain: 2 arcs (3 pontos)').toBe(2)
-
   const aliceLngLat: [number, number] = [ALICE_GEO.lng, ALICE_GEO.lat]
-  const carolLngLat: [number, number] = [CAROL_GEO.lng, CAROL_GEO.lat]
-  const daveLngLat: [number, number] = [DAVE_GEO.lng, DAVE_GEO.lat]
 
-  // Arc 0 = Brasília→SP (origin→primeiro destino). OK, fiel.
-  expect(arcMatches(r.postArcs[0]!, aliceLngLat, carolLngLat), 'arc0 = Brasília→SP').toBe(true)
+  // Toda aresta que SAI da origem (Brasília) é LITERAL (inferred=false): o
+  // evento SPREAD referencia o post de Alice — isso o dado AFIRMA.
+  const fromOrigin = r.postArcs.filter((a) => near(a.from[0], aliceLngLat[0]) && near(a.from[1], aliceLngLat[1]))
+  expect(fromOrigin.length, 'há ≥1 aresta origem→spreader').toBeGreaterThan(0)
+  for (const a of fromOrigin) {
+    expect(a.inferred ?? false, 'origem→spreader é LITERAL (inferred=false)').toBe(false)
+  }
 
-  // Arc 1 = SP→Rio. ESTE é o arc ENGANOSO: liga Carol→Dave por mera
-  // adjacência cronológica na chain, sugerindo visualmente que Carol
-  // passou o post pra Dave. NA VERDADE ambos espalharam o post da Alice;
-  // a chain linear inventa um elo geográfico que não corresponde nem ao
-  // follow-graph (Dave→Carol) nem a uma propagação real spreader→spreader.
-  expect(
-    arcMatches(r.postArcs[1]!, carolLngLat, daveLngLat),
-    'arc1 = SP→Rio (chain liga 2º ao 3º destino — elo enganoso)',
-  ).toBe(true)
+  // Toda aresta que NÃO sai da origem é spreader→spreader = ESTIMADA
+  // (inferred=true). NUNCA afirma transmissão registrada (§28).
+  const spreaderToSpreader = r.postArcs.filter((a) => !(near(a.from[0], aliceLngLat[0]) && near(a.from[1], aliceLngLat[1])))
+  for (const a of spreaderToSpreader) {
+    expect(a.inferred, 'spreader→spreader é ESTIMADA (inferred=true)').toBe(true)
+  }
 
-  // Confirmação: o post mode NÃO desenha origin→cada-dest (estrela real
-  // do "todo mundo espalhou o post da Alice"). Desenha cadeia sequencial.
-  // O fix #3c proposto no plano é exatamente origin→cada-dest.
-  // Veredito SPEC3: chain linear confirmada como modelo atual (enganosa).
+  // Não é mais cadeia linear forçada: é árvore (cada nó liga ao predecessor
+  // mais provável por tempo+geo, podendo ligar direto à origem).
 })
 
 // ─────────────────────────────────────────────────────────────────────
@@ -405,28 +417,35 @@ test('SPEC5 veredito: modelo MEDIDO = geográfico estrela (global) + chain linea
     cascadeSocialLinks: CASCADE.length, // 3
     geoVisibleLinks: r.cascadeSpreadRows.filter((x) => x.location !== null).length, // 2
     globalArcsForP1: r.globalArcsForP1.length, // 2
-    globalAllArcsStartAtAuthor: allGlobalFromAuthor, // true = ESTRELA
-    globalDrawsSpreaderToSpreader: hasSocialEdgeCarolDave, // false = NÃO cascata
-    postChainArcs: r.postArcs.length, // 2 (chain linear)
+    globalAllArcsStartAtAuthor: allGlobalFromAuthor, // true = ESTRELA (global intocado)
+    globalDrawsSpreaderToSpreader: hasSocialEdgeCarolDave, // false = NÃO cascata literal
+    postArcs: r.postArcs.length,
+    postInferredArcs: r.postArcs.filter((a) => a.inferred).length, // spreader→spreader estimados
+    postLiteralArcs: r.postArcs.filter((a) => !a.inferred).length, // origem→spreader literais
     globalArcTotalAggregate: r.globalArcTotal, // sanidade do agregado
   }
   // Imprime o veredito no relatório de teste (visível em --reporter=list).
   // eslint-disable-next-line no-console
   console.log('[PROPAGATION MODEL — MEDIDO]', JSON.stringify(verdict, null, 2))
 
-  // ── HIPÓTESE NULA CONFIRMADA (bug #3 presente): ──
-  // 1. Global desenha ESTRELA a partir do autor, não cascata social.
+  // ── MODELO FIXADO (deliberação Satoshi+HIMYM 2026-05-30): ──
+  // 1. Global = ESTRELA geográfica do autor (canônico, sem lente). Honesto:
+  //    o arco origem→spreader é o que o evento literalmente diz.
   expect(verdict.globalAllArcsStartAtAuthor, 'global = estrela do autor').toBe(true)
-  // 2. Global NÃO desenha o elo social spreader→spreader (Carol→Dave).
-  expect(verdict.globalDrawsSpreaderToSpreader, 'global não desenha cascata social').toBe(false)
-  // 3. Cascata social de 3 elos perde 1 (Bob GPS off) no mapa.
+  // 2. Global NÃO inventa elo spreader→spreader (não há transmissão registrada).
+  expect(verdict.globalDrawsSpreaderToSpreader, 'global não fabrica cascata social').toBe(false)
+  // 3. Cascata social de 3 elos perde 1 (Bob GPS off) — limite honesto da geo.
   expect(verdict.geoVisibleLinks).toBeLessThan(verdict.cascadeSocialLinks)
-  // 4. Post mode é chain linear (não estrela origin→cada-dest).
-  expect(verdict.postChainArcs).toBe(2)
+  // 4. Post = árvore HONESTA: ≥1 aresta literal (origem→spreader) e TODA
+  //    aresta spreader→spreader marcada `inferred` (estimada §28). NUNCA uma
+  //    cadeia que afirma transmissão não-registrada.
+  expect(verdict.postLiteralArcs, 'post tem ≥1 aresta literal origem→spreader').toBeGreaterThan(0)
+  // (postInferredArcs pode ser 0 se todos ligam direto à origem — ok; o que
+  //  importa é que NENHUMA aresta spreader→spreader seja não-inferred.)
 
-  // VEREDITO: bug #3 CONFIRMADO. O mapa NÃO é fiel à cascata social
-  // Alice→Bob→Carol→Dave. Global = estrela geográfica (autor→spreader);
-  // Post = chain linear cronológica (sugere elos spreader→spreader que
-  // não existem). Evidência pra deliberação #3b (geográfico vs social)
-  // e forcing-function da legenda honesta #5.
+  // VEREDITO: bug #3 RESOLVIDO honestamente. Global = estrela geográfica
+  // (literal). Post = árvore estimada com arestas spreader→spreader rotuladas
+  // `inferred` (§28: Drift não registra de quem cada um viu → não fabrica
+  // transmissão como fato). A "sensação de infecção" vem do eixo temporal
+  // (scrubber), não de elos falsos.
 })
