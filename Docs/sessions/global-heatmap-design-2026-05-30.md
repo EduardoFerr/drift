@@ -13,11 +13,24 @@ full). Sucede `map-model-deliberation-2026-05-30.md`.
 | **network** | ARCOS + lente PPR + pontes K=1 | "minha rede" | ✅ |
 
 ### Por que global → calor (não arcos)
-- **§28 privacidade:** arco/dot individual a cidade pequena = K=1 doxx
-  (known-limitations #7). Calor agrega → esconde o indivíduo.
-- **Escala:** full seed (~2730) = teia crua ilegível. Calor escala.
+- **Escala/legibilidade:** full seed (~2730) = teia crua ilegível. Calor escala.
 - **Honestidade:** arco origem→spreader agregado cross-post sugere transmissão
   que não existe. Calor = só densidade de atividade, sem aresta implícita.
+
+### Calor NÃO é privacidade (correção Satoshi 2026-05-30)
+Rejeitado o argumento "calor esconde o indivíduo / mitiga K=1 doxx". DUAS razões:
+1. **Tecnicamente falso:** HeatmapLayer usa os MESMOS pontos `[lng,lat]`. Ponto
+   solitário vira blob gaussiano CENTRADO na coord exata → centroide ainda revela
+   a localização. Mesma data dos dots, só borrada. Não esconde nada.
+2. **Filosoficamente proibido (§17/§25):** privacidade NÃO pode ser imposta. O user
+   já escolheu publicar a location (§27/§28 opt-in). Borrar a escolha dele "pra
+   proteger" = paternalismo = nos tornar ditadores da rede livre. A proteção mora
+   na ESCOLHA (publicar ou não), NUNCA no render forçado. Se publicou, mostramos
+   honesto.
+
+Logo o explainer NUNCA diz "calor protege sua localização". Diz "densidade de
+atividade". K=1 doxx continua endereçado SÓ no publish-time (granularidade de GPS
+opt-in que o user controla), não no modo de viz.
 
 ## Fórmulas (revisadas + travadas por Ted+Marshall)
 
