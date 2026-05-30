@@ -85,6 +85,32 @@ shipping prematuro).
 
 ---
 
+## Cadeia de perf do boot dev-seed — 2026-05-30 (full usável)
+
+User: "use full quando puder" + "após o seed fica um bom tempo parado". Boot
+full era ~minutos + trava frozen. Atacado em 3 floors sequenciais:
+
+- [x] **batch-INSERT** — fechado 2026-05-30 em `93b61f2` — drain fazia ~2
+  postMessages/evento × ~2730 = ~5500 roundtrips serializados. Agora writes
+  bufferizam (setWriteSink) + flush em transação (`db.batch`) por batch.
+  Drain ~2-3 ev/s → ~54 ev/s. Invariante #1 preservado (writes via
+  onNostrEvent→persist*→buffer). Verificado E2E 12/12.
+- [x] **recalcAllScores bulk** — fechado 2026-05-30 em `39afb47` — era a TRAVA
+  pós-drain (screenshot do user): `for each post: recalculateScore` ≈ 13k
+  roundtrips per-post. Agora 3 reads + compute JS (reusa fns puras) + 1
+  `db.batch` UPDATE. **Medido ao vivo: ~2.5s** (501 posts, 381 score>0, 3
+  moderados §26). Comments → path per-post (zero no seed). E2E 12/12.
+- [x] **anchor 1-pass** — fechado 2026-05-30 em `7151041` — o 2-pass assinava
+  ~2730 eventos 2× (~48s no full) só pra achar o maxTs. Agora pass-1 é probe
+  com finalize STUB (não assina, só created_at) → maxTs barato; pass-2 assina
+  1×. Signing full ~48s → ~24s. Reusa o MESMO código (stub swappable, zero
+  drift). E2E 12/12 + dev-seed-fixtures full-ancorado.
+
+Resultado: full boot ~minutos+trava → ~76s de progresso VISÍVEL (24s sign +
+~50s drain + 2.5s recalc), sem trava frozen. Drain (~50s, JS-bound a ~54 ev/s)
+é o maior floor restante — otimizável (skip checks no seed trusted) mas dor
+aguda resolvida.
+
 ## E2E Fase B desbloqueado + 2 achados — 2026-05-29 (noite II)
 
 Rodando as suites E2E pela 1ª vez (antes nunca carregavam — header dizia
