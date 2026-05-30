@@ -284,6 +284,16 @@ export interface PropagationArc {
    * ao post sendo visualizado por construção).
    */
   isCurrent?: boolean
+  /**
+   * True quando o arco é uma ARESTA INFERIDA (não registrada). Post mode
+   * (cascata viral 2026-05-30): a transmissão "quem viu de quem" NÃO existe
+   * nos eventos (SPREAD só referencia o post, nunca o spreader-fonte —
+   * registrar isso vazaria o grafo de atenção). A árvore de cascata é
+   * ESTIMADA por proximidade tempo+geo. `inferred:true` → render tracejado +
+   * rótulo §28 "rota estimada". Arcos da origem (post→1º spreader) e o
+   * agregado global NÃO são inferred (são o que o evento literalmente diz).
+   */
+  inferred?: boolean
 }
 
 /**

@@ -131,16 +131,25 @@ type OverlayInstance = { setProps: (p: { layers: unknown[] }) => void }
 //   - drawing (draw<1): cabeça viva (alpha alto) → leitura de "frente".
 //   - source mais opaco que target: gradiente direcional A→B.
 //   - recency multiplica o alpha: arcos velhos recuam, recentes brilham.
-type ArcShade = { isCurrent?: boolean; draw: number; recency: number }
+type ArcShade = { isCurrent?: boolean; inferred?: boolean; draw: number; recency: number }
 type RGBA = [number, number, number, number]
 
 const ARC_HUE_CURRENT: [number, number, number] = [232, 255, 90] // chartreuse
 const ARC_HUE_OTHER: [number, number, number] = [52, 211, 153] // mint
+// Aresta ESTIMADA (spreader→spreader inferido, post mode). Cinza-azulado frio
+// + alpha reduzido → lê como "incerto/tracejado" vs o mint sólido das arestas
+// literais. Honestidade §28: o olho distingue rota registrada de rota estimada.
+const ARC_HUE_INFERRED: [number, number, number] = [120, 150, 180] // slate frio
+const INFERRED_ALPHA = 0.45 // estimado vive ~45% do alpha de uma literal
 
 /** Cor do corpo do arco num endpoint ('source' = origem, 'target' = tip).
  *  Source mais opaco que target → gradiente direcional. */
 function arcColor(d: ArcShade, end: 'source' | 'target'): RGBA {
-  const [r, g, b] = d.isCurrent ? ARC_HUE_CURRENT : ARC_HUE_OTHER
+  const [r, g, b] = d.inferred
+    ? ARC_HUE_INFERRED
+    : d.isCurrent
+    ? ARC_HUE_CURRENT
+    : ARC_HUE_OTHER
   const drawing = d.draw < 1
   // Alpha base por estado: corrente vive mais alto que os demais.
   const headBase = d.isCurrent ? 255 : 165
@@ -148,17 +157,23 @@ function arcColor(d: ArcShade, end: 'source' | 'target'): RGBA {
   const base = drawing ? headBase : bodyBase
   // Target levemente mais translúcido que source (sensação de fluxo).
   const endFactor = end === 'source' ? 1 : 0.62
-  const a = Math.round(base * endFactor * d.recency)
+  const inferFactor = d.inferred ? INFERRED_ALPHA : 1
+  const a = Math.round(base * endFactor * d.recency * inferFactor)
   return [r, g, b, a]
 }
 
 /** Cor do glow underlay — mesma hue, alpha baixo modulado por recência.
- *  Aditivo: cruzamentos somam luz. */
+ *  Aditivo: cruzamentos somam luz. Arestas estimadas quase não brilham. */
 function glowColor(d: ArcShade): RGBA {
-  const [r, g, b] = d.isCurrent ? ARC_HUE_CURRENT : ARC_HUE_OTHER
+  const [r, g, b] = d.inferred
+    ? ARC_HUE_INFERRED
+    : d.isCurrent
+    ? ARC_HUE_CURRENT
+    : ARC_HUE_OTHER
   const drawing = d.draw < 1
   const base = d.isCurrent ? (drawing ? 90 : 60) : drawing ? 55 : 32
-  return [r, g, b, Math.round(base * d.recency)]
+  const inferFactor = d.inferred ? INFERRED_ALPHA : 1
+  return [r, g, b, Math.round(base * d.recency * inferFactor)]
 }
 
 // ─── Public component ─────────────────────────────────────────────────

@@ -81,8 +81,14 @@ export function getMapExplainerCopy(context: MapExplainerContext): ExplainerCopy
         {
           swatch: 'rgb(52, 211, 153)',
           shape: 'line',
-          label: 'arco de propagação',
-          hint: 'liga origem → drifts em ordem cronológica',
+          label: 'arco sólido (verde) — ligação à origem',
+          hint: 'o post foi DRIFT-ado por essa pessoa: ligação REGISTRADA (o evento referencia o post)',
+        },
+        {
+          swatch: 'rgb(120, 150, 180)',
+          shape: 'line',
+          label: 'arco fraco (cinza) — rota ESTIMADA',
+          hint: 'cascata provável entre spreaders por tempo+proximidade. Drift NÃO registra de quem cada um viu (vazaria o grafo de atenção, §28) — esta aresta é um palpite, não um fato.',
         },
       ],
     }

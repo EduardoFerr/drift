@@ -23,6 +23,7 @@
 
 import { useEffect, useState } from 'react'
 import { db } from '../lib/db'
+import { inferCascadeTree } from '../lib/cascade'
 import { seedFromSpreaders } from '../lib/seeder'
 import { useFollowsStore } from '../lib/follows'
 import { useBootStore } from '../lib/bootstrap'
@@ -149,17 +150,16 @@ async function buildPostData(postId: string): Promise<SpreadMapData> {
     })
     .filter((r): r is LocatedSpread => r !== null)
 
-  // Build chain: [origin?, dest0, dest1, ...]
-  type ChainPoint = { pos: [number, number]; ts: number }
-  const chain: ChainPoint[] = []
-  if (origin && postRow?.created_at) {
-    chain.push({ pos: [origin.lng, origin.lat], ts: postRow.created_at })
-  }
-  for (const r of records) {
-    chain.push({ pos: [r.location.lng, r.location.lat], ts: r.createdAt })
-  }
-
-  const { normalize } = makeNormalizer(chain.map((c) => c.ts))
+  // Cascata viral HONESTA (2026-05-30): antes era cadeia linear
+  // origem→d0→d1→d2 (consecutivos por tempo), que IMPLICAVA d0→d1 — uma
+  // transmissão fabricada (o evento não registra "de quem cada um viu").
+  // Agora árvore estimada por proximidade tempo+geo (lib/cascade.ts): cada
+  // spread liga ao predecessor mais provável. Arcos origem→spreader =
+  // literais; spreader→spreader = inferred (tracejado + rótulo §28).
+  const tsForNorm: number[] = []
+  if (origin && postRow?.created_at) tsForNorm.push(postRow.created_at)
+  for (const r of records) tsForNorm.push(r.createdAt)
+  const { normalize } = makeNormalizer(tsForNorm)
 
   const destinations = records.map((r) => ({
     point: r.location,
@@ -167,11 +167,15 @@ async function buildPostData(postId: string): Promise<SpreadMapData> {
     t: normalize(r.createdAt),
   }))
 
-  const arcs: PropagationArc[] = []
-  for (let i = 0; i < chain.length - 1; i++) {
-    const next = chain[i + 1]
-    if (next) arcs.push({ from: chain[i]!.pos, to: next.pos, t: normalize(next.ts) })
-  }
+  const originNode =
+    origin && postRow?.created_at
+      ? { lng: origin.lng, lat: origin.lat, ts: postRow.created_at }
+      : null
+  const arcs: PropagationArc[] = inferCascadeTree(
+    originNode,
+    records.map((r) => ({ lng: r.location.lng, lat: r.location.lat, ts: r.createdAt })),
+    normalize,
+  )
 
   const allCountries = new Set<string>()
   if (origin) allCountries.add(regionKey(origin))
