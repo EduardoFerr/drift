@@ -364,6 +364,55 @@ describe('anchor de tempo (anti-staleness)', () => {
     },
     30_000,
   )
+
+  // FULL ancorado (user 2026-05-29: "testou com dev-seed não-lite?"). O drain
+  // full no browser é bloqueado pelo floor (batch-INSERT pendente), mas o BUILD
+  // ancorado full nunca tinha sido exercido. Confirma que o anchor escala:
+  // preserva CONTAGEM (só shifta tempo, não cria/dropa evento) + causalidade +
+  // newest ≈ now. Preservar a contagem prova que o 63-vs-61 do score #5 NÃO é
+  // o anchor (é o mock-mesh leak cross-context). 2-pass × signing → lento.
+  it(
+    'FULL ancorado: mesma CONTAGEM que full puro (anchor só shifta tempo)',
+    () => {
+      const pure = getSeedEvents('full')
+      const anchored = buildSeedEvents('full', 1_900_000_000)
+      // Anchor NÃO altera o nº de eventos — só os timestamps/ids.
+      expect(anchored.domain.length).toBe(pure.domain.length)
+      expect(anchored.contactLists.length).toBe(pure.contactLists.length)
+      // ids diferentes (timeline shiftada).
+      expect(anchored.domain.map((e) => e.id)).not.toEqual(pure.domain.map((e) => e.id))
+    },
+    180_000,
+  )
+
+  it(
+    'FULL ancorado: newest ≈ now + causalidade preservada em escala',
+    () => {
+      const anchor = 1_900_000_000
+      const anchored = buildSeedEvents('full', anchor)
+      const maxTs = Math.max(...anchored.domain.map((e) => e.created_at))
+      expect(maxTs).toBeLessThanOrEqual(anchor)
+      expect(maxTs).toBeGreaterThan(anchor - 1 * 24 * HOUR)
+      // causalidade: nenhuma reação precede o post-alvo (full ~2000 spreads).
+      const postTime = new Map<string, number>()
+      for (const e of anchored.domain) {
+        if (e.kind === DRIFT_KIND.POST) postTime.set(e.id, e.created_at)
+      }
+      let checked = 0
+      for (const e of anchored.domain) {
+        if (e.kind === DRIFT_KIND.SPREAD || e.kind === DRIFT_KIND.BURY) {
+          const tid = e.tags.find((t) => t[0] === 'e')?.[1]
+          const pt = tid ? postTime.get(tid) : undefined
+          if (pt !== undefined) {
+            expect(e.created_at).toBeGreaterThanOrEqual(pt)
+            checked++
+          }
+        }
+      }
+      expect(checked).toBeGreaterThan(1000)
+    },
+    180_000,
+  )
 })
 
 // ─── 5. Cascata A→B→C→D (bug #3 ground-truth) ───────────────────────
