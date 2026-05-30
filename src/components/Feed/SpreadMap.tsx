@@ -485,6 +485,10 @@ function GlobalModeMap({ data, className, mode, onModeChange }: ModeMapProps) {
   // pós-recomputeLens; zero query extra).
   const lensShowInMapPref = usePrefsStore((s) => s.lens_show_in_map)
   const pprScores = useLensStore((s) => s.pprScores)
+  // Pontes K=1 (Fase 2b): nós que são única via até alguém na MINHA rede.
+  // Ring mecânico só no network + lente ON (mesmo gate da cor PPR). Sinal
+  // estrutural local, nunca moral (§22/§25).
+  const bridges = useLensStore((s) => s.bridges)
   // §24 (deliberação 2026-05-30, ver [[reference_map_model]]): a LENTE só
   // pode tingir o modo NETWORK (minha WoT local). global/post são canônicos
   // e compartilhados — NUNCA personalizados pela minha lente. Antes
@@ -553,6 +557,16 @@ function GlobalModeMap({ data, className, mode, onModeChange }: ModeMapProps) {
       count: n.spreadCount,
       npub: n.npub,
     }))
+
+    // Pontes K=1 (Fase 2b): subset dos socialNodes cujo npub é única via
+    // até ≥1 pessoa na minha rede. Só no network + lente ON. Render como
+    // ring (anel vazado) acima do nó — sinal mecânico, não juízo de valor.
+    const bridgeNodes =
+      lensShowInMap
+        ? socialNodes
+            .filter((n) => bridges.has(n.npub))
+            .map((n) => ({ ...n, blast: bridges.get(n.npub) ?? 0 }))
+        : []
 
     void (async () => {
       try {
@@ -715,6 +729,32 @@ function GlobalModeMap({ data, className, mode, onModeChange }: ModeMapProps) {
                       lineWidthUnits: 'pixels',
                       pickable: true,
                       updateTriggers: { getFillColor: lensShowInMap },
+                    }),
+                  ]
+                : []),
+              // ─── Pontes K=1 (Fase 2b) — ring mecânico ────────────────────
+              //
+              // Anel vazado (stroked, fill transparente) ao redor de nós que
+              // são única via até alguém na MINHA rede. Raio > o do nó pra
+              // formar halo. Cor accent2 (não verde/vermelho — evita semântica
+              // moral "bom/ruim"). Só network + lente ON. Render acima dos
+              // social-nodes pra o anel cercar o pin. Manifesto §22/§25.
+              ...(bridgeNodes.length > 0
+                ? [
+                    new ScatterplotLayer({
+                      id: 'bridge-rings',
+                      data: bridgeNodes,
+                      getPosition: (d: { pos: [number, number] }) => d.pos,
+                      getRadius: (d: { count: number }) =>
+                        Math.max(4, Math.sqrt(d.count) * 4) + 5,
+                      getFillColor: [0, 0, 0, 0] as [number, number, number, number],
+                      stroked: true,
+                      filled: false,
+                      getLineColor: [244, 130, 14, 230] as [number, number, number, number],
+                      getLineWidth: 2,
+                      lineWidthUnits: 'pixels',
+                      radiusUnits: 'pixels',
+                      pickable: false,
                     }),
                   ]
                 : []),

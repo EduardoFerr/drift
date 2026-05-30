@@ -142,6 +142,50 @@ test.describe('mapa NETWORK — filtro §24 por follows (evidência)', () => {
     }
   })
 
+  test('5. lente ACENDE: PPR cache não-vazio pra grace após follows (Fase 2b "PPR real")', async ({
+    browser,
+  }) => {
+    // Regressão do gap descoberto 2026-05-30: recomputeLens não tinha
+    // caller → lens_walks_cache ficava VAZIO pra sempre → cores PPR e
+    // pontes da legenda nunca apareciam. O trigger em bootstrap
+    // (startLensAutoRecompute) recomputa do grafo de follows (NIP-02,
+    // fallback quando lens_edges vazio). Prova end-to-end que a lente
+    // materializa scores pro user ativo.
+    const grace = await setupUser(browser, 'grace')
+    try {
+      await waitSeedSettled(grace.page)
+      // recompute é debounced (400ms) + disparado on follows-change; faz
+      // poll até o cache popular (ou timeout do expect.poll).
+      const graceNpub = NAMED_BY_NAME.grace!.pub
+      await expect
+        .poll(
+          async () => {
+            const rows = await dbExec<{ n: number }>(
+              grace.page,
+              `SELECT COUNT(*) AS n FROM lens_walks_cache WHERE source_npub = ?`,
+              [graceNpub],
+            )
+            return rows[0]?.n ?? 0
+          },
+          { timeout: 8000, message: 'lens_walks_cache deve popular pra grace (lente acendeu)' },
+        )
+        .toBeGreaterThan(0)
+      // E os targets do cache ∈ rede alcançável de grace (não lixo): todos
+      // os scores são > 0 e < 1 (PPR normalizado, soma ≤ 1).
+      const cache = await dbExec<{ target_npub: string; ppr_score: number }>(
+        grace.page,
+        `SELECT target_npub, ppr_score FROM lens_walks_cache WHERE source_npub = ?`,
+        [graceNpub],
+      )
+      for (const row of cache) {
+        expect(row.ppr_score).toBeGreaterThan(0)
+        expect(row.ppr_score).toBeLessThanOrEqual(1)
+      }
+    } finally {
+      await grace.context.close()
+    }
+  })
+
   test('4. NEGATIVO: dave (não seguido) aparece no global, some do network de grace', async ({
     browser,
   }) => {

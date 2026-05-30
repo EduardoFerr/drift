@@ -423,6 +423,8 @@ src/
 │   ├── follows.ts         NIP-02 (kind 3) follows + store (Fase 5)
 │   ├── identities.ts      multi-identidade (Fase 5) — manifesto §4
 │   ├── moderation-local.ts  block/mute local (Fase 5) — manifesto §24
+│   ├── trust-lens.ts      PPR lens (strength/pprScores/bridges) + recomputeLens (fallback follows-graph quando lens_edges vazio); trigger boot+follows em bootstrap.ts
+│   ├── wot.ts             sinais WoT mecânicos: findBridges (ponte K=1, network-only) — Fase 2b §22/§25
 │   ├── bip39.ts           NIP-06 BIP39→nsec opt-in (Fase 5)
 │   ├── passkey.ts         WebAuthn gate opt-in (Fase 5)
 │   ├── probe.ts           probe anti-eclipse (Fase 5) — manifesto §20

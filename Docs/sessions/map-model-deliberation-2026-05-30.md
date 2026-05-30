@@ -35,10 +35,39 @@ deliberadamente não captura caminho de transmissão (privacy-correct).
 - rótulo moral "saudável/tóxico" em pessoa → reputação §22 + chave-mestra §25.
 - lente no global/post → feed canônico personalizado §24.
 
+## Fonte da aresta WoT (decisão 2026-05-30, "3 e 1")
+
+Pergunta: o que define a aresta source→target da MINHA lente?
+- **NIP-02 follows** = topologia pública, barata, dá FORMA ao grafo (PPR tem
+  estrutura, pontes podem existir). Sybil-limitado: PPR do MEU nó exige caminho
+  de entrada do meu conjunto confiável.
+- **Interação (meus spreads)** = preferência revelada, mais cara de forjar, mas
+  NÃO cria alcance novo — só reponderra. `lens_edges`/`computeInfluence` foi
+  DESENHADO pra isso mas nunca foi cabeado.
+- **Decisão = HÍBRIDO**: follows = base topológica (influence=1), interação =
+  refinamento ponderado que tem PRECEDÊNCIA. Pontes dependem da PROFUNDIDADE do
+  follow-graph, não da interação.
+
+## Gap crítico descoberto + corrigido (2026-05-30)
+`recomputeLens` / `recordEdge` / `upsertEdge` **não tinham NENHUM caller** →
+`lens_edges` ficava vazio pra sempre → `pprScores` vazio → cores PPR (2a) E
+pontes NUNCA acendiam no app real. Era o verdadeiro "gap da legenda".
+**Fix**: `bootstrap.ts:startLensAutoRecompute` recomputa no boot + on
+follows-change (debounced, fire-and-forget); `recomputeLens` cai pro grafo de
+follows (NIP-02, influence=1) quando `lens_edges` vazio. MCP-validado:
+cache PPR de grace acende com scores reais.
+
 ## Implementação (fases)
-- ✅ **Fase 1** (commit pendente): post → árvore honesta (`lib/cascade.ts` +
-  arcos `inferred` tracejados + rótulo §28 no MapExplainer). Unit lock
-  `tests/cascade.test.ts` (6) + E2E `propagation-model.spec` reescrito (5/5).
-- ⏳ **Fase 2**: network → `lib/wot.ts` (PPR real + pontes K=1 + cluster +
-  filtro-hit), cores mecânicas, lente gateada SÓ no network (hoje
-  `lens_show_in_map` pode pintar global → restringir).
+- ✅ **Fase 1**: post → árvore honesta (`lib/cascade.ts` + arcos `inferred`
+  tracejados + rótulo §28). `tests/cascade.test.ts` (6) + `propagation-model.spec` (5/5).
+- ✅ **Fase 2a**: lente gateada SÓ no network (`lensShowInMap = pref && mode==='network'`).
+- ✅ **Fase 2b**: `lib/wot.ts:findBridges` (ponte K=1 = cut-vertex source-rooted,
+  blastCount). Ring mecânico no network map (cor accent2, NUNCA verde/vermelho —
+  sem semântica moral). Legenda + explainer copy mecânica ("única via até N
+  pessoas", "não é juízo de valor"). Pipeline da lente CABEADO (boot+follows
+  trigger, fallback follows-graph). Seed aprofundado (carol→frank→heidi cauda
+  exclusiva → carol = ponte blast=2 na lente de grace). Locks: `tests/wot.test.ts`
+  (12) + `map-explainer-conformance` (anti-rótulo-moral) + `network-map.spec` #5
+  (lente acende). MCP: ring renderiza em São Paulo (grace), global/post sem ring (§24).
+- ⏳ **Fase 2b+ (futuro)**: cluster isolado + filtro-hit; `recordEdge` on-spread
+  (interação ponderada live, hoje só fallback follows); recompute em worker thread.

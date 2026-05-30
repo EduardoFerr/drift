@@ -17,7 +17,7 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 
 vi.mock('../src/lib/db', () => ({
-  db: { exec: vi.fn(), run: vi.fn(), get: vi.fn() },
+  db: { exec: vi.fn(), run: vi.fn(), get: vi.fn(), batch: vi.fn() },
 }))
 vi.mock('../src/lib/nostr', async () => {
   const actual = await vi.importActual<typeof import('../src/lib/nostr')>(
@@ -34,6 +34,8 @@ vi.mock('../src/lib/verify', () => ({
 }))
 vi.mock('../src/lib/scoring', () => ({
   calculateScoreNow: vi.fn(() => 0),
+  // Bulk recalcAllScores (2026-05-29) usa calculateScore puro direto.
+  calculateScore: vi.fn(() => 0),
   applyCommentReceived: vi.fn((args: { currentScore: number }) => args.currentScore),
 }))
 vi.mock('../src/lib/feed', () => ({
@@ -69,6 +71,7 @@ const dbMock = db as unknown as {
   exec: ReturnType<typeof vi.fn>
   run: ReturnType<typeof vi.fn>
   get: ReturnType<typeof vi.fn>
+  batch: ReturnType<typeof vi.fn>
 }
 const verifyMock = verifyEventAsync as unknown as ReturnType<typeof vi.fn>
 const invalidateFeedMock = invalidateFeed as unknown as ReturnType<typeof vi.fn>
@@ -83,9 +86,11 @@ beforeEach(() => {
   dbMock.run.mockReset()
   dbMock.exec.mockReset()
   dbMock.get.mockReset()
+  dbMock.batch.mockReset()
   dbMock.run.mockResolvedValue(undefined)
   dbMock.exec.mockResolvedValue([])
   dbMock.get.mockResolvedValue(null)
+  dbMock.batch.mockResolvedValue(undefined)
   verifyMock.mockReset()
   verifyMock.mockResolvedValue(true)
   invalidateFeedMock.mockReset()
@@ -442,20 +447,28 @@ describe('recalcAllScores — bulk pass (dev-seed)', () => {
   it('recalcula todos os posts + modera reportados (recalc antes de moderação §26)', async () => {
     const POST_A = HEX('a')
     const POST_B = HEX('b')
-    // exec #1: SELECT id FROM posts → 2 posts.
-    // recalc de cada post chama exec (UNION actions) → [] (sem ações).
-    // exec final: SELECT DISTINCT post_id FROM reports → 1 reportado.
+    // BULK pass (2026-05-29): 3 reads (posts c/ created_at+author_pub,
+    // spreads, buries, users), UPDATEs via db.batch (1 transação), depois
+    // comments + reports. UPDATE não passa mais por db.run — vai pro batch.
     dbMock.exec.mockImplementation(async (sql: string) => {
-      if (/SELECT id FROM posts/i.test(sql)) return [{ id: POST_A }, { id: POST_B }]
+      if (/SELECT id, created_at, author_pub FROM posts/i.test(sql))
+        return [
+          { id: POST_A, created_at: 1714000000, author_pub: HEX('f') },
+          { id: POST_B, created_at: 1714000000, author_pub: HEX('f') },
+        ]
       if (/DISTINCT post_id FROM reports/i.test(sql)) return [{ post_id: POST_A }]
-      return [] // UNION de ações + comments → vazio
+      // spreads / buries / users / comments DISTINCT → vazio
+      return []
     })
-    dbMock.get.mockResolvedValue({ created_at: 1714000000, author_pub: HEX('f') })
 
     await recalcAllScores()
 
-    // Cada post recebeu UPDATE de score (recalc).
-    expect(runCallsMatching(/UPDATE posts SET score/i).length).toBe(2)
+    // Cada post recebeu UPDATE de score via db.batch (bulk). Conta ops
+    // UPDATE em todas as chamadas de batch.
+    const batchedUpdates = dbMock.batch.mock.calls
+      .flatMap((c) => (c[0] as Array<{ sql: string }>))
+      .filter((op) => /UPDATE posts SET score/i.test(op.sql))
+    expect(batchedUpdates.length).toBe(2)
     // Post reportado passou por moderação — DEPOIS do recalc (§26 -999 último).
     expect(maybeModerateMock).toHaveBeenCalledTimes(1)
     expect(maybeModerateMock).toHaveBeenCalledWith(POST_A, expect.any(Number))

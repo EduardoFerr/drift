@@ -79,6 +79,27 @@ audits só por feio. Defer documentado > silence.
 - **Reopener:** Telemetria local p95 > 200ms OR user report de UI
   stutter.
 
+### 4b. Lente alimentada SÓ por follows (interação não cabeada) — Fase 2b
+
+- **Issue:** o builder de aresta por interação (`recordEdge` on-spread,
+  `lens_edges` interação-ponderado) **não tem caller** ainda. Até
+  2026-05-30 NADA chamava `recomputeLens` → a lente ficava dormente
+  (pprScores vazio, cores/pontes nunca apareciam). Corrigido cabeando
+  `bootstrap.ts:startLensAutoRecompute` (boot + on follows-change) com
+  `recomputeLens` caindo pro **grafo de follows (NIP-02, influence=1)**
+  quando `lens_edges` está vazio.
+- **Status:** PARCIAL. A lente acende (follows-graph), mas é HÍBRIDO só na
+  teoria — a metade de interação (spreads ponderando influence) ainda não
+  popula `lens_edges`. Hoje toda aresta vale 1.
+- **Risk:** LOW. Follows-graph já dá topologia válida + Sybil-resistência
+  (PPR do meu nó). Falta só o refinamento de peso por preferência revelada.
+- **Mitigation:** decisão de fonte registrada (HÍBRIDO) em
+  `Docs/sessions/map-model-deliberation-2026-05-30.md`; fallback follows
+  documentado no código. Pontes (`wot.ts:findBridges`) dependem da
+  PROFUNDIDADE do follow-graph, não da interação — já funcionam.
+- **Reopener:** quando wirar `recordEdge` no ingest de SPREAD próprio
+  (interação ponderada live) — vira increment "Fase 2b+".
+
 ---
 
 ## Weight / Score

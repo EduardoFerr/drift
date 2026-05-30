@@ -144,7 +144,17 @@ function named(
 export const NAMED_IDENTITIES: readonly SeedIdentity[] = Object.freeze([
   named('alice', geo(-15.79, -47.88, 'Brasília', 'BR'), [], TS_BASE - 30 * WEEK),
   named('bob', null, [NAMED_PUBS.alice], TS_BASE - 12 * WEEK),
-  named('carol', geo(-23.55, -46.63, 'São Paulo', 'BR'), [NAMED_PUBS.bob], TS_BASE - 6 * WEEK),
+  // carol → bob (cascata, LOCK) + frank (cauda EXCLUSIVA pra grace). grace
+  // segue alice/bob/carol DIRETO, mas NÃO frank/heidi — então carol vira a
+  // ÚNICA via de grace até frank→heidi: carol é PONTE K=1 (blast=2) na lente
+  // de grace. Demonstra `wot.ts:findBridges` no mapa network. Ver
+  // network-map.spec + Docs/sessions/map-model-deliberation-2026-05-30.md.
+  named(
+    'carol',
+    geo(-23.55, -46.63, 'São Paulo', 'BR'),
+    [NAMED_PUBS.bob, NAMED_PUBS.frank],
+    TS_BASE - 6 * WEEK,
+  ),
   named('dave', geo(-22.9, -43.17, 'Rio de Janeiro', 'BR'), [NAMED_PUBS.carol], TS_BASE - 2 * WEEK),
   named(
     'erin',
@@ -152,7 +162,8 @@ export const NAMED_IDENTITIES: readonly SeedIdentity[] = Object.freeze([
     [NAMED_PUBS.alice, NAMED_PUBS.carol],
     TS_BASE - 20 * WEEK,
   ),
-  named('frank', geo(52.52, 13.4, 'Berlin', 'DE'), [NAMED_PUBS.alice], TS_BASE - 16 * WEEK),
+  // frank → alice + heidi: estende a cauda exclusiva carol→frank→heidi.
+  named('frank', geo(52.52, 13.4, 'Berlin', 'DE'), [NAMED_PUBS.alice, NAMED_PUBS.heidi], TS_BASE - 16 * WEEK),
   named(
     'grace',
     geo(35.68, 139.69, 'Tokyo', 'JP'),

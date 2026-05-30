@@ -143,6 +143,30 @@ describe('MapExplainerCard — export + copy + legenda', () => {
     expect(copy.purpose).toMatch(/§24/)
   })
 
+  // Fase 2b (deliberação 2026-05-30): network ganha sinal de ponte K=1.
+  it('network: legenda inclui PONTE K=1 (shape ring, copy mecânica)', () => {
+    const net = getMapExplainerCopy('network')
+    const bridge = net.legend.find((l) => /ponte/i.test(l.label))
+    expect(bridge).toBeDefined()
+    expect(bridge!.shape).toBe('ring')
+    // copy é MECÂNICA ("única via"), explicitamente NÃO juízo de valor
+    expect(bridge!.hint ?? '').toMatch(/única via/i)
+    expect(bridge!.hint ?? '').toMatch(/não é juízo de valor/i)
+  })
+
+  it('network: copy de ponte NÃO usa rótulo moral (§22/§25 NO-GO)', () => {
+    const net = getMapExplainerCopy('network')
+    const joined = net.legend
+      .map((l) => `${l.label} ${l.hint ?? ''}`)
+      .join(' ')
+      .toLowerCase()
+    // proibido rotular pessoa como saudável/tóxica/perigosa/suspeita —
+    // isso seria reputação subjetiva (§22) / chave-mestra (§25).
+    expect(joined).not.toMatch(/saudáve|tóxic|perigos|suspeit|confiáve. demais|nociv/)
+    // mas DEVE citar a justificativa do princípio
+    expect(joined).toMatch(/§22|§25/)
+  })
+
   it('copy post/global/network reforça "tamanho ≠ qualidade" (Satoshi A5 Gap #1)', () => {
     // LOCK_VIA_TEST: bandwagon visual mitigation — explicit no-quality
     // disclaimer em cada copy de mode.

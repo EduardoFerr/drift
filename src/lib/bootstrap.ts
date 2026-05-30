@@ -24,8 +24,8 @@ import { loadPrefs, usePrefsStore } from './prefs'
 import { applyTheme, DEFAULT_THEME_ID, isThemeId } from './theme'
 import { loadRelays } from './relays'
 import { loadIdentities } from './identities'
-import { loadFollows } from './follows'
-import { loadLens } from './trust-lens'
+import { loadFollows, useFollowsStore } from './follows'
+import { loadLens, recomputeLens } from './trust-lens'
 import { initBuiltinLenses } from './lens/init'
 import { loadModLocal } from './moderation-local'
 // V10.11 — passkey movido pra dynamic import. ~3.58 KB raw / 1.4 KB gz
@@ -157,6 +157,42 @@ export const useBootStore = create<BootState>(() => INITIAL)
 
 function setBoot(updater: (s: BootState) => BootState): void {
   useBootStore.setState(updater)
+}
+
+// ─── Trust Lens auto-recompute (Fase 2b "PPR real", 2026-05-30) ──────
+//
+// A lente não tinha NENHUM caller de recomputeLens — pprScores ficava
+// vazio pra sempre e a legenda prometia cores/pontes que nunca apareciam.
+// Este trigger conserta: recomputa a lente do user ativo no boot e sempre
+// que o conjunto de follows muda (cobre follow/unfollow runtime + o drain
+// do dev-seed, onde follows chegam via kind 3 durante o boot). Debounced
+// pra colapsar bursts; fire-and-forget (nunca bloqueia/derruba o boot).
+// recomputeLens internamente cai pro grafo de follows quando lens_edges
+// está vazio (topologia pública NIP-02, influence=1) — manifesto §24/§28.
+let lensAutoStarted = false
+let lensRecomputeTimer: ReturnType<typeof setTimeout> | null = null
+function startLensAutoRecompute(): void {
+  if (lensAutoStarted) return
+  lensAutoStarted = true
+  // best-effort TOTAL: a lente NUNCA pode abortar o boot (transport
+  // registration vem depois). Qualquer throw aqui (store mockado sem
+  // subscribe em teste, etc) é engolido.
+  try {
+    const trigger = (): void => {
+      try {
+        const npub = useBootStore.getState().identity?.npub ?? null
+        if (!npub) return
+        if (lensRecomputeTimer) clearTimeout(lensRecomputeTimer)
+        lensRecomputeTimer = setTimeout(() => {
+          void recomputeLens(npub).catch(() => { /* lente é best-effort */ })
+        }, 400)
+      } catch { /* best-effort */ }
+    }
+    trigger() // boot: follows locais podem já existir
+    if (typeof useFollowsStore?.subscribe === 'function') {
+      useFollowsStore.subscribe(trigger) // reativo a follow/unfollow + drain seed
+    }
+  } catch { /* lente best-effort — nunca bloqueia boot */ }
 }
 
 /** Adiciona razão à lista de degradedReasons mantendo idempotência por
@@ -370,6 +406,15 @@ async function doBootstrap(): Promise<void> {
     // Idempotente. Após este ponto, getActiveLens() está disponível.
     // Manifesto §17 — registry open, user troca lente livremente.
     initBuiltinLenses()
+
+    // Fase 2b "PPR real" (2026-05-30): a lente PRECISA de um trigger de
+    // recompute — sem ele, lens_edges/follows nunca viram pprScores e a
+    // legenda promete cores que nunca aparecem (gap descoberto 2026-05-30).
+    // recomputeLens cai pro grafo de follows (NIP-02) quando lens_edges
+    // está vazio. Disparamos no boot (follows já carregados localmente) e
+    // reativamente quando o conjunto de follows muda (follow/unfollow OU
+    // drain do dev-seed). Debounced, fire-and-forget (não bloqueia boot).
+    startLensAutoRecompute()
 
     // Identity exposure tracking — Satoshi adversarial guard 2026-05-17.
     // Carrega `last_nsec_export_at` pra UI mostrar "última exposição".

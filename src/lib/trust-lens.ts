@@ -35,6 +35,7 @@ import {
   temporalDecay,
   type AdjacencyList,
 } from './trust/ppr'
+import { findBridges } from './wot'
 import { createPprRng } from './trust/rng'
 import { upsertEdge } from './trust/edges'
 import { parsePredicate, evaluatePredicate } from './trust/predicate'
@@ -55,6 +56,10 @@ interface LensState {
   enabled: boolean
   /** PPR scores em memória (Map<targetNpub, ppr>). Read-only view. */
   pprScores: Map<string, number>
+  /** Pontes K=1 da minha rede: Map<npub, blastCount>. Sinal MECÂNICO
+   *  (§22/§25) — "X é única via até N pessoas". Derivado da adjacência
+   *  em recomputeLens/loadLens. Network map desenha ring nesses nós. */
+  bridges: Map<string, number>
   /** Timestamp ms da última recompute (pra TTL trigger). */
   lastRecomputedAt: number | null
   /** Filter rules ativas (loaded from `lens_filter_rules`). */
@@ -67,6 +72,7 @@ const INITIAL: LensState = {
   strength: 0,
   enabled: false,
   pprScores: new Map(),
+  bridges: new Map(),
   lastRecomputedAt: null,
   filterRules: [],
   loaded: false,
@@ -129,6 +135,32 @@ export async function loadLens(): Promise<void> {
   const pprScores = new Map<string, number>()
   for (const row of pprRows) pprScores.set(row.target_npub, row.ppr_score)
 
+  // Pontes K=1 (Fase 2b): derivadas no boot a partir da adjacência crua
+  // de `lens_edges` (sem decay — só precisamos da ESTRUTURA). Garante
+  // que os rings de ponte aparecem já na primeira abertura do mapa, sem
+  // esperar um trigger de recompute. Sinal mecânico local-only.
+  let bridges = new Map<string, number>()
+  const activeRow = await db.get<{ value: string }>(
+    `SELECT value FROM user_prefs WHERE key = 'active_identity'`,
+  )
+  const activeSource = activeRow?.value ?? null
+  if (activeSource) {
+    const edgeRows = await db.exec<{ source_npub: string; target_npub: string }>(
+      `SELECT source_npub, target_npub FROM lens_edges
+       WHERE source_npub = ? OR target_npub IN (
+         SELECT target_npub FROM lens_edges WHERE source_npub = ?
+       )`,
+      [activeSource, activeSource],
+    )
+    const plain: AdjacencyList = new Map()
+    for (const e of edgeRows) {
+      const list = plain.get(e.source_npub) ?? []
+      list.push({ target: e.target_npub, influence: 1 })
+      plain.set(e.source_npub, list)
+    }
+    bridges = findBridges(activeSource, plain)
+  }
+
   // Strength persistido em user_prefs.lens_strength (REAL 0..1). Default 0
   // — feed canônico bit-exact até o user mover o slider. Manifesto §24.
   const strengthRow = await db.get<{ value: string }>(
@@ -142,6 +174,7 @@ export async function loadLens(): Promise<void> {
   useLensStore.setState({
     filterRules: rules,
     pprScores,
+    bridges,
     strength,
     enabled: strength > 0,
     loaded: true,
@@ -344,6 +377,27 @@ export async function recomputeLens(source: string): Promise<number> {
     graph.set(row.source_npub, list)
   }
 
+  // Fallback topológico (2026-05-30, Fase 2b "PPR real"): se `lens_edges`
+  // ainda está vazio (nenhum edge de interação construído), a lente cairia
+  // pra cold-start eterno — PPR vazio, cores default, nenhuma ponte. Isso
+  // é o "gap da legenda": a legenda promete tiers PPR que nunca apareciam.
+  // Usamos então a TOPOLOGIA PÚBLICA do grafo de follows (NIP-02, kind 3)
+  // como adjacência base, influence=1. É exatamente "PPR brota da topologia
+  // pública vista do MEU nó" (deliberação 2026-05-30): anti-Sybil de graça
+  // (Sybil sem aresta de entrada da minha rede → PPR ~0), local-only,
+  // observador-relativo. lens_edges (interação-ponderado) tem precedência
+  // quando existir — este fallback só preenche o vazio.
+  if (graph.size === 0) {
+    const follows = await db.exec<{ follower_pub: string; following_pub: string }>(
+      `SELECT follower_pub, following_pub FROM follows LIMIT 20000`,
+    )
+    for (const f of follows) {
+      const list = graph.get(f.follower_pub) ?? []
+      list.push({ target: f.following_pub, influence: 1 })
+      graph.set(f.follower_pub, list)
+    }
+  }
+
   const rng = createPprRng(source, Date.now())
   const ppr = computePpr({ source, graph, rng, ...PPR_PARAMS })
 
@@ -358,7 +412,11 @@ export async function recomputeLens(source: string): Promise<number> {
     )
   }
 
-  useLensStore.setState({ pprScores: new Map(ppr), lastRecomputedAt: now })
+  // Sinal mecânico Fase 2b: pontes K=1 da minha rede. Derivado do MESMO
+  // graph (decay não zera arestas → estrutura preservada). Local-only,
+  // nunca persiste/escapa (invariante #11).
+  const bridges = findBridges(source, graph)
+  useLensStore.setState({ pprScores: new Map(ppr), bridges, lastRecomputedAt: now })
   return ppr.size
 }
 
@@ -367,6 +425,6 @@ export async function recomputeLens(source: string): Promise<number> {
 export const __testing = {
   resetStore: () => {
     loadedOnce = false
-    useLensStore.setState({ ...INITIAL, pprScores: new Map() })
+    useLensStore.setState({ ...INITIAL, pprScores: new Map(), bridges: new Map() })
   },
 }

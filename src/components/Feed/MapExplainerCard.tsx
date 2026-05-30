@@ -45,8 +45,9 @@ interface ExplainerCopy {
 interface LegendItem {
   /** Cor CSS (hex/rgb) pro swatch. Quando undefined, item é só texto/ícone. */
   swatch?: string
-  /** Forma do swatch: 'dot' (círculo), 'line' (barra) ou 'badge' (texto). */
-  shape?: 'dot' | 'line' | 'badge'
+  /** Forma do swatch: 'dot' (círculo), 'line' (barra), 'ring' (anel
+   *  vazado) ou 'badge' (texto). */
+  shape?: 'dot' | 'line' | 'ring' | 'badge'
   /** Texto curto ao lado do swatch. */
   label: string
   /** Explicação curta abaixo do label (opcional). */
@@ -141,6 +142,12 @@ export function getMapExplainerCopy(context: MapExplainerContext): ExplainerCopy
           shape: 'dot',
           label: 'baixa confiança / desconhecido',
           hint: 'PPR < 0.3 ou sem edge na sua rede',
+        },
+        {
+          swatch: 'rgb(244, 130, 14)',
+          shape: 'ring',
+          label: 'anel — ponte na sua rede',
+          hint: 'esta pessoa é a ÚNICA via até alguém que você segue: se deixar de seguir, esse alguém some do seu mapa. Fato estrutural da sua rede — não é juízo de valor sobre a pessoa (§22/§25). Você decide se importa.',
         },
       ],
     }
@@ -280,6 +287,15 @@ function Swatch({ item }: { item: LegendItem }) {
         aria-hidden="true"
         className="mt-1.5 inline-block h-[3px] w-5 shrink-0 rounded-full"
         style={{ backgroundColor: item.swatch }}
+      />
+    )
+  }
+  if (item.shape === 'ring' && item.swatch) {
+    return (
+      <span
+        aria-hidden="true"
+        className="mt-1 inline-block h-3 w-3 shrink-0 rounded-full border-2 bg-transparent"
+        style={{ borderColor: item.swatch }}
       />
     )
   }
