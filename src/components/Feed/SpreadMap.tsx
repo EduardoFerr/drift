@@ -176,6 +176,148 @@ function glowColor(d: ArcShade): RGBA {
   return [r, g, b, Math.round(base * d.recency * inferFactor)]
 }
 
+// ─── Draw-on gating compartilhado (global + post mode) ────────────────
+//
+// Extraído ao módulo (2026-05-30) pra GlobalModeMap E PostModeMap usarem o
+// MESMO contrato de gating clock-driven, sem duplicar a lógica de
+// recency/lerp/draw. Antes só GlobalModeMap desenhava arcos; PostModeMap
+// (cascata viral honesta §28) tinha `data.arcs` computado por
+// inferCascadeTree mas NUNCA instanciava ArcLayer → P0 bug (mapa sem arcos).
+//
+// Contrato (idêntico ao histórico de GlobalModeMap, commit 879d868):
+//   - DRAW_FRAC: fração do ciclo (0→1) pra um arco terminar de desenhar.
+//   - draw = (currentTime - arc.t) / DRAW_FRAC, clamp (0,1]; reduced → 1.
+//   - tip: endpoint interpolado from→to por `draw` (rastro cresce A→B).
+//   - recency: arcos que já assentaram desbotam (não somem — §16).
+const DRAW_FRAC = 0.14 // fração do ciclo pra desenhar 1 arco (~4.2s @30s)
+const FADE_WINDOW = 0.5 // após terminar, leva ~50% do ciclo p/ assentar
+
+/** Arco enriquecido com estado de desenho (draw/tip/recency) pro frame atual. */
+type DrawArc = PropagationArc & {
+  draw: number
+  tip: [number, number]
+  recency: number
+}
+
+/**
+ * Interpolação linear de [lng,lat] com easeOutCubic (flat map → linear é
+ * exato o suficiente; pura/determinística, manifesto §7). A curva visível
+ * vem do getHeight da ArcLayer, não daqui — este tip é só o ENDPOINT até
+ * onde o arco já desenhou.
+ */
+function lerpPos(
+  from: [number, number],
+  to: [number, number],
+  k: number,
+): [number, number] {
+  const e = 1 - Math.pow(1 - k, 3) // easeOutCubic
+  return [from[0] + (to[0] - from[0]) * e, from[1] + (to[1] - from[1]) * e]
+}
+
+/**
+ * Constrói os segmentos visíveis pro cursor `p` (currentTime 0→1). Pura
+ * (determinística por (arcs, p, reducedMotion)). Arco ainda não disparado
+ * (draw<=0) é omitido. reduced-motion → todos full (draw=1, recency=1).
+ *
+ * Reusado por GlobalModeMap e PostModeMap — gating clock-único idêntico.
+ */
+function buildVisSegs(
+  arcs: readonly PropagationArc[],
+  p: number,
+  reducedMotion: boolean,
+): DrawArc[] {
+  const visSegs: DrawArc[] = []
+  for (const s of arcs) {
+    const draw = reducedMotion ? 1 : (p - s.t) / DRAW_FRAC
+    if (draw <= 0) continue
+    const clamped = Math.min(draw, 1)
+    const age = p - s.t - DRAW_FRAC
+    const recency = reducedMotion
+      ? 1
+      : age <= 0
+      ? 1
+      : Math.max(0.35, 1 - age / FADE_WINDOW)
+    visSegs.push({
+      ...s,
+      draw: clamped,
+      tip: clamped >= 1 ? s.to : lerpPos(s.from, s.to, clamped),
+      recency,
+    })
+  }
+  return visSegs
+}
+
+/**
+ * Fabrica as duas ArcLayers (glow underlay aditivo + corpo gradiente/taper)
+ * pros segmentos visíveis. `ArcLayer` é o ctor async-carregado via loadMapDeps.
+ * `idPrefix` evita colisão de id entre modos (global usa 'prop-arcs',
+ * post usa 'post-arcs'). `p` entra nos updateTriggers pra forçar re-eval
+ * dos accessors a cada tick do relógio.
+ *
+ * Reusa arcColor/glowColor (módulo) → arestas inferred (spreader→spreader)
+ * renderizam slate/weak; literais (origin→spreader) mint/sólido. §28.
+ */
+function makeArcLayers(
+  ArcLayer: LayerCtor,
+  visSegs: DrawArc[],
+  p: number,
+  idPrefix: string,
+): unknown[] {
+  return [
+    // GLOW UNDERLAY: arco largo, translúcido, blend ADITIVO — cruzamentos
+    // somam luz em vez de empilhar opacidade suja.
+    new ArcLayer({
+      id: `${idPrefix}-glow`,
+      data: visSegs,
+      getSourcePosition: (d: DrawArc) => d.from,
+      getTargetPosition: (d: DrawArc) => d.tip,
+      getHeight: (d: DrawArc) => 0.35 * d.draw,
+      greatCircle: false,
+      getWidth: (d: DrawArc) => (d.isCurrent ? 9 : 6),
+      widthUnits: 'pixels',
+      getSourceColor: (d: DrawArc) => glowColor(d),
+      getTargetColor: (d: DrawArc) => glowColor(d),
+      parameters: {
+        blend: true,
+        blendColorOperation: 'add',
+        blendColorSrcFactor: 'src-alpha',
+        blendColorDstFactor: 'one',
+        blendAlphaOperation: 'add',
+        blendAlphaSrcFactor: 'src-alpha',
+        blendAlphaDstFactor: 'one',
+        depthTest: false,
+      },
+      updateTriggers: {
+        getSourceColor: p,
+        getTargetColor: p,
+        getWidth: 1,
+        getHeight: p,
+        getTargetPosition: p,
+      },
+    }),
+    // CORPO: arco fino e nítido, gradiente source→target + taper.
+    new ArcLayer({
+      id: idPrefix,
+      data: visSegs,
+      getSourcePosition: (d: DrawArc) => d.from,
+      getTargetPosition: (d: DrawArc) => d.tip,
+      getHeight: (d: DrawArc) => 0.35 * d.draw,
+      greatCircle: false,
+      getWidth: (d: DrawArc) => (d.isCurrent ? 3 : 1.75),
+      widthUnits: 'pixels',
+      getSourceColor: (d: DrawArc) => arcColor(d, 'source'),
+      getTargetColor: (d: DrawArc) => arcColor(d, 'target'),
+      updateTriggers: {
+        getSourceColor: p,
+        getTargetColor: p,
+        getWidth: 1,
+        getHeight: p,
+        getTargetPosition: p,
+      },
+    }),
+  ]
+}
+
 // ─── Public component ─────────────────────────────────────────────────
 
 export function SpreadMap({
@@ -309,7 +451,6 @@ interface ModeMapProps {
 }
 
 interface PointLayerProps { position: [number, number] }
-interface HeatmapPointProps { point: { lng: number; lat: number } }
 /** Dot animado no GlobalModeMap. `isCurrent` controla cor (chartreuse
  *  vs mint atenuado) e raio (4 vs 3 px). */
 interface AnimDotProps {
@@ -331,22 +472,39 @@ function PostModeMap({ data, className, mode, onModeChange }: ModeMapProps) {
   const [k1WarningDismissed, setK1WarningDismissed] = useState(false)
   const showK1Warning = isUserSoloSpreader(data, activeNpub) && !k1WarningDismissed
 
-  // Ted refactor B 2026-05-22: useMapInstance encapsula loadMapDeps +
-  // new Map + addControl + cleanup. Mantém comportamento bit-equivalente
-  // ao pré-refactor — layers + fitBounds aplicados via onReady.
+  // ─── Relógio compartilhado único (cascata viral honesta, 2026-05-30) ──
+  //
+  // P0 fix: post mode = "cascata viral honesta" (§28). `data.arcs` (calculado
+  // por inferCascadeTree) tinha as arestas origin→spreader (literais) e
+  // spreader→spreader (inferidas) PRONTAS, mas PostModeMap nunca instanciava
+  // ArcLayer → mapa sem propagação. Agora post mode usa o MESMO relógio único
+  // (useTimelineClock, 30s) que global/network: os arcos desenham A→B gated
+  // pelo `currentTime`; o scrubber lê o mesmo cursor. reduced-motion →
+  // estático (arcos full). Idêntico ao GlobalModeMap (helpers compartilhados).
+  const reducedMotion = useReducedMotion() ?? false
+  const { currentTime, paused, togglePaused } = useTimelineClock({ reducedMotion })
+
+  // renderFrame é construído no onReady (precisa do overlay + ArcLayer ctor
+  // async). Guardamos num ref pra o effect do relógio chamá-lo sem reconstruir
+  // o mapa. Não há RAF aqui — o cursor vem do relógio único.
+  const renderFrameRef = useRef<((p: number) => void) | null>(null)
+  const latestTimeRef = useRef(currentTime)
+
   const centerPoint = data.origin ?? data.destinations[0]?.point ?? null
   const center: [number, number] = centerPoint
     ? [centerPoint.lng, centerPoint.lat]
     : [0, 20]
 
+  // Ted refactor B 2026-05-22: useMapInstance encapsula loadMapDeps +
+  // new Map + addControl + cleanup.
   useMapInstance({
     containerRef,
     style: buildMapStyle(tileTemplate),
     center,
     zoom: 1.5,
-    deps: [data, mapView, tileTemplate],
+    deps: [data, mapView, tileTemplate, reducedMotion],
     onReady: ({ map, overlay, deps: mapDeps }) => {
-      const { ScatterplotLayer, HeatmapLayer } = mapDeps.layers
+      const { ScatterplotLayer, ArcLayer } = mapDeps.layers
 
       if (mapView === 'fit-bounds') {
         const bounds = computeBounds([
@@ -365,54 +523,77 @@ function PostModeMap({ data, className, mode, onModeChange }: ModeMapProps) {
       const originPoints: PointLayerProps[] = data.origin
         ? [{ position: [data.origin.lng, data.origin.lat] }]
         : []
-      const destPoints: PointLayerProps[] = data.destinations.map((d) => ({
-        position: [d.point.lng, d.point.lat],
+      // Destinos com `t` pra aparecerem só quando o arco correspondente
+      // termina de desenhar (mesma semântica de GlobalModeMap).
+      const destPoints = data.destinations.map((d) => ({
+        position: [d.point.lng, d.point.lat] as [number, number],
+        t: d.t,
       }))
 
-      overlay.setProps({
-        layers: [
-          new HeatmapLayer({
-            id: 'spread-heat',
-            data: data.destinations,
-            getPosition: (d: HeatmapPointProps) => [d.point.lng, d.point.lat],
-            getWeight: 1,
-            radiusPixels: 40,
-            intensity: 1,
-            threshold: 0.05,
-            aggregation: 'SUM',
-            colorRange: [
-              [33, 102, 172, 0],
-              [103, 169, 207, 80],
-              [209, 229, 240, 130],
-              [253, 219, 199, 180],
-              [239, 138, 98, 220],
-              [178, 24, 43, 250],
-            ],
-          }),
-          new ScatterplotLayer({
-            id: 'spread-origin',
-            data: originPoints,
-            getPosition: (p: PointLayerProps) => p.position,
-            getFillColor: [251, 191, 36, 230],
-            getRadius: 8,
-            radiusUnits: 'pixels',
-            stroked: true,
-            getLineColor: [251, 191, 36, 255],
-            lineWidthUnits: 'pixels',
-            getLineWidth: 1.5,
-          }),
-          new ScatterplotLayer({
-            id: 'spread-destinations',
-            data: destPoints,
-            getPosition: (p: PointLayerProps) => p.position,
-            getFillColor: [52, 211, 153, 140],
-            getRadius: 3,
-            radiusUnits: 'pixels',
-          }),
-        ],
+      // Render gated por currentTime (relógio único). Arcos desenham A→B;
+      // dots aparecem quando o rastro chega. Heatmap REMOVIDO (2026-05-30):
+      // o blob do HeatmapLayer cobria os arcos finos (mesma área geográfica)
+      // e empurrava a leitura pra "densidade", não "propagação". A cascata
+      // honesta é sobre ROTAS (quem→quem), não calor — os dots já dão a
+      // noção de concentração sem ofuscar as arestas.
+      function renderFrame(p: number) {
+        const visSegs = buildVisSegs(data.arcs, p, reducedMotion)
+        const visPts = destPoints.filter(
+          (d) => reducedMotion || p - d.t >= DRAW_FRAC,
+        )
+
+        overlay.setProps({
+          layers: [
+            // Arcos da cascata: literais (origin→spreader) mint/sólido,
+            // inferidos (spreader→spreader) slate/weak — distinção §28 via
+            // arcColor/glowColor (d.inferred). Helper compartilhado c/ global.
+            ...makeArcLayers(ArcLayer, visSegs, p, 'post-arcs'),
+            // Origem (amber) — pin do post original. Sempre visível.
+            new ScatterplotLayer({
+              id: 'spread-origin',
+              data: originPoints,
+              getPosition: (pt: PointLayerProps) => pt.position,
+              getFillColor: [251, 191, 36, 230],
+              getRadius: 8,
+              radiusUnits: 'pixels',
+              stroked: true,
+              getLineColor: [251, 191, 36, 255],
+              lineWidthUnits: 'pixels',
+              getLineWidth: 1.5,
+            }),
+            // Destinos (mint) — aparecem quando o rastro chega.
+            new ScatterplotLayer({
+              id: 'spread-destinations',
+              data: visPts,
+              getPosition: (pt: { position: [number, number] }) => pt.position,
+              getFillColor: [52, 211, 153, 140],
+              getRadius: 3,
+              radiusUnits: 'pixels',
+              updateTriggers: { getPosition: 1 },
+            }),
+          ],
+        })
+      }
+
+      renderFrameRef.current = renderFrame
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ;(map as any).once('load', () => {
+        renderFrameRef.current?.(latestTimeRef.current)
       })
+
+      return () => {
+        renderFrameRef.current = null
+      }
     },
   })
+
+  // ─── Draw on clock tick ─────────────────────────────────────────────
+  // Único ponto que dirige o desenho: cada avanço de `currentTime` (RAF do
+  // relógio único) re-renderiza o frame gated. Sem RAF próprio aqui.
+  useEffect(() => {
+    latestTimeRef.current = currentTime
+    renderFrameRef.current?.(currentTime)
+  }, [currentTime])
 
   return (
     <div className="relative h-full w-full">
@@ -423,6 +604,7 @@ function PostModeMap({ data, className, mode, onModeChange }: ModeMapProps) {
         onModeChange={onModeChange}
         stats={`${data.totalSpreads} drifts · ${data.countries.length} ${data.countries.length === 1 ? 'país' : 'países'}`}
         timelineEvents={data.destinations.map((d) => ({ created_at: d.createdAt }))}
+        clock={{ currentTime, paused, togglePaused }}
       />
       {showK1Warning && (
         <SoloSpreaderWarning onDismiss={() => setK1WarningDismissed(true)} />
@@ -638,62 +820,16 @@ function GlobalModeMap({ data, className, mode, onModeChange }: ModeMapProps) {
         // destino (efeito "reaching out"). O bow (getHeight) também escala com
         // draw pra a curva nascer rasa e abrir conforme estende — leitura
         // orgânica de rastro, não de linha pop-in.
-        const DRAW_FRAC = 0.14       // fração do ciclo pra desenhar 1 arco (~4.2s @30s)
-
-        // Interpolação linear de [lng,lat] (flat map → linear é exato o
-        // suficiente; pura/determinística, manifesto §7). easeOutCubic dá
-        // sensação de "rastro acelerando e desacelerando" no desenho. A curva
-        // visível vem do getHeight da ArcLayer, não daqui — este tip é só o
-        // ENDPOINT até onde o arco já desenhou.
-        function lerpPos(
-          from: [number, number],
-          to: [number, number],
-          k: number,
-        ): [number, number] {
-          const e = 1 - Math.pow(1 - k, 3) // easeOutCubic
-          return [from[0] + (to[0] - from[0]) * e, from[1] + (to[1] - from[1]) * e]
-        }
+        //
+        // Gating clock-único (DRAW_FRAC/lerpPos/buildVisSegs/makeArcLayers)
+        // foi extraído ao módulo (2026-05-30) — global E post mode usam o
+        // MESMO contrato. Ver helpers no topo do arquivo.
 
         function renderFrame(p: number) {
           if (!overlay) return
 
-          // Cada arco visível ganha `draw` ∈ (0,1]. reducedMotion → 1
-          // (aparece full estático, sem crescer). Arco ainda não disparado
-          // (draw <= 0) é omitido.
-          //
-          // `recency` ∈ (0,1]: arcos mais antigos (t baixo, já assentados há
-          // tempo no ciclo) afinam e desbotam; recentes ficam vivos. Reduz a
-          // poluição visual da "teia" — o olho segue a frente da propagação,
-          // não o emaranhado completo. Medido como quão recentemente o arco
-          // TERMINOU de desenhar, normalizado por uma janela de fade.
-          const FADE_WINDOW = 0.5 // após terminar, leva ~50% do ciclo p/ assentar
-          type DrawArc = PropagationArc & {
-            draw: number
-            tip: [number, number]
-            recency: number
-          }
-          const visSegs: DrawArc[] = []
-          for (const s of data.arcs) {
-            const draw = reducedMotion ? 1 : (p - s.t) / DRAW_FRAC
-            if (draw <= 0) continue
-            const clamped = Math.min(draw, 1)
-            // age = quanto tempo (em frações de ciclo) desde que o arco
-            // COMPLETOU o desenho. <0 enquanto desenha → recency=1 (frente
-            // viva). Depois decai linearmente até um piso (não some — §16,
-            // o arco persiste; só recua visualmente).
-            const age = p - s.t - DRAW_FRAC
-            const recency = reducedMotion
-              ? 1
-              : age <= 0
-              ? 1
-              : Math.max(0.35, 1 - age / FADE_WINDOW)
-            visSegs.push({
-              ...s,
-              draw: clamped,
-              tip: clamped >= 1 ? s.to : lerpPos(s.from, s.to, clamped),
-              recency,
-            })
-          }
+          // Segmentos visíveis pro cursor atual (gating compartilhado).
+          const visSegs = buildVisSegs(data.arcs, p, reducedMotion)
 
           // Dots: destino aparece só quando o arco correspondente terminou
           // de desenhar (drawProgress = 1 ⇔ p - t >= DRAW_FRAC). reduced →
@@ -759,73 +895,10 @@ function GlobalModeMap({ data, className, mode, onModeChange }: ModeMapProps) {
                   ]
                 : []),
               // ─── Rastro curvo (ArcLayer) — duas camadas pra glow ────────
-              //
-              // GLOW UNDERLAY: arco largo, translúcido, blend ADITIVO. Onde
-              // dois rastros se cruzam o aditivo SOMA luz → cruzamento brilha
-              // (bonito) em vez de empilhar opacidade suja (a "teia crua"
-              // antiga). Largura ~3.5× a do corpo; alpha baixo modulado por
-              // recency. Mesma geometria (from→tip, getHeight) do corpo.
-              new ArcLayer({
-                id: 'prop-arcs-glow',
-                data: visSegs,
-                getSourcePosition: (d: DrawArc) => d.from,
-                getTargetPosition: (d: DrawArc) => d.tip,
-                // Bow cresce com o desenho: curva nasce rasa e abre conforme
-                // estende → "reaching out". Determinístico por draw.
-                getHeight: (d: DrawArc) => 0.35 * d.draw,
-                greatCircle: false,
-                getWidth: (d: DrawArc) => (d.isCurrent ? 9 : 6),
-                widthUnits: 'pixels',
-                // Glow tinge na cor do arco com alpha baixo × recency.
-                getSourceColor: (d: DrawArc) => glowColor(d),
-                getTargetColor: (d: DrawArc) => glowColor(d),
-                // Blend ADITIVO (luma.gl v9 string params — deck.gl 9.3):
-                // src-alpha × ONE soma a luz onde rastros se cruzam. depthTest
-                // off pra glow não auto-ocluir. NÃO usar os GL numéricos
-                // antigos (blendFunc:[770,1]) — v9 só aceita os strings abaixo.
-                parameters: {
-                  blend: true,
-                  blendColorOperation: 'add',
-                  blendColorSrcFactor: 'src-alpha',
-                  blendColorDstFactor: 'one',
-                  blendAlphaOperation: 'add',
-                  blendAlphaSrcFactor: 'src-alpha',
-                  blendAlphaDstFactor: 'one',
-                  depthTest: false,
-                },
-                updateTriggers: {
-                  getSourceColor: p,
-                  getTargetColor: p,
-                  getWidth: 1,
-                  getHeight: p,
-                  getTargetPosition: p,
-                },
-              }),
-              // CORPO: arco fino e nítido, gradiente source→target + taper.
-              // getSourceColor brilhante (origem do fluxo) → getTargetColor
-              // mais translúcido (destino) = sensação direcional A→B. Cabeça
-              // (desenhando, draw<1) mais viva; corpo assenta + recency fade.
-              new ArcLayer({
-                id: 'prop-arcs',
-                data: visSegs,
-                getSourcePosition: (d: DrawArc) => d.from,
-                getTargetPosition: (d: DrawArc) => d.tip,
-                getHeight: (d: DrawArc) => 0.35 * d.draw,
-                greatCircle: false,
-                // Taper: mais grosso na origem, afina no destino → fluxo
-                // direcional. ArcLayer interpola width source→target.
-                getWidth: (d: DrawArc) => (d.isCurrent ? 3 : 1.75),
-                widthUnits: 'pixels',
-                getSourceColor: (d: DrawArc) => arcColor(d, 'source'),
-                getTargetColor: (d: DrawArc) => arcColor(d, 'target'),
-                updateTriggers: {
-                  getSourceColor: p,
-                  getTargetColor: p,
-                  getWidth: 1,
-                  getHeight: p,
-                  getTargetPosition: p,
-                },
-              }),
+              // Glow underlay aditivo + corpo gradiente/taper. Geometria,
+              // cor (arcColor/glowColor) e gating idênticos ao post mode —
+              // fabricados pelo helper compartilhado makeArcLayers.
+              ...makeArcLayers(ArcLayer, visSegs, p, 'prop-arcs'),
               new ScatterplotLayer({
                 id: 'prop-dots',
                 data: visPts,
