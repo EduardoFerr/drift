@@ -52,7 +52,7 @@ import { Image } from '../UI/Image'
 import { FullPageCard } from '../UI/FullPageCard'
 import { DriftButton } from '../UI/DriftButton'
 import { SubpostLayout } from '../Post/SubpostLayout'
-import { usePrefsStore } from '../../lib/prefs'
+import { usePrefsStore, setPref } from '../../lib/prefs'
 import { useIdentitiesStore } from '../../lib/identities'
 import { dialog } from '../../lib/dialog'
 import { WarningIcon } from '../UI/Icons'
@@ -196,6 +196,16 @@ export function ComposeOverlay({
   // Regra 2 (chrome ambiente): postar como outra persona é glanceable —
   // borda accent no card inteiro enquanto a escolha ≠ ativa.
   const postingAsOther = showIdentityPicker && !!activeNpub && signWithNpub !== activeNpub
+  // §28 honestidade: nota one-time de correlação. Postar várias identidades
+  // da MESMA sessão é ligável por quem observa a rede (mesmo IP, relays,
+  // horário) — inerente ao transporte WSS, não corrigível no cliente.
+  // Compartimentalização forte (Tor) chega na Fase 6. A nota aparece só
+  // quando o user escolhe uma persona ≠ ativa E ainda não dismissou.
+  // Dismiss permanente (setPref) — informativa, NUNCA bloqueia publicação.
+  const correlationNoticeDismissed = usePrefsStore(
+    (s) => s.multi_id_correlation_notice_dismissed,
+  )
+  const showCorrelationNotice = postingAsOther && !correlationNoticeDismissed
   const chosenIdentity = identities.find((i) => i.npub === signWithNpub) ?? null
   // Nome user-facing da persona escolhida: label > npub…<last6> (público).
   const chosenPersonaName =
@@ -446,6 +456,39 @@ export function ComposeOverlay({
               <span className="font-bold uppercase tracking-meta">postando como: </span>
               «{chosenPersonaName}» — diferente da sua identidade ativa.
             </p>
+          </div>
+        )}
+        {/* §28 honestidade: nota one-time de correlação multi-identidade.
+            Postar identidades diferentes da MESMA sessão é ligável por quem
+            observa a rede (mesmo IP, relays, horário) — limite INERENTE ao
+            transporte WSS, não corrigível aqui. Compartimentalização forte
+            (Tor) chega na Fase 6. NÃO bloqueia publicação (informativa);
+            dismissível permanente via setPref. Vender segurança falsa é
+            pior que admitir o limite (manifesto §28). */}
+        {showCorrelationNotice && (
+          <div
+            role="note"
+            aria-label="aviso de correlação entre identidades"
+            className="flex shrink-0 items-start gap-2 border-b border-drift-border/40 bg-drift-surface/40 px-4 py-3 text-drift-muted"
+          >
+            <span aria-hidden="true" className="mt-0.5 shrink-0 text-drift-muted">
+              <WarningIcon size={14} strokeWidth={2} />
+            </span>
+            <p className="flex-1 font-mono text-[11px] leading-relaxed">
+              Postar com identidades diferentes da mesma sessão pode ligá-las
+              pra quem observa a rede (mesmo IP, relays, horário).
+              Compartimentalização forte (Tor) chega na Fase&nbsp;6.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                void setPref('multi_id_correlation_notice_dismissed', true)
+              }}
+              className="shrink-0 self-start rounded-lg border border-drift-border/40 bg-drift-bg px-2.5 py-1 font-mono text-[10px] uppercase tracking-meta text-drift-muted transition-colors hover:border-drift-accent2/40 hover:text-drift-text focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
+              aria-label="entendi, não mostrar de novo"
+            >
+              entendi
+            </button>
           </div>
         )}
         {/* Satoshi audit 2026-05-19: badge warning quando upload_endpoint

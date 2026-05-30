@@ -438,6 +438,21 @@ export interface UserPrefs {
    */
   lens_nudge_dismissed: boolean
   /**
+   * Nota one-time de correlação multi-identidade (per-post picker, §28
+   * honestidade). Quando o user escolhe no picker uma identidade ≠ ativa
+   * pela PRIMEIRA vez, o ComposeOverlay mostra um aviso dismissível:
+   * postar várias identidades da MESMA sessão é ligável por quem observa
+   * a rede (mesmo IP, mesmos relays, mesmo horário) — isso é inerente ao
+   * transporte WSS, não corrigível no cliente; compartimentalização forte
+   * (Tor) chega na Fase 6.
+   *
+   * Dismiss permanente (espelha discover/lens nudges). Default `false`
+   * (nunca visto). NÃO bloqueia publicação — é informativo, separado do
+   * hard-confirm de GPS×identidade que já existe. Manifesto §28: vender
+   * segurança falsa é pior que admitir o limite. Local-only, zero export.
+   */
+  multi_id_correlation_notice_dismissed: boolean
+  /**
    * Trust Lens PR-5 (shipped 2026-05-20) — toggle opt-in pra exibir
    * indicador visual quando a lente reordenou um post. Default OFF
    * (lente já é discreta; chip "lente" no LensInspector cobre o caso
@@ -639,6 +654,7 @@ export const DEFAULT_USER_PREFS: UserPrefs = {
   theme_id: 'cinder',
   discover_nudge_dismissed: false,
   lens_nudge_dismissed: false,
+  multi_id_correlation_notice_dismissed: false,
   lens_show_reorder_indicator: false,
   lens_ppr_decay_enabled: false,
   lens_show_in_map: false,

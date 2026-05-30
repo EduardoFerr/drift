@@ -114,6 +114,45 @@ describe('ComposeOverlay — wiring do picker (regras de segurança)', () => {
     expect(COMPOSE).toMatch(/postingAsOther \? 'ring-2 ring-inset ring-drift-accent/)
   })
 
+  // §28 honestidade (Task 3): nota one-time de correlação multi-id.
+  // O disclaimer deve ser factualmente preciso (cita os vetores reais)
+  // e o dismiss deve PERSISTIR — uma nota que reaparece sempre vira ruído
+  // ignorado; uma que mente sobre o limite vende segurança falsa.
+  it('mostra nota de correlação só quando não-ativa E não dismissada', () => {
+    // gate: postingAsOther (escolha ≠ ativa) E pref não dismissada
+    expect(COMPOSE).toMatch(/multi_id_correlation_notice_dismissed/)
+    expect(COMPOSE).toMatch(
+      /const showCorrelationNotice = postingAsOther && !correlationNoticeDismissed/,
+    )
+    // renderiza atrás do gate
+    expect(COMPOSE).toMatch(/showCorrelationNotice && \(/)
+  })
+
+  it('o texto da nota cita os vetores reais (IP, relays) + Fase 6 (Tor)', () => {
+    // factualmente precisa: a correlação é por origem de rede, não pela chave
+    expect(COMPOSE).toMatch(/mesmo IP, relays, horário/)
+    // não overclaim: aponta o fix real (Tor) e a fase, sem prometer hoje
+    expect(COMPOSE).toMatch(/Compartimentaliza[çc][ãa]o forte \(Tor\) chega na Fase/)
+  })
+
+  it('o dismiss da nota PERSISTE em user_prefs (não some só na sessão)', () => {
+    expect(COMPOSE).toMatch(
+      /setPref\('multi_id_correlation_notice_dismissed',\s*true\)/,
+    )
+    // importa setPref (persistência SQLite), não só useState local
+    expect(COMPOSE).toMatch(/import \{ usePrefsStore, setPref \} from '\.\.\/\.\.\/lib\/prefs'/)
+  })
+
+  it('a nota NÃO bloqueia publicação (role=note, separada do hard-confirm)', () => {
+    // role=note (informativo) — não role=alertdialog nem gate no handlePublish.
+    // O único bloqueio em handlePublish é o hard-confirm GPS×identidade (regra 6).
+    expect(COMPOSE).toMatch(/role="note"\s*\n\s*aria-label="aviso de correla[çc][ãa]o entre identidades"/)
+    const fnStart = COMPOSE.indexOf('async function handlePublish()')
+    const fnBody = COMPOSE.slice(fnStart, COMPOSE.indexOf('}', COMPOSE.indexOf('await onPublish')))
+    // handlePublish não referencia a nota de correlação (não bloqueia)
+    expect(fnBody).not.toMatch(/correlationNotice|multi_id_correlation/)
+  })
+
   it('onPublish type inclui signWithNpub obrigatório (não opcional)', () => {
     // assinatura obriga o caller a capturar — `signWithNpub: string` (sem ?)
     expect(COMPOSE).toMatch(/signWithNpub: string\b/)
