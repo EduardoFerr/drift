@@ -21,10 +21,40 @@ import {
   computeTimelineRange,
   formatRelativePtBr,
   counterLabelForMode,
+  countEventsUpTo,
 } from '../src/components/Feed/TimelineScrubber'
 
 const SCRUBBER = readFileSync('src/components/Feed/TimelineScrubber.tsx', 'utf8')
 const SPREAD_MAP = readFileSync('src/components/Feed/SpreadMap.tsx', 'utf8')
+
+describe('counter sincronizado com scrubber (user 2026-05-29)', () => {
+  const ticks = [0, 0.25, 0.5, 0.75, 1] // 5 eventos espalhados
+
+  it('cursor=0 → só eventos no início (posição 0)', () => {
+    expect(countEventsUpTo(ticks, 0, 5)).toBe(1) // só o tick em 0
+  })
+
+  it('cursor cresce → counter sobe monotônico', () => {
+    expect(countEventsUpTo(ticks, 0.25, 5)).toBe(2)
+    expect(countEventsUpTo(ticks, 0.5, 5)).toBe(3)
+    expect(countEventsUpTo(ticks, 0.99, 5)).toBe(4)
+    expect(countEventsUpTo(ticks, 1, 5)).toBe(5) // todos no fim
+  })
+
+  it('cursor=null (fallback legacy sem clock) → total', () => {
+    expect(countEventsUpTo(ticks, null, 5)).toBe(5)
+  })
+
+  it('clampa cursor fora de [0,1]', () => {
+    expect(countEventsUpTo(ticks, -1, 5)).toBe(1)
+    expect(countEventsUpTo(ticks, 2, 5)).toBe(5)
+  })
+
+  it('componente usa countEventsUpTo pro counter visível (não o total cru)', () => {
+    expect(SCRUBBER).toMatch(/countEventsUpTo\(ticks,\s*cursor,\s*count\)/)
+    expect(SCRUBBER).toMatch(/liveCounterLabel/)
+  })
+})
 
 describe('TimelineScrubber — exports + props', () => {
   it('exporta TimelineScrubber component', () => {

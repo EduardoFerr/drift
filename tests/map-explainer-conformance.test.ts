@@ -74,6 +74,36 @@ describe('MapExplainerCard — export + copy + legenda', () => {
     expect(EXPLAINER).toMatch(/export type MapExplainerContext/)
   })
 
+  // User 2026-05-29: o "?" deve explicar os 3 modos (POST/GLOBAL/NETWORK)
+  // em QUALQUER contexto, além da legenda do modo atual.
+  it('tem MODE_GUIDE com os 3 modos (POST/GLOBAL/NETWORK)', () => {
+    expect(EXPLAINER).toMatch(/MODE_GUIDE/)
+    expect(EXPLAINER).toMatch(/key:\s*'POST'/)
+    expect(EXPLAINER).toMatch(/key:\s*'GLOBAL'/)
+    expect(EXPLAINER).toMatch(/key:\s*'NETWORK'/)
+  })
+
+  it('renderiza a seção "os 3 modos" (exceto overlay-default que já lista)', () => {
+    expect(EXPLAINER).toMatch(/os 3 modos do mapa/)
+    expect(EXPLAINER).toMatch(/context !== 'overlay-default'/)
+    expect(EXPLAINER).toMatch(/MODE_GUIDE\.map/)
+  })
+
+  // User 2026-05-29: "?" do global era confuso (pessoa? post? app todo?).
+  // Cada modo lidera com ESCOPO explícito.
+  it.each(['post', 'global', 'network'] as MapExplainerContext[])(
+    'purpose do modo "%s" lidera com ESCOPO explícito',
+    (ctx) => {
+      expect(getMapExplainerCopy(ctx).purpose).toMatch(/^ESCOPO:/)
+    },
+  )
+
+  it('escopos são distintos (post=este post, global=toda a rede, network=quem você segue)', () => {
+    expect(getMapExplainerCopy('post').purpose).toMatch(/só ESTE post/)
+    expect(getMapExplainerCopy('global').purpose).toMatch(/TODA a rede/)
+    expect(getMapExplainerCopy('network').purpose).toMatch(/só quem VOCÊ segue/)
+  })
+
   const contexts: MapExplainerContext[] = [
     'embedded',
     'overlay-default',

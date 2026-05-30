@@ -161,6 +161,23 @@ export function computeTimelineRange(events: Array<{ created_at: number }>): {
   return { min, max, ticks, count: valid.length }
 }
 
+/**
+ * Counter SINCRONIZADO com o scrubber (user 2026-05-29): quantos eventos já
+ * "aconteceram" até o cursor temporal. Conta os ticks (posições normalizadas
+ * [0,1]) cuja posição ≤ cursor. `cursor === null` (fallback legacy sem clock)
+ * → retorna o total (não dá pra rastrear o progresso CSS em JS). Pura,
+ * exportada pra LOCK_VIA_TEST.
+ */
+export function countEventsUpTo(
+  ticks: number[],
+  cursor: number | null,
+  total: number,
+): number {
+  if (cursor === null) return total
+  const c = Math.min(1, Math.max(0, cursor))
+  return ticks.reduce((n, p) => (p <= c ? n + 1 : n), 0)
+}
+
 export function TimelineScrubber({
   events,
   now,
@@ -209,6 +226,14 @@ export function TimelineScrubber({
       ? Math.min(1, Math.max(0, currentTime))
       : null
 
+  // Counter SINCRONIZADO com o scrubber (user 2026-05-29): no modo controlled
+  // o número de eventos sobe conforme a barra avança — conta os ticks cuja
+  // posição normalizada já foi cruzada pelo cursor. No fallback legacy (sem
+  // clock) mostra o total (não dá pra rastrear o progresso CSS em JS). O
+  // aria-label fica com o TOTAL (descrição estável, sem spam de SR a cada tick).
+  const liveCount = countEventsUpTo(ticks, cursor, count)
+  const liveCounterLabel = counterLabelForMode(liveCount, mode)
+
   const pausedAttr = paused ? 'true' : 'false'
 
   return (
@@ -220,7 +245,7 @@ export function TimelineScrubber({
       <div className="mb-1.5 flex items-center justify-between gap-2 font-mono text-[10px] uppercase tracking-meta text-drift-muted">
         <span>{startLabel}</span>
         <span aria-hidden="true" className="flex-1 text-center text-drift-muted/60">
-          {counterLabel}
+          {liveCounterLabel}
         </span>
         <span>{endLabel}</span>
         {/* Toggle ▶/⏸ — pointer-events-auto pra clicável dentro de

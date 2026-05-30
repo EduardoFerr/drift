@@ -64,7 +64,7 @@ export function getMapExplainerCopy(context: MapExplainerContext): ExplainerCopy
     return {
       title: 'mapa de propagação',
       purpose:
-        'Este mapa mostra onde este post foi DRIFT-ado. Cada ponto é um lugar onde alguém viu o post e decidiu dar DRIFT (gesto ↑). A origem é onde o autor publicou. 💡 tamanho do pin ≠ qualidade do post — só conta DRIFTs geográficos (manifesto §22).',
+        'ESCOPO: só ESTE post — não a rede toda, não só você. Cada ponto é um lugar onde alguém viu o post e decidiu dar DRIFT (gesto ↑). A origem é onde o autor publicou. 💡 tamanho do pin ≠ qualidade do post — só conta DRIFTs geográficos (manifesto §22).',
       legend: [
         {
           swatch: 'rgb(232, 255, 90)',
@@ -91,7 +91,7 @@ export function getMapExplainerCopy(context: MapExplainerContext): ExplainerCopy
     return {
       title: 'rede geográfica',
       purpose:
-        'Cada ponto é uma pessoa que já deu DRIFT em algum post na rede Drift, no local que ela declarou. Tamanho do ponto cresce com quantos drifts ela fez. Arcos mostram propagação cross-post no tempo. 💡 tamanho do ponto ≠ qualidade nem importância — só conta DRIFTs geográficos (manifesto §22).',
+        'ESCOPO: TODA a rede Drift — todas as pessoas, todos os posts. NÃO é este post nem só você. Cada ponto é uma pessoa que já deu DRIFT em algum post, no local que ela declarou. Tamanho do ponto cresce com quantos drifts ela fez. Arcos mostram propagação cross-post no tempo. 💡 tamanho do ponto ≠ qualidade nem importância — só conta DRIFTs geográficos (manifesto §22).',
       legend: [
         {
           swatch: 'rgb(232, 255, 90)',
@@ -116,7 +116,7 @@ export function getMapExplainerCopy(context: MapExplainerContext): ExplainerCopy
     return {
       title: 'sua rede geográfica',
       purpose:
-        'Mesma visualização do mapa global, mas filtrado por quem você segue (NIP-02). Útil pra ver onde estão geograficamente as pessoas que importam pra você. É lente local — não afeta o feed canônico (manifesto §24). 💡 tamanho do ponto ≠ qualidade — só conta DRIFTs geográficos (§22).',
+        'ESCOPO: só quem VOCÊ segue (NIP-02) — não a rede toda, não este post. Recorte do mapa global pela sua lista de follows: onde estão geograficamente as pessoas que importam pra você. É lente local — não afeta o feed canônico (manifesto §24). 💡 tamanho do ponto ≠ qualidade — só conta DRIFTs geográficos (§22).',
       legend: [
         {
           swatch: 'rgb(244, 130, 14)',
@@ -151,6 +151,18 @@ export function getMapExplainerCopy(context: MapExplainerContext): ExplainerCopy
     ],
   }
 }
+
+/**
+ * Guia curto dos 3 modos do mapa — renderizado em TODO contexto (exceto
+ * 'overlay-default', cuja legenda já é esta lista). User 2026-05-29: o "?"
+ * deve explicar o que POST/GLOBAL/NETWORK mostram, independente de qual modo
+ * está aberto. Vocabulário UI (DRIFT, não SPREAD).
+ */
+const MODE_GUIDE: readonly { key: string; desc: string }[] = [
+  { key: 'POST', desc: 'propagação de UM post — onde quem viu deu DRIFT nele (estrela a partir da origem).' },
+  { key: 'GLOBAL', desc: 'agregado de toda a rede — cada pessoa que deu DRIFT em algum post, no local que declarou.' },
+  { key: 'NETWORK', desc: 'só quem você segue (NIP-02) — sua lente local, não afeta o feed canônico (§24).' },
+]
 
 export function MapExplainerCard({ context, onClose }: MapExplainerCardProps) {
   const copy = getMapExplainerCopy(context)
@@ -189,6 +201,29 @@ export function MapExplainerCard({ context, onClose }: MapExplainerCardProps) {
             ))}
           </ul>
         </section>
+
+        {/* Os 3 modos — sempre presente (user 2026-05-29): abrir o "?" em
+            qualquer modo explica TAMBÉM o que cada um dos 3 mapas mostra, pra
+            o user entender as abas POST/GLOBAL/NETWORK. Omitido só no
+            'overlay-default', cuja legenda JÁ é essa lista (evita duplicar). */}
+        {context !== 'overlay-default' && (
+          <section aria-labelledby="explainer-modes">
+            <h3
+              id="explainer-modes"
+              className="mb-3 font-mono text-[10px] uppercase tracking-meta text-drift-muted"
+            >
+              os 3 modos do mapa
+            </h3>
+            <ul className="space-y-2">
+              {MODE_GUIDE.map((m) => (
+                <li key={m.key} className="text-[13px] leading-snug text-drift-text">
+                  <strong className="font-semibold text-drift-accent2">{m.key}</strong>
+                  <span className="text-drift-muted"> — {m.desc}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
 
         {/* Disclaimer §28 — sempre presente */}
         <section
