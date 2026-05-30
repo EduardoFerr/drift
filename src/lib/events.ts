@@ -28,7 +28,7 @@ import { db } from './db'
 import { getTag } from './nostr'
 import { verifyEventAsync } from './verify'
 import { DRIFT_KIND, SCORE_RECALC_DEBOUNCE_MS, VIRAL_PIN_THRESHOLD } from '../config/constants'
-import { applyCommentReceived, calculateScoreNow } from './scoring'
+import { applyCommentReceived, calculateScore, calculateScoreNow } from './scoring'
 import { bumpUnseenCount, invalidateFeed } from './feed'
 import { getReportWeight, maybeModerate } from './moderation'
 import { calculateUserWeight, calculateWeight } from './weight'
@@ -1006,15 +1006,127 @@ function scheduleScoreRecalc(postId: string): void {
  * (`seedDatabase`) garante 1 invalidate final consistente após o bulk.
  */
 export async function recalcAllScores(yieldEvery: number = 50): Promise<void> {
-  const postRows = await db.exec<{ id: string }>(`SELECT id FROM posts`)
+  // BULK (user 2026-05-29: "após o seed fica um bom tempo parado"). Antes:
+  // `for each post: await recalculateScore(id)` → ~5 roundtrips/post × ~2700
+  // posts ≈ 13k postMessages serializados = trava de minutos PÓS-drain (o
+  // batch-INSERT tornou o drain rápido, mas o recalc per-post virou o floor).
+  //
+  // Agora: carrega spreads/buries/users de UMA vez (3 reads), computa todos
+  // os scores em JS (REUSA as MESMAS fns puras: selectLatestActionByUser +
+  // calculateWeight + calculateScore → determinismo §7 idêntico) e escreve
+  // tudo num único `db.batch` (1 transação). ~13k roundtrips → ~5.
+  //
+  // Comments (Track C.5): a contribuição de comments NÃO é incluída no bulk
+  // (sua matemática vive em applyCommentsContribution, read-heavy). Posts COM
+  // comments caem no path per-post provado (`recalculateScore`) num 2º passo
+  // — raro no geral, ZERO no dev-seed (kinds 9078-9081, sem 1111). Score
+  // idêntico: post sem comment → contribuição 0 → bulk == per-post.
+  const posts = await db.exec<{ id: string; created_at: number; author_pub: string }>(
+    `SELECT id, created_at, author_pub FROM posts`,
+  )
+  if (posts.length === 0) return
+  const spreads = await db.exec<{ post_id: string; spreader_pub: string; created_at: number }>(
+    `SELECT post_id, spreader_pub, created_at FROM spreads`,
+  )
+  const buries = await db.exec<{ post_id: string; burier_pub: string; created_at: number }>(
+    `SELECT post_id, burier_pub, created_at FROM buries`,
+  )
+  const users = await db.exec<{ npub: string; created_at: number; last_active: number | null }>(
+    `SELECT npub, created_at, last_active FROM users`,
+  )
+
+  const nowMs = Date.now()
+  const nowSec = Math.floor(nowMs / 1000)
+
+  // spreads_received(autor) = nº de spreads em posts que ele autorou (mesma
+  // agregação que fetchUserAggsInChunks faz por user, computada de uma vez).
+  const postAuthor = new Map<string, string>()
+  for (const p of posts) postAuthor.set(p.id, p.author_pub)
+  const spreadsReceived = new Map<string, number>()
+  for (const s of spreads) {
+    const author = postAuthor.get(s.post_id)
+    if (author) spreadsReceived.set(author, (spreadsReceived.get(author) ?? 0) + 1)
+  }
+
+  // weight por user (fórmula pura, 1 `now` capturado → determinismo intra-run).
+  const weightByUser = new Map<string, number>()
+  for (const u of users) {
+    weightByUser.set(
+      u.npub,
+      calculateWeight({
+        createdAt: u.created_at * 1000,
+        spreadsReceived: spreadsReceived.get(u.npub) ?? 0,
+        lastActive: u.last_active !== null ? u.last_active * 1000 : null,
+        now: nowMs,
+      }),
+    )
+  }
+
+  // ações agrupadas por post.
+  const actionsByPost = new Map<string, ActionRow[]>()
+  const pushAction = (postId: string, row: ActionRow) => {
+    let arr = actionsByPost.get(postId)
+    if (!arr) {
+      arr = []
+      actionsByPost.set(postId, arr)
+    }
+    arr.push(row)
+  }
+  for (const s of spreads)
+    pushAction(s.post_id, { kind: 'spread', user_pub: s.spreader_pub, created_at: s.created_at })
+  for (const b of buries)
+    pushAction(b.post_id, { kind: 'bury', user_pub: b.burier_pub, created_at: b.created_at })
+
+  // score por post (§23 última-ação via selectLatestActionByUser) → UPDATE ops.
+  const ops: Array<{ sql: string; params: unknown[] }> = []
+  for (const post of posts) {
+    const latest = selectLatestActionByUser(actionsByPost.get(post.id) ?? [])
+    let spreadWeight = 0
+    let buryWeight = 0
+    let spreadCount = 0
+    let buryCount = 0
+    for (const [userPub, action] of latest) {
+      const w = weightByUser.get(userPub) ?? 0
+      if (action === 'spread') {
+        spreadWeight += w
+        spreadCount++
+      } else {
+        buryWeight += w
+        buryCount++
+      }
+    }
+    const score = calculateScore({
+      spreadWeight,
+      buryWeight,
+      createdAt: post.created_at,
+      now: nowSec,
+    })
+    ops.push({
+      sql: `UPDATE posts SET score = ?, spreads = ?, buries = ? WHERE id = ?`,
+      params: [score, spreadCount, buryCount, post.id],
+    })
+  }
+  // Flush em chunks (payload postMessage saudável + yield ao main entre eles).
+  const CHUNK = 800
+  for (let i = 0; i < ops.length; i += CHUNK) {
+    await db.batch(ops.slice(i, i + CHUNK))
+    if (i + CHUNK < ops.length) await yieldToMain()
+  }
+
+  // 2º passo — posts COM comments: contribuição de comments via path per-post
+  // provado. ZERO no dev-seed (sem kind 1111). Roda ANTES da moderação.
+  const commentedPosts = await db.exec<{ post_id: string }>(
+    `SELECT DISTINCT post_id FROM comments`,
+  )
   let processed = 0
-  for (const { id } of postRows) {
-    await recalculateScore(id)
+  for (const { post_id } of commentedPosts) {
+    await recalculateScore(post_id)
     processed++
     if (processed % yieldEvery === 0) await yieldToMain()
   }
-  // 2º passo — moderação §26 por post reportado. Roda DEPOIS do recalc pra
-  // que o -999 (quando threshold é cruzado) seja o último write e vença.
+
+  // 3º passo — moderação §26 por post reportado. DEPOIS do recalc pra que o
+  // -999 (threshold cruzado) seja o último write e vença.
   const reportedRows = await db.exec<{ post_id: string }>(
     `SELECT DISTINCT post_id FROM reports`,
   )
