@@ -78,9 +78,46 @@ guia-do-usuario (escolher id ao postar), este doc.
 - persistir o id escolhido como novo default (é per-compose; default sempre = ativo, anti-deanon).
 - decriptar nsec fora do ato de assinar / logar nsec (§8).
 
-## Sequência
-1. `getIdentitySecretKey` + unit.
-2. `signDriftEvent` signWithNpub + unit (+ regressão default).
-3. `createPost` opt.
-4. ComposeOverlay seletor + IdentityPickerButton.
-5. Barney security review + E2E/MCP + docs.
+## Barney security review (2026-05-30) — GO-WITH-MITIGATIONS
+
+Veredito: arquitetura sólida, insight "sem reload" confirmado contra o código,
+superfície de decrypt aceitável (até MENOR que o cache do ativo) — DESDE QUE sem
+cache. Mas a spec sub-especificava exatamente as partes que causam deanon
+irreversível. **6 must-haves (blockers se ausentes):**
+
+1. **`getIdentitySecretKey`:** SEM cache (decrypt→sign→drop na mesma scope; cachear
+   = N nsecs residentes = blast radius maior). Assertar `getPublicKey(bytes) === npub`
+   ANTES de retornar (throw on mismatch — senão assina sob pubkey que o user NÃO viu =
+   deanon silencioso; cobre além do "npub inexistente"). Mensagem de erro contém SÓ o
+   npub (público) — NUNCA bytes/ciphertext/hex (App.tsx:~1040 mostra `err.message` na UI).
+2. **`bytes.fill(0)`** após `finalizeEvent` (JS não garante zeroização de string, mas
+   limpar o Uint8Array é honesto e barato).
+3. **Id assinante VISÍVEL e persistente no corpo do compose** (identicon + label/npub-curto
+   ao lado do `publicar ↑`), NÃO colapsado em ícone estilo GpsScopeButton. GPS errado vaza
+   cidade; id errado **funde 2 personas irreversível na rede** — classe de risco diferente.
+   Id ≠ ativo → estado visual distinto AMBIENTE (cor/borda no chrome do compose). label pode
+   ser null → usar identicon+npub-curto.
+4. **Confirm DURO** (não micro-warning) quando `gpsScope !== 'off'` E `signWithNpub !== ativo`:
+   "Postar como «X» COM localização precisa?" — GPS preciso em persona pseudônima = deanon
+   clássico. Mitigação de maior valor da feature.
+5. **`signWithNpub` capturado SÍNCRONO no topo de `handlePublish`** (antes de qualquer
+   await), threaded como ARG explícito via onPublish→createPost→signDriftEvent. signDriftEvent
+   NUNCA relê store/ref (evita race de picker stale assinar chave errada). Igual `gpsScope` já é.
+6. **Disclaimer honesto de correlação na rede** (guia-do-usuário + nota one-time UI):
+   "postar ids diferentes da MESMA sessão pode ligá-los pra quem observa (mesmo IP/relays/
+   timing/WebSocket). Compartimentalização forte (Tor) = Fase 6." Inerente ao transport WSS,
+   NÃO mitigado aqui — mas o picker faz o user ACREDITAR que está compartimentado → §28 exige
+   dizer a verdade. **Gate de doc duro.**
+
+Nice-to-have: decidir conscientemente `isMine` (App.tsx:~1385) pra post próprio sob id
+não-ativo (hoje renderiza como não-meu — talvez correto pra compartimentalização).
+
+## Sequência (com mitigações Barney)
+1. `getIdentitySecretKey(npub)` — SEM cache + assert pubkey===npub + erro npub-only + unit.
+2. `signDriftEvent({signWithNpub})` — bytes.fill(0) pós-sign + unit (+ regressão default ativo).
+3. `createPost` opt signWithNpub (arg explícito, threaded).
+4. ComposeOverlay: seletor persistente no corpo (identicon+label) + estado ambiente quando ≠ativo
+   + captura síncrona em handlePublish + IdentityPickerButton (popover).
+5. Confirm duro location+id≠ativo.
+6. Disclaimer correlação (guia + nota one-time) + §28.
+7. Barney re-review (must-haves presentes) + E2E/MCP + docs (CLAUDE.md #15 nota, guia).
