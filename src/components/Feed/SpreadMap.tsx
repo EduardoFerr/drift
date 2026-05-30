@@ -483,8 +483,14 @@ function GlobalModeMap({ data, className, mode, onModeChange }: ModeMapProps) {
   // audit). Quando ON, social-nodes layer usa pinColor(pprScore) em
   // vez de cor uniforme. pprScores vem do useLensStore (já em memória
   // pós-recomputeLens; zero query extra).
-  const lensShowInMap = usePrefsStore((s) => s.lens_show_in_map)
+  const lensShowInMapPref = usePrefsStore((s) => s.lens_show_in_map)
   const pprScores = useLensStore((s) => s.pprScores)
+  // §24 (deliberação 2026-05-30, ver [[reference_map_model]]): a LENTE só
+  // pode tingir o modo NETWORK (minha WoT local). global/post são canônicos
+  // e compartilhados — NUNCA personalizados pela minha lente. Antes
+  // `lens_show_in_map` pintava os social-nodes em QUALQUER modo (inclusive
+  // global) → furo §24. Gate por modo fecha isso.
+  const lensShowInMap = lensShowInMapPref && mode === 'network'
   // WCAG 2.3.3 (user pedido 2026-05-28 "linha desenha de A→B"): com
   // reduced-motion, arcos aparecem full estáticos (sem draw-on que
   // cresce). Sem reduced, cada arco DESENHA progressivamente do ponto

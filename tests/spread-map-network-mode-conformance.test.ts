@@ -18,6 +18,23 @@ import { readFileSync } from 'node:fs'
 const HOOK = readFileSync('src/hooks/useSpreadMap.ts', 'utf8')
 const MAP = readFileSync('src/components/Feed/SpreadMap.tsx', 'utf8')
 
+describe('SpreadMap — lente SÓ no network (§24, deliberação 2026-05-30)', () => {
+  it('lensShowInMap é gateado por mode === network (não pinta global/post)', () => {
+    // §24: a lente (PPR colors) só tinge a MINHA WoT (network). global/post
+    // são canônicos/compartilhados → nunca personalizados pela lente. O gate
+    // combina a pref com o modo.
+    expect(MAP).toMatch(/lens_show_in_map/)
+    expect(MAP).toMatch(/lensShowInMap\s*=\s*lensShowInMapPref\s*&&\s*mode === 'network'/)
+  })
+
+  it('getFillColor da lente usa o valor GATEADO (não a pref crua)', () => {
+    // pinColor(ppr) só quando lensShowInMap (já = pref && network).
+    expect(MAP).toMatch(/getFillColor:\s*lensShowInMap/)
+    // a pref crua não pode ser usada direto no getFillColor (furaria §24).
+    expect(MAP).not.toMatch(/getFillColor:\s*lensShowInMapPref/)
+  })
+})
+
 describe('SpreadMap network mode — type system', () => {
   it('declares SpreadMapMode type with 3 values', () => {
     expect(HOOK).toMatch(
