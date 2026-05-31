@@ -22,14 +22,16 @@
 > 4. Calor DESCARTARIA o fluxo geográfico real (arcos são literais) — segue
 >    sendo a solução errada pro hairball.
 >
-> **Problema real (grounded) → fix candidato (NÃO calor):**
-> - **(a) density-aware alpha/blend taming:** o blob vem do glow ADITIVO não
->   escalar (N arcos somam luz → branco saturado). Reduzir alpha/intensidade
->   por densidade de overlap mata o blowout e mantém arcos distinguíveis.
->   Barato, maior ganho visual imediato. Preserva fluxo literal.
-> - **(b) zoom-cluster:** agrupa nós no zoom-out, expande no zoom-in. Fix
->   estrutural pra "arcos demais". Preserva fluxo literal.
-> Próximo: deliberar (a) vs (a)+(b), validar de novo em full via MCP. NÃO calor.
+> **Problema real (grounded) → RESOLVIDO 2026-05-30 via (a):**
+> - ✅ **(a) density-aware glow taming** (SHIPADO): `SpreadMap.tsx:glowDensityFactor(count)`
+>   — count≤200 → 1.0 (lite/post/network bit-idêntico); acima decai ~200/count
+>   (piso 0.12), aplicado a alpha+largura do GLOW aditivo (corpo intacto). MCP
+>   full (~1178 arcos): blob saturado → nós+arcos legíveis
+>   (`evidence-global-full-TAMED-2026-05-30.png`). Unit: spread-map.test.ts.
+> - ⛔ **(b) zoom-cluster: NÃO necessário** — (a) sozinho resolveu o hairball.
+>   Construir (b) especulativo = débito desnecessário. Reopener: SE em uso real
+>   ainda houver densidade-problema que (a) não cobre.
+> **global = arcos literais (com glow density-tamed).** NÃO calor.
 >
 > Modelo final dos 3 mapas: **post=arcos cascata / global=arcos literais /
 > network=arcos+lente+pontes.** As fórmulas de calor abaixo ficam só de arquivo.
