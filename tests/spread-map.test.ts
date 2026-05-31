@@ -11,7 +11,7 @@ vi.mock('../src/lib/db', () => ({
   },
 }))
 
-import { _computeBounds } from '../src/components/Feed/SpreadMap'
+import { _computeBounds, glowDensityFactor } from '../src/components/Feed/SpreadMap'
 
 // Fixtures geográficos com sinais distintos (evita confundir lat/lng).
 const SP_LNG = -46.63
@@ -67,5 +67,36 @@ describe('_computeBounds', () => {
       [PA_LNG, PA_LAT],
     ]
     expect(_computeBounds(points)).toEqual(_computeBounds(points))
+  })
+})
+
+describe('glowDensityFactor — tame do glow aditivo (fix hairball)', () => {
+  it('contagem baixa (lite/post/network) → 1.0, sem regressão', () => {
+    expect(glowDensityFactor(0)).toBe(1)
+    expect(glowDensityFactor(50)).toBe(1)
+    expect(glowDensityFactor(148)).toBe(1) // lite real
+    expect(glowDensityFactor(200)).toBe(1) // threshold inclusivo
+  })
+
+  it('escala full atenua (~FULL/count) e mantém piso', () => {
+    expect(glowDensityFactor(400)).toBeCloseTo(0.5, 5)
+    expect(glowDensityFactor(1178)).toBeCloseTo(200 / 1178, 5) // ~0.17 — full real
+    // piso 0.12 a densidade enorme
+    expect(glowDensityFactor(100000)).toBe(0.12)
+  })
+
+  it('monótono não-crescente acima do threshold', () => {
+    let prev = 1
+    for (const c of [200, 300, 600, 1200, 5000]) {
+      const f = glowDensityFactor(c)
+      expect(f).toBeLessThanOrEqual(prev)
+      prev = f
+    }
+  })
+
+  it('determinístico + guard non-finite → 1 (§7)', () => {
+    expect(glowDensityFactor(1178)).toBe(glowDensityFactor(1178))
+    expect(glowDensityFactor(NaN)).toBe(1)
+    expect(glowDensityFactor(Infinity)).toBe(1)
   })
 })
