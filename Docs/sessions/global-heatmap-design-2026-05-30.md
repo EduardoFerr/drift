@@ -12,14 +12,24 @@
 > 2. **Privacidade não justifica** (corrigido neste mesmo doc): calor não
 >    esconde (mesmos pontos) e impor blur seria ditadura (§17/§25). Privacidade
 >    = escolha de publicar (granularidade GPS) + qual id (picker §4, já shipado).
-> 3. **Legibilidade já resolvida:** scrubber + recency-fade afinam densidade
->    (só arcos perto do cursor desenham). Lite (~148 arcos) = leque legível.
-> 4. Calor DESCARTARIA o fluxo geográfico real por ganho marginal; + refactor
->    grande (split GlobalModeMap/NetworkModeMap) sem retorno.
+ 3. ~~**Legibilidade já resolvida:** scrubber + recency-fade afinam densidade.~~
+>    **❌ ERRADO — corrigido por evidência 2026-05-30.** Era especulação ("lite
+>    ~148 arcos = leque legível, full deve estar ok"). MCP em escala FULL
+>    (`?dev-seed=1`, 745 posts / 1178 geo-spreads → ~1178 arcos) PROVOU o
+>    contrário: `ctx-global-full2.png` mostra um BLOB verde saturado sobre
+>    EU/US — glow aditivo soma luz e estoura; impossível traçar qualquer fluxo.
+>    **Hairball em full é problema REAL.**
+> 4. Calor DESCARTARIA o fluxo geográfico real (arcos são literais) — segue
+>    sendo a solução errada pro hairball.
 >
-> **Reopener:** SE hairball em escala full (~2730) provar ser problema real
-> (validado via MCP/uso, não especulativo) → **zoom-cluster** (agrupa visual no
-> zoom-out, expande no zoom-in) PRESERVANDO os arcos literais. NÃO calor.
+> **Problema real (grounded) → fix candidato (NÃO calor):**
+> - **(a) density-aware alpha/blend taming:** o blob vem do glow ADITIVO não
+>   escalar (N arcos somam luz → branco saturado). Reduzir alpha/intensidade
+>   por densidade de overlap mata o blowout e mantém arcos distinguíveis.
+>   Barato, maior ganho visual imediato. Preserva fluxo literal.
+> - **(b) zoom-cluster:** agrupa nós no zoom-out, expande no zoom-in. Fix
+>   estrutural pra "arcos demais". Preserva fluxo literal.
+> Próximo: deliberar (a) vs (a)+(b), validar de novo em full via MCP. NÃO calor.
 >
 > Modelo final dos 3 mapas: **post=arcos cascata / global=arcos literais /
 > network=arcos+lente+pontes.** As fórmulas de calor abaixo ficam só de arquivo.
