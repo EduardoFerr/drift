@@ -193,6 +193,30 @@ function glowColor(d: ArcShade): RGBA {
 const DRAW_FRAC = 0.14 // fração do ciclo pra desenhar 1 arco (~4.2s @30s)
 const FADE_WINDOW = 0.5 // após terminar, leva ~50% do ciclo p/ assentar
 
+// ─── Density taming do glow aditivo (2026-05-30, fix hairball global) ──
+//
+// PROBLEMA (evidência MCP `?dev-seed=1`, ~1178 arcos): o glow underlay usa
+// blend ADITIVO (src-alpha × ONE) — bonito com poucos arcos (cruzamentos
+// brilham), mas em escala FULL N arcos somam luz e ESTOURAM num blob
+// verde-branco saturado sobre regiões densas (EU/US) → ilegível.
+// FIX: atenuar a intensidade (alpha + largura) do GLOW conforme o número de
+// segmentos visíveis cresce, mantendo a soma aditiva limitada. O CORPO
+// (blend normal, é o sinal real do fluxo) NÃO é tocado.
+//
+// Pura/determinística (§7): mesma contagem → mesmo fator. Sem regressão em
+// lite/post/network: contagem ≤ GLOW_DENSITY_FULL → fator 1.0 (idêntico ao
+// histórico). Só global-em-escala atenua.
+const GLOW_DENSITY_FULL = 200 // ≤ isto → glow cheio (lite ~148 / post / network)
+const GLOW_DENSITY_MIN = 0.12 // piso do fator a densidade muito alta
+
+/** Fator [GLOW_DENSITY_MIN, 1] que escala o glow aditivo pela contagem de
+ *  arcos visíveis. count ≤ FULL → 1 (sem mudança). Acima, decai ~FULL/count
+ *  com piso MIN. Pura. */
+export function glowDensityFactor(visibleCount: number): number {
+  if (!Number.isFinite(visibleCount) || visibleCount <= GLOW_DENSITY_FULL) return 1
+  return Math.max(GLOW_DENSITY_MIN, GLOW_DENSITY_FULL / visibleCount)
+}
+
 /** Arco enriquecido com estado de desenho (draw/tip/recency) pro frame atual. */
 type DrawArc = PropagationArc & {
   draw: number
@@ -264,9 +288,17 @@ function makeArcLayers(
   p: number,
   idPrefix: string,
 ): unknown[] {
+  // Density taming: quanto mais arcos visíveis, mais fraco/fino o glow
+  // aditivo (evita blob saturado em escala full). 1.0 em lite/post/network.
+  const glowF = glowDensityFactor(visSegs.length)
+  const glowColorDimmed = (d: DrawArc): RGBA => {
+    const c = glowColor(d)
+    return [c[0], c[1], c[2], Math.round(c[3] * glowF)]
+  }
   return [
     // GLOW UNDERLAY: arco largo, translúcido, blend ADITIVO — cruzamentos
-    // somam luz em vez de empilhar opacidade suja.
+    // somam luz em vez de empilhar opacidade suja. Alpha+largura atenuados
+    // por densidade (glowF) pra não estourar em escala full.
     new ArcLayer({
       id: `${idPrefix}-glow`,
       data: visSegs,
@@ -274,10 +306,11 @@ function makeArcLayers(
       getTargetPosition: (d: DrawArc) => d.tip,
       getHeight: (d: DrawArc) => 0.35 * d.draw,
       greatCircle: false,
-      getWidth: (d: DrawArc) => (d.isCurrent ? 9 : 6),
+      // largura do halo encolhe com densidade (0.55..1× do base) → menos overlap.
+      getWidth: (d: DrawArc) => (d.isCurrent ? 9 : 6) * (0.55 + 0.45 * glowF),
       widthUnits: 'pixels',
-      getSourceColor: (d: DrawArc) => glowColor(d),
-      getTargetColor: (d: DrawArc) => glowColor(d),
+      getSourceColor: (d: DrawArc) => glowColorDimmed(d),
+      getTargetColor: (d: DrawArc) => glowColorDimmed(d),
       parameters: {
         blend: true,
         blendColorOperation: 'add',
@@ -289,9 +322,9 @@ function makeArcLayers(
         depthTest: false,
       },
       updateTriggers: {
-        getSourceColor: p,
-        getTargetColor: p,
-        getWidth: 1,
+        getSourceColor: [p, glowF],
+        getTargetColor: [p, glowF],
+        getWidth: glowF,
         getHeight: p,
         getTargetPosition: p,
       },
