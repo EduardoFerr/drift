@@ -1,8 +1,34 @@
-# Design — global = CALOR (heatmap), post = arcos, network = arcos+lente
+# Design — global = CALOR (heatmap) — ⛔ NO-GO (revertido 2026-05-30)
+
+> **VEREDITO FINAL: NÃO IMPLEMENTAR. global MANTÉM arcos.**
+> Este doc fica como registro da deliberação + por que o calor caiu.
+>
+> Razão do NO-GO (Satoshi, após matar a justificativa de privacidade):
+> 1. **Arcos globais são LITERAIS, não falsos.** `buildGlobalData` desenha
+>    `post.location (autor) → spread.location (spreader)`; ambos publicados
+>    pelo autor (§28 opt-in) e o spread REFERENCIA o post → relação REGISTRADA.
+>    Diferente dos elos inferidos spreader→spreader do post-mode. Não há
+>    desonestidade a corrigir.
+> 2. **Privacidade não justifica** (corrigido neste mesmo doc): calor não
+>    esconde (mesmos pontos) e impor blur seria ditadura (§17/§25). Privacidade
+>    = escolha de publicar (granularidade GPS) + qual id (picker §4, já shipado).
+> 3. **Legibilidade já resolvida:** scrubber + recency-fade afinam densidade
+>    (só arcos perto do cursor desenham). Lite (~148 arcos) = leque legível.
+> 4. Calor DESCARTARIA o fluxo geográfico real por ganho marginal; + refactor
+>    grande (split GlobalModeMap/NetworkModeMap) sem retorno.
+>
+> **Reopener:** SE hairball em escala full (~2730) provar ser problema real
+> (validado via MCP/uso, não especulativo) → **zoom-cluster** (agrupa visual no
+> zoom-out, expande no zoom-in) PRESERVANDO os arcos literais. NÃO calor.
+>
+> Modelo final dos 3 mapas: **post=arcos cascata / global=arcos literais /
+> network=arcos+lente+pontes.** As fórmulas de calor abaixo ficam só de arquivo.
+
+---
 
 Deliberação Satoshi + HIMYM (Ted arquitetura / Marshall conformance) 2026-05-30.
-Grounded via MCP (global hoje = leque de arcos do hub → vira teia + K=1 doxx em
-full). Sucede `map-model-deliberation-2026-05-30.md`.
+Grounded via MCP (global hoje = leque de arcos do hub; legível em lite).
+Sucede `map-model-deliberation-2026-05-30.md`.
 
 ## Decisão: 3 mapas, cada um responde 1 pergunta
 
