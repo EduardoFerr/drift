@@ -279,6 +279,17 @@ Trocar identidade ativa exige `location.reload()` em seguida — sync
 e feed precisam reset clean. Manifesto §3 (dispositivo descartável,
 identidade não) torna isso aceitável.
 
+**Assinatura per-post (`identity.ts:signWithNpub`) NÃO troca a ativa
+e NÃO exige reload.** Ela só *empresta* a chave da identidade escolhida
+pra UMA assinatura (per-post identity picker, manifesto §4) — sem mexer
+em `user_prefs.active_identity` nem na tabela `identity` singular, sem
+resetar sync/feed. O requisito de `location.reload()` acima aplica-se
+**só à troca da identidade ATIVA** (`setActiveIdentity`). Limite honesto
+da assinatura per-post via WSS: postar múltiplas identidades da mesma
+sessão é correlacionável no fio (mesmo IP/relays/horário) — inerente ao
+transporte, mitigado só pela Fase 6 (Tor). Disclaimer one-time no
+ComposeOverlay + `Docs/known-limitations.md` #9. Manifesto §28.
+
 ### 16. Funções puras críticas têm tests Vitest
 
 `scoring.ts`, `weight.ts`, `moderation.ts`, `feed.ts:applyContentFilters`,

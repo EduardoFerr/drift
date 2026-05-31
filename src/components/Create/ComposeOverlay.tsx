@@ -52,9 +52,12 @@ import { Image } from '../UI/Image'
 import { FullPageCard } from '../UI/FullPageCard'
 import { DriftButton } from '../UI/DriftButton'
 import { SubpostLayout } from '../Post/SubpostLayout'
-import { usePrefsStore } from '../../lib/prefs'
+import { usePrefsStore, setPref } from '../../lib/prefs'
+import { useIdentitiesStore } from '../../lib/identities'
+import { dialog } from '../../lib/dialog'
 import { WarningIcon } from '../UI/Icons'
 import { GpsScopeButton } from './GpsScopeButton'
+import { IdentityPickerButton } from './IdentityPickerButton'
 
 export interface ComposeOverlayProps {
   publishing: boolean
@@ -77,6 +80,16 @@ export interface ComposeOverlayProps {
      * — NÃO mais lê `prefs.location_granularity` direto no publish flow.
      */
     gpsScope: LocationGranularity
+    /**
+     * npub hex 64 da identidade que deve ASSINAR este post (manifesto §4
+     * compartimentalização). Capturado SÍNCRONO no topo de `handlePublish`
+     * (antes de qualquer await) e threaded como argumento explícito —
+     * downstream (App.tsx → createPost) NUNCA re-lê o picker state. Quando
+     * a identidade escolhida = ativa, este valor coincide com a ativa;
+     * createPost trata `signWithNpub` como no-op nesse caso. Sempre
+     * presente (não opcional) pra forçar a captura síncrona no caller.
+     */
+    signWithNpub: string
   }) => Promise<void> | void
 }
 
@@ -167,6 +180,37 @@ export function ComposeOverlay({
   // GpsScopeButton no header sem mexer no setting persistente.
   const defaultScope = usePrefsStore((s) => s.location_granularity)
   const [gpsScope, setGpsScope] = useState<LocationGranularity>(defaultScope)
+  // Manifesto §4 (compartimentalização): per-post identity picker. Lista
+  // de identidades + a ativa vêm do useIdentitiesStore. Picker só aparece
+  // quando há >1 identidade (1 id = comportamento atual, sem picker).
+  //
+  // Default = ativa, capturado UMA vez no mount (lazy init do useState).
+  // Per-compose state: reseta pra ativa a cada abertura (componente
+  // remonta ao fechar/reabrir o overlay). NUNCA persiste a escolha como
+  // novo default — escolha durável de identidade ativa fundiria personas
+  // por inércia (anti-deanon, espelha a lógica do gpsScope).
+  const identities = useIdentitiesStore((s) => s.list)
+  const activeNpub = useIdentitiesStore((s) => s.activeNpub)
+  const showIdentityPicker = identities.length > 1 && !!activeNpub
+  const [signWithNpub, setSignWithNpub] = useState<string>(() => activeNpub ?? '')
+  // Regra 2 (chrome ambiente): postar como outra persona é glanceable —
+  // borda accent no card inteiro enquanto a escolha ≠ ativa.
+  const postingAsOther = showIdentityPicker && !!activeNpub && signWithNpub !== activeNpub
+  // §28 honestidade: nota one-time de correlação. Postar várias identidades
+  // da MESMA sessão é ligável por quem observa a rede (mesmo IP, relays,
+  // horário) — inerente ao transporte WSS, não corrigível no cliente.
+  // Compartimentalização forte (Tor) chega na Fase 6. A nota aparece só
+  // quando o user escolhe uma persona ≠ ativa E ainda não dismissou.
+  // Dismiss permanente (setPref) — informativa, NUNCA bloqueia publicação.
+  const correlationNoticeDismissed = usePrefsStore(
+    (s) => s.multi_id_correlation_notice_dismissed,
+  )
+  const showCorrelationNotice = postingAsOther && !correlationNoticeDismissed
+  const chosenIdentity = identities.find((i) => i.npub === signWithNpub) ?? null
+  // Nome user-facing da persona escolhida: label > npub…<last6> (público).
+  const chosenPersonaName =
+    chosenIdentity?.label?.trim() ||
+    (chosenIdentity ? `npub…${chosenIdentity.npubBech32.slice(-6)}` : signWithNpub.slice(-6))
   // Toast inline quando permission GPS é negada após user selecionar
   // country/city/precise. Visível 4s; dismiss manual via tap.
   const [gpsDeniedToast, setGpsDeniedToast] = useState(false)
@@ -246,9 +290,30 @@ export function ComposeOverlay({
 
   async function handlePublish() {
     if (blocked) return
+    // ── Captura SÍNCRONA do npub assinante (regra 5, deanon-critical) ──
+    // ANTES de qualquer await: congela a identidade escolhida num const
+    // local. Threaded como argumento explícito até createPost — downstream
+    // NUNCA re-lê o picker state (que poderia mudar durante o await da
+    // confirmação/upload). Espelha como `gpsScope` é capturado/threaded.
+    // Fallback pra activeNpub quando picker oculto (1 id) ou string vazia.
+    const chosenNpub = signWithNpub || activeNpub || ''
+    const isNonActive = !!activeNpub && chosenNpub !== '' && chosenNpub !== activeNpub
+
     const nonEmpty = drafts.filter((d) => !isDraftEmpty(d))
     const subposts: Subpost[] = nonEmpty.map((d, i) => draftToSubpost(d, i))
     if (subposts.length === 0) return
+
+    // Confirmação dura [regra 6]: postar como OUTRA persona COM localização
+    // pode ligar essa persona ao seu local físico (deanon cruzado GPS×id).
+    // Bloqueia o publish se o user cancelar. Só dispara quando AMBOS:
+    // gpsScope !== 'off' E a identidade escolhida ≠ ativa.
+    if (gpsScope !== 'off' && isNonActive) {
+      const ok = await dialog.confirm(
+        `Postar como «${chosenPersonaName}» com localização precisa? Isso pode ligar essa persona ao seu local.`,
+        { title: 'identidade + localização', dangerous: true, okLabel: 'publicar mesmo assim', cancelLabel: 'cancelar' },
+      )
+      if (!ok) return
+    }
 
     // imetas na ordem dos subposts com imagem (RFC §3.5.3 — convenção
     // ordem = ordem). Subposts só-texto não contribuem entrada.
@@ -256,7 +321,7 @@ export function ComposeOverlay({
       .map((d) => d.blobMeta)
       .filter((m): m is BlobMeta => m !== null)
 
-    await onPublish({ subposts, contentWarning, imetas, gpsScope })
+    await onPublish({ subposts, contentWarning, imetas, gpsScope, signWithNpub: chosenNpub })
     // Reset interno (caller fecha o overlay).
     setDrafts([newDraft()])
     setCurrentIdx(0)
@@ -312,6 +377,20 @@ export function ComposeOverlay({
           − sub
         </button>
       )}
+      {/* Identity picker (regra 1, manifesto §4): identidade assinante
+          PERSISTENTEMENTE visível ao lado do `publicar ↑` — não escondida
+          atrás de tap-to-reveal. Só aparece com >1 identidade. Identidade
+          errada funde personas irreversivelmente — classe de risco maior
+          que GPS (que vaza só uma cidade). */}
+      {showIdentityPicker && (
+        <IdentityPickerButton
+          identities={identities}
+          value={signWithNpub}
+          activeNpub={activeNpub!}
+          onChange={setSignWithNpub}
+          disabled={publishing}
+        />
+      )}
       {/* DRIFT ↑ via DriftButton primitive (variant primary, size lg).
           Mantém visual idêntico ao botão inline anterior; padding py-[13px]
           + font-display extrabold é override via className extra (variant
@@ -328,13 +407,19 @@ export function ComposeOverlay({
             DRIFT já é nome do app + ação no feed (↑ swipe). Usar "drift"
             também no compose CTA criava o terceiro significado ("publicar"),
             quebrando mental model do user. "publicar" + ↑ preserva
-            consistência visual com swipe direction sem overload do verbo. */}
+            consistência visual com swipe direction sem overload do verbo.
+
+            Regra 4 (manifesto §4): quando assina como OUTRA persona, o CTA
+            NOMEIA a persona — "publicar como «X» ↑" — pra que o ato de
+            postar sob outra identidade nunca seja silencioso. */}
         {publishing
           ? capturingLocation
             ? '📍 capturando location…'
             : 'publicando…'
           : anyUploading
           ? 'aguardando upload…'
+          : postingAsOther
+          ? `publicar como «${chosenPersonaName}» ↑`
           : 'publicar ↑'}
       </DriftButton>
     </div>
@@ -349,7 +434,63 @@ export function ComposeOverlay({
       footer={footer}
       escDismissible={!publishing}
     >
-      <div className="flex h-full flex-col">
+      {/* Regra 2 (manifesto §4): estado visual AMBIENTE quando assina como
+          outra persona — ring/tint accent no corpo inteiro do compose, pra
+          que "postando como outra identidade" seja glanceable durante toda
+          a edição, não um fato pontual no momento do publish. */}
+      <div
+        className={`flex h-full flex-col transition-colors ${
+          postingAsOther ? 'ring-2 ring-inset ring-drift-accent/40' : ''
+        }`}
+        data-posting-as-other={postingAsOther ? 'true' : 'false'}
+      >
+        {/* Banner persistente "postando como «X»" — reforça regra 2 com
+            texto explícito (não só cor; WCAG não-depende-de-cor). */}
+        {postingAsOther && (
+          <div
+            role="status"
+            className="flex shrink-0 items-center gap-2 border-b border-drift-accent/40 bg-drift-accent/10 px-4 py-2.5 text-drift-accent"
+          >
+            <span aria-hidden="true" className="shrink-0">⚑</span>
+            <p className="font-mono text-[11px] leading-relaxed">
+              <span className="font-bold uppercase tracking-meta">postando como: </span>
+              «{chosenPersonaName}» — diferente da sua identidade ativa.
+            </p>
+          </div>
+        )}
+        {/* §28 honestidade: nota one-time de correlação multi-identidade.
+            Postar identidades diferentes da MESMA sessão é ligável por quem
+            observa a rede (mesmo IP, relays, horário) — limite INERENTE ao
+            transporte WSS, não corrigível aqui. Compartimentalização forte
+            (Tor) chega na Fase 6. NÃO bloqueia publicação (informativa);
+            dismissível permanente via setPref. Vender segurança falsa é
+            pior que admitir o limite (manifesto §28). */}
+        {showCorrelationNotice && (
+          <div
+            role="note"
+            aria-label="aviso de correlação entre identidades"
+            className="flex shrink-0 items-start gap-2 border-b border-drift-border/40 bg-drift-surface/40 px-4 py-3 text-drift-muted"
+          >
+            <span aria-hidden="true" className="mt-0.5 shrink-0 text-drift-muted">
+              <WarningIcon size={14} strokeWidth={2} />
+            </span>
+            <p className="flex-1 font-mono text-[11px] leading-relaxed">
+              Postar com identidades diferentes da mesma sessão pode ligá-las
+              pra quem observa a rede (mesmo IP, relays, horário).
+              Compartimentalização forte (Tor) chega na Fase&nbsp;6.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                void setPref('multi_id_correlation_notice_dismissed', true)
+              }}
+              className="shrink-0 self-start rounded-lg border border-drift-border/40 bg-drift-bg px-2.5 py-1 font-mono text-[10px] uppercase tracking-meta text-drift-muted transition-colors hover:border-drift-accent2/40 hover:text-drift-text focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
+              aria-label="entendi, não mostrar de novo"
+            >
+              entendi
+            </button>
+          </div>
+        )}
         {/* Satoshi audit 2026-05-19: badge warning quando upload_endpoint
             customizado E user tem foto pra publicar. Defesa via
             visibilidade — adversário não consegue mais setar endpoint

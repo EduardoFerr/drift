@@ -133,7 +133,9 @@ describe('ComposeOverlay — wire GpsScopeButton no header', () => {
   })
 
   it('onPublish payload inclui gpsScope', () => {
-    expect(COMPOSE).toMatch(/onPublish\(\s*\{\s*subposts,\s*contentWarning,\s*imetas,\s*gpsScope\s*\}/)
+    // signWithNpub (per-post identity picker, §4) foi appendado após
+    // gpsScope — regex tolera campos adicionais depois de gpsScope.
+    expect(COMPOSE).toMatch(/onPublish\(\s*\{\s*subposts,\s*contentWarning,\s*imetas,\s*gpsScope\b/)
   })
 
   it('ComposeOverlayProps onPublish declara gpsScope: LocationGranularity', () => {

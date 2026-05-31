@@ -982,6 +982,11 @@ function App() {
      *  leitura direta de `prefs.location_granularity` — pref agora é
      *  só "padrão pra novos posts" (pre-selecionado), não "vaza sempre". */
     gpsScope: import('./types/drift').LocationGranularity
+    /** npub hex 64 da identidade que assina este post (manifesto §4).
+     *  Capturado SÍNCRONO em ComposeOverlay.handlePublish (antes de qualquer
+     *  await) e threaded como argumento explícito — App.tsx NUNCA re-lê o
+     *  picker state; só repassa pra createPost. */
+    signWithNpub: string
   }) {
     if (publishing || input.subposts.length === 0) return
     setPublishing(true)
@@ -1031,6 +1036,11 @@ function App() {
         // Track B.2: tags `imeta` NIP-94 com hash + url + cid (best-effort).
         // Posts só-texto não passam imetas (array vazio é omitido).
         ...(input.imetas.length > 0 ? { imetas: input.imetas } : {}),
+        // Manifesto §4: assina com a identidade escolhida per-post (sem
+        // trocar a ativa, invariante #15). Threaded explícito do compose —
+        // App.tsx não lê o picker state. createPost trata como no-op quando
+        // coincide com a ativa. Omitido se vazio (sem multi-id / fallback).
+        ...(input.signWithNpub ? { signWithNpub: input.signWithNpub } : {}),
       })
       // V7: success path fecha o modal. SubpostEditor reseta seus drafts
       // internos no próprio handleSubmit (já era assim antes do V7).

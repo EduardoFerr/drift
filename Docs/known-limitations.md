@@ -271,6 +271,48 @@ audits só por feio. Defer documentado > silence.
 - **Reopener:** É o trabalho ativo — não fechável até Fase 6/7
   shipparem.
 
+### 9. Multi-identidade da mesma sessão é correlacionável no fio (WSS)
+
+- **Issue:** O per-post identity picker (manifesto §4, `lib/identity.ts:
+  signWithNpub` + `ComposeOverlay`) deixa o user assinar um post com uma
+  identidade ≠ ativa sem trocar a sessão. Mas postar **várias identidades
+  da MESMA sessão** é **ligável por um observador de rede** (operador de
+  relay, ISP, MITM): mesmo IP de origem, mesmo conjunto de relays
+  (read/write), mesmas conexões WebSocket persistentes, e timing apertado
+  (dois posts de "personas distintas" minutos um do outro, da mesma
+  origem). O picker escolhe a CHAVE que assina — não esconde a ORIGEM da
+  conexão.
+- **Risk:** MEDIUM-HIGH pra quem depende do picker pra compartimentalizar
+  personas adversariais (jornalista/fonte, dissidente). O picker pode
+  induzir falsa sensação de separação ("estou postando como outra pessoa")
+  que o transporte não entrega. Vender essa segurança falsa seria pior que
+  o limite em si (manifesto §28 honestidade).
+- **Inerência:** Limitação **do transporte WSS** (WebSocket clearnet
+  direto), não do picker nem da camada de assinatura. Não é corrigível no
+  cliente atual — assinar com chave diferente não muda o circuito de rede.
+- **Mitigation atual:**
+  - **Disclaimer honesto one-time** no `ComposeOverlay`: quando o user
+    escolhe uma identidade ≠ ativa pela primeira vez, aparece nota
+    dismissível citando IP/relays/horário + Tor na Fase 6. Persiste o
+    dismiss em `user_prefs.multi_id_correlation_notice_dismissed`.
+    LOCK_VIA_TEST `compose-identity-picker-conformance.test.ts`.
+  - **Guia do usuário** documenta o limite + recomenda sessões/devices/
+    redes separados pra separação real hoje.
+  - O picker NÃO bloqueia publicação (informativo); o hard-confirm
+    GPS×identidade que já existe cobre o caso pior (deanon cruzado por
+    localização).
+- **Fix correto:** **Fase 6** — cliente nativo Tauri com Tor embedded
+  (arti), cada identidade saindo por **circuito Tor isolado** (stream
+  isolation por persona). Isso quebra a correlação por IP + mistura o
+  timing. WebRTC P2P + multi-transport complementam. Mesmo dependente
+  de §15/§21 (item 7).
+- **Reopener:** Fase 6 Tor transport shipado com stream-isolation
+  per-identity validado, OR design de "perfil de rede por identidade"
+  (relay set distinto por persona) que reduza a correlação já no PWA
+  (paliativo parcial — não fecha IP/timing).
+- **Doc canônico:** manifesto §4 + §21 + §28; `CLAUDE.md` invariante #15;
+  spec do picker.
+
 ---
 
 ---

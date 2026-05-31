@@ -71,6 +71,13 @@ export interface CreatePostInput {
    * caem pro `imageUrl` do subpost diretamente, sem hash verify.
    */
   imetas?: BlobMeta[]
+  /**
+   * Per-post identity picker (manifesto §4). Quando presente, este post
+   * é assinado com a identidade `signWithNpub` em vez da ativa, SEM
+   * trocar a ativa (invariante #15). Argumento explícito — protocol.ts
+   * não lê stores. npub hex 64.
+   */
+  signWithNpub?: string
 }
 
 /**
@@ -118,11 +125,14 @@ export async function createPost(input: CreatePostInput): Promise<SignedEvent> {
     layout: normalizeLayout(s.layout),
   }))
 
-  const event = await signDriftEvent({
-    kind: DRIFT_KIND.POST,
-    tags,
-    content: JSON.stringify({ subposts }),
-  })
+  const event = await signDriftEvent(
+    {
+      kind: DRIFT_KIND.POST,
+      tags,
+      content: JSON.stringify({ subposts }),
+    },
+    input.signWithNpub ? { signWithNpub: input.signWithNpub } : undefined,
+  )
   await publishToRelays(event)
   return event
 }

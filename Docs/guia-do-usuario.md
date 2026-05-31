@@ -472,6 +472,28 @@ publicar. É inconveniente, mas é o que torna a rede livre.
 Cada uma tem `nsec` própria, histórico próprio, peso próprio. Trocar
 de ativa exige reload do app.
 
+### "Posso escolher qual identidade publica cada post?"
+
+✅ Sim. Quando você tem **mais de uma identidade**, o editor de post
+mostra um seletor ao lado do botão **publicar ↑**. Você escolhe com
+qual identidade aquele post sai — **sem precisar trocar a identidade
+ativa** nem recarregar o app. Quando a identidade escolhida é diferente
+da ativa, o editor inteiro ganha uma borda de destaque e o botão passa a
+dizer **"publicar como «nome» ↑"**, pra que postar como outra persona
+nunca seja silencioso.
+
+⚠️ **Limite honesto de privacidade.** Postar com identidades diferentes
+**da mesma sessão** (mesmo navegador, mesmo momento) pode **ligá-las pra
+quem observa a rede**: o relay e quem está no meio do caminho veem o
+mesmo IP, o mesmo conjunto de relays e o mesmo horário pras duas
+identidades. Isso é **inerente ao transporte atual** (WebSocket direto)
+— o seletor escolhe a chave que assina, mas não esconde a origem da
+conexão. **Compartimentalização forte** (cada identidade saindo por um
+circuito Tor isolado) chega na **Fase 6** (cliente nativo). Até lá: se
+você precisa de separação real entre personas hoje, use o Drift em
+**sessões/dispositivos/redes separados** pra cada uma. O editor mostra
+esse aviso uma vez quando você escolhe uma identidade diferente da ativa.
+
 ### "Alguém pode saber se eu vi o post mas não dei spread?"
 
 **Não.** Ver/scroll/abrir não publica eventos. Só ações explícitas
