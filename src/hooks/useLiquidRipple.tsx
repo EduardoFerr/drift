@@ -98,12 +98,20 @@ export interface UseLiquidRippleResult {
 }
 
 // ── Parâmetros físicos da onda ───────────────────────────────────────
-const MAP_SIZE = 256 // resolução do raster do displacement map
-const STOPS = 12 // nº de amostras do seno no radialGradient
+// PERF (2026-05-31, Android jank no slim-toggle): MAP_SIZE 256→128 + STOPS
+// 12→8 cortam o raster do displacement map a ~1/4 (decode SVG por frame era
+// o hog). A onda é um gradiente suave — 128² já é visualmente idêntico.
+const MAP_SIZE = 128 // resolução do raster do displacement map
+const STOPS = 8 // nº de amostras do seno no radialGradient
 const WAVELENGTH = 0.16 // fração do disco por anel (menor = mais anéis)
 const FALLOFF_EXP = 1.4 // expoente da atenuação radial (1−r)^exp
 const TAU = 0.42 // constante de decay temporal (e^(−k/τ))
 const OMEGA_TURNS = 3.2 // voltas de fase ao longo da animação (anéis viajam)
+// PERF: regenerar o displacement map (build string + encode + decode SVG no
+// pipeline do filtro) é caro. Desacoplamos de `scale`: scale anima todo
+// frame (barato, atributo só), o MAPA regenera no máximo a cada
+// MAP_REGEN_MS (~20fps) → anéis ainda viajam, ~1/3 dos decodes.
+const MAP_REGEN_MS = 48
 
 // Contador global pra IDs únicos de filtro (múltiplos hosts coexistem
 // sem colidir o `url(#...)`).
@@ -209,6 +217,22 @@ function prefersReducedMotion(): boolean {
   )
 }
 
+/**
+ * PERF (Android): ponteiro grosso (touch) = celular, onde o re-decode do
+ * displacement map por frame trava. Nesses aparelhos usamos o path
+ * SCALE-ONLY — o mapa é gerado UMA vez no `fire` e só o `scale` da lente
+ * anima (1 decode total). Anéis não viajam, mas a gota ainda pulsa
+ * (cresce → dissipa). Desktop (ponteiro fino) mantém os anéis viajando
+ * via regen throttled. Decisão por capability, não por width.
+ */
+function isCoarsePointer(): boolean {
+  return (
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(pointer: coarse)').matches
+  )
+}
+
 export function useLiquidRipple(
   opts: UseLiquidRippleOptions = {},
 ): UseLiquidRippleResult {
@@ -258,8 +282,16 @@ export function useLiquidRipple(
       const cy = Math.max(0, Math.min(1, epicenter.y))
       const t0 = performance.now()
 
+      // PERF: em ponteiro grosso (Android/touch) NÃO regeneramos o mapa no
+      // loop — gera 1× (fase 0) e só anima `scale`. Desktop regenera
+      // throttled (anéis viajam). `lastMapT` guarda o último regen.
+      const coarse = isCoarsePointer()
+      let lastMapT = -Infinity
+
       el.style.filter = `url(#${filterIdRef.current})`
       el.style.willChange = 'filter'
+      // Mapa inicial (fase 0) — único decode no path coarse.
+      feImage.setAttribute('href', buildDisplacementMap(cx, cy, 0, 1))
 
       const frame = (t: number): void => {
         const k = (t - t0) / durationMs // progresso 0..1
@@ -272,10 +304,17 @@ export function useLiquidRipple(
         const decay = Math.exp(-k / TAU)
         const envelope = Math.sin(k * Math.PI)
         const amp = decay * envelope
-        const phase = k * Math.PI * OMEGA_TURNS // anéis viajam pra fora
 
+        // `scale` anima TODO frame (barato — só atributo numérico).
         feDisp.setAttribute('scale', String(maxScale * amp))
-        feImage.setAttribute('href', buildDisplacementMap(cx, cy, phase, 1))
+
+        // Mapa regenera SÓ no desktop e SÓ a cada MAP_REGEN_MS (anéis
+        // viajam sem re-decodificar SVG a 60fps). Android: nunca regenera.
+        if (!coarse && t - lastMapT >= MAP_REGEN_MS) {
+          lastMapT = t
+          const phase = k * Math.PI * OMEGA_TURNS // anéis viajam pra fora
+          feImage.setAttribute('href', buildDisplacementMap(cx, cy, phase, 1))
+        }
         rafRef.current = requestAnimationFrame(frame)
       }
       rafRef.current = requestAnimationFrame(frame)

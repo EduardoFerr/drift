@@ -167,6 +167,32 @@ describe('pref liquid_ripple — schema + default + parser', () => {
   })
 })
 
+describe('PERF Android (2026-05-31) — slim-toggle não trava celular', () => {
+  it('MAP_SIZE reduzido (≤128) — raster do displacement map mais barato', () => {
+    const m = HOOK.match(/const MAP_SIZE\s*=\s*(\d+)/)
+    expect(m).not.toBeNull()
+    expect(Number(m![1])).toBeLessThanOrEqual(128)
+  })
+
+  it('regen do mapa é THROTTLED (MAP_REGEN_MS), desacoplado do scale', () => {
+    expect(HOOK).toMatch(/const MAP_REGEN_MS\s*=/)
+    // scale anima todo frame; mapa só regenera passado o intervalo
+    expect(HOOK).toMatch(/t\s*-\s*lastMapT\s*>=\s*MAP_REGEN_MS/)
+  })
+
+  it('coarse-pointer (Android/touch) NÃO regenera mapa no loop (scale-only)', () => {
+    expect(HOOK).toMatch(/function isCoarsePointer/)
+    expect(HOOK).toMatch(/pointer:\s*coarse/)
+    // o regen é gated por !coarse — celular nunca re-decodifica SVG por frame
+    expect(HOOK).toMatch(/if\s*\(\s*!coarse\s*&&/)
+  })
+
+  it('scale (atributo barato) anima fora do gate de regen do mapa', () => {
+    // setAttribute('scale', ...) ocorre antes/independente do bloco de regen
+    expect(HOOK).toMatch(/feDisp\.setAttribute\(\s*['"]scale['"]/)
+  })
+})
+
 describe('não quebra ripples existentes', () => {
   it('long-press ripple-wave intacto', () => {
     expect(CSS).toMatch(/@keyframes ripple-wave/)
