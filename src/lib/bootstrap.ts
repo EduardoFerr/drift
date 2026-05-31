@@ -326,6 +326,40 @@ async function doBootstrap(): Promise<void> {
           }
         }
 
+        // `?dev-seed-multi-id` (manifesto §4 compartimentalização): semeia
+        // DUAS identidades no device pra destravar o per-post identity picker
+        // (ComposeOverlay só renderiza o picker com >1 identidade). O dev-seed
+        // normal cria só a ativa (via ?as=), então o picker fica invisível e
+        // a validação visual/E2E não tem como exercê-lo. Aqui importamos a
+        // ativa + um 2º named user (heidi por default; grace se ?as=heidi)
+        // pela porta canônica `importIdentityNsec` (nsec_encrypted AES-GCM
+        // válido sob a master key da sessão) e fixamos a ativa via
+        // `setActiveIdentity` (user_prefs.active_identity → store.activeNpub).
+        // Auto-contido: NÃO depende da timing da migração identity→identities.
+        // DEV-only (dentro do guard import.meta.env.DEV && wantsDevSeed).
+        const wantsMultiId = new URLSearchParams(
+          window.location.search,
+        ).has('dev-seed-multi-id')
+        if (wantsMultiId) {
+          const activeName = asName ?? 'grace'
+          const otherName = activeName === 'heidi' ? 'grace' : 'heidi'
+          const activeNsec = NAMED_NSECS[activeName]
+          const otherNsec = NAMED_NSECS[otherName]
+          if (activeNsec && otherNsec) {
+            const { importIdentityNsec, setActiveIdentity } = await import(
+              './identities'
+            )
+            const activeRec = await importIdentityNsec(activeNsec, activeName)
+            await importIdentityNsec(otherNsec, otherName)
+            await setActiveIdentity(activeRec.npub)
+          } else {
+            console.warn(
+              '[bootstrap] dev-seed-multi-id: nsec faltando em NAMED_NSECS ' +
+                `(${activeName}/${otherName}) — picker não será semeado.`,
+            )
+          }
+        }
+
         setBoot((p) => ({ ...p, devSeedActive: true }))
         // eslint-disable-next-line no-console
         console.warn(
