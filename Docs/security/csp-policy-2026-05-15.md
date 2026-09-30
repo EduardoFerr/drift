@@ -85,7 +85,7 @@ explicitamente (prefetch, application manifest, etc.).
 - **`'self'`** — fetch dos próprios assets.
 - **`wss:`** — relays Nostr são WSS arbitrários (manifesto §28:
   compatível com ecossistema). Lista de relays é dinâmica
-  (§17 do CLAUDE.md, gerenciamento via `lib/relays.ts`),
+  (invariante #17, gerenciamento via `lib/relays.ts`),
   hardcode quebraria o modelo. WebRTC signaling também via WSS.
   **Não permitimos `ws:`** — clearnet sem TLS quebra manifesto §15.
 - **`https:`** — fetch de imagens nostr.build, NIP-65 discovery via

@@ -4,10 +4,10 @@
 **Owner:** Lily (HIMYM persona — core code, runtime, fluxos de dados)
 **Sibling RFCs:** Ted §4.1 design system v0.8 (motion tokens), Marshall §4.3 token enforcement
 **Sources consumed:**
-- `Docs/sessions/ted-delegation-plan-2026-05-08.md` §4.1 + §4.2 (motion tokens, scope)
-- `Docs/sessions/design-qa-baseline-2026-05-08.md` (CP-4 8 valores duration; CP-6 skeleton; AY-9 reduced motion)
-- `Docs/sessions/comments-ux-audit-2026-05-08.md` (UX-2 peek vazia, UX-14 loading)
-- `Docs/sessions/ted-ux-spike-deployed-2026-05-08.md` (TX-1 sub-card flicker, TX-3 post 70% empty, TX-9 UpdatePrompt clutter)
+- `nota interna` §4.1 + §4.2 (motion tokens, scope)
+- `nota interna` (CP-4 8 valores duration; CP-6 skeleton; AY-9 reduced motion)
+- `nota interna` (UX-2 peek vazia, UX-14 loading)
+- `nota interna` (TX-1 sub-card flicker, TX-3 post 70% empty, TX-9 UpdatePrompt clutter)
 - Code: `src/components/Post/PostViewer.tsx`, `CommentCard.tsx`, `Create/ComposeOverlay.tsx`, `UI/Image.tsx`, `UI/SlideUpOverlay.tsx`, `UI/FullPageOverlay.tsx`, `UI/UpdatePrompt.tsx`
 
 > **Mandate (user reforço 2026-05-09):** "ainda precisamos melhorar a UI
@@ -318,7 +318,7 @@ Pesquisa em `src/components/Post/`:
 
 Manifesto §22 (deterministic scoring) **não conflita** com optimistic
 UI: optimistic é estado React local, descartado quando SQLite
-confirma (CLAUDE.md invariante 2). Critical UX win.
+confirma (invariante 2). Critical UX win.
 
 **Pattern proposto: `useOptimistic<T>()` hook** em
 `src/hooks/useOptimistic.ts`:
@@ -569,10 +569,10 @@ visual ≥ 85% conformity (Ted §6 gate).
 
 - `Docs/rfcs/2026-05-rfc-design-system-v08.md` — Ted §4.1 (motion tokens canon)
 - `Docs/rfcs/2026-05-rfc-event-handler-registry.md` — predecessor patterns
-- `Docs/sessions/marshall-token-enforcement-plan-2026-05-08.md` — Marshall §4.3 lint rules
-- `Docs/sessions/comments-ux-audit-2026-05-08.md` UX-14 (loading skeleton)
-- `Docs/sessions/ted-ux-spike-deployed-2026-05-08.md` TX-1 (sub-card flicker), TX-3 (post 70% empty), TX-9 (UpdatePrompt clutter)
-- `Docs/sessions/design-qa-baseline-2026-05-08.md` CP-4 (8 durations), CP-6 (skeleton), AY-9 (reduced motion)
+- `nota interna` — Marshall §4.3 lint rules
+- `nota interna` UX-14 (loading skeleton)
+- `nota interna` TX-1 (sub-card flicker), TX-3 (post 70% empty), TX-9 (UpdatePrompt clutter)
+- `nota interna` CP-4 (8 durations), CP-6 (skeleton), AY-9 (reduced motion)
 
 ## §9 — Open questions (Round 4 kickoff)
 

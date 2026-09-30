@@ -383,7 +383,7 @@ Aceitável pra DM Mono (body); discutível pra Syne (display).
 #### 3.4.2 Subset PT-BR
 
 `@fontsource/dm-mono` distribui latin + latin-ext (suporta PT, ES, FR,
-DE, etc.). Drift é PT-BR-only no UI (CLAUDE.md vocabulary mapping).
+DE, etc.). Drift é PT-BR-only no UI (vocabulary mapping).
 Subset pra characters PT-BR + ASCII pode reduzir woff2 ~30%
 (15 KB → ~10 KB DM Mono; 30 KB → ~21 KB Syne).
 
@@ -687,7 +687,7 @@ CWV-2:
   distribuída), §17 (sem chave mestra)
 - `Docs/drift-arquitetura-v4.md` §30.6 (kinds 9078..9081 regular)
 - `Docs/rfcs/2026-05-rfc-motion-perf-polish.md` (DriftSkeleton dependency)
-- `Docs/sessions/lighthouse-2026-05-09.md` (raw data — TBD se ainda
+- `nota interna` (raw data — TBD se ainda
   não criado)
 - `vite.config.ts:184-206` (current build config)
 - `src/App.tsx:32-76` (eager imports inventory)

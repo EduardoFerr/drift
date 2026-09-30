@@ -1,7 +1,7 @@
 /**
  * Conformance test — auto-rebroadcast on addRelay.
  *
- * Satoshi audit 2026-05-21 (`Docs/sessions/satoshi-redundancia-audit-2026-05-21.md`)
+ * Satoshi audit 2026-05-21 (`nota interna`)
  * flagou gap: `rebroadcastToRelay` era 100% funcional, mas MANUAL — user
  * precisava clicar em Settings pra rodar. Promessa manifesto §16
  * (disponibilidade distribuída) só funciona se user souber clicar.

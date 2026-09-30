@@ -17,7 +17,7 @@
 - **Lockfile**: comitado, 100% dos `resolved` URLs apontam para
   `registry.npmjs.org` oficial. Sem mirror suspeito, sem git URL.
 - **Pinning**: 1 dep crítica pinada exata (`@sqlite.org/sqlite-wasm`,
-  documentado em `CLAUDE.md`). Restante usa `^` (caret), aceitável dado
+  documentado no README). Restante usa `^` (caret), aceitável dado
   que o `package-lock.json` materializa versões reais.
 - **SBOM**: não publicado. **Recomendado** gerar via `npm sbom` na CI
   do release workflow (script `scripts/gen-sbom.mjs` adicionado nesta
@@ -90,7 +90,7 @@ GitHub Actions runner, sem dado sensível.
 |---|---|---|---|---|
 | `nostr-tools` | ^2.7.0 | **alta** (signs nsec, verify Schnorr) | fiatjaf + nbd-wtf org | Ativo. Auditado por ecossistema Nostr. |
 | `@scure/bip32`, `@scure/bip39` | ^2.2.0 | **alta** (BIP39 → nsec, NIP-06) | Paul Miller (paulmillr) | Reputable, auditado, foco em crypto primitive minimal. Indireto: `@noble/curves`, `@noble/hashes`. |
-| `@sqlite.org/sqlite-wasm` | `3.51.2-build9` (PINADO) | **alta** (persiste todo o estado local) | sqlite.org oficial | Único pacote pinado exato — documentado em CLAUDE.md. |
+| `@sqlite.org/sqlite-wasm` | `3.51.2-build9` (PINADO) | **alta** (persiste todo o estado local) | sqlite.org oficial | Único pacote pinado exato — documentado no README. |
 | `react`, `react-dom` | ^18.3.0 | alta | Meta | — |
 | `framer-motion` | ^11.0.0 | média (DOM manip / gesture) | framer.com | Ativo. |
 | `helia`, `@helia/unixfs`, `blockstore-idb`, `datastore-idb` | ^6.1.4 / ^7 / ^3 / ^4 | média (IPFS, Fase 6+) | ipfs / libp2p org | Ativo. **Auditar antes de Fase 6 final**: libp2p tem superfície grande, vale review separado. |
@@ -140,7 +140,7 @@ via `fetch()`.
 - CSP estrita (`Docs/security/csp-policy-2026-05-15.md`) bloqueia
   `fetch()` para origens não-whitelisted.
 - nsec criptografada em IndexedDB (master key não-exportável) limita
-  exfil a *ciphertext*, não plaintext — invariante #8 do CLAUDE.md.
+  exfil a *ciphertext*, não plaintext — invariante #8.
 
 **Gaps**:
 - Sem alerta automático em release de dep crítica. **Recomendação

@@ -5,7 +5,7 @@
 **Date:** 2026-05-09
 **Track:** C (NIP-22 comments) — paradigm shift on top of P0/P1/P2 polish
 **Predecessors:**
-- [`Docs/sessions/comments-ux-audit-2026-05-08.md`](../sessions/comments-ux-audit-2026-05-08.md) — UX audit (15 findings, S0 paradigm flagged em UX-1)
+- [`nota interna`](../sessions/comments-ux-audit-2026-05-08.md) — UX audit (15 findings, S0 paradigm flagged em UX-1)
 - F-19 do Barney friction audit (S0)
 - [`Docs/design-comments.md`](../design-comments.md) v0.2 — spec atual (card-stack)
 - [`Docs/comments.md`](../comments.md) v0.3 — protocol/data layer
@@ -692,7 +692,7 @@ Em `tests/`:
   ordering, indent calc, expandedSet manipulation.
 - `tests/manifesto-conformance.test.ts` — adicionar regra: lista
   não introduz scoring "for you" (continua determinístico).
-- E2E manual: cobertura em `Docs/sessions/comments-list-mode-qa.md`
+- E2E manual: cobertura em `nota interna`
   (cap 5 cenários: 5 top-levels, deep nest, spoiler reveal,
   toggle list⇄cards, virtualized scroll perf).
 
@@ -943,7 +943,7 @@ Se §10 aprovar, atualizar:
     Map<postId, commentId[]>)
 - **`Docs/design-system.md`** §X — novo padrão "thread line" border-left
   conectiva.
-- **`CLAUDE.md`** — registrar invariante #18 (a inventar): `comments
+- **** — registrar invariante #18 (a inventar): `comments
   view mode é per-user, persistido, default list-mode pra novos users`.
 
 ---

@@ -62,11 +62,10 @@ export const NIP22_COMMENT_KIND = 1111
  *    aceita plugin de moderação/scan; por extensão, dispatcher é
  *    fechado.
  *  - Handlers vivem TODOS dentro deste arquivo (`src/lib/events.ts`).
- *    CLAUDE.md invariante #1 (única porta SQLite domínio) + conformance
+ *    invariante #1 (única porta SQLite domínio) + conformance
  *    test em `tests/manifesto-conformance.test.ts:655-679` validam path
  *    literal — extrair handler pra outro arquivo viola conformance.
- *  - Pipeline cheap→expensive→persist→recalc→invalidate (CLAUDE.md
- *    invariante #5) preservado em `onNostrEvent`. Handler só implementa
+ *  - Pipeline cheap→expensive→persist→recalc→invalidate (*    invariante #5) preservado em `onNostrEvent`. Handler só implementa
  *    seus passos; pipeline é centralizado.
  *
  * Migração futura pra registry full (RFC Robin §2): trivial. Quando
@@ -81,7 +80,7 @@ interface KindHandler {
   name: string
   /**
    * Validação cheap, ANTES de `verifyEventAsync`. Sem db, sem await
-   * (CLAUDE.md invariante #5 — manter ordem cheap→expensive). Pode ler
+   * (invariante #5 — manter ordem cheap→expensive). Pode ler
    * tags + `JSON.parse(content)`. Retorna `false` pra rejeitar
    * silenciosamente (manifesto §29 — cliente não fala com atacante).
    */
@@ -241,7 +240,7 @@ export async function onNostrEvent(
   if (!skipVerify && !(await verifyEventAsync(event))) return
 
   // 4. Persist (handler decide INSERT + invalidateFeed + recalc).
-  //    Pipeline preservado: invariantes #1, #5, #6 do CLAUDE.md.
+  //    Pipeline preservado: invariantes #1, #5, #6.
   //    `deferSideEffects` (default false) adia recalc/invalidate pós-persist
   //    — caller bulk-aware (dev-seed) consolida no fim.
   await handler.persist(event, options?.deferSideEffects ?? false)
@@ -602,8 +601,7 @@ async function persistBury(event: SignedEvent, deferSideEffects: boolean): Promi
 
 /**
  * Persiste comment NIP-22 (kind 1111). PRIVADO — única porta de INSERT
- * da tabela `comments` é `onNostrEvent` via este helper (CLAUDE.md
- * invariante #1).
+ * da tabela `comments` é `onNostrEvent` via este helper (* invariante #1).
  *
  * Sanity check (Barney HIGH #1): apesar do parser NIP-22 dar uma
  * estrutura aparentemente válida, atacante pode forjar pares onde
@@ -785,7 +783,7 @@ function isValidReason(v: string | null): v is ReportReason {
 // recomendou trocar pra ON CONFLICT...WHERE excluded.created_at >
 // reports.created_at (LWW real); deixei como INSERT OR IGNORE por
 // agora pra ficar simétrico com persistReport. Trade-off documentado
-// em Docs/sessions/relay-moderation-himym-research-2026-05-17.md.
+// em nota interna
 
 async function persistNip56Report(event: SignedEvent, deferSideEffects: boolean): Promise<void> {
   const { mapNip56ToDrift } = await import('./nip56-mapping')
@@ -1215,13 +1213,13 @@ interface UserAggRow {
 /**
  * Recalcula score de um post agregando ações líquidas com pesos.
  *
- * **Semântica "última ação vale"** (manifesto §23, `Docs/sessions/
+ * **Semântica "última ação vale"** (manifesto §23, `nota interna
  * conversa-29-04-analise.md` §Seção 2): cada (post_id, user_pub)
  * contribui com APENAS sua ação cronologicamente mais recente entre
  * seus spreads e buries. Pessoas mudam de opinião — eventos imutáveis
  * preservam histórico, mas o score líquido só conta a última.
  *
- * **Score weighted by spreader weight** (`Docs/sessions/conformance-
+ * **Score weighted by spreader weight** (`nota interna
  * conversa-29-04.md` §Recomendação central, papel: revisão de
  * conformance): cada ação contribui com o `weight` da identidade Drift
  * do user (0..100). Sybil novo tem weight ~0 → spread vale ~0.

@@ -1,5 +1,5 @@
 /**
- * webrtc/pipeline — DataChannel inbound (invariante #5 do CLAUDE.md).
+ * webrtc/pipeline — DataChannel inbound (invariante #5).
  *
  * Pipeline cheap → caro:
  *   1. Rate limit (token bucket)               → cheap

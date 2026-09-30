@@ -15,7 +15,7 @@
  *     postId (Ted Issue #4 design-comments §15) — N consumers compartilham
  *     uma única REQ; cleanup decrementa, último zera dispara unsubscribe.
  *
- * Invariante #1 (CLAUDE.md): comments só entram no SQLite via
+ * Invariante #1: comments só entram no SQLite via
  * `events.ts:onNostrEvent` → `persistCommentRow`. Este módulo NÃO
  * insere — só lê do banco e expõe API pra UI consumir reativo.
  */

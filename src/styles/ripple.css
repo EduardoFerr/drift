@@ -151,7 +151,7 @@
  * ─── Refração líquida real (useLiquidRipple) ───────────────────────
  *
  * V_2026-05-29 (user pedido: "refração líquida REAL no toque"). Spike
- * GO A-scoped: Docs/sessions/ripple-refraction-spike-2026-05-29.md.
+ * GO A-scoped: nota interna
  *
  * Diferente de `.ripple-wave`/`.material-ripple` (overlays alpha — o
  * pixel atrás NÃO se move): aqui o conteúdo do card sofre deslocamento

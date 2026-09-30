@@ -8,7 +8,7 @@
  * Stage 3 vai adicionar: #22-24 (BA graph, cold-start hostile, window
  * boundary Spearman).
  *
- * Source: Docs/sessions/trust-lens-math-stage3-himym-2026-05-17.md §Conformance
+ * Source: nota interna §Conformance
  */
 
 import { describe, it, expect } from 'vitest'

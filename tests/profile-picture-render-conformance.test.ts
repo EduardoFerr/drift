@@ -1,7 +1,7 @@
 /**
  * Profile picture render conformance — LOCK_VIA_TEST Sprint N+2 P2.11.
  *
- * Source: Lily audit `Docs/sessions/profile-picture-audit-2026-05-21.md`.
+ * Source: Lily audit `nota interna`.
  *
  * Pre-fix: feature MVP+1 incompleta — `feed.ts:rowToPost` não populava
  * `authorAvatar`/`authorAlias`; SubpostLayout/CommentCard nunca exibiam

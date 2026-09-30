@@ -40,8 +40,8 @@
  * - "Esconder posts sem profile metadata" (técnico, neutro)
  *
  * Refs:
- *  - Docs/sessions/marshall-lens-identified-check-2026-05-23.md
- *  - Docs/sessions/barney-lens-identified-threat-2026-05-23.md (top-1 mitigation)
+ *  - nota interna
+ *  - nota interna (top-1 mitigation)
  *  - Manifesto §4 (anonimato preservado), §17 (sem chave mestra),
  *    §22 (sem reputação subjetiva)
  */

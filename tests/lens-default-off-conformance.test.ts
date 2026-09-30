@@ -24,8 +24,8 @@
  *    cria pseudo-hierarquia oficial)
  *
  * Refs:
- *  - Docs/sessions/barney-lens-identified-threat-2026-05-23.md C1
- *  - Docs/sessions/marshall-lens-identified-check-2026-05-23.md
+ *  - nota interna C1
+ *  - nota interna
  *  - src/lib/lens/registry.ts DEFAULT_ACTIVE_ID
  */
 

@@ -3,7 +3,7 @@
  *
  * Origem: revisão adversarial 2026-05-02.
  * Claims testadas: PRIVACY.md ("sem telemetria"/"sem fingerprinting"),
- * manifesto §25 (sem scan automático), invariante CLAUDE.md #7.
+ * manifesto §25 (sem scan automático), invariante #7.
  *
  * **Premissa:** PRIVACY.md afirma "Sem telemetria. Sem analytics. Sem
  * reports automáticos de erro. (`grep` no repositório confirma)" e "Sem
@@ -165,7 +165,7 @@ describe('PRIVACY.md claim: "Sem fingerprinting de usuário entre sessões"', ()
   })
 })
 
-describe('CLAUDE.md invariante #8: "nsec NUNCA sai do dispositivo"', () => {
+describe('invariante #8: "nsec NUNCA sai do dispositivo"', () => {
   it('JSON.stringify não é aplicado próximo a variáveis nomeadas como nsec/secretKey/privKey em transport', () => {
     // Heurística estática: JSON.stringify nas mesmas 5 linhas de um
     // identificador `nsec`/`secretKey`/`privKey`/`privateKey` em código
@@ -260,7 +260,7 @@ describe('Marshall finding: sovereignty endpoints customizáveis via UserPrefs',
     // (refactor fc306c2 2026-05-21 Gap A decay extraiu const prefs
     // pra reusar com report_decay_enabled). Invariante real é "ambos
     // tokens presentes próximos no arquivo", não shape sintático.
-    // Audit: Docs/sessions/marshall-baseline-failures-audit-2026-05-26.md
+    // Audit: nota interna
     expect(src).toMatch(/getPrefs\(\)/)
     expect(src).toMatch(/\.report_threshold_override\b/)
     expect(src).toMatch(/getReportThreshold\(activeUsers,\s*reason,\s*override\)/)

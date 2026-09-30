@@ -2,7 +2,7 @@
  * §15 anti-censura — WebRTC isolado em modo Tor (anti-IP-leak).
  *
  * **Por que esse teste existe:** Robin's finding em
- * `Docs/sessions/15-e2e-testbed-scoping-2026-05-08.md` §7 item 1 expôs
+ * `nota interna` §7 item 1 expôs
  * spec-vs-code drift: `Docs/webrtc-6.4-plan.md:106` afirma "em modo `tor`
  * ou `onion-only`, WebRTC desabilitado (orchestrator não registra
  * `webrtcTransport`)". Mas `bootstrap.ts:277-278` registrava ambos os

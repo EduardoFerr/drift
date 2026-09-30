@@ -35,7 +35,7 @@ switch (event.kind) {
 6. Test conformance em `tests/manifesto-conformance.test.ts` se a tabela for nova de domínio (espelhar o pattern "INSERT INTO X só em events.ts").
 7. Tipos em `src/types/drift.ts`.
 
-**Threshold do Ted**: 3 kinds bastava pra justificar refatoração. Hoje são 5 (4 Drift + NIP-22 reuse). Roadmap do CLAUDE.md reserva 9082 (boost pago) e 9083+ (TBD). Quando 9082 entrar, o switch tem 6 ramos com pipeline idêntico (cheap → expensive → persist → invalidate). Custo marginal por kind cresce linear na quantidade de pontos de edição (7 acima), com risco real de drift entre as duas máquinas (alguém adiciona case no `switch` e esquece o `passesSchemaCheck`).
+**Threshold do Ted**: 3 kinds bastava pra justificar refatoração. Hoje são 5 (4 Drift + NIP-22 reuse). O roadmap reserva 9082 (boost pago) e 9083+ (TBD). Quando 9082 entrar, o switch tem 6 ramos com pipeline idêntico (cheap → expensive → persist → invalidate). Custo marginal por kind cresce linear na quantidade de pontos de edição (7 acima), com risco real de drift entre as duas máquinas (alguém adiciona case no `switch` e esquece o `passesSchemaCheck`).
 
 **Evidência atual** (events.ts é um arquivo de 841 linhas):
 
@@ -49,7 +49,7 @@ switch (event.kind) {
 
 Os handlers já são funções coesas — só falta a indireção que evita os dois switches.
 
-**Pressão da invariante #1** (CLAUDE.md): toda escrita em domínio passa por `events.ts`. O conformance test em `tests/manifesto-conformance.test.ts:655-679` faz check **por path literal** (`src/lib/events.ts`). Qualquer registry tem que continuar fazendo o INSERT dentro desse arquivo, não em handler externo. Isso restringe o desenho.
+**Pressão da invariante #1**: toda escrita em domínio passa por `events.ts`. O conformance test em `tests/manifesto-conformance.test.ts:655-679` faz check **por path literal** (`src/lib/events.ts`). Qualquer registry tem que continuar fazendo o INSERT dentro desse arquivo, não em handler externo. Isso restringe o desenho.
 
 ---
 
@@ -242,7 +242,7 @@ Recomendação: **strangler-pattern incremental, 1 PR por kind**, na seguinte or
 
 **Quando vale**: se Drift fica congelado em 5 kinds (sem 9082, sem 9083+) — o switch escala fine até ~8-10 kinds. switch tem **exhaustive check do TypeScript** se `event.kind` for narrow union (hoje não é, é `number`, mas dá pra refinar). Zero indireção, debug stack trace direto.
 
-**Quando NÃO vale**: roadmap CLAUDE.md já reserva 9082 (boost pago, manifesto §18) e 9083+ (TBD). Quando 9082 entrar com pipeline idêntico (cheap → expensive → INSERT → invalidate), são 3 lugares pra editar (DRIFT_KIND, passesSchemaCheck, switch persist). E o segundo switch (`passesSchemaCheck`) continua sendo a fonte real de drift — alguém vai adicionar case num e esquecer no outro. Já passou perto: COMMENT (kind 1111) hoje tem **fluxo separado** (`if isNip22Comment` antes do switch) porque adicionar case `1111:` no switch principal sem adicionar em `passesSchemaCheck` daria comportamento bizarro. A complexidade do "vale a pena unificar?" já bateu na cara do dev.
+**Quando NÃO vale**: roadmap já reserva 9082 (boost pago, manifesto §18) e 9083+ (TBD). Quando 9082 entrar com pipeline idêntico (cheap → expensive → INSERT → invalidate), são 3 lugares pra editar (DRIFT_KIND, passesSchemaCheck, switch persist). E o segundo switch (`passesSchemaCheck`) continua sendo a fonte real de drift — alguém vai adicionar case num e esquecer no outro. Já passou perto: COMMENT (kind 1111) hoje tem **fluxo separado** (`if isNip22Comment` antes do switch) porque adicionar case `1111:` no switch principal sem adicionar em `passesSchemaCheck` daria comportamento bizarro. A complexidade do "vale a pena unificar?" já bateu na cara do dev.
 
 ### Alt B — Registry proposto (recomendado)
 

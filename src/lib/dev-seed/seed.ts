@@ -13,7 +13,7 @@
  *     garantir que `setupUser('alice')` resolva pro MESMO nsec que o
  *     seed gerou. Manifesto §7 (determinismo).
  *
- * ─── Invariante #1 (CLAUDE.md) preservado ───────────────────────────
+ * ─── Invariante #1 preservado ───────────────────────────
  *
  * Eventos de domínio (POST/SPREAD/BURY/REPORT) entram EXCLUSIVAMENTE
  * por `onNostrEvent()` — mesma porta que o subscribe real. O seed NÃO

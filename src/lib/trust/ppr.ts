@@ -4,7 +4,7 @@
  * Pure functions. Toda computação determinística dado mesma seed +
  * mesmo grafo de entrada — manifesto §7 cross-device convergence.
  *
- * Stage 3 HIMYM consensus (`Docs/sessions/trust-lens-math-stage3-himym-2026-05-17.md`):
+ * Stage 3 HIMYM consensus (`nota interna`):
  *
  * Algorithm (PPR Monte Carlo):
  *   for k in 1..K:

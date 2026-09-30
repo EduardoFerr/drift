@@ -5,7 +5,7 @@
 Esta página lista todos os ADRs (Architecture Decision Records) do
 Drift e cataloga decisões arquiteturais relevantes que **ainda não
 têm ADR dedicada** (vivendo hoje em `manifesto.md`,
-`drift-arquitetura-v4.md` §30.x, ou commits + CLAUDE.md invariantes).
+`drift-arquitetura-v4.md` §30.x, ou commits + invariantes).
 
 Convenções e quando criar uma ADR estão em [README.md](README.md).
 
@@ -27,7 +27,7 @@ Convenções e quando criar uma ADR estão em [README.md](README.md).
 ## Decisões já documentadas — não precisam de ADR dedicada
 
 Estas decisões têm tratamento canônico no manifesto, na arquitetura
-ou nos invariantes do `CLAUDE.md`. ADRs novas só fazem sentido se a
+ou nos invariantes do projeto. ADRs novas só fazem sentido se a
 decisão for **revista, parcialmente revertida ou complementada**.
 
 | Decisão | Tratada em | Comentário |
@@ -37,19 +37,19 @@ decisão for **revista, parcialmente revertida ou complementada**.
 | Gun.js descartado | `drift-arquitetura-v4.md` §30.1 + manifesto "tecnologias proibidas" | Decisão duplicaria. |
 | CRDT (Automerge/Yjs) descartado | `drift-arquitetura-v4.md` §30.2 | Decisão duplicaria. |
 | Kinds 9078..9081 (regular events vs 30078+ replaceable) | `drift-arquitetura-v4.md` §30.6 | Tem racional + alternativas — qualidade de ADR já. |
-| Inicialização robusta do worker SQLite + bootstrap singleton | `drift-arquitetura-v4.md` §30.7 + `CLAUDE.md` "Bootstrap fora do React" | Pragmatic; bem documentado. |
-| Portabilidade de identidade (Fase 2.5) | `drift-arquitetura-v4.md` §30.8 + `CLAUDE.md` invariantes §8, §9 | Coberta. |
+| Inicialização robusta do worker SQLite + bootstrap singleton | `drift-arquitetura-v4.md` §30.7 + convenção "Bootstrap fora do React" | Pragmatic; bem documentado. |
+| Portabilidade de identidade (Fase 2.5) | `drift-arquitetura-v4.md` §30.8 + invariantes #8, §9 | Coberta. |
 | Compromisso vinculante do manifesto (Fase 6) | `drift-arquitetura-v4.md` §30.9 + `manifesto.md` v2.2 | Coberta. |
-| Estado reativo via Zustand sem poll | `drift-arquitetura-v4.md` §30.10 + `CLAUDE.md` §10 + padrões Zustand | Coberta (mas tem co-decisão com ADR `onNostrEvent`). |
-| Sem scan automático no cliente oficial | `drift-arquitetura-v4.md` §30.11 + manifesto §25 + `CLAUDE.md` §7 | Densamente coberta. |
+| Estado reativo via Zustand sem poll | `drift-arquitetura-v4.md` §30.10 + invariante #10 + padrões Zustand | Coberta (mas tem co-decisão com ADR `onNostrEvent`). |
+| Sem scan automático no cliente oficial | `drift-arquitetura-v4.md` §30.11 + manifesto §25 + invariante #7 | Densamente coberta. |
 | Anti-Sybil dentro do transport (não DDP paralelo) | `drift-arquitetura-v4.md` §30.12 + manifesto §20 | Coberta (RFC formal histórico). |
 | BIP39 (NIP-06) + Passkey como opt-ins | `drift-arquitetura-v4.md` §30.13 | Coberta. |
-| Score recalc debounced 100ms | `CLAUDE.md` invariante §6 + `src/lib/events.ts:scheduleScoreRecalc` | Otimização documentada; ADR overkill. |
-| Optimistic UI nunca alimenta SQLite | `CLAUDE.md` invariante §2 | Curto, claro, locked por convenção. |
-| Funções puras pra negócio (determinismo §7) | `CLAUDE.md` invariante §3 + tests Vitest | Coberta. |
-| Pipeline `onNostrEvent` (kind → schema → Schnorr → persist → recalc) | `CLAUDE.md` invariante §5 | Coberta; ordem documentada. |
-| Compatibilidade NIP-01 sem extensões obrigatórias | `manifesto.md` §28-30 + `drift-arquitetura-v4.md` §30.12-13 + `CLAUDE.md` §14 | Coberta. |
-| Relays dinâmicos via `relays_user` (não hardcode pós-seed) | `CLAUDE.md` invariante §17 + `src/lib/relays.ts` | Coberta. |
+| Score recalc debounced 100ms | invariante #6 + `src/lib/events.ts:scheduleScoreRecalc` | Otimização documentada; ADR overkill. |
+| Optimistic UI nunca alimenta SQLite | invariante #2 | Curto, claro, locked por convenção. |
+| Funções puras pra negócio (determinismo §7) | invariante #3 + tests Vitest | Coberta. |
+| Pipeline `onNostrEvent` (kind → schema → Schnorr → persist → recalc) | invariante #5 | Coberta; ordem documentada. |
+| Compatibilidade NIP-01 sem extensões obrigatórias | `manifesto.md` §28-30 + `drift-arquitetura-v4.md` §30.12-13 + invariante #14 | Coberta. |
+| Relays dinâmicos via `relays_user` (não hardcode pós-seed) | invariante #17 + `src/lib/relays.ts` | Coberta. |
 
 ---
 
@@ -66,8 +66,8 @@ ADRs futuras — prioridade pelo risco de "virar folclore".
 | App-level Error Boundary com recovery actions | Commit `ec68878` | Decisão de UX postural — "user reproduz crash localmente" — derivada de §4 (anti-telemetria). Tie-in interessante mas curto. | baixa |
 | SRI (Subresource Integrity) baseline em dist artifacts | Commit `e6f90a8` + status line "SRI sha384 baseline" | Postura anti-tampering pra distribuição via mirror/CDN não-confiável; cumpre §17. | média |
 | BIP39 (NIP-06) + Passkey opt-in *como ADR formal* | `drift-arquitetura-v4.md` §30.13 | §30.13 é denso e tem todos os ingredientes; promover a ADR dedicada melhora discoverability sem reescrever conteúdo. | baixa |
-| Eviction de cache respeita spreads + pinned | `CLAUDE.md` invariante §1 exceção + manifesto §16 + `src/lib/cache.ts` | Decisão sensível (apaga dados locais!) com cláusula crítica (NUNCA evict post espalhado). Vale ADR pra blindar contra "otimização" futura que ignore a cláusula. | alta |
-| Moderation via threshold dinâmico + score = -999 (NÃO delete) | `CLAUDE.md` invariantes §1 e §13 + manifesto §26 + `src/lib/moderation.ts` | Distinção "esconder vs deletar" é compromisso forte. ADR formal protege contra "simplificação" futura. | alta |
+| Eviction de cache respeita spreads + pinned | invariante #1 exceção + manifesto §16 + `src/lib/cache.ts` | Decisão sensível (apaga dados locais!) com cláusula crítica (NUNCA evict post espalhado). Vale ADR pra blindar contra "otimização" futura que ignore a cláusula. | alta |
+| Moderation via threshold dinâmico + score = -999 (NÃO delete) | invariantes #1 e §13 + manifesto §26 + `src/lib/moderation.ts` | Distinção "esconder vs deletar" é compromisso forte. ADR formal protege contra "simplificação" futura. | alta |
 | Lazy bootstrap (webrtc/tor diferidos pra `requestIdleCallback`) | Commits `714385a` + `8a27a7e` | Decisão de boot-order com impacto em first paint + manifesto §15 (anti-censura disponível mas não no critical path). | baixa |
 | `kvvfs` fallback (Safari/iOS sem OPFS) | `drift-arquitetura-v4.md` §30 menção + bootstrap | Fallback silencioso que muda durabilidade; user/dev deveria saber por contrato. | média |
 | Auto-classificação `content-warning` (Compose informativo TM-3) | Commit `b68b240` + manifesto §27 | Distinção entre informar autor vs forçar tag = manifesto §25/§27 borderline; vale ADR. | baixa |

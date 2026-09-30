@@ -86,7 +86,7 @@ export default {
       // Drift escala apenas em 320..448 px (max-w-md cap); acima disso o
       // container congela em letterbox e a tipografia também (cap em max).
       // Determinístico (manifesto §7) — mesmo viewport → mesmo render.
-      // Decisão de scale + trade-offs em Docs/sessions/text-responsivity-audit-2026-05-08.md §3-4.
+      // Decisão de scale + trade-offs em nota interna §3-4.
       // Espelhado em src/index.css :root (`--t-fluid-*`); LOCK_VIA_TEST
       // garante paridade.
       fontSize: {

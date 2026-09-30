@@ -7,8 +7,8 @@
 | Author        | Barney (peer review crítico — security / threat modeling)                              |
 | Status        | Draft · pareia com RFC Ted (`Docs/rfcs/2026-05-rfc-verify-worker.md`, mesmo dia)       |
 | Manifesto     | §5 pipeline canônico, §7 determinismo, §8 nsec, §10 cliente leve, §17 sem chave mestra |
-| Arquitetura   | v5.3 · CLAUDE.md invariantes #1, #5, #6, #7, #8                                        |
-| Relacionado a | RFC perf round 10 (`Docs/rfcs/2026-05-rfc-perf-architecture-round-10.md`), Lily long-task audit (`Docs/sessions/lily-long-task-audit-2026-05-15.md` §6/§9 rank 2), supply-chain audit (`Docs/security/supply-chain-audit-2026-05-15.md`), CSP policy (`Docs/security/csp-policy-2026-05-15.md`) |
+| Arquitetura   | v5.3 · invariantes #1, #5, #6, #7, #8                                        |
+| Relacionado a | RFC perf round 10 (`Docs/rfcs/2026-05-rfc-perf-architecture-round-10.md`), Lily long-task audit (`nota interna` §6/§9 rank 2), supply-chain audit (`Docs/security/supply-chain-audit-2026-05-15.md`), CSP policy (`Docs/security/csp-policy-2026-05-15.md`) |
 | Escopo        | T1–T6 do boundary main↔worker introduzido ao mover `verifyDriftEvent` (Schnorr secp256k1) pra worker dedicado |
 
 Este documento é **prereq de arquitetura** pra Ted incorporar no RFC do
@@ -84,7 +84,7 @@ maintainer hijack, T3 npm cache poisoning) — supply-chain audit
 | Adversário        | A1 (event flood) + design bug |
 | Vetor             | Pipeline canônico atual (`events.ts:124-139`) é **sync no main**: `verifyDriftEvent` retorna `boolean` direto antes de `handler.persist`. Mover verify pra worker introduz `await` ou callback no meio do pipeline. Se Ted implementar com `worker.postMessage({event, id}); /* outro código roda aqui */; on('message', () => persist())`, há janela onde main pode receber OUTRO evento via `sync.ts:220-223` e chamar `onNostrEvent` reentrant. Se a 2a chamada não aguardar o resultado do worker pro 1o evento, ou se o pipeline persistir baseado em queue position (não em verify ack), **um INSERT pode acontecer pra evento cuja signature ainda não foi verificada**. |
 | Pré-requisito     | Implementação do worker boundary que não preserve a invariante "persist só roda após receber ack do worker correspondente ao eventId" |
-| Impacto           | **Integridade — crítica**. Atacante publica evento com signature inválida → cliente persiste no SQLite. Quebra invariante CLAUDE.md #5 e #1. Manifesto §5 (pipeline canônico) viola. |
+| Impacto           | **Integridade — crítica**. Atacante publica evento com signature inválida → cliente persiste no SQLite. Quebra invariante #5 e #1. Manifesto §5 (pipeline canônico) viola. |
 | Probabilidade     | Alta SEM design discipline. Race condition é o caso esperado em código multi-threaded sem locking explícito. |
 | Severidade        | **Crítica** — viola contrato fundamental "evento inválido NUNCA persiste". |
 | Mitigação P1      | **Boundary half-duplex assíncrono por eventId**: main envia `{type: 'verify', id, event}` ao worker; main armazena `pending: Map<id, Promise<boolean>>`. `onNostrEvent` await na resolução do Promise antes de chamar `handler.persist`. NÃO usar evento-por-evento RPC sync (`Atomics.wait`/`SharedArrayBuffer`) — bloqueia main thread, derrota o propósito. Usar `postMessage` + correlação por id, padrão idêntico ao `db.ts:51-58` (`call<T>(type, payload)`) que já funciona em prod. |
@@ -170,7 +170,7 @@ maintainer hijack, T3 npm cache poisoning) — supply-chain audit
 
 ## 3. Invariantes preservados — checklist pra Ted incorporar no RFC
 
-### 3.1 Invariante #1 (CLAUDE.md) — onNostrEvent ÚNICA porta INSERT em domínio
+### 3.1 Invariante #1 — onNostrEvent ÚNICA porta INSERT em domínio
 
 **NÃO** colocar INSERT no worker. Boundary correto:
 
@@ -332,7 +332,7 @@ ratchet promoção em `cwv-conformance.test.ts`). P3 são polish.
   de chunking documentadas lá (deve ser lazy? eager? — decisão de Ted no
   RFC; recomendação Barney: **eager** porque verify roda em todo evento
   via subscribe pós-boot, lazy adiciona latência ao primeiro burst).
-- `Docs/sessions/lily-long-task-audit-2026-05-15.md` §6 rank 2 e §9 rank
+- `nota interna` §6 rank 2 e §9 rank
   2 "Mover `verifyDriftEvent` pro worker" — motivação original. §2.5
   estima ganho 500-2000ms scripting/min sob verify-storm.
 
@@ -345,7 +345,7 @@ ratchet promoção em `cwv-conformance.test.ts`). P3 são polish.
 - §17 sem chave mestra (worker NÃO é vetor de chave mestra — só verifica
   signatures públicas)
 
-### CLAUDE.md invariantes
+### invariantes
 - #1 — onNostrEvent única porta INSERT (BW1, BW3 acima)
 - #5 — ordem pipeline (BW2 acima)
 - #6 — recalc debounced (preservado por design)

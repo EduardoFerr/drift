@@ -568,10 +568,10 @@ Override via build flag (Phase 2), nunca runtime setting do user.
 
 - Constants: `src/lib/trust/constants.ts`
 - Plano consolidado: `Docs/plans/trust-lens-phase1-plan.md`
-- Deliberação HIMYM 5/5: `Docs/sessions/trust-lens-math-stage3-himym-2026-05-17.md`
-- Math review Stage 1 (Marshall): `Docs/sessions/trust-lens-math-marshall-2026-05-17.md`
-- Survey arquitetural: `Docs/sessions/zero-trust-survey-ted-2026-05-17.md`
-- UX decisions: `Docs/sessions/trust-lens-multilist-lily-2026-05-17.md`
+- Deliberação HIMYM 5/5: `nota interna`
+- Math review Stage 1 (Marshall): `nota interna`
+- Survey arquitetural: `nota interna`
+- UX decisions: `nota interna`
 
 ---
 

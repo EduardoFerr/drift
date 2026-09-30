@@ -157,7 +157,7 @@ sempre derivado.
 - A fonte da verdade são os eventos Nostr distribuídos
 
 **Implementação:** `onNostrEvent` é o ÚNICO ponto de escrita em
-tabelas de domínio. Ver invariante #1 em `CLAUDE.md`.
+tabelas de domínio. Ver invariante #1.
 
 ### 7. Determinismo Global
 
@@ -171,7 +171,7 @@ dado o mesmo conjunto de eventos.
 
 **Implementação:** `calculateScore`, `calculateWeight`,
 `getMaxSubposts` recebem `now` por parâmetro. Não consultam SQLite.
-Ver invariante #3 em `CLAUDE.md`.
+Ver invariante #3.
 
 ### 8. Ordenação Determinística
 
@@ -395,7 +395,7 @@ que escolha consciente.
 **Adendo de escopo II (2026-05-17) — §17 derivado: Drift NUNCA contra o user.**
 
 Decisão política registrada após deliberação HIMYM Phase 2/3 Trust Lens
-(`Docs/sessions/trust-lens-multilist-barney-2026-05-17.md` +
+(`nota interna` +
 `trust-lens-multilist-lily-2026-05-17.md`).
 
 §17 protege todo user de Drift sendo Drift usado **contra ele** —
@@ -877,12 +877,12 @@ O sistema é compreensível e previsível.
 - Regras explícitas vencem comportamento implícito
 - Pipeline de eventos é debugável localmente
 - Mesma entrada → mesma saída — bugs são reproduzíveis
-- Documentação acompanha o código (CLAUDE.md, drift-arquitetura-v4.md, este)
+- Documentação acompanha o código (drift-arquitetura-v4.md, este)
 - Quando houver dúvida entre solução elegante e solução simples, vence
   a simples (princípio operacional do projeto)
 
 **Implementação:** Estrutura de código em `src/lib/` com módulos de
-responsabilidade única. Invariantes documentadas em CLAUDE.md.
+responsabilidade única. Invariantes documentadas na arquitetura.
 
 ---
 

@@ -4,7 +4,7 @@
  *
  * Fase A relay moderation (Etapa 3 da deliberação HIMYM 2026-05-17).
  *
- * Manifesto §17 adendo + CLAUDE invariante #18: relays moderados são
+ * Manifesto §17 adendo + invariante #18: relays moderados são
  * OPT-IN no Discovery, NUNCA pré-populados no SEED. Sub-card complementa
  * a UI "adicionar manualmente" existente em RelaySettings.
  *

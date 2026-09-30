@@ -1,7 +1,7 @@
 /**
  * SettingExplainer — primitive de "setting explicada".
  *
- * Source: audit `Docs/sessions/settings-friction-audit-2026-05-18.md`.
+ * Source: audit `nota interna`.
  * User feedback 2026-05-18: "usuário comum não sabe do que se trata,
  * do impacto que a configuração tem, ou outras mais avançadas não dá
  * para ele saber como configurar".

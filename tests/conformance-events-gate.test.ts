@@ -1,17 +1,17 @@
 /**
- * Conformance — invariant §1 (CLAUDE.md): `onNostrEvent()` é a ÚNICA
+ * Conformance — invariant §1: `onNostrEvent()` é a ÚNICA
  * porta de INSERT em tabelas de domínio (`posts`, `spreads`, `buries`,
  * `reports`).
  *
  * Espelha o test existente para `comments` em
  * `manifesto-conformance.test.ts`, estendendo cobertura para as 4
- * tabelas de domínio enumeradas no CLAUDE.md.
+ * tabelas de domínio enumeradas no schema.
  *
  * UPDATE/DELETE locais autorizados (cache eviction, moderation hide)
  * estão fora de escopo deste teste — somente INSERT é gated.
  *
  * Falha = violação direta de invariant §1. Se a regra mudar, atualizar
- * CLAUDE.md primeiro e este teste depois.
+ * primeiro e este teste depois.
  */
 
 import { describe, expect, it } from 'vitest'
@@ -28,7 +28,7 @@ function stripComments(src: string): string {
 
 const DOMAIN_TABLES = ['posts', 'spreads', 'buries', 'reports'] as const
 
-describe('CLAUDE.md invariant §1: onNostrEvent é a única porta de INSERT em domínio', () => {
+describe('invariant §1: onNostrEvent é a única porta de INSERT em domínio', () => {
   it.each(DOMAIN_TABLES)(
     'INSERT INTO %s aparece apenas em src/lib/events.ts',
     async (table) => {
@@ -73,7 +73,7 @@ describe('CLAUDE.md invariant §1: onNostrEvent é a única porta de INSERT em d
 
       expect(
         offenders,
-        `Violação invariant §1 do CLAUDE.md: INSERT em tabela de domínio (${table}) ` +
+        `Violação invariant invariante #1: INSERT em tabela de domínio (${table}) ` +
           `fora de src/lib/events.ts. Apenas onNostrEvent() pode inserir em ` +
           `posts/spreads/buries/reports.\n` +
           offenders.map((o) => `  Arquivo: ${o.file}, linha: ${o.line} — ${o.text}`).join('\n'),

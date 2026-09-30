@@ -15,7 +15,7 @@
  * interna além da entrega serial do event loop — main thread garante
  * que o resolve da Promise correta acontece via pending Map (verify.ts).
  *
- * Invariantes preservados (CLAUDE.md):
+ * Invariantes preservados:
  *  #1 — Worker NUNCA escreve no SQLite (sem import de db).
  *  #5 — Pipeline cheap→caro: schema check fica no main (events.ts),
  *       só eventos que passam no schema chegam aqui pro verify caro.

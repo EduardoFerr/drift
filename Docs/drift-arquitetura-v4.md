@@ -752,8 +752,7 @@ drift/
 │   ├── manifesto.md
 │   ├── drift-arquitetura-v4.md
 │   └── drift-fluxograma-v4.html
-├── CLAUDE.md
-├── vite.config.ts · tailwind.config.js · tsconfig.json · package.json
+├── ├── vite.config.ts · tailwind.config.js · tsconfig.json · package.json
 ```
 
 ---
@@ -1302,7 +1301,7 @@ default. Manifesto §25 v2.2.
 
 **Histórico da decisão:**
 - v1: arquitetura previa `lib/csam.ts` com PhotoDNA fail-closed
-  pré-assinatura (CLAUDE.md invariante #7 antiga)
+  pré-assinatura (invariante #7 antiga)
 - v2 (manifesto v2.1): rejeição absoluta — "lib/csam.ts não existe,
   nunca existirá"
 - v3 (manifesto v2.2 — atual): refinamento — protocolo não obriga,

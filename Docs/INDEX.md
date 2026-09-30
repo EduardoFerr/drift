@@ -13,7 +13,6 @@ ou **Por persona** pra pular direto.
 1. **[../README.md](../README.md)** — visão geral 30s, swipes, stack, status
 2. **[manifesto.md](manifesto.md)** — 34 princípios, contrato público (vence sobre arquitetura)
 3. **[drift-arquitetura-v4.md](drift-arquitetura-v4.md)** — fonte da verdade técnica
-4. **[../CLAUDE.md](../CLAUDE.md)** — invariantes operacionais (relevante mesmo sem usar Claude Code)
 5. **[roadmap-v060.md](roadmap-v060.md)** — roteiro ativo até `v0.6.0` stable (3 tracks A/B/C, vetos firmes do dbdp.txt)
 
 ---
@@ -27,7 +26,6 @@ ou **Por persona** pra pular direto.
 ### Arquitetura
 - **[drift-arquitetura-v4.md](drift-arquitetura-v4.md)** — modelo, fluxos, decisões técnicas (v5.3, abril 2026)
 - **[drift-fluxograma-v4.html](drift-fluxograma-v4.html)** — fluxograma visual interativo (v5.3)
-- **[../CLAUDE.md](../CLAUDE.md)** — 17 invariantes operacionais (abril 2026)
 
 ### Fase 6 (cliente nativo + transports)
 - **[archive/webrtc-seeding.md](archive/webrtc-seeding.md)** — visão geral WebRTC + Proof of Interest (TBD)
@@ -80,10 +78,10 @@ ou **Por persona** pra pular direto.
 [../README.md](../README.md) → [manifesto.md](manifesto.md)
 
 ### Sou um dev querendo contribuir
-[../README.md](../README.md) → [manifesto.md](manifesto.md) → [../CLAUDE.md](../CLAUDE.md) → [drift-arquitetura-v4.md](drift-arquitetura-v4.md)
+[../README.md](../README.md) → [manifesto.md](manifesto.md) → [drift-arquitetura-v4.md](drift-arquitetura-v4.md)
 
 ### Sou um auditor de segurança
-[manifesto.md](manifesto.md) §17 + §25 → [../CLAUDE.md](../CLAUDE.md) (invariantes #7, #8, #12) → [webrtc-threats.md](webrtc-threats.md) → [drift-arquitetura-v4.md](drift-arquitetura-v4.md) §36 (threat model geral) → [../SECURITY.md](../SECURITY.md) (escopo e canal de report)
+[manifesto.md](manifesto.md) §17 + §25 → [webrtc-threats.md](webrtc-threats.md) → [drift-arquitetura-v4.md](drift-arquitetura-v4.md) §36 (threat model geral) → [../SECURITY.md](../SECURITY.md) (escopo e canal de report)
 
 ### Quero rodar Drift no meu servidor
 [deploy.md](deploy.md) → [../CHANGELOG.md](../CHANGELOG.md) (versões testadas) → release artifacts (`dist.zip` + `SHA256SUMS` em GitHub Releases)
@@ -103,18 +101,18 @@ ou **Por persona** pra pular direto.
 
 | Princípio | Onde é tratado |
 |-----------|----------------|
-| §2-3 identidade portável | [../CLAUDE.md](../CLAUDE.md) invariantes #8, #9, #15; `src/lib/identity.ts`, `lib/identities.ts` |
+| §2-3 identidade portável | `src/lib/identity.ts`, `lib/identities.ts` |
 | §4 anonimato (não-mixnet) | [drift-arquitetura-v4.md](drift-arquitetura-v4.md) §36 threat model |
 | §6 verdade por eventos | `src/lib/scoring.ts` `selectLatestActionByUser` (resolve spread+bury simultâneo por created_at) |
-| §7 determinismo | [../CLAUDE.md](../CLAUDE.md) invariantes #3, #16 (Vitest tests) |
+| §7 determinismo | `src/lib/scoring.ts`, `src/lib/weight.ts` (funções puras) + tests Vitest |
 | §12 múltiplos transportes | [archive/webrtc-seeding.md](archive/webrtc-seeding.md), [archive/webrtc-6.1a-plan.md](archive/webrtc-6.1a-plan.md), [archive/webrtc-6.2-plan.md](archive/webrtc-6.2-plan.md), `src/lib/transport/` |
 | §15 anti-censura por país | [archive/webrtc-seeding.md](archive/webrtc-seeding.md), [webrtc-6.4-plan.md](webrtc-6.4-plan.md) (Tor transport: arti real shipped + smoke verified 2026-05-01) |
 | §16 disponibilidade distribuída | [archive/webrtc-seeding.md](archive/webrtc-seeding.md) (PoI seeder), [fdroid.md](fdroid.md), `lib/rebroadcast.ts` |
-| §17 sem chave mestra + build reproduzível | [fdroid.md](fdroid.md), [../CLAUDE.md](../CLAUDE.md) invariante #12 |
+| §17 sem chave mestra + build reproduzível | [fdroid.md](fdroid.md) |
 | §20 resistência a isolamento | `lib/probe.ts` (probe anti-eclipse), [webrtc-threats.md](webrtc-threats.md), [archive/webrtc-6.2-plan.md](archive/webrtc-6.2-plan.md) (path diversity scoring) |
-| §22, §24 score sem afinidade | [../CLAUDE.md](../CLAUDE.md) invariante #11; `src/lib/scoring.ts` (puro, sem afinidade) |
+| §22, §24 score sem afinidade | `src/lib/scoring.ts` (puro, sem afinidade) |
 | §23 bury não pune | `src/lib/scoring.ts` (peso simétrico) |
-| §25 sem scan automático | [../CLAUDE.md](../CLAUDE.md) invariante #7 |
+| §25 sem scan automático | `tests/no-scan-automatico-conformance.test.ts` |
 | §26 moderação reativa | `src/lib/moderation.ts` (threshold dinâmico) |
 | §27 auto-classificação voluntária | `content-warning` tag, `lib/feed.ts:applyContentFilters` |
 | §28-30 compatibilidade Nostr | [drift-arquitetura-v4.md](drift-arquitetura-v4.md) §30.12-13; `lib/nip65.ts`, `lib/follows.ts`, `lib/bip39.ts` |
@@ -126,7 +124,6 @@ ou **Por persona** pra pular direto.
 | Doc | TL;DR |
 |-----|-------|
 | [../README.md](../README.md) | Visão de 30s. Stack, kinds 9078-9081, garantias resumidas, setup local. Aponta pra manifesto pra spec completa. |
-| [../CLAUDE.md](../CLAUDE.md) | Instruções pra Claude Code: TL;DR do sistema, 17 invariantes que se quebrados quebram o sistema, stack pinado, padrões (Zustand, SQL via worker, idempotência), tecnologias proibidas. Útil pra qualquer dev. |
 | [../CHANGELOG.md](../CHANGELOG.md) | Keep a Changelog. Última: v0.6.0-alpha.3 (10 sprints pós-auditoria + Tor §15 VERIFIED), v0.6.0-alpha.2 (arti scaffold + dep validation), v0.6.0-alpha.1 (Phase 6.1b: NIP-44 signaling real), v0.6.0-alpha.0 (Phase 6.1a-C: WebRTC core + heatmap), v0.5.4 (TWA bubblewrap). |
 | [../LICENSE](../LICENSE) | Licença do repositório. |
 | [manifesto.md](manifesto.md) | Contrato técnico v2.2. 34 princípios divididos em 5 partes (Existência/Identidade, Eventos, Transporte, Score/Comunidade, Compromisso). Cada princípio tem Regras + Implementação + Fase. Vence sobre arquitetura quando conflita. |

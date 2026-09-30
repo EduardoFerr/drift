@@ -108,7 +108,7 @@ npm run build            # vite build + tsc strict
 
 ## Estrutura
 
-Documentação interna em [`Docs/drift-arquitetura-v4.md`](Docs/drift-arquitetura-v4.md) e [`CLAUDE.md`](CLAUDE.md).
+Documentação interna em [`Docs/drift-arquitetura-v4.md`](Docs/drift-arquitetura-v4.md) .
 
 ```
 src/

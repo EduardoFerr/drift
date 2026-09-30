@@ -29,8 +29,8 @@
  *  - §22 sem reputação subjetiva
  *
  * Refs:
- *  - Docs/sessions/barney-lens-identified-threat-2026-05-23.md C6
- *  - Docs/sessions/marshall-lens-identified-check-2026-05-23.md
+ *  - nota interna C6
+ *  - nota interna
  *  - Análogo: tests/manifesto-conformance.test.ts (LOCK_VIA_TEST §17)
  */
 

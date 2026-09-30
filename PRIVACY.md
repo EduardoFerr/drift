@@ -17,7 +17,7 @@ Quando executado, o cliente:
 
 - Gera ou aceita uma chave secp256k1 (`nsec`). A chave é cifrada com
   AES-GCM 256 e armazenada em IndexedDB. **A chave nunca sai do
-  dispositivo** — invariante #8 do `CLAUDE.md`.
+  dispositivo** — invariante #8.
 - Mantém um SQLite WASM local (OPFS quando disponível, kvvfs como
   fallback) com eventos Nostr recebidos, materializações de feed, e
   preferências do usuário (`user_prefs`).
@@ -62,7 +62,7 @@ formas de obter o cliente.
 - Sem fingerprinting de usuário entre sessões além do que o navegador
   expõe naturalmente.
 - Sem scan automático de conteúdo (PhotoDNA, ML, blocklists embutidas)
-  no cliente oficial — invariante #7 do `CLAUDE.md`, manifesto §25.
+  no cliente oficial — invariante #7, manifesto §25.
 
 ## Identidade e portabilidade
 

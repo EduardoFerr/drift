@@ -11,7 +11,7 @@ materialmente): Perf **98** · A11y **100** · Best Practices **100** · SEO **1
 
 > Este documento é a **fonte única de verdade** sobre o status atual de
 > entrega dos 34 princípios do manifesto. Substitui o status espalhado
-> em `CLAUDE.md` (que agora aponta pra cá). Atualizar sempre que uma
+> em outros docs (que agora apontam pra cá). Atualizar sempre que uma
 > fase fechar ou um princípio mudar de status.
 
 ---
@@ -57,7 +57,7 @@ materialmente): Perf **98** · A11y **100** · Best Practices **100** · SEO **1
 
 | § | Princípio | Status | Evidência | Gap |
 |---|---|---|---|---|
-| §6 | Verdade por Eventos — append-only, SQLite é cache | ✅ | `src/lib/events.ts:onNostrEvent` é única porta de INSERT em domínio (CLAUDE.md invariante #1); `tests/events.lastActionWins.test.ts`; eventos sempre `INSERT OR IGNORE` | — |
+| §6 | Verdade por Eventos — append-only, SQLite é cache | ✅ | `src/lib/events.ts:onNostrEvent` é única porta de INSERT em domínio (invariante #1); `tests/events.lastActionWins.test.ts`; eventos sempre `INSERT OR IGNORE` | — |
 | §7 | Determinismo Global — funções puras, mesma entrada→mesma saída | ✅ | `src/lib/scoring.ts:46` `calculateScore` (pura, recebe `now` por param); `tests/scoring.test.ts` + `tests/weight.test.ts` + `tests/moderation.test.ts` + `tests/bip39.test.ts` + `tests/nip65.test.ts` + `tests/applyContentFilters.test.ts` cobrem todas as funções puras críticas | — |
 | §8 | Ordenação Determinística — `created_at` + `id` lex tie-break | ✅ | Queries em `feed.ts` usam `ORDER BY score DESC, created_at DESC, id ASC`; `INSERT OR IGNORE` para idempotência; `tests/events.lastActionWins.test.ts` valida tie-break `kind` ASC pra empate exato | — |
 | §9 | Validação Determinística — schema + Schnorr + regras puras | ✅ | `src/lib/events.ts:157` `passesSchemaCheck`; `tests/schemaCheck.test.ts` + `tests/manifesto-conformance.test.ts` | — |
@@ -68,7 +68,7 @@ materialmente): Perf **98** · A11y **100** · Best Practices **100** · SEO **1
 | § | Princípio | Status | Evidência | Gap |
 |---|---|---|---|---|
 | §11 | Rede como meio — verify por assinatura, não origem | ✅ | `src/lib/sync.ts` `pool.subscribeMany`; verify roda antes de persistir (§5) | — |
-| §12 | Múltiplos Transportes — WSS, Tor, WebRTC | 🟡 | WSS ✅ (`src/lib/transport/wss.ts`); WebRTC ✅ (12 arquivos em `src/lib/transport/webrtc/` + orchestrator + tests T1-T4); Tor ✅ em Tauri `--features arti` (`src-tauri/src/tor.rs` + `src/lib/transport/tor.ts`). Smoke e2e VERIFIED 2026-05-01 (`Docs/sessions/sprint7-smoke-2026-05-01.md`) | Tor inacessível pra usuário PWA browser (runtime limit, esperado). Distribuição binária Tauri pra desktop end-user via `v0.6.0-alpha.3` em Releases mas adoção depende de download. Sneakernet (§13) pendente Fase 7. |
+| §12 | Múltiplos Transportes — WSS, Tor, WebRTC | 🟡 | WSS ✅ (`src/lib/transport/wss.ts`); WebRTC ✅ (12 arquivos em `src/lib/transport/webrtc/` + orchestrator + tests T1-T4); Tor ✅ em Tauri `--features arti` (`src-tauri/src/tor.rs` + `src/lib/transport/tor.ts`). Smoke e2e VERIFIED 2026-05-01 (`nota interna`) | Tor inacessível pra usuário PWA browser (runtime limit, esperado). Distribuição binária Tauri pra desktop end-user via `v0.6.0-alpha.3` em Releases mas adoção depende de download. Sneakernet (§13) pendente Fase 7. |
 | §13 | Neutralidade de transporte — eventos não dependem do meio | 🟡 | Eventos Nostr puros (NIP-01); transport interface abstrata em `src/lib/transport/index.ts` (`publish/subscribe/health`); orchestrator dedup natural via `INSERT OR IGNORE` | Export/import bundle JSON ou QR (sneakernet) ⏳ Fase 7. Não há `lib/bundle-export.ts` ainda. |
 | §14 | Bootstrap Distribuído — seed list + NIP-65 + user-defined | 🟡 | `src/config/relays.ts` seed list (4 relays); `src/lib/relays.ts` dynamic CRUD + `relays_user` SQLite table; NIP-65 publish/parse ✅ em `src/lib/nip65.ts` + `tests/nip65.test.ts`; UI Settings de relays shipped Fase 5 | Preferência `.onion` sobre clearnet existe em `network_mode=tor`, mas requer cliente nativo. Tutorial "run-your-own-relay" ✅ em `Docs/run-your-own-relay.md`. |
 | §15 | Anti-Censura por País — múltiplos transportes + bootstrap + custo assimétrico | 🟡 | Tor real shipped em Tauri (`v0.6.0-alpha.3` + smoke VERIFIED 2026-05-01 — `Docs/fase-6-roadmap.md`); WebRTC P2P + path diversity (`src/lib/peerRegistry.ts`, `src/lib/peerScore.ts`); multi-bootstrap 4 relays; documentação pública pendente | Doc público "como instalar Drift em país censurado" não publicado ainda. Em PWA-only, §15 NÃO é cumprido — só pra source-builders + binários Tauri Releases. Aceito em arquitetura. |
@@ -105,7 +105,7 @@ materialmente): Perf **98** · A11y **100** · Best Practices **100** · SEO **1
 | §31 | Compatibilidade entre Versões Drift — tag `drift-version` | ✅ | `passesSchemaCheck` exige `drift-version`; decisões em `Docs/drift-arquitetura-v4.md` §30; CHANGELOG mantido; auto-update Tauri (§31 preserve) | — |
 | §32 | Compatibilidade entre Clientes Drift — spec pública versionada | ✅ | `Docs/manifesto.md` (CC0) + `Docs/drift-arquitetura-v4.md` + `Docs/protocol-spec.md` públicos; código MIT; sem kinds privados | — |
 | §33 | Anti-Spam Pela Mecânica Social — bury + reports + limite por peso | ✅ | Buries reduzem score em `scoring.ts`; reports via `moderation.ts`; `getMaxSubposts` cresce com peso em `weight.ts`; PoW (NIP-13) é opt-in, não invariante | — |
-| §34 | Simplicidade Operacional | ✅ | Estrutura `src/lib/` com módulos de responsabilidade única; invariantes em `CLAUDE.md`; pipeline `onNostrEvent` linear documentado; 1032 tests reproduzíveis | — |
+| §34 | Simplicidade Operacional | ✅ | Estrutura `src/lib/` com módulos de responsabilidade única; invariantes do projeto; pipeline `onNostrEvent` linear documentado; 1032 tests reproduzíveis | — |
 
 ---
 
@@ -152,7 +152,7 @@ Princípios com status parcial são o **trabalho honesto restante**. Em ordem de
 
 1. Quando uma feature fechar, mudar status (🟡 → ✅) e remover linha correspondente em "Riscos".
 2. Quando manifesto bumpar versão (v2.3+), reler princípios novos/alterados e adicionar/atualizar linhas.
-3. Não duplicar matriz em `CLAUDE.md` — apontar pra cá.
+3. Não duplicar a matriz em outro doc — apontar pra cá.
 4. Substituir o doc inteiro em nova auditoria periódica (snapshot dated) ao invés de mutar — preserva histórico.
 
 ---

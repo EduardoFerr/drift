@@ -233,17 +233,17 @@ describe('Manifesto §25 — zero identifiers de scan/classify automático em sr
 })
 
 describe('Manifesto §25 — declaração presente em fontes canônicas', () => {
-  it('CLAUDE.md declara invariante "sem scan automático" explicitamente', () => {
-    const claudeMd = readFileSync(join(ROOT, 'CLAUDE.md'), 'utf8')
+  it('README.md declara invariante "sem scan automático" explicitamente', () => {
+    const readmeMd = readFileSync(join(ROOT, 'README.md'), 'utf8')
     // Heurística: deve mencionar tanto §25 (numérico) quanto a frase
     // negacional. Tolerante a variações ortográficas.
     expect(
-      claudeMd,
-      'CLAUDE.md deve referenciar manifesto §25 explicitamente',
+      readmeMd,
+      'README.md deve referenciar manifesto §25 explicitamente',
     ).toMatch(/§25\b/)
     expect(
-      claudeMd,
-      'CLAUDE.md deve declarar invariante de não-scan de conteúdo (frase com "não escaneia" / "sem scan automático" / "NÃO escaneia")',
+      readmeMd,
+      'README.md deve declarar invariante de não-scan de conteúdo (frase com "não escaneia" / "sem scan automático" / "NÃO escaneia")',
     ).toMatch(/(?:n[ãa]o\s+escaneia|sem\s+scan\s+autom[áa]tico|NÃO\s+escaneia)/i)
   })
 

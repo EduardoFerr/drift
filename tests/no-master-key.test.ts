@@ -3,9 +3,9 @@
  *
  * Origem: revisão adversarial 2026-05-02.
  * Claims testadas: manifesto §17 (sem chave mestra), invariantes
- * CLAUDE.md #1 (onNostrEvent única porta INSERT), #12, #13, #14.
+ * #1 (onNostrEvent única porta INSERT), #12, #13, #14.
  *
- * **Premissa:** Manifesto §17 + CLAUDE.md invariante #12 + invariante #13:
+ * **Premissa:** Manifesto §17 + invariante #12 + invariante #13:
  *  - Não escrever `deletePost()`, `banUser()`, `flagAsSpam()` global, ou
  *    qualquer função que dê ao fundador poder sobre conteúdo de outros.
  *  - Cliente NÃO deleta dados moderados do SQLite — `score = -999`
@@ -76,7 +76,7 @@ function scanSource(patterns: { name: string; re: RegExp }[]): Match[] {
   return hits
 }
 
-describe('Manifesto §17 / CLAUDE.md #12: "Sem chave mestra, jamais"', () => {
+describe('Manifesto §17 / #12: "Sem chave mestra, jamais"', () => {
   it('código fonte não exporta funções com nomes proibidos (deletePost/banUser/etc.)', () => {
     // Cobrimos `function`, `const`, `class method`, `export`. Pegamos
     // qualquer declaração — se nome existe na superfície do módulo, é
@@ -106,7 +106,7 @@ describe('Manifesto §17 / CLAUDE.md #12: "Sem chave mestra, jamais"', () => {
   })
 })
 
-describe('CLAUDE.md invariante #13: "Cliente NÃO deleta dados moderados do SQLite"', () => {
+describe('invariante #13: "Cliente NÃO deleta dados moderados do SQLite"', () => {
   it('moderation.ts não contém DELETE FROM em tabelas de domínio', () => {
     const file = join(SRC_ROOT, 'lib', 'moderation.ts')
     const content = readFileSync(file, 'utf8')
@@ -136,7 +136,7 @@ describe('CLAUDE.md invariante #13: "Cliente NÃO deleta dados moderados do SQLi
   })
 })
 
-describe('Manifesto §25 / CLAUDE.md #7: "Sem scan automático de conteúdo"', () => {
+describe('Manifesto §25 / #7: "Sem scan automático de conteúdo"', () => {
   it('package.json não inclui dependências de scan/ML automático', () => {
     const pkgRaw = readFileSync(join(ROOT, 'package.json'), 'utf8')
     const pkg = JSON.parse(pkgRaw) as {
@@ -186,7 +186,7 @@ describe('Manifesto §25 / CLAUDE.md #7: "Sem scan automático de conteúdo"', (
   })
 })
 
-describe('CLAUDE.md invariante #14: "Sem kinds privados fora da faixa Drift documentada"', () => {
+describe('invariante #14: "Sem kinds privados fora da faixa Drift documentada"', () => {
   it('DRIFT_KIND contém apenas 9078..9081 (POST/SPREAD/BURY/REPORT)', () => {
     // Validação contra os valores canônicos. Reservados 9082, 9083 NÃO
     // devem aparecer no DRIFT_KIND ainda — só quando implementados.

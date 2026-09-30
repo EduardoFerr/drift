@@ -1,6 +1,6 @@
 // Feed queue cap + snapshot timestamp — LOCK_VIA_TEST.
 //
-// Source: Lily Tinder-audit 2026-05-21 (Docs/sessions/
+// Source: Lily Tinder-audit 2026-05-21 (nota interna
 // lily-tinder-audit-2026-05-21.md). Items 2 + 3 shipados nesta sprint.
 //
 // Item 2: Zustand `useFeedStore.posts` cap explícito (FEED_QUEUE_CAP)

@@ -67,13 +67,13 @@ export interface PeerState {
    *  `disconnected`. Cancelado em transições out-of-disconnected
    *  (connected, failed, closed) e em `cleanupPeer` pra evitar
    *  empilhar timers em redes flakey (Wi-Fi handover). Ver
-   *  Docs/sessions/webrtc-architecture-audit-2026-05-08.md §B1. */
+   *  nota interna §B1. */
   disconnectGraceTimer?: ReturnType<typeof setTimeout> | null
   /** fix: B3 — handle do setTimeout do ICE connect timeout (30s).
    *  Cancelado em `cleanupPeer` pra liberar a referência ao PeerState
    *  antigo (RTCPeerConnection já fechada + outboundQueue) antes do
    *  GC natural ao fim dos 30s. Ver
-   *  Docs/sessions/webrtc-architecture-audit-2026-05-08.md §B3. */
+   *  nota interna §B3. */
   iceConnectTimer?: ReturnType<typeof setTimeout> | null
 }
 

@@ -19,7 +19,7 @@
  *    resposta (Ted RFC §3.2).
  *  - Init timeout 15s, mesmo padrão de `db.ts` (Barney P2.4).
  *
- * Invariantes preservados (CLAUDE.md):
+ * Invariantes preservados:
  *  #1 — Worker não escreve no SQLite. onNostrEvent continua única
  *       porta de INSERT no main.
  *  #5 — Pipeline cheap→caro: caller (events.ts/pipeline.ts) faz

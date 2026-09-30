@@ -5,8 +5,8 @@
 **Data**: 2026-05-16
 **Persona inputs**: Lily (gatilho — audit estática rank 2), Barney (threat model do channel main↔worker), Marshall (test strategy)
 **Relacionado**:
-- `Docs/sessions/lily-long-task-audit-2026-05-15.md` §2.5 e §9 rank 2 — origem do high-ROI deferido
-- CLAUDE.md invariantes #1 (única porta INSERT) e #5 (pipeline ordem cheap→caro)
+- `nota interna` §2.5 e §9 rank 2 — origem do high-ROI deferido
+- invariantes #1 (única porta INSERT) e #5 (pipeline ordem cheap→caro)
 - `Docs/rfcs/2026-05-rfc-event-handler-registry.md` — pipeline já desenhado pra ser registry-friendly
 
 ---

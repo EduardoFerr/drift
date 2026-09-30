@@ -10,7 +10,7 @@
  * "funciona" mas viola contrato (ex: alguém importa `db` no
  * verify.worker.ts, ou copia nsec via postMessage).
  *
- * Invariantes do CLAUDE.md verificados:
+ * Invariantes verificados:
  *  #1 — INSERT só via events.ts (worker NÃO escreve em SQLite)
  *  #5 — Pipeline cheap→caro (verify.worker importa SOMENTE nostr-tools/pure)
  *  #7 — Determinismo: verify result determinístico em main vs worker

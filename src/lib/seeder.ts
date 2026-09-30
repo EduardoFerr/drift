@@ -67,7 +67,7 @@ export async function seedFromSpreaders(postId: string): Promise<number> {
   // bootstrap.ts:registerTransport(webrtcTransport). Sem este gate,
   // abrir SpreadMap em modo Tor disparava connectTo() → RTCPeerConnection
   // direto, bypassando o orchestrator. Documentado em
-  // Docs/sessions/15-e2e-testbed-scoping-2026-05-08.md §7 item 1
+  // nota interna §7 item 1
   // (Robin finding) e webrtc-6.4-plan.md:106.
   const networkMode = getPrefs().network_mode
   if (networkMode !== 'clearnet') {

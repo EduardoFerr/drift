@@ -42,7 +42,7 @@ sniff é frágil e `process.env` não existe no browser.
 
 ¹ PWA precisa COOP/COEP corretos pra OPFS funcionar. Ver `vite.config.ts`.
 ² WebAuthn em Tauri 2.x é viável via plugin oficial; não testado ainda.
-³ **Status atualizado (2026-05-01)**: Tor real com arti está shippado em código com `cargo tauri build --features arti` — listener SOCKS5 próprio (`socks5_proxy.rs`), bridge IPC WS (`tor_ws.rs` ↔ `torWebSocket.ts`), wire-up condicional em `bootstrap.ts`. **Smoke test e2e VERIFIED em 2026-05-01** (Sprint 7 do roadmap pós-auditoria — registro em `Docs/sessions/sprint7-smoke-2026-05-01.md`): captura Wireshark confirmou ZERO TLS direto a relay Nostr em modo `onion-only`, 7 guards Tor publicamente registrados em 7 países distintos, porta 9001 ORPort canônica. Sem `--features arti`, é stub IPC com `lastError: "STUB: arti integration pending"`.
+³ **Status atualizado (2026-05-01)**: Tor real com arti está shippado em código com `cargo tauri build --features arti` — listener SOCKS5 próprio (`socks5_proxy.rs`), bridge IPC WS (`tor_ws.rs` ↔ `torWebSocket.ts`), wire-up condicional em `bootstrap.ts`. **Smoke test e2e VERIFIED em 2026-05-01** (Sprint 7 do roadmap pós-auditoria — registro em `nota interna`): captura Wireshark confirmou ZERO TLS direto a relay Nostr em modo `onion-only`, 7 guards Tor publicamente registrados em 7 países distintos, porta 9001 ORPort canônica. Sem `--features arti`, é stub IPC com `lastError: "STUB: arti integration pending"`.
 
 ## Pontos de gating no código
 

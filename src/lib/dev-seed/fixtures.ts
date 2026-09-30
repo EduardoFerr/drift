@@ -1,7 +1,7 @@
 /**
  * Dev-seed fixtures — eventos Drift determinísticos pra dev-seed mode + E2E.
  *
- * Sprint N+5 Batch B1 (Marshall). Plano: `Docs/sessions/
+ * Sprint N+5 Batch B1 (Marshall). Plano: `nota interna
  * sprint-n5-e2e-validation-2026-05-29.md`.
  *
  * ─── Determinismo absoluto (manifesto §7) ───────────────────────────
@@ -19,7 +19,7 @@
  * ─── Os eventos PASSAM pelo pipeline real ───────────────────────────
  *
  * `seed.ts:seedDatabase()` itera estes eventos e chama `onNostrEvent()`
- * pra cada um (CLAUDE.md invariante #1 — única porta de INSERT em
+ * pra cada um (invariante #1 — única porta de INSERT em
  * domínio). Cada evento é assinado de verdade; em dev-seed mode (browser)
  * o `verify.worker` valida a Schnorr normalmente. Follows (kind 3 NIP-02)
  * não passam por `onNostrEvent` (fora do ranking, §24) — vão por
@@ -148,7 +148,7 @@ export const NAMED_IDENTITIES: readonly SeedIdentity[] = Object.freeze([
   // segue alice/bob/carol DIRETO, mas NÃO frank/heidi — então carol vira a
   // ÚNICA via de grace até frank→heidi: carol é PONTE K=1 (blast=2) na lente
   // de grace. Demonstra `wot.ts:findBridges` no mapa network. Ver
-  // network-map.spec + Docs/sessions/map-model-deliberation-2026-05-30.md.
+  // network-map.spec + nota interna
   named(
     'carol',
     geo(-23.55, -46.63, 'São Paulo', 'BR'),

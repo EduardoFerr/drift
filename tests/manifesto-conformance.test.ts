@@ -7,7 +7,7 @@
  * §23 (bury não pune), §17 (CSP/headers como prova de "sem chave
  * mestra disfarçada via deploy").
  *
- * **Premissa:** vários invariantes do CLAUDE.md são "função pura X não
+ * **Premissa:** vários invariantes do projeto são "função pura X não
  * deve usar Date.now()" ou "constante Y deve permanecer N". Tests de
  * output (existentes em `tests/scoring.test.ts` etc.) NÃO pegam
  * regressões silenciosas onde o resultado fica próximo mas o
@@ -65,7 +65,7 @@ function stripComments(src: string): string {
     .replace(/\/\/.*$/gm, '')
 }
 
-describe('Manifesto §7 / CLAUDE.md #3: funções puras críticas não usam relógio implícito', () => {
+describe('Manifesto §7 / #3: funções puras críticas não usam relógio implícito', () => {
   it('calculateScore (scoring.ts) não usa Date.now / performance.now / Math.random', () => {
     const src = readFileSync(join(SRC, 'lib', 'scoring.ts'), 'utf8')
     const body = extractFunctionBody(src, 'calculateScore')
@@ -124,7 +124,7 @@ describe('Manifesto §7 / CLAUDE.md #3: funções puras críticas não usam rel�
   })
 })
 
-describe('CLAUDE.md #5 / §29: skipVerify é DEV-seed-only, gated por import.meta.env.DEV', () => {
+describe('#5 / §29: skipVerify é DEV-seed-only, gated por import.meta.env.DEV', () => {
   // Ted+Marshall 2026-05-29: dev-seed pula verify Schnorr (passo CARO) pra
   // fixtures self-signed. Risco: skip de verify em PROD = aceitar evento
   // forjado da rede sem checar assinatura (catástrofe §29). Estes locks
@@ -208,7 +208,7 @@ describe('Manifesto §26: threshold de moderação tem default razoável', () =>
   )
 })
 
-describe('CLAUDE.md invariante #14: compatibilidade NIP-01 — ranges de kind corretos', () => {
+describe('invariante #14: compatibilidade NIP-01 — ranges de kind corretos', () => {
   it('todos os DRIFT_KIND estão na faixa NIP-01 regular (1..9999)', () => {
     const src = readFileSync(join(SRC, 'config', 'constants.ts'), 'utf8')
     const blockMatch = src.match(/export\s+const\s+DRIFT_KIND\s*=\s*\{([^}]+)\}/m)
@@ -329,9 +329,9 @@ describe('Service Worker integrity (Barney §d — chave mestra disfarçada)', (
 
 describe('Stack pin sqlite-wasm cross-doc (Marshall LOCK_VIA_TEST)', () => {
   // Fonte canônica: package.json devDependencies/dependencies pin.
-  // Replicado em CLAUDE.md (stack section) e README.md (stack section).
+  // Replicado em README.md (stack section).
   // Drift = upgrade silencioso onde docs ficam stale.
-  it('versão de @sqlite.org/sqlite-wasm em package.json bate com CLAUDE.md e README.md', () => {
+  it('versão de @sqlite.org/sqlite-wasm em package.json bate com README.md', () => {
     const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')) as {
       dependencies?: Record<string, string>
       devDependencies?: Record<string, string>
@@ -342,12 +342,7 @@ describe('Stack pin sqlite-wasm cross-doc (Marshall LOCK_VIA_TEST)', () => {
     // Pin exato (sem `^`/`~`) — manifesto §17 quer build determinístico.
     expect(pinnedVersion!, 'sqlite-wasm precisa pin exato (sem ^/~)').toMatch(/^[\d.]+(?:-[\w.]+)?$/)
 
-    const claudeMd = readFileSync(join(ROOT, 'CLAUDE.md'), 'utf8')
     const readmeMd = readFileSync(join(ROOT, 'README.md'), 'utf8')
-    expect(
-      claudeMd,
-      `CLAUDE.md deve mencionar a versão pinada (${pinnedVersion}) — drift entre package.json e CLAUDE.md`,
-    ).toContain(pinnedVersion!)
     expect(
       readmeMd,
       `README.md deve mencionar a versão pinada (${pinnedVersion}) — drift entre package.json e README.md`,
@@ -357,9 +352,9 @@ describe('Stack pin sqlite-wasm cross-doc (Marshall LOCK_VIA_TEST)', () => {
 
 describe('Schema kind 9078 tag `d` presente em fachadas públicas (Marshall risco #1)', () => {
   // Spec canônica: protocol-spec.md exige tag `d` obrigatória no kind 9078
-  // (NIP-33-style addressable param). README.md e CLAUDE.md são entry
-  // points públicos — implementador externo lê ambos primeiro. Se
-  // omitirem `d`, evento criado é inválido.
+  // (NIP-33-style addressable param). README.md é entry point público —
+  // implementador externo lê ambos primeiro. Se omitirem `d`, evento
+  // criado é inválido.
   it('README.md tabela de kinds inclui tag `d` no row 9078', () => {
     const readmeMd = readFileSync(join(ROOT, 'README.md'), 'utf8')
     // Encontra linha da tabela com 9078
@@ -371,14 +366,11 @@ describe('Schema kind 9078 tag `d` presente em fachadas públicas (Marshall risc
     ).toMatch(/\bd\b/)
   })
 
-  it('CLAUDE.md menciona tag `d` no contexto de POST/9078', () => {
-    const claudeMd = readFileSync(join(ROOT, 'CLAUDE.md'), 'utf8')
-    // Procura por tabela ou bloco que referencie 9078 + d
-    const has9078 = claudeMd.includes('9078')
-    expect(has9078, 'CLAUDE.md deve referenciar kind 9078').toBe(true)
-    // Heurística: na seção de kinds, tag `d` deve aparecer próxima.
-    // CLAUDE.md tem "tags: [d, drift-version, client, ...]" no bloco kinds.
-    expect(claudeMd, 'CLAUDE.md deve mencionar tag `d` no contexto de kinds').toMatch(/\bd,\s*drift-version/)
+  it('protocol-spec.md menciona tag `d` no contexto de POST/9078', () => {
+    const spec = readFileSync(join(ROOT, 'Docs', 'protocol-spec.md'), 'utf8')
+    expect(spec.includes('9078'), 'protocol-spec.md deve referenciar kind 9078').toBe(true)
+    // Spec descreve a tag `d` como obrigatória na seção do kind 9078.
+    expect(spec, 'protocol-spec.md deve documentar a tag `d`').toMatch(/"d",|`d`:/)
   })
 })
 
@@ -387,7 +379,7 @@ describe('Vocabulary UI guard (V0 redesign — Marshall LOCK_VIA_TEST)', () => {
   // e camada protocolo (SPREAD/BURY). Strings PT antigas como
   // 'espalhar'/'enterrar' foram migradas em V0 (commit subsequente);
   // este teste garante que NÃO reaparecem em UI nova. Detalhes em
-  // CLAUDE.md "Vocabulary mapping" + Docs/design-system.md §1.
+  // Docs/design-system.md §1 (glossário canônico).
   //
   // Heurística: scan src/**/*.tsx por matches em strings (entre aspas
   // ou JSX text). Strip comments primeiro (matches em comments OK pra
@@ -849,7 +841,7 @@ describe('§28 privacidade pelo mínimo — comments sem location (Track C.5)', 
 
 describe('§15 anti-censura — webrtcTransport gated por network_mode', () => {
   // Origem: Robin's finding em
-  // `Docs/sessions/15-e2e-testbed-scoping-2026-05-08.md` §7 item 1.
+  // `nota interna` §7 item 1.
   // Spec `Docs/webrtc-6.4-plan.md:106` exige que em modo `tor` ou
   // `onion-only` o orchestrator NÃO registre `webrtcTransport` —
   // STUN/ICE candidates locais vazariam IP do user mesmo com tráfego

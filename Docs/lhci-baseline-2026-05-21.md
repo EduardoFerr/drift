@@ -14,7 +14,7 @@ gate), Robin (este doc).
 
 ## §1 Baseline anterior
 
-Source-of-truth: `Docs/sessions/cwv-final-report-2026-05-09.md`
+Source-of-truth: `nota interna`
 (Round CWV-3, 2026-05-09).
 
 **Snapshot estimado pós-CWV-2 (não run real, mas mecanicamente
@@ -155,8 +155,8 @@ em cel real:
 
 ## §6 Cross-refs
 
-- Baseline: `Docs/sessions/cwv-final-report-2026-05-09.md`
-- Research base: `Docs/sessions/cwv-research-2026-05-09.md`
+- Baseline: `nota interna`
+- Research base: `nota interna`
 - Tooling: `Docs/cwv-tooling.md`
 - RFC bundle strategy: `Docs/rfcs/2026-05-rfc-cwv-bundle-strategy.md`
 - LH config: `.lighthouserc.cjs`

@@ -5,7 +5,7 @@
  * Manifesto §15 (DoS resistance). Barney audit #3.
  *
  * `consumeRateBudget` é chamada cheap-first em `pipeline.ts` ANTES do
- * `JSON.parse` — invariante #5 do `CLAUDE.md` (cheap → caro). Em
+ * `JSON.parse` — invariante #5 (cheap → caro). Em
  * violação acumulada acima do threshold, marca peer como `failed` e
  * dispara `cleanupPeer` lazy (evita circular import com `peer.ts`).
  */

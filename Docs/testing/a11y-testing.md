@@ -33,8 +33,7 @@ npm run test:all
 
 A suite a11y **não roda** no `npm run test` default — fica num config
 separado (`vitest.a11y.config.ts`) porque exige `jsdom` (DOM real).
-A suite Node continua leve e cobre só funções puras (lock §16 do
-CLAUDE.md: pure-only em Node).
+A suite Node continua leve e cobre só funções puras (lock invariante #16: pure-only em Node).
 
 ## Arquitetura
 

@@ -6,7 +6,7 @@
  * (kind 9081). Quando o peso acumulado dos reports supera um threshold
  * dinâmico, o post recebe `score = -999` localmente e some do feed
  * default — MAS continua nos relays e no SQLite local (manifesto §10
- * + invariante #13 do CLAUDE.md). Cliente alternativo pode exibir.
+ * + invariante #13). Cliente alternativo pode exibir.
  *
  * Tudo aqui é função pura/determinística — manifesto §7.
  *
@@ -245,7 +245,7 @@ export async function maybeModerate(postId: string, now: number): Promise<void> 
     const t = getReportThreshold(activeUsers, reason, override)
     if (byReason[reason] >= t) {
       await db.run(`UPDATE posts SET score = -999 WHERE id = ?`, [postId])
-      // Invariante #1 (CLAUDE.md): UPDATE em domínio fora de
+      // Invariante #1: UPDATE em domínio fora de
       // `events.ts:onNostrEvent` é exceção autorizada (eviction +
       // moderação), MAS exige `invalidateFeed()` pra que UI reflita.
       // Sem isso, post fica `score: -999` no banco mas o store

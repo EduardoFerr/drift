@@ -27,7 +27,7 @@
 
 ### ✅ 6.2 — Path diversity + peer registry persistente (entregue em `[Unreleased]`)
 
-**Plano**: `Docs/archive/webrtc-6.2-plan.md`. Shipped via 5 sub-fases.
+**Plano**: `nota interna`. Shipped via 5 sub-fases.
 
 Escopo:
 - **Random walk obrigatório** (manifesto §20): mesmo após `CONNECTED`, cliente continua descobrindo via amostragem aleatória de peers conhecidos

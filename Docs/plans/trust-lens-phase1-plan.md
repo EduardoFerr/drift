@@ -3,7 +3,7 @@
 **Data:** 2026-05-17
 **Status:** Plano ship-ready. Sintetiza deliberação HIMYM 5/5.
 **Source artifacts:**
-- RFC Ted: `Docs/sessions/trust-lens-ted-rfc-2026-05-17.md`
+- RFC Ted: `nota interna`
 - Threat review Barney + Schema review Marshall + UX review Lily + Research Robin (deliberation outputs)
 
 ---
@@ -84,7 +84,7 @@ influence(source → target) = sigmoid(
 )
 ```
 
-**Personalized PageRank Monte Carlo** (Ted v2 + Stage 3 HIMYM 2026-05-17 corrigido — `Docs/sessions/trust-lens-math-stage3-himym-2026-05-17.md`):
+**Personalized PageRank Monte Carlo** (Ted v2 + Stage 3 HIMYM 2026-05-17 corrigido — `nota interna`):
 ```
 parameters (HARD-CODED em src/lib/trust/constants.ts — não user_prefs):
   K = 1000 walks
@@ -202,7 +202,7 @@ src/lib/trust-lens.ts integrates with:
 
 ### 1.6.5 Princípio capability-based + §24 carve-out (Ted survey + Stage 3 HIMYM 2026-05-17)
 
-`Docs/sessions/zero-trust-survey-ted-2026-05-17.md` reforça que Trust Lens segue
+`nota interna` reforça que Trust Lens segue
 modelo **capability-based** estilo Tahoe-LAFS: o `npub` ativo é a capability
 que define o ponto-de-vista do walk. Nenhuma view escapa dessa restrição —
 PPR não tem "view privilegiada" do operador; só viewer + grafo.
@@ -214,7 +214,7 @@ ranking". Trust Lens segue mesmo carve-out: `s_local` é calculado no
 view-boundary do render, NUNCA persisted em `posts.score`, NUNCA shared via
 event. Robin Stage 2 levantou tensão filosófica (PPR personalização **é**
 afinidade local) — resolução: o §24 protege canônico (compartilhado entre
-clientes Drift), não view local. CLAUDE.md invariante #11 atualizado com nota
+clientes Drift), não view local. invariante #11 atualizado com nota
 explícita.
 
 **Bandeiras vermelhas confirmadas** (Phase 2/3 não cruzar):
@@ -403,7 +403,7 @@ Quem quiser fork "Drift Family" pode — manifesto próprio. Cliente oficial nã
 5. Lente pre-fab "anti-CSAM/extremismo" hardcoded com escopo amplo no client default
 6. "Stealth mode" lente (ativa sem indicator visible)
 
-**5 bandeiras adicionais Barney 2026-05-17** (`Docs/sessions/trust-lens-wot-deep-dive-barney-2026-05-17.md`):
+**5 bandeiras adicionais Barney 2026-05-17** (`nota interna`):
 7. Auto-boost por NIP-05 verified — prova DNS, não trust
 8. PPR feedback "você tem PPR alto" — karma vira catedral
 9. Anchor follow auto-suggest onboarding — default trust list de facto
@@ -414,7 +414,7 @@ Quem quiser fork "Drift Family" pode — manifesto próprio. Cliente oficial nã
 
 Path diversity (§1.2) protege contra **chains lineares** mas NÃO contra **anéis densos** (Cenário B Barney — 50 sock puppets coordenados em 6 meses). Drift Phase 1 trata nó e cluster como mesmo objeto — gap estrutural.
 
-**Plano Ted nodes/clusters** (`Docs/sessions/trust-lens-nodes-clusters-ted-2026-05-17.md`):
+**Plano Ted nodes/clusters** (`nota interna`):
 
 | Phase | Componente | Custo | Tipo |
 |---|---|---|---|
@@ -435,7 +435,7 @@ Path diversity (§1.2) protege contra **chains lineares** mas NÃO contra **ané
 - C (mass-mute brigading) = **CLUSTER anti-vítima** → self-isolation alarm (Phase 2)
 - D (state actor lente) = **CLUSTER de listas externas** → discovery hardening (Phase 3 multi-list)
 
-Detalhes: `Docs/sessions/trust-lens-multilist-barney-2026-05-17.md` + `trust-lens-multilist-lily-2026-05-17.md`
+Detalhes: `nota interna` + `trust-lens-multilist-lily-2026-05-17.md`
 
 Robin research ainda rodando — quando completar, integra NIP-51 adoção + Argon2id WASM size (nota: relevância reduzida sem password lock) + anti-centralização patterns Phase 3.
 
@@ -471,7 +471,7 @@ Phase 1 e 1.5 podem ser commits intercalados num único PR ou PRs separados — 
 
 ## 5. Open questions / handoffs pós-plano
 
-- ~~**Ted refinement L= tensão**~~ ✅ **RESOLVIDO 2026-05-17** — Ted v2 deliberation locked L=6 (math: ⌊1/α⌋ par, captura ~62% massa natural, ~75ms compute). Hard-coded em `src/lib/trust/constants.ts`. Detalhes: `Docs/sessions/trust-lens-L-parameter-ted-2026-05-17.md`
+- ~~**Ted refinement L= tensão**~~ ✅ **RESOLVIDO 2026-05-17** — Ted v2 deliberation locked L=6 (math: ⌊1/α⌋ par, captura ~62% massa natural, ~75ms compute). Hard-coded em `src/lib/trust/constants.ts`. Detalhes: `nota interna`
 - **Marshall predicate DSL**: refinar operators conforme casos de uso reais aparecerem (Phase 2 pode precisar `time_decay`, `relay_subset`).
 - **Lily**: copy final pra empty states e Rede view ("@alice deu drift" testar com 3-5 users PT-BR, sugerido Robin).
 - **Barney followup**: Alvisi 2013 SoK + Mohaisen 2010 mixing time worth deep read antes de Phase 1 freeze.

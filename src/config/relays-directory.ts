@@ -1,7 +1,7 @@
 /**
  * Relay directory — fonte de descoberta de relays, separada do SEED.
  *
- * **Manifesto §17 adendo + CLAUDE invariante #18:** SEED_RELAY_CONFIGS
+ * **Manifesto §17 adendo + invariante #18:** SEED_RELAY_CONFIGS
  * (`config/relays.ts`) só contém relays neutros ou anti-spam-only.
  * Discovery UX (Settings > Relays > Descobrir) consome ESTE directory
  * pra mostrar opções moderadas e free-speech como opt-in.
