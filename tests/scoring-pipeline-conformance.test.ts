@@ -107,17 +107,21 @@ describe('calculateScore — guard de não-finito', () => {
 })
 
 describe('Pipeline — invariantes que só existem no texto da SQL', () => {
-  it('D7: as 3 queries de feed.ts têm tie-break determinístico por id', () => {
+  it('D7: a ordenação do feed tem tie-break determinístico por id', () => {
     const feed = read('src/lib/feed.ts')
-    const ordenacoes = feed.match(/ORDER BY p\.score DESC[^`\n]*/g) ?? []
-    expect(ordenacoes.length, 'feed.ts deve ter 3 ORDER BY por score').toBe(3)
-    for (const o of ordenacoes) {
-      // Manifesto §8: ORDER BY score DESC, created_at DESC, id ASC.
-      // Sem o terceiro critério, empates (score = 0 exato é comum)
-      // resolvem pelo plano de query do SQLite e dois clientes com os
-      // mesmos eventos divergem — viola §7.
-      expect(o, `ORDER BY sem tie-break por id: "${o}"`).toMatch(/p\.id ASC/)
-    }
+    // Desde a correção de D1 as 3 queries compartilham uma constante
+    // (`FEED_ORDER`) em vez de repetir o ORDER BY literalmente — por
+    // isso a asserção mudou de forma. O tie-break continua obrigatório:
+    // manifesto §8 exige `score DESC, created_at DESC, id ASC`. Sem o
+    // terceiro critério, empates (numerador 0 é comum) resolvem pelo
+    // plano de query do SQLite e dois clientes divergem, violando §7.
+    const ordenacao = feed.match(/const FEED_ORDER = `([^`]+)`/)
+    expect(ordenacao, 'feed.ts deve definir FEED_ORDER').toBeTruthy()
+    expect(ordenacao![1], 'ORDER BY sem tie-break por id').toMatch(/p\.created_at DESC, p\.id ASC/)
+
+    // E as 3 queries precisam usá-la — nenhuma pode ter ordenação própria.
+    const usos = feed.match(/\$\{FEED_ORDER\}/g) ?? []
+    expect(usos.length, 'Global, Seguindo e Em alta devem usar FEED_ORDER').toBe(3)
   })
 
   it('D3: spreads_received exclui auto-spread', () => {

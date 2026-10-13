@@ -43,6 +43,34 @@ export interface ScoreInput {
   now: number
 }
 
+/**
+ * NUMERADOR do score, sem o divisor temporal. Invariante no tempo: só
+ * muda quando chega evento novo no post.
+ *
+ * Existe separado desde a correção de D1 (auditoria 2026-10-13). O
+ * `score` materializado congelava a idade no instante do último spread,
+ * então o decay nunca acontecia. Agora persistimos só esta parte em
+ * `posts.score_base` e o divisor é aplicado na LEITURA (ORDER BY do
+ * feed), de forma que o tempo passa de verdade sem nenhum job
+ * periódico reescrevendo a tabela.
+ *
+ * `calculateScore` abaixo = `scoreNumerator / (ageHours + 2) ^ 1.5`.
+ * A paridade entre esta função, `calculateScore` e a expressão SQL do
+ * feed é travada por `tests/score-decay-parity.test.ts`.
+ */
+export function scoreNumerator(spreadWeight: number, buryWeight: number): number {
+  if (!Number.isFinite(spreadWeight) || !Number.isFinite(buryWeight)) return 0
+  return spreadWeight - buryWeight * 0.3
+}
+
+/**
+ * Divisor temporal. Único lugar em TS que conhece o `+2` e o expoente
+ * `1.5`; a expressão SQL em `feed.ts` é a réplica, travada por teste.
+ */
+export function decayDivisor(ageHours: number): number {
+  return Math.pow(Math.max(0, ageHours) + 2, 1.5)
+}
+
 export function calculateScore(input: ScoreInput): number {
   const { spreadWeight, buryWeight, createdAt, now } = input
 
@@ -62,8 +90,7 @@ export function calculateScore(input: ScoreInput): number {
   }
 
   const ageHours = Math.max(0, (now - createdAt) / 3600)
-  const netEngagement = spreadWeight - buryWeight * 0.3
-  return netEngagement / Math.pow(ageHours + 2, 1.5)
+  return scoreNumerator(spreadWeight, buryWeight) / decayDivisor(ageHours)
 }
 
 /** Conveniência: usa o relógio atual. Use apenas em paths de

@@ -33,7 +33,7 @@ import {
   SCORE_RECALC_DEBOUNCE_MS,
   VIRAL_PIN_THRESHOLD,
 } from '../config/constants'
-import { applyCommentReceived, calculateScore, calculateScoreNow } from './scoring'
+import { applyCommentReceived, calculateScore, calculateScoreNow, scoreNumerator } from './scoring'
 import { bumpUnseenCount, invalidateFeed } from './feed'
 import { getReportWeight, maybeModerate } from './moderation'
 import { calculateUserWeight, calculateWeight } from './weight'
@@ -1122,9 +1122,12 @@ export async function recalcAllScores(yieldEvery: number = 50): Promise<void> {
       createdAt: post.created_at,
       now: nowSec,
     })
+    // `score_base` = numerador sem o divisor temporal (D1). É o que o
+    // feed usa pra ordenar, aplicando o decay na leitura; `score` segue
+    // materializado pro sentinela -999, VIRAL_PIN e reports_confirmed.
     ops.push({
-      sql: `UPDATE posts SET score = ?, spreads = ?, buries = ? WHERE id = ?`,
-      params: [score, spreadCount, buryCount, post.id],
+      sql: `UPDATE posts SET score = ?, score_base = ?, spreads = ?, buries = ? WHERE id = ?`,
+      params: [score, scoreNumerator(spreadWeight, buryWeight), spreadCount, buryCount, post.id],
     })
   }
   // Flush em chunks (payload postMessage saudável + yield ao main entre eles).
@@ -1302,8 +1305,8 @@ async function recalculateScore(postId: string): Promise<void> {
       Date.now(),
     )
     await db.run(
-      `UPDATE posts SET score = ?, spreads = 0, buries = 0 WHERE id = ?`,
-      [withComments, postId],
+      `UPDATE posts SET score = ?, score_base = ?, spreads = 0, buries = 0 WHERE id = ?`,
+      [withComments, scoreNumerator(0, 0), postId],
     )
     invalidateFeed()
     return
@@ -1364,8 +1367,8 @@ async function recalculateScore(postId: string): Promise<void> {
     userWeightMap,
   )
   await db.run(
-    `UPDATE posts SET score = ?, spreads = ?, buries = ? WHERE id = ?`,
-    [score, spreadCount, buryCount, postId],
+    `UPDATE posts SET score = ?, score_base = ?, spreads = ?, buries = ? WHERE id = ?`,
+    [score, scoreNumerator(spreadWeight, buryWeight), spreadCount, buryCount, postId],
   )
   invalidateFeed()
   // Satoshi audit redundância 2026-05-21 — auto-pin IPFS de posts virais.

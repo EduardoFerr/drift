@@ -36,6 +36,9 @@ vi.mock('../src/lib/scoring', () => ({
   calculateScoreNow: vi.fn(() => 0),
   // Bulk recalcAllScores (2026-05-29) usa calculateScore puro direto.
   calculateScore: vi.fn(() => 0),
+  // D1 (2026-10-13): o numerador é persistido em `posts.score_base` pra
+  // que o decay seja aplicado na leitura. Mock fiel à fórmula real.
+  scoreNumerator: vi.fn((s: number, b: number) => s - b * 0.3),
   applyCommentReceived: vi.fn((args: { currentScore: number }) => args.currentScore),
 }))
 vi.mock('../src/lib/feed', () => ({
