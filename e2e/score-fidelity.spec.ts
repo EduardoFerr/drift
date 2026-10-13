@@ -147,24 +147,47 @@ test('#1 header DERIVA == posts.score do post visível (render fiel ao DB)', asy
     // formatamos cada um com a MESMA regra do app, e exigimos que o header
     // seja um deles. Isso pega "render mente sobre o DB" sem assumir QUAL post
     // o cursor está mostrando.
-    const rows = await dbExec<{ score: number }>(
+    // D1 (2026-10-13): o header NÃO mostra mais `posts.score`. Desde que
+    // o decay passou a ser aplicado na leitura, o que a UI exibe é o
+    // valor decaído — o MESMO que ordena o feed (`feed.ts`, alias
+    // `score_now`). Comparar contra a coluna materializada aqui
+    // acusaria falsamente: ela só existe hoje pro sentinela -999, pro
+    // VIRAL_PIN e pro reports_confirmed.
+    //
+    // Então re-derivamos o decaído a partir de `score_base` (numerador,
+    // invariante no tempo) + `created_at`, exatamente como a query faz.
+    const rows = await dbExec<{ score_base: number; created_at: number }>(
       alice.page,
-      `SELECT score FROM posts WHERE score > -999`,
+      `SELECT score_base, created_at FROM posts WHERE score > -999`,
     )
     expect(rows.length, 'feed vazio — seed não materializou?').toBeGreaterThan(0)
 
     const fmt = (score: number) =>
       Math.abs(score) >= 1000 ? Math.round(score).toLocaleString('pt-BR') : score.toFixed(3)
-    const allFormatted = new Set(rows.map((r) => fmt(r.score)))
+
+    const decayed = (base: number, createdAt: number, nowSec: number) =>
+      base / Math.pow(Math.max(0, (nowSec - createdAt) / 3600) + 2, 1.5)
+
+    // Entre o render do header e esta leitura passam segundos, e com
+    // decay real o valor muda continuamente — comparação por string num
+    // instante único seria instável na 3ª casa. Geramos os formatados
+    // numa JANELA ao redor de agora; o header tem que ser um deles.
+    const nowSec = Math.floor(Date.now() / 1000)
+    const allFormatted = new Set<string>()
+    for (let delta = -60; delta <= 5; delta += 1) {
+      for (const r of rows) allFormatted.add(fmt(decayed(r.score_base, r.created_at, nowSec + delta)))
+    }
 
     const headerStr = await readHeaderDeriva(alice.page)
 
-    // ADVERSARIAL: o header tem que ser o score formatado de ALGUM post real.
-    // Se mostra um número que não bate com NENHUM posts.score, render infiel.
+    // ADVERSARIAL: o header tem que ser o score decaído de ALGUM post
+    // real. Se mostra um número que não bate com nenhum, render infiel —
+    // ou pior, voltou a exibir a coluna congelada enquanto o feed ordena
+    // por outra coisa (a incoerência que o §22 proíbe).
     expect(
       allFormatted.has(headerStr),
-      `Header mostra "${headerStr}", que não corresponde a posts.score de NENHUM ` +
-        `post visível (${rows.length} posts). Render não-fiel ao DB.`,
+      `Header mostra "${headerStr}", que não corresponde ao score decaído de ` +
+        `NENHUM post visível (${rows.length} posts). Render não-fiel ao DB.`,
     ).toBe(true)
   } finally {
     await alice.context.close()

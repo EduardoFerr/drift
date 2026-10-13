@@ -56,9 +56,22 @@ import type {
  */
 const DECAYED_SCORE = `(p.score_base / pow((? - p.created_at) / 3600.0 + 2, 1.5))`
 
+/**
+ * O valor decaído é SELECIONADO como `score_now` e é ele que vira
+ * `Post.score` em `rowToPost`. Isso não é detalhe de implementação: se
+ * a UI exibisse a coluna materializada enquanto o feed ordena pelo
+ * valor decaído, o número mostrado não explicaria a ordem — a mesma
+ * incoerência que o manifesto §22 (algoritmo legível) proíbe.
+ *
+ * Ordenar pelo ALIAS (e não repetir a expressão) mantém um único `?`
+ * de relógio por query, na posição do SELECT, que vem antes dos
+ * parâmetros do WHERE e do LIMIT.
+ */
+const SCORE_NOW = `${DECAYED_SCORE} AS score_now`
+
 /** Ordenação canônica do feed — manifesto §8 exige o `id ASC` final
  *  como desempate determinístico. */
-const FEED_ORDER = `ORDER BY ${DECAYED_SCORE} DESC, p.created_at DESC, p.id ASC`
+const FEED_ORDER = `ORDER BY score_now DESC, p.created_at DESC, p.id ASC`
 
 /** Relógio em unix seconds, no formato que a SQL espera. */
 function nowSeconds(now: number): number {
@@ -83,8 +96,11 @@ interface PostRow {
   /** Score materializado. Serve o sentinela -999, o VIRAL_PIN_THRESHOLD
    *  e o `reports_confirmed`. NÃO é o que ordena o feed desde D1. */
   score: number
-  /** Numerador invariante no tempo. O decay é aplicado no ORDER BY. */
+  /** Numerador invariante no tempo, como gravado. */
   score_base: number
+  /** Score COM o decay aplicado, calculado na query. É o que ordena o
+   *  feed e o que a UI exibe. */
+  score_now: number
   spreads: number
   buries: number
   /** raw_event JSON — usado pra extrair tags `imeta` no read path (B.2). */
@@ -111,7 +127,8 @@ interface PostRow {
  */
 const POST_SELECT = `SELECT
     p.id, p.author_pub, p.content, p.created_at, p.category, p.location,
-    p.client, p.content_warning, p.score, p.score_base, p.spreads, p.buries, p.raw_event,
+    p.client, p.content_warning, p.score, p.score_base, ${SCORE_NOW},
+    p.spreads, p.buries, p.raw_event,
     um.name AS author_name, um.display_name AS author_display_name,
     um.picture AS author_picture
   FROM posts p
@@ -146,7 +163,7 @@ export async function getFollowingFeed(limit = 50, now = Date.now()): Promise<Po
      WHERE p.score > -999 AND p.author_pub IN (${placeholders})
      ${FEED_ORDER}
      LIMIT ?`,
-    [...followingSet, nowSeconds(now), limit],
+    [nowSeconds(now), ...followingSet, limit],
   )
   return rows.map(rowToPost)
 }
@@ -165,7 +182,7 @@ export async function getTrendingFeed(limit = 50, now = Date.now()): Promise<Pos
      WHERE p.score > -999 AND p.created_at >= ?
      ${FEED_ORDER}
      LIMIT ?`,
-    [cutoffSeconds, nowSeconds(now), limit],
+    [nowSeconds(now), cutoffSeconds, limit],
   )
   return rows.map(rowToPost)
 }
@@ -400,7 +417,8 @@ function rowToPost(row: PostRow): Post {
     location: parseLocation(row.location),
     client: row.client,
     contentWarning: row.content_warning,
-    score: row.score,
+    // O que a UI mostra é o valor decaído, o mesmo que ordena o feed.
+    score: row.score_now,
     spreads: row.spreads,
     buries: row.buries,
     authorAlias,

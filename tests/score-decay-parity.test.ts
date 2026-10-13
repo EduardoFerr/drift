@@ -137,9 +137,20 @@ describe('A expressão de decay do feed.ts não divergiu', () => {
 
   it('as 3 queries do feed usam a ordenação canônica com tie-break', () => {
     const feed = readFileSync(join(ROOT, 'src/lib/feed.ts'), 'utf8')
-    expect(feed).toMatch(/ORDER BY \$\{DECAYED_SCORE\} DESC, p\.created_at DESC, p\.id ASC/)
+    expect(feed).toMatch(/ORDER BY score_now DESC, p\.created_at DESC, p\.id ASC/)
     const usos = feed.match(/\$\{FEED_ORDER\}/g) ?? []
     expect(usos.length, 'Global, Seguindo e Em alta devem usar a mesma ordenação').toBe(3)
+  })
+
+  it('a UI exibe o MESMO valor que ordena o feed', () => {
+    const feed = readFileSync(join(ROOT, 'src/lib/feed.ts'), 'utf8')
+    // Se `rowToPost` expusesse `row.score` (a coluna materializada)
+    // enquanto o ORDER BY usa o valor decaído, o número mostrado não
+    // explicaria a ordem — a incoerência que o manifesto §22 proíbe,
+    // e que a auditoria já tinha apontado como origem do sintoma
+    // "a DERIVA parece arbitrária".
+    expect(feed, 'rowToPost deve expor o score decaído').toMatch(/score:\s*row\.score_now/)
+    expect(feed, 'score_now deve ser selecionado na query').toMatch(/AS score_now/)
   })
 
   it('o feed NÃO ordena mais pela coluna materializada', () => {
