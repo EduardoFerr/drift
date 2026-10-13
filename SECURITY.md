@@ -3,7 +3,7 @@
 ## Escopo
 
 Este documento cobre **vulnerabilidades em código deste repositório** —
-quebras de invariantes do `CLAUDE.md`, bugs criptográficos no manuseio
+quebras das invariantes arquiteturais do projeto, bugs criptográficos no manuseio
 de `nsec`, falhas que expõem dados locais, comprometimento do pipeline
 `onNostrEvent`, regressões em `lib/scoring.ts`/`lib/moderation.ts`.
 

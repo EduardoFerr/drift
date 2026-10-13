@@ -1,10 +1,10 @@
 // Liquid refraction ripple (useLiquidRipple) — LOCK_VIA_TEST conformance.
 //
 // Source: user pedido 2026-05-29 "refração líquida REAL no toque".
-// Spike GO A-scoped: Docs/sessions/ripple-refraction-spike-2026-05-29.md.
+// Spike GO A-scoped: nota interna
 //
 // Estes testes são estáticos (leem o source) — não rodam o browser nem
-// medem FPS. Travam as INVARIANTES que o spike e o CLAUDE.md exigem:
+// medem FPS. Travam as INVARIANTES que o spike e o exigem:
 //   1. Filtro usa feDisplacementMap (refração real de pixels, não overlay)
 //   2. reduced-motion faz bypass TOTAL (hook + CSS) — WCAG 2.3.3
 //   3. RAF é cancelado na dissipação E no unmount (sem leak; idle zero-JS, §1)

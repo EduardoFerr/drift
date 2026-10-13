@@ -3,7 +3,7 @@
   "version": "2026-05",
   "lastAuditedAt": "2026-05-17",
   "curator": "Drift HIMYM research (Robin)",
-  "rationale": "Snapshot mensal versionado em git. Lista de sugestão NÃO whitelist — user sempre pode adicionar relay manualmente em Settings > Relays. Constraint do Arquiteto 2026-05-17: SEM pagos. Constraint manifesto §17 adendo + CLAUDE invariante #18: relays AI-moderated entram no Discovery, NUNCA no SEED.",
+  "rationale": "Snapshot mensal versionado em git. Lista de sugestão NÃO whitelist — user sempre pode adicionar relay manualmente em Settings > Relays. Constraint do Arquiteto 2026-05-17: SEM pagos. Constraint manifesto §17 adendo + invariante #18: relays AI-moderated entram no Discovery, NUNCA no SEED.",
   "tabs": {
     "curated": "Recomendados Drift — relays neutros gratuitos, mix de jurisdições, alto volume",
     "moderated": "Moderados opt-in com AI filter — user escolhe conscientemente (manifesto §17 adendo)",

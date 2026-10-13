@@ -40,7 +40,7 @@ describe('Trust Lens — conformance (LOCK_VIA_TEST §17 §22 §24 §25 §27)', 
   // outro arquivo = violação §22 (canônico mutado fora do owner).
   it('1. UPDATE posts SET score restrito a scoring/moderation/events (recalc canônico)', () => {
     // events.ts:scheduleScoreRecalc + applyCommentsContribution são parte
-    // do pipeline canônico (CLAUDE.md invariante #6 — debounced recalc).
+    // do pipeline canônico (invariante #6 — debounced recalc).
     // scoring.ts é puro (calculateScore) e moderation.ts é §26 reports
     // threshold. Outros arquivos NÃO podem atualizar score.
     const allowed = new Set([
@@ -224,7 +224,7 @@ describe('Trust Lens — conformance (LOCK_VIA_TEST §17 §22 §24 §25 §27)', 
     // "Sua Lente" — Docs/guia-do-usuario.md §337 "Sua Lente (Trust
     // Lens)" já permite o duplo-rótulo. Lock #7 mantém ban em
     // componentes Feed/Lens/PostViewer onde label visível violaria §22.
-    // Fonte: Docs/sessions/marshall-baseline-failures-audit-2026-05-26.md
+    // Fonte: nota interna
     const PEDAGOGICAL_ALLOW = new Set<string>([
       'src/components/Settings/GuideCard.tsx',
     ])

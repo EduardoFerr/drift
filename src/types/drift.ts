@@ -675,7 +675,7 @@ export const DEFAULT_USER_PREFS: UserPrefs = {
 // "Sua Lente" (PT-BR user-facing), "lens" (código/spec).
 //
 // Plano completo: Docs/plans/trust-lens-phase1-plan.md
-// HIMYM deliberation: Docs/sessions/trust-lens-*-2026-05-17.md
+// HIMYM deliberation: nota interna
 
 /**
  * Components do edge weight — schema versionado pra forward-compat.

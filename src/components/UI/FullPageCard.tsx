@@ -1,8 +1,8 @@
 /**
  * FullPageCard — primitive de overlay fullscreen (substituto de
  * `<FullPageOverlay>`). Convergente com Ted UX spike §5 + Robin QA #1 §7
- * (`Docs/sessions/ted-ux-spike-deployed-2026-05-08.md`,
- *  `Docs/sessions/design-qa-baseline-2026-05-08.md`).
+ * (`nota interna`,
+ *  `nota interna`).
  *
  * Diferenças vs FullPageOverlay:
  *

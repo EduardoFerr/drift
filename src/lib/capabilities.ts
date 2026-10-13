@@ -9,7 +9,7 @@
  *
  * **Princípios:**
  *
- * 1. **Pure functions** (CLAUDE.md invariante #16): cada `hasXxx()`
+ * 1. **Pure functions** (invariante #16): cada `hasXxx()`
  *    query é função pura sobre estado SQLite/prefs — testável sem
  *    mock React.
  * 2. **Re-derivable cross-device** (manifesto §3): capability state

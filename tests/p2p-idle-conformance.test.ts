@@ -3,7 +3,7 @@
  * convergente, 2026-05-23).
  *
  * Origem:
- * - `Docs/sessions/lily-p2p-idle-audit-2026-05-23.md` (Lily, runtime).
+ * - `nota interna` (Lily, runtime).
  * - Convergência tripla com Marshall (schema/conformance) e Satoshi
  *   (privacy/game-theory) sobre 3 quick wins implementadas + 1 lista
  *   de APIs proibidas (Satoshi NO-GO §17).

@@ -7,7 +7,7 @@
  *  - Cada kind conhecido roteia pro persist correto (POST → posts,
  *    SPREAD → spreads, BURY → buries, REPORT → reports, 1111 → comments).
  *  - Schema check inválido NÃO chega ao persist (pipeline cheap →
- *    expensive → persist preservado, CLAUDE.md invariante #5).
+ *    expensive → persist preservado, invariante #5).
  *  - `passesSchemaCheck` (API pública) delega pro mesmo dispatch
  *    (fonte única de verdade pós-refactor — sem dois switches paralelos).
  *
@@ -120,7 +120,7 @@ function makePost(): SignedEvent {
   // Satoshi Gap C (bf76dda 2026-05-20): validatePostShape rejeita
   // POST com subposts vazio (NOP farming guard). Fixture usa subpost
   // dummy não-vazio pra exercer o pipeline persist completo. Audit:
-  // Docs/sessions/marshall-baseline-failures-audit-2026-05-26.md
+  // nota interna
   return makeEvent({
     kind: DRIFT_KIND.POST,
     tags: [['drift-version', '1']],
@@ -253,7 +253,7 @@ describe('KIND_DISPATCH — kinds conhecidos roteiam pro persist correto', () =>
 describe('KIND_DISPATCH — pipeline cheap → expensive → persist', () => {
   it('schema inválido (POST sem drift-version) NÃO chega ao verify', async () => {
     // POST com tag `e` mas sem `drift-version` → schema falha ANTES do
-    // verifyDriftEvent (CLAUDE.md invariante #5: cheap antes de expensive).
+    // verifyDriftEvent (invariante #5: cheap antes de expensive).
     const ev = makeEvent({
       kind: DRIFT_KIND.POST,
       tags: [['e', POST_ID]],

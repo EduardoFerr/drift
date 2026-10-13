@@ -2,7 +2,7 @@
  * propagation-model.spec.ts — suite ADVERSARIAL pro bug #3 (mapas não
  * fiéis aos algoritmos). Sprint N+5 Batch B2 (Satoshi).
  *
- * Plano: `Docs/sessions/sprint-n5-e2e-validation-2026-05-29.md`.
+ * Plano: `nota interna`.
  *
  * ─── Hipótese nula (a PROVAR errada, ou confirmar como bug) ──────────
  *

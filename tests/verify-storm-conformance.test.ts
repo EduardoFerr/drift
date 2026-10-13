@@ -16,7 +16,7 @@
  * `queueMicrotask`. Sem timer real. Não testa throughput de worker
  * (testado em verify-queue), só pipeline correctness sob carga.
  *
- * Invariantes citados (CLAUDE.md):
+ * Invariantes citados:
  *  #1 — INSERT só após verify ok (mock conta INSERTs)
  *  #5 — Pipeline ordem (cheap antes de await)
  *  #7 — Determinismo: storm idempotente — mesmo conjunto de events,

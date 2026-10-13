@@ -330,7 +330,7 @@ CREATE INDEX IF NOT EXISTS idx_users_metadata_nip05 ON users_metadata(nip05);
 --   §28-30 compat ecossistema — zero novos kinds Nostr
 --
 -- Plano completo: Docs/plans/trust-lens-phase1-plan.md
--- HIMYM deliberation: Docs/sessions/trust-lens-{ted-rfc,himym-reviews,
+-- HIMYM deliberation: nota interna,himym-reviews,
 --   L-parameter-ted,multilist-barney,multilist-lily}-2026-05-17.md
 
 -- Edges do grafo de lente. source_npub SEMPRE = active identity

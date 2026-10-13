@@ -272,7 +272,7 @@ undefined = dynamic calc.
 
 §17 (sem chave mestra): mesmo conteúdo claramente ilegal **não é
 apagado** — só `score=-999` (esconde do feed). User pode exportar,
-auditar, cliente alternativo exibe. **§13 do CLAUDE.md**: cliente NÃO
+auditar, cliente alternativo exibe. **invariante #13**: cliente NÃO
 deleta dados moderados do SQLite.
 
 ---
@@ -354,7 +354,7 @@ influence = σ(1.164) = 0.762
 
 ### Razão direct:FoF ≈ 7×
 
-Stage 3 HIMYM consensus (`Docs/sessions/trust-lens-math-stage3-himym-2026-05-17.md`):
+Stage 3 HIMYM consensus (`nota interna`):
 
 ```
 σ(0.5)  / σ(-2.0) = 0.622 / 0.119 = 5.2×    (follow puro vs FoF vazio)

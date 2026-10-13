@@ -2,7 +2,7 @@
  * webrtc/config — constantes compartilhadas pelos sub-módulos.
  *
  * Magic numbers que antes viviam espalhados pelo `webrtc.ts` 1190 LOC,
- * agora centralizados. Ver `Docs/archive/webrtc-6.2-plan.md` §5/§7
+ * agora centralizados. Ver `nota interna` §5/§7
  * pra justificativas históricas.
  *
  * **Ponto único de sintonia**: ajustar caps/thresholds aqui afeta

@@ -3,7 +3,7 @@
  * `feDisplacementMap`.
  *
  * V_2026-05-29 (user pedido: "refração líquida REAL no toque").
- * Spike GO A-scoped: `Docs/sessions/ripple-refraction-spike-2026-05-29.md`.
+ * Spike GO A-scoped: `nota interna`.
  *
  * Diferente de `useMaterialRipple` (overlay alpha — pixel atrás NÃO se
  * move), aqui os **children do elemento-alvo** sofrem deslocamento

@@ -600,7 +600,7 @@ antes de C.1 (schema):
 
 - **Ted Issue #1 [BLOCK]** — `persistComment` deve ser inline em
   `onNostrEvent` (case kind === 1111), não função separada exportada.
-  Invariante "única porta INSERT" (CLAUDE.md §1).
+  Invariante "única porta INSERT" (invariante #1).
 - **Ted Issue #2 [FIX]** — Remover FK `comments.post_id REFERENCES
   posts(id)`. Race comment-antes-do-post existe e é compromisso §16.
   Usar índice simples; `buildThread` já trata órfãos.

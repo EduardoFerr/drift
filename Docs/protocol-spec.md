@@ -260,10 +260,9 @@ Um cliente é **Drift-conforme** se:
 - Implementa pipeline §8 (com verificação Schnorr obrigatória).
 - Implementa score determinístico §7 (impl literal de
   `lib/scoring.ts` ou equivalente verificável).
-- Não implementa "chave mestra" — manifesto §17 + invariante #12 do
-  CLAUDE.md.
+- Não implementa "chave mestra" — manifesto §17 + invariante #12.
 - Não escaneia conteúdo automaticamente (PhotoDNA, ML, blocklists
-  embutidas) — invariante #7 do CLAUDE.md, manifesto §25.
+  embutidas) — invariante #7, manifesto §25.
 
 Clientes que cumprem o acima podem usar o nome "Drift" livremente.
 Clientes que não cumprem são clientes Nostr genéricos que **podem ler**

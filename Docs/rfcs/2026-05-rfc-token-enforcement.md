@@ -4,9 +4,9 @@
 **Data:** 2026-05-09
 **Owner:** Marshall (schema/conformance/tests)
 **Cross-refs:**
-- `Docs/sessions/ted-delegation-plan-2026-05-08.md` §4.3 (spec inicial)
-- `Docs/sessions/design-qa-baseline-2026-05-08.md` (90 finds)
-- `Docs/sessions/design-qa-regression-2026-05-08.md` §3.2 (top 3 residuais
+- `nota interna` §4.3 (spec inicial)
+- `nota interna` (90 finds)
+- `nota interna` §3.2 (top 3 residuais
   CL-40/44/49 — 62 hits Identity*+Onboarding)
 - `Docs/design-system.md` v0.7 (tokens canônicos drift-*)
 - `Docs/rfcs/2026-05-rfc-design-system-v08.md` (paleta v0.8)

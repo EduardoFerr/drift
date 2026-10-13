@@ -1,6 +1,6 @@
 /**
  * ADVERSARIAL — bug #1 (score "estranho"). Sprint N+5 Batch B2 (Marshall).
- * Plano: `Docs/sessions/sprint-n5-e2e-validation-2026-05-29.md`.
+ * Plano: `nota interna`.
  *
  * ─── Hipótese nula (queremos PROVAR ERRADO) ──────────────────────────
  *
@@ -337,7 +337,7 @@ test('#3 §23 última-ação-vale: spread→bury do mesmo user conta só bury', 
 
     // 1) SPREAD fresco (created_at = now). protocol.spreadPost assina com a
     //    identidade ativa e publica; alimentamos o retorno na porta canônica
-    //    onNostrEvent (CLAUDE.md invariante #1) pra materializar no SQLite —
+    //    onNostrEvent (invariante #1) pra materializar no SQLite —
     //    o transport mockado em E2E pode não fazer loopback sozinho.
     await bob.page.evaluate(
       async ({ postId, authorPub }) => {

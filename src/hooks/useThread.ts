@@ -8,7 +8,7 @@
  *  - postId muda: cleanup velho, mount novo.
  *
  * Reactividade: usa `useThreadStore` selectors granulares — re-render
- * só quando o entry deste postId muda. Sem poll (CLAUDE.md invariante
+ * só quando o entry deste postId muda. Sem poll (invariante
  * #10).
  *
  * Expõe `forest` (top-level CommentNode[] com replies aninhadas) +

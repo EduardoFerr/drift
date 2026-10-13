@@ -5,7 +5,7 @@ import { defineConfig, devices } from '@playwright/test'
  *
  * Valida bugs profundos #1 (score) e #3 (propagação) + P2P/Helia
  * end-to-end com ground-truth conhecido (cascata Alice→Bob→Carol→Dave).
- * Ver `Docs/sessions/sprint-n5-e2e-validation-2026-05-29.md`.
+ * Ver `nota interna`.
  *
  * ── crossOriginIsolated / COOP+COEP ────────────────────────────────
  * Drift exige `crossOriginIsolated === true` pra SharedArrayBuffer +

@@ -3,7 +3,7 @@
  * lente (PPR). Camada estrutural acima de `trust/ppr.ts`: enquanto PPR
  * dá "quão perto da minha rede", aqui derivamos topologia podável.
  *
- * Decisão de design: `Docs/sessions/map-model-deliberation-2026-05-30.md`
+ * Decisão de design: `nota interna`
  * (Fase 2b). Princípio travado — **saúde = MECÂNICA, nunca moral**
  * (manifesto §22 reputação subjetiva + §25 chave-mestra disfarçada).
  * Nunca rotular pessoa "saudável/tóxica". Só descrevemos ESTRUTURA da

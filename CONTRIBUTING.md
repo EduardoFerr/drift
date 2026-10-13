@@ -10,7 +10,8 @@ contribui pro protocolo + cliente, não pra um mantenedor.
 ## Como contribuir
 
 1. Abra fork. Faça as mudanças. PR contra `main`.
-2. Cumpra as **17 invariantes** de [CLAUDE.md](CLAUDE.md) — quebrá-las
+2. Cumpra as **invariantes arquiteturais** documentadas em
+   [`Docs/drift-arquitetura-v4.md`](Docs/drift-arquitetura-v4.md) — quebrá-las
    quebra o sistema; PRs que as quebram são rejeitados independente do
    mérito da feature.
 3. Funções puras (`lib/scoring.ts`, `lib/weight.ts`, `lib/moderation.ts`,
@@ -47,7 +48,7 @@ ajusta ou a mudança é rejeitada.
 
 Mudanças no próprio manifesto exigem PR separado, justificativa
 explícita, e idealmente revisão crítica das 5 perspectivas
-documentadas em CLAUDE.md ("personas LLM"). Manifesto é CC0 — qualquer
+descritas como "personas LLM". Manifesto é CC0 — qualquer
 fork pode adotar, modificar, ou substituir o manifesto sem permissão.
 
 ## Personas LLM como ferramenta de revisão

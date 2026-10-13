@@ -79,7 +79,7 @@ Highlights:
   TLS direto a relay Nostr em modo `onion-only`, 7 guards Tor
   publicamente registrados em 7 países distintos (LU/SE/CA/HU/PL/NL/FR),
   porta 9001 ORPort canônica. Registro em
-  `Docs/sessions/sprint7-smoke-2026-05-01.md`.
+  `nota interna`.
 - **Sprint 4 — webrtc.ts split**: 1190 LOC monolíticas → 12 arquivos
   sob `src/lib/transport/webrtc/`. Coordenado por Ted (arquitetura)
   + Marshall (contratos) + Lily (manutenibilidade) + Barney (peer review
@@ -183,7 +183,7 @@ feature) fix LNK1181 Windows.
   + comentários em `src/lib/schema.sql`, `src/lib/peerRegistry.ts`,
   `src/lib/seeder.ts`, `src/lib/transport/{index,signaling,webrtc-
   signaling-mock}.ts`, `tests/webrtc-reconnect.test.ts`. Refs em
-  `Docs/archive/*` e `CHANGELOG.md` históricas mantidas (snapshot da
+  `nota interna` e `CHANGELOG.md` históricas mantidas (snapshot da
   época).
 
 ### Added (Fase 6.4 — Tor real funcional, etapas 1-4)
@@ -502,11 +502,11 @@ Highlights:
 
 ### Docs
 
-- **`Docs/sessions/deploy-vercel-protection-2026-04-29.md` — decisão "não implementar X-Robots-Tag"** (Ted). Drift descoberto via npub/Nostr/sneakernet, não SEO orgânico. Hardening trivial sem ROI hoje. Trigger pra revisitar: SEO afetar ranking real.
+- **`nota interna` — decisão "não implementar X-Robots-Tag"** (Ted). Drift descoberto via npub/Nostr/sneakernet, não SEO orgânico. Hardening trivial sem ROI hoje. Trigger pra revisitar: SEO afetar ranking real.
 
 ### Operacional
 
-- **Vercel Deployment Protection: `Standard` → `Only Preview`** (2026-04-29). Hostnames auto-gerados de production (`drift-{hash}-...vercel.app`) estavam retornando 401 em `manifest.webmanifest`, quebrando PWA install. Causa: `ssoProtection.deploymentType: "all_except_custom_domains"` (default Vercel pra projetos comerciais) bloqueava todos os hostnames exceto o alias custom `drift-wheat-one.vercel.app`. Mudou pra `"preview"` via REST API — production deployments públicos, previews continuam protegidos. Justificativa + comandos de reversão em [Docs/sessions/deploy-vercel-protection-2026-04-29.md](Docs/sessions/deploy-vercel-protection-2026-04-29.md). Manifesto §16/§17.
+- **Vercel Deployment Protection: `Standard` → `Only Preview`** (2026-04-29). Hostnames auto-gerados de production (`drift-{hash}-...vercel.app`) estavam retornando 401 em `manifest.webmanifest`, quebrando PWA install. Causa: `ssoProtection.deploymentType: "all_except_custom_domains"` (default Vercel pra projetos comerciais) bloqueava todos os hostnames exceto o alias custom `drift-wheat-one.vercel.app`. Mudou pra `"preview"` via REST API — production deployments públicos, previews continuam protegidos. Justificativa + comandos de reversão em nota interna Manifesto §16/§17.
 
 ### Added
 

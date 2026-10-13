@@ -32,7 +32,7 @@
  *     Vite injeta `<link rel="modulepreload">` runtime sem `integrity`.
  *     Mitigação futura: passar `integrity` via build.modulePreload.resolveDependencies
  *     ou patching de __vitePreload — fora de escopo desta baseline.
- *     Documentado em Docs/sessions/sri-baseline-2026-05-15.md como TODO.
+ *     Documentado em nota interna como TODO.
  *
  * Roda automaticamente após `vite build` via npm script `build`:
  *   `tsc -b && vite build && node scripts/strip-sourcemaps.mjs && node scripts/inject-sri.mjs`

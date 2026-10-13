@@ -204,7 +204,7 @@ versions tab; `sqlite.org/wasm`.
   shipado em `0.6.0-alpha.1`). Zero deps novas.
 - **R5** (privacidade NIP-44 + gift wrap mínimo) — ✅ resolvido em 6.1b
   (2026-04-29). Gift wrap kind 1059 minimal sem NIP-17 seal — decisão
-  documentada em `Docs/archive/webrtc-6.1b-plan.md`.
+  documentada em `nota interna`.
 - **R11** (arti bindings Tauri 2026) — ✅ resolvido (2026-05-01). Crates
   `arti-client = 0.41` + `tor-rtcompat = 0.41` + `tokio` (full features)
   + rustls compilam clean junto com Tauri 2.11. Ver `Docs/webrtc-6.4-plan.md

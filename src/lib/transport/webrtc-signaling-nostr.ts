@@ -4,7 +4,7 @@
  *
  * Substitui o BroadcastChannel mock de 6.1a — peers em redes diferentes
  * se descobrem usando relays Nostr existentes como rendezvous, sem
- * inventar diretório paralelo (manifesto §14, invariante #14 do CLAUDE.md).
+ * inventar diretório paralelo (manifesto §14, invariante #14).
  *
  * **Discovery (PoI-only)**: caller chama `transport.connectTo(peerNpub)`
  * sabendo o npub do alvo via SQLite local (ex: `spreader_pub` de spreads

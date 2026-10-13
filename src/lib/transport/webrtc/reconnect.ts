@@ -79,7 +79,7 @@ export function _scheduleReconnect(peerId: string): number | null {
     // duplicado dentro do mesmo RTCPeerConnection. getOrCreatePeer é
     // idempotente, mas initiateOffer não é — chamaria de novo se
     // shouldInitiateOffer===true. Audit §B2.
-    // Docs/sessions/webrtc-architecture-audit-2026-05-08.md §B2.
+    // nota interna §B2.
     void import('./state').then(({ getPeer }) => {
       const existing = getPeer(peerId)
       if (existing && existing.status === 'open') {

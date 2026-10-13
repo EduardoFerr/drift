@@ -104,7 +104,7 @@ export function getOrCreatePeer(remoteId: string): PeerState | null {
     // disconnected↔connected empilham N setTimeouts cujos guards (status,
     // hasPeer) não cobrem o caso de N callbacks chamando _scheduleReconnect
     // em sequência rápida — counter avança N vezes, atinge cap=5 prematuro.
-    // Audit: Docs/sessions/webrtc-architecture-audit-2026-05-08.md §B1.
+    // Audit: nota interna §B1.
     if (s !== 'disconnected' && peer.disconnectGraceTimer) {
       clearTimeout(peer.disconnectGraceTimer)
       peer.disconnectGraceTimer = null

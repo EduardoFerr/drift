@@ -704,23 +704,23 @@ Validados em Round 5 por Marshall.
 
 ### §7.2 Origens dos finds (auditorias)
 
-- **`Docs/sessions/design-qa-baseline-2026-05-08.md`** (Robin QA #1) —
+- **`nota interna`** (Robin QA #1) —
   CP-2 (padding), CP-3 (tracking), CP-4 (motion), CP-15 (border), CP-6
   (skeleton). 90 finds.
-- **`Docs/sessions/design-qa-regression-2026-05-08.md`** (Robin QA #2) —
+- **`nota interna`** (Robin QA #2) —
   verdict 🟢 verde 68% conformidade. Gap analysis motivando v0.8.
-- **`Docs/sessions/text-responsivity-audit-2026-05-08.md`** (Ted §3.1)
+- **`nota interna`** (Ted §3.1)
   — type scale fluid (§2.5).
-- **`Docs/sessions/comments-ux-audit-2026-05-08.md`** (Robin) — UX-Cm-*
+- **`nota interna`** (Robin) — UX-Cm-*
   finds informando CommentCard / DriftCard size=sm + thread skeleton.
-- **`Docs/sessions/ted-ux-spike-deployed-2026-05-08.md`** (Ted) — TX-1
+- **`nota interna`** (Ted) — TX-1
   até TX-12, FullPageCard pattern → DriftCard variant=elevated.
-- **`Docs/sessions/track-c-debt-scoping-2026-05-08.md`** (Lily) —
+- **`nota interna`** (Lily) —
   motion debt, alimentando §2.3.
 
 ### §7.3 Sucessores planejados
 
-- **`Docs/sessions/lily-motion-perf-plan-2026-05-08.md`** (Round 3
+- **`nota interna`** (Round 3
   paralelo §4.2) — convergência com §2.3 motion tokens + reduced
   motion handling em DriftSkeleton/DriftCard.
 - **Round 4 implementation** — Lily executa §3 + §4.2.

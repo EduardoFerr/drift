@@ -18,7 +18,7 @@ Formato:
 - Item fechado: `- [x] <decisão> — fechado YYYY-MM-DD em <commit-hash> — <1 linha resolução>`
 
 **📋 Sprint N+3 plan Satoshi (2026-05-21) — ZERO DÉBITO MADURO:**
-`Docs/sessions/satoshi-sprint-n3-plan-2026-05-21.md`
+`nota interna`
 
 Resumo (8-11d buffer-tolerant, 4 batches paralelos = 5-6d wall-clock):
 
@@ -55,7 +55,7 @@ lentes (defer N+4 pós feedback POC).
 shipping prematuro).
 
 **LHCI plan:** Day 0 (pré-sprint) + Day N (pós-sprint) — 5 métricas
-× 3 datas em `Docs/sessions/lhci-2026-05-21.md`.
+× 3 datas em `nota interna`.
 
 **Próxima ação user:** GO → Batch A dispatch (4 agents: 0.1+0.2+1.6+1.8).
 
@@ -66,7 +66,7 @@ shipping prematuro).
   store mantinha snapshot pré-metadata até próximo evento de domínio
   chegar. LOCK_VIA_TEST `tests/feed-author-avatar.test.ts`.
 - [x] **D2 LHCI re-measure + delta** — fechado parcial em
-  [b84d63c] — `Docs/sessions/lhci-2026-05-21.md` publicado.
+  [b84d63c] — `nota interna` publicado.
   Bundle entry gz 110→63 kB (-43%). LCP/INP/CLS/TBT inconclusivos
   (LHCI tropeçou em EPERM tmpdir cleanup Windows; audits rodaram, JSON
   perdido). CI workflow vai re-medir no PR. Sem regressão por proxy.
@@ -433,7 +433,7 @@ Rodando as suites E2E pela 1ª vez (antes nunca carregavam — header dizia
 
 ## Pool de tarefas — gap audit Robin 2026-05-23
 
-(Origem: `Docs/sessions/robin-pool-tarefas-gap-audit-2026-05-23.md`.
+(Origem: `nota interna`.
 17 itens novos descobertos em audit AMPLA de 7 dias — docs de sessão,
 commits, TODOs em código, sprint plans vs realidade. Top 3 críticos:
 L-ID lens tests, AppErrorBoundary custom modal, GlassIconButton purge.)
@@ -498,11 +498,11 @@ L-ID lens tests, AppErrorBoundary custom modal, GlassIconButton purge.)
 - [ ] **B-UX-1 LOCK_VIA_TEST "configurações" canônico em strings
   JSX user-facing** — P0 vocab. 5 paths pra Settings com 5 labels
   distintos (config/configurações/Ajustes/Settings/location). Mesma
-  família DRIFT/SINK do CLAUDE.md. Whitelist pra: "Ajustes" em
+  família DRIFT/SINK do vocabulary mapping. Whitelist pra: "Ajustes" em
   iOS-guidance contexts (`GpsErrorBanner` etc). ~30 LoC test. **P0**.
 
 - [ ] **B-UX-2 LOCK_VIA_TEST "spread" em strings JSX user-facing** —
-  P0 vocab violação CLAUDE.md mapping (SPREAD é spec/código; DRIFT é
+  P0 vocab violação mapping (SPREAD é spec/código; DRIFT é
   UI). 5 hits hoje: `SpreadMap.tsx:193,196` empty state,
   `TimelineScrubber.tsx:73` aria-label, `SettingsCards.tsx:288,1204,
   1507`. `tests/manifesto-conformance.test.ts` cobre só
@@ -621,7 +621,7 @@ L-ID lens tests, AppErrorBoundary custom modal, GlassIconButton purge.)
 
 ### Sprint N+3 follow-ups (7 itens semi-fechados)
 
-(Sprint plan Satoshi `Docs/sessions/satoshi-sprint-n3-plan-2026-05-21.md`
+(Sprint plan Satoshi `nota interna`
 listou 11 fecháveis; Batch A rodou 4. Batches B/C/D nunca
 dispatchados explicitamente. Itens abaixo são os pendentes
 re-promovidos ao backlog raiz.)
@@ -755,13 +755,13 @@ N+3 Batch A. Rodada paralela HIMYM, todos pushed.
 - [x] **Ted arquitetural maps review** — fechado em [4eb72a2].
   Read-only audit conferiu queries SQL (post ⊂ global, network ⊆
   global), cache invalidation correto, sem leaks cross-mode.
-  Arquivo: `Docs/sessions/ted-maps-review-2026-05-21.md`. 3 gaps
+  Arquivo: `nota interna`. 3 gaps
   estruturais registrados como items separados abaixo (split
   SpreadMap.tsx, camera persist, legend respect flag).
 
 - [x] **Satoshi adversarial maps audit** — fechado em [a74639d].
   Threat model rodou em SpreadMap.tsx + queries + UI. Arquivo:
-  `Docs/sessions/satoshi-maps-audit-2026-05-21.md`. Gaps P1 sendo
+  `nota interna`. Gaps P1 sendo
   atacados pelo agent Maps polish round 2 em paralelo (commit pending).
   1 P_phase2 doxx preventivo registrado abaixo (Profile map).
 
@@ -782,7 +782,7 @@ N+3 Batch A. Rodada paralela HIMYM, todos pushed.
 
 - [ ] **Split SpreadMap.tsx (794 LoC) — fadiga estrutural iminente**
   Ted arquitetural review 2026-05-21
-  (`Docs/sessions/ted-maps-review-2026-05-21.md`). Arquivo cresceu
+  (`nota interna`). Arquivo cresceu
   pra 794 LoC e mistura: layer rendering, mode toggle, long-press
   detector, scrubber, explainer card mount, query orchestration.
   Estimativa Ted: ~2h split em 4 sub-componentes (SpreadMapShell +
@@ -809,7 +809,7 @@ N+3 Batch A. Rodada paralela HIMYM, todos pushed.
 
 - [ ] **Map novo no Profile — NO-GO preventivo (K=1 doxx amplification)**
   Satoshi adversarial audit 2026-05-21
-  (`Docs/sessions/satoshi-maps-audit-2026-05-21.md`). Adicionar
+  (`nota interna`). Adicionar
   mapa no Profile (mostrar spreads do user específico geo) seria
   amplificador K=1 doxx — feed-level já protege via aggregation,
   Profile expõe individual. Mesmo com location off-default,
@@ -832,7 +832,7 @@ N+3 Batch A. Rodada paralela HIMYM, todos pushed.
 ---
 
 **📋 Sprint N+2 plano consolidado (Satoshi + Ted 2026-05-21):**
-`Docs/sessions/satoshi-ted-sprint-n2-plan-2026-05-21.md`
+`nota interna`
 
 Resumo (~8d P0 + 3.5d P1 + 1.5d P2 = 10-13d, buffer-tolerant):
 
@@ -1030,12 +1030,12 @@ Plano Ted HIMYM 2026-05-17 (analysis registrada em commit do PR1 [c823e8f]).
   - Opt-in via `UserPrefs.dedup_enabled` default false
   - Penalty em `calculateScore` (factor 0.5 default)
   - Satoshi mitigations: never hide own post, threshold >5/1h
-  Full deliberação: `Docs/sessions/content-hash-dedup-deliberation-2026-05-21.md`
+  Full deliberação: `nota interna`
   Reabrir requer evidência concreta de spam NÃO resolvido por
   weight=0, não suspicion geral.
 
 - [~] **Tinder queue patterns — parcialmente shipado (Lily audit 2026-05-21)**
-  Ver `Docs/sessions/lily-tinder-audit-2026-05-21.md`.
+  Ver `nota interna`.
   - [x] Item 2 (Zustand queue cap FEED_QUEUE_CAP=100) — shipado
   - [x] Item 3 (snapshotTs + FeedSnapshotAgeBadge UI) — shipado
   - [x] Item 3 batch atômico — já era feito (✅ pré-existente)
@@ -1102,7 +1102,7 @@ Plano Ted HIMYM 2026-05-17 (analysis registrada em commit do PR1 [c823e8f]).
 - [x] **Robin multi-list research re-dispatch** — fechado 2026-05-20
   em [PENDING-pool] (decisão registrada). Agente background original
   expirou há dias; research materializado em
-  `Docs/sessions/lily-multi-list-deep-dive-*.md`. Decisão conservadora:
+  `nota interna`. Decisão conservadora:
   ABORTAR re-spawn — research já consolidado, nova rodada seria
   redundante. Se precisar revisitar, dispatch novo HIMYM com escopo
   fresh em vez de re-spawnar legacy.
@@ -1123,7 +1123,7 @@ Plano Ted HIMYM 2026-05-17 (analysis registrada em commit do PR1 [c823e8f]).
   - Micro-label discreto bottom-center pra a11y (aria-live polite)
 
 - [x] **Ativar localização — fechado em [36809ef] + [a7ebdc8]**
-  Lily audit `Docs/sessions/profile-picture-audit-2026-05-21.md`
+  Lily audit `nota interna`
   diagnosticou 2 problemas. Fixes shipados:
   - **Layout reflow:** minHeight 88px + sempre renderiza (zero reflow)
   - **Confusão "GPS travando":** nota explicativa "GPS só é solicitado
@@ -1153,14 +1153,14 @@ Plano Ted HIMYM 2026-05-17 (analysis registrada em commit do PR1 [c823e8f]).
   continuarem idênticos.
 
 - [x] **Profile picture render feed/comments — fechado em [2137243]**
-  Lily audit `Docs/sessions/profile-picture-audit-2026-05-21.md`. Fix
+  Lily audit `nota interna`. Fix
   Sprint N+2 P2.11: feed.ts LEFT JOIN users_metadata + SubpostLayout
   header autor + CommentCard + AuthorChip primitive. 14 conformance
   tests. Sprint N+3 P0.1 (D3 no plan Satoshi) confirma feature shipada
   — reopener se regressão visível for reportada.
 
 - [~] **Redundância — audit Satoshi 2026-05-21 (7 OK / 3 parciais / 1 não-impl)**
-  Doc: `Docs/sessions/satoshi-redundancia-audit-2026-05-21.md`.
+  Doc: `nota interna`.
   **Diagnóstico:** Drift não falha em redundância core. 2 gaps de
   **automação** (não código).
   **Top 3 closures Sprint N+2 (~2.5h total):**
@@ -1202,7 +1202,7 @@ B1-B9 + Lily Material Ripple report + audits paralelos.)
 
 - [ ] **Material Ripple Phase 1 wiring (4 componentes)** — primitive
   shipado em [984aa2d] mas adoção NÃO autorizada. Lily report
-  `Docs/sessions/lily-material-ripple-report-2026-05-21.md` lista 4
+  `nota interna` lista 4
   superfícies (DriftButton, GlassIconButton xl, Settings rows, modal
   close). Estimativa 4-6h + LOCK_VIA_TEST `material-ripple-adoption`.
   Bloqueio: 3 perguntas Q1/Q2/Q3 abertas pra user — DriftChip md
@@ -1272,7 +1272,7 @@ B1-B9 + Lily Material Ripple report + audits paralelos.)
 
 - [ ] **Redundância audit — outros 7 OK cenários documentados, mas
   doc-only changes pendentes?** — Satoshi audit
-  `Docs/sessions/satoshi-redundancia-audit-2026-05-21.md` listou 10
+  `nota interna` listou 10
   cenários. Top 3 closures shipados Sprint N+2 (#1 auto-rebroadcast
   [88d1337], #2 auto-pin IPFS [11ec501], #3 random walk DOC [6c5f768]).
   Outros 7 cenários FUNCIONAIS (multi-relay publish, backup nsec,
@@ -1294,12 +1294,12 @@ B1-B9 + Lily Material Ripple report + audits paralelos.)
 
 - [ ] **Mais uma rodada LHCI — melhorar métricas Core Web Vitals**
   Adicionado pelo user 2026-05-21. **Status 2026-05-22:** Sprint N+3
-  Batch A (D2 LHCI re-measure) rodou parcial — `Docs/sessions/lhci-2026-05-21.md`
+  Batch A (D2 LHCI re-measure) rodou parcial — `nota interna`
   publicado com bundle entry gz 110→63 kB (-43%). LCP/INP/CLS/TBT
   inconclusivos (EPERM tmpdir Windows; CI workflow disparado, await
   Linux run pra resultado limpo). NÃO fechar até CI Linux entregar
   números íntegros. Última rodada LHCI registrada em
-  `Docs/sessions/cwv-final-report-2026-05-09.md` e
+  `nota interna` e
   `round-11-perf-2026-05-16.md`. Reabrir pra:
   - Re-measure LCP / CLS / INP / TTFB / TBT pós sessões maratona
     2026-05-17→05-21 (PostViewer cleanup, primitives novos, mapa 5
@@ -1320,7 +1320,7 @@ B1-B9 + Lily Material Ripple report + audits paralelos.)
 ## Infra / Arquitetura — adicionados 2026-05-17 (sessão noite)
 
 - [x] **i18n — spike + relatório** — fechado em [86ff522].
-  Relatório completo em `Docs/sessions/i18n-spike-2026-05-17.md`.
+  Relatório completo em `nota interna`.
   Recomendação: **LinguiJS v4** (bundle ~2 KB, macros AOT, ICU
   completo, types gerados). Catalog PO files por locale em
   `src/locales/<lang>/messages.po`. Weblate self-host pra workflow
@@ -1384,7 +1384,7 @@ B1-B9 + Lily Material Ripple report + audits paralelos.)
     delegation + race tolerance).
 
 - [x] **Settings/menus — friction audit + framework completo** —
-  audit em `Docs/sessions/settings-friction-audit-2026-05-18.md`.
+  audit em `nota interna`.
   Shipado em 5 commits (Phase 1+2+3+5+6):
   - [45cd93f] Phase 1: SettingExplainer primitive + 3 cards
   - [0350ac8] Phase 2: refactor restantes 6 cards (allowlist zerado)
@@ -1501,7 +1501,7 @@ B1-B9 + Lily Material Ripple report + audits paralelos.)
   **Phase 1 minimal (~1 sprint, viável agora):**
   - `lib/capabilities.ts`: capacidades derivadas de queries SQLite locais
     (`hasFirstPost`, `hasFirstSpread`, `hasBackup`, `hasFollow`) — funções
-    puras testáveis (CLAUDE.md invariante #16)
+    puras testáveis (invariante #16)
   - `user_prefs.capabilities_dismissed` bag substitui `onboarding_done`
     boolean por granularidade
   - `lib/guidance.ts`: store Zustand com regras declarativas hardcoded

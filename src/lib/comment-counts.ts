@@ -12,7 +12,7 @@
  * é estritamente *contagens agregadas*, sem overlap. Mantém PRs paralelos
  * sem conflito de merge.
  *
- * Idempotência (CLAUDE.md §1 — invariante):
+ * Idempotência (invariante #1 — invariante):
  *  - `bumpCommentCount` é chamado SÓ uma vez por commentId (dedup via
  *    `seenCommentIds` Set, FIFO cap 10k igual `seenPostIds` em events.ts).
  *  - Em `loadCommentCounts` (boot), populamos o Set com todos os ids

@@ -56,7 +56,7 @@ interface LegendItem {
 
 /**
  * Copy por contexto. PT-BR, vocabulary DRIFT/SINK user-facing (não
- * SPREAD/BURY do protocolo — §CLAUDE.md vocabulary mapping).
+ * SPREAD/BURY do protocolo — vocabulary mapping).
  *
  * Pure function (sem state/effects) — testável.
  */

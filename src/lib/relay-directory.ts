@@ -224,7 +224,7 @@ export async function getDirectoryEntries(
 export { RELAY_DIRECTORY }
 
 /**
- * Valida SEED_RELAY_CONFIGS contra invariante #18 (CLAUDE.md): SEED não
+ * Valida SEED_RELAY_CONFIGS contra invariante #18: SEED não
  * pode conter relays com policy `ai-assisted-opt-in`, `ai-automated`,
  * `manual-human` ou `private`. Só `manual-spam-only` e `unmoderated`.
  *
@@ -246,7 +246,7 @@ export function validateSeedAgainstInvariant18(
     if (!allowed.has(entry.policy)) {
       violations.push({
         url,
-        violation: `policy '${entry.policy}' não permitida em SEED (apenas manual-spam-only ou unmoderated). CLAUDE.md invariante #18.`,
+        violation: `policy '${entry.policy}' não permitida em SEED (apenas manual-spam-only ou unmoderated). invariante #18.`,
       })
     }
   }

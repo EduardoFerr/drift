@@ -94,7 +94,7 @@ audits só por feio. Defer documentado > silence.
 - **Risk:** LOW. Follows-graph já dá topologia válida + Sybil-resistência
   (PPR do meu nó). Falta só o refinamento de peso por preferência revelada.
 - **Mitigation:** decisão de fonte registrada (HÍBRIDO) em
-  `Docs/sessions/map-model-deliberation-2026-05-30.md`; fallback follows
+  `nota interna`; fallback follows
   documentado no código. Pontes (`wot.ts:findBridges`) dependem da
   PROFUNDIDADE do follow-graph, não da interação — já funcionam.
 - **Reopener:** quando wirar `recordEdge` no ingest de SPREAD próprio
@@ -165,7 +165,7 @@ audits só por feio. Defer documentado > silence.
   como NIP-94 faz com imagens seria defesa natural."
 - **Status:** **NO-GO atual** após deliberação Satoshi + Ted
   (2026-05-21). Decisão registrada em
-  `Docs/sessions/content-hash-dedup-deliberation-2026-05-21.md`.
+  `nota interna`.
 - **Razões NO-GO:**
   - **Evasão custo zero:** atacante muda 1 char (espaço, emoji,
     homoglyph cirílico) → hash diferente. Não eleva tax.
@@ -310,7 +310,7 @@ audits só por feio. Defer documentado > silence.
   per-identity validado, OR design de "perfil de rede por identidade"
   (relay set distinto por persona) que reduza a correlação já no PWA
   (paliativo parcial — não fecha IP/timing).
-- **Doc canônico:** manifesto §4 + §21 + §28; `CLAUDE.md` invariante #15;
+- **Doc canônico:** manifesto §4 + §21 + §28; invariante #15;
   spec do picker.
 
 ---

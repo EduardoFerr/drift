@@ -1,6 +1,6 @@
 // SettingExplainer conformance — LOCK_VIA_TEST.
 //
-// Source: audit `Docs/sessions/settings-friction-audit-2026-05-18.md`.
+// Source: audit `nota interna`.
 // User feedback 2026-05-18 — "usuário comum não sabe do que se trata".
 //
 // Trava:

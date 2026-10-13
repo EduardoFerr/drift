@@ -1,6 +1,6 @@
 /**
  * Tests pra `<FullPageCard>` primitive — convergente com Ted UX spike §5
- * (`Docs/sessions/ted-ux-spike-deployed-2026-05-08.md`).
+ * (`nota interna`).
  *
  * Vitest config = environment node. Não rendeiza React; testa as funções
  * puras que constroem motion config + container className. Isso cobre os

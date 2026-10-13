@@ -19,7 +19,7 @@
  *  - Init timeout
  *  - Init falha lança Error (Barney P1.5, sem fallback sync)
  *
- * Invariantes citados (CLAUDE.md):
+ * Invariantes citados:
  *  #5 — Pipeline cheap→caro: tests confirmam que main-side roda sync
  *       até `await verifyEventAsync`.
  *  #8 — Worker recebe apenas SignedEvent (público). Tests mockam

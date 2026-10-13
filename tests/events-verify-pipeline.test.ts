@@ -7,7 +7,7 @@
  *
  * Cobertura:
  *  - Cheap checks (kind + schema) rodam SYNC antes do `await
- *    verifyEventAsync` — invariante #5 do CLAUDE.md.
+ *    verifyEventAsync` — invariante #5.
  *  - Event com kind fora do DRIFT_KIND_SET nunca chega ao verify worker.
  *  - Event com sig inválida NÃO é persistido (INSERT bloqueado).
  *  - Event com sig válida é persistido após verify ok.
@@ -17,7 +17,7 @@
  * Mocka `verifyEventAsync` — não roda worker real (testado isoladamente
  * em `verify-queue.test.ts`). Foco aqui: pipeline correctness.
  *
- * Invariantes citados (CLAUDE.md):
+ * Invariantes citados:
  *  #1 — INSERT só após verify ok (verifica via db.run mock count)
  *  #5 — Pipeline cheap→caro: verifica que verify NÃO é chamado pra
  *       kinds fora do DRIFT_KIND_SET ou schemas inválidos.

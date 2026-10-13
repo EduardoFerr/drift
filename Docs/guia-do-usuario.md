@@ -528,7 +528,7 @@ cenários integrados.
 
 ### "Quero ver o código fonte / contribuir."
 
-O código é aberto. Veja [CLAUDE.md](../CLAUDE.md) pra entender a
+O código é aberto. Veja [a arquitetura](drift-arquitetura-v4.md) pra entender a
 arquitetura.
 
 ### "Tenho uma sugestão / encontrei um bug."

@@ -16,8 +16,8 @@ arquiteturais não-triviais.
   princípio.
 
 Decisões pequenas (refactors locais, fixes óbvios) **não** precisam
-de ADR — vivem no commit message + eventualmente em
-`Docs/sessions/`.
+de ADR — vivem no commit message + eventualmente em notas
+internas não versionadas.
 
 ## Convenções
 
@@ -31,8 +31,7 @@ de ADR — vivem no commit message + eventualmente em
 - Estrutura mínima: **Context · Problem · Decision · Consequences ·
   Alternatives considered · References**.
 
-Diferenças versus `Docs/sessions/`:
-- `sessions/` = artefato pontual de uma sessão (auditoria, conformance
-  check de uma data).
+O que qualifica:
 - `decisions/` = decisão arquitetural formal, referenciável por ADRs
-  futuras, não-revogável sem nova ADR superseding.
+  futuras, não-revogável sem nova ADR superseding. Artefato pontual de
+  uma sessão (auditoria, conformance check de uma data) não é ADR.

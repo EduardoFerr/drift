@@ -3,7 +3,7 @@
  *
  * Por que separado de `vitest.config.ts`:
  * - Config raiz roda em `environment: node` e cobre só funções puras
- *   (sem React, sem SQLite WASM). Lock estabelecido em §16 do CLAUDE.md.
+ *   (sem React, sem SQLite WASM). Lock estabelecido em invariante #16.
  * - A11y tests precisam de `jsdom` (renderizar DOM real pra axe-core
  *   inspecionar landmarks, roles, ARIA, contraste de structure).
  *

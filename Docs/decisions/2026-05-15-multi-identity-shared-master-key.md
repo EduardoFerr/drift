@@ -131,4 +131,4 @@ Racional:
   ainda não criada — decisão atualmente vive em arquitetura §30.13.)*
 - Manifesto §3, §4, §8, §17.
 - Audit Barney B2 — flag de ausência de ADR (esta ADR responde).
-- `CLAUDE.md` invariante §15 (multi-identidade pipeline).
+- invariante #15 (multi-identidade pipeline).

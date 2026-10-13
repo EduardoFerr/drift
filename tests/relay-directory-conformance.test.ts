@@ -4,7 +4,7 @@
  * Garante:
  *  1. JSON estático (`Docs/curated-relays-YYYY-MM.json`) tem schema válido
  *     (tab e policy dentro do enum)
- *  2. SEED_RELAY_CONFIGS respeita CLAUDE.md invariante #18 (nada de
+ *  2. SEED_RELAY_CONFIGS respeita invariante #18 (nada de
  *     ai-assisted-opt-in, ai-automated, manual-human, private no SEED)
  *  3. Constraint do Arquiteto 2026-05-17: SEM relays pagos no curated
  *  4. URLs do directory são wss:// ou ws:// (não http/https soltos)
@@ -101,13 +101,13 @@ describe('Relay directory schema conformance', () => {
   })
 })
 
-describe('LOCK_VIA_TEST — CLAUDE invariante #18 (SEED sem AI moderation)', () => {
+describe('LOCK_VIA_TEST — invariante #18 (SEED sem AI moderation)', () => {
   it('SEED_RELAY_CONFIGS não tem nenhum relay com policy AI/private/human', () => {
     const seedUrls = SEED_RELAY_CONFIGS.map((r) => r.url)
     const violations = validateSeedAgainstInvariant18(seedUrls)
     expect(
       violations,
-      `SEED viola invariante #18 (CLAUDE.md):\n${violations
+      `SEED viola invariante #18:\n${violations
         .map((v) => `  ${v.url}: ${v.violation}`)
         .join('\n')}`,
     ).toEqual([])

@@ -13,8 +13,8 @@ Complementa — **não duplica** — o threat model geral em
 e relay; este cobre **adversários no plano P2P direto** (DataChannel +
 ICE + signaling cifrado).
 
-Referências: `Docs/archive/webrtc-seeding.md`, `Docs/archive/webrtc-6.1a-plan.md`,
-`Docs/manifesto.md` §15/§17/§20/§28, invariantes #2/#5/#14 do `CLAUDE.md`.
+Referências: `nota interna`, `nota interna`,
+`Docs/manifesto.md` §15/§17/§20/§28, invariantes #2/#5/#14.
 
 > ⚠ **Status pós-6.2/6.3 (atualizado 2026-05-01)** — sub-fases 6.2
 > (peer registry + path diversity + cross-proto threshold) e 6.3

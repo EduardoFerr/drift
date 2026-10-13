@@ -70,7 +70,7 @@ Lazy import (CWV-3, 2026-05-15) garante zero custo de bundle em PWA puro.
 - `tor`: prefere `.onion` quando o seed tem alias; senão usa clearnet via TorWebSocket.
 - `onion-only`: filtra fora qualquer URL sem `.onion` conhecido.
 
-**Smoke test e2e** — `Docs/sessions/sprint7-smoke-2026-05-01.md`:
+**Smoke test e2e** — `nota interna`:
 ✅ PASS em `0cd2362`. Wireshark confirmou zero SNI de relay Nostr
 em modo `onion-only`. Tráfego foi 100% pra portas Tor guard
 (444/9001/9100/9200). §15 VERIFIED nessa baseline.
@@ -491,7 +491,7 @@ sem Tauri.
 
 - Manifesto v2.2 §4, §15, §17, §28 — `Docs/manifesto.md`
 - Arquitetura v5.3 §30.12, §30.13 — `Docs/drift-arquitetura-v4.md`
-- Smoke test e2e — `Docs/sessions/sprint7-smoke-2026-05-01.md`
+- Smoke test e2e — `nota interna`
 - arti integration spec — `Docs/webrtc-6.4-plan.md` §"arti integration"
 - Coverage matrix R1 — Robin sprint output (status §15 🟡)
 - Source:

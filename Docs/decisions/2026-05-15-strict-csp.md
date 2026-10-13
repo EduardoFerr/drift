@@ -99,6 +99,6 @@ Revisão de PR enforça.
 - `Docs/security/csp-policy-2026-05-15.md` — racional por diretiva.
 - Commits: `4402acc` (CSP inicial restritiva), `331c2b1` (hardening
   + media-src + upgrade-insecure-requests + doc).
-- `Docs/sessions/barney-security-regression-round5-2026-05-08.md` —
+- `nota interna` —
   gap #2 da auditoria Barney que originou `4402acc`.
 - Manifesto §4 (anti-telemetria), §17 (sem chave mestra disfarçada).

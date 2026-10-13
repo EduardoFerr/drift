@@ -200,14 +200,13 @@ trivialmente removível sem test falhar. Manifesto §4 silently broken.
 Test puro em Node (sem RTC real). ~30 LOC. Quebra de gate = test
 vermelho. **Custo**: 1-2h. **Owner sugerido**: Marshall (conformance).
 
-### P1 — Documentar invariante "WebRTC OFF sob Tor" no CLAUDE.md
+### P1 — Documentar invariante "WebRTC OFF sob Tor"
 
 **Problema**: invariante hoje é implícita (vive em 2 file:lines +
-comentário inline). CLAUDE.md não menciona. Lily/Ted onboarding pode
+comentário inline). não menciona. Lily/Ted onboarding pode
 escapar.
 
-**Mitigação proposta**: adicionar item na seção "Invariantes" do
-`CLAUDE.md` — sugestão de wording:
+**Mitigação proposta**: adicionar item na seção "Invariantes" da arquitetura — sugestão de wording:
 
 > ### 18. WebRTC OFF em modo Tor/onion-only
 >
@@ -373,7 +372,7 @@ Out-of-scope.
    manifesto §4 fica refém de "ninguém quebrou ainda". Custo ~2h,
    ROI altíssimo. Owner Marshall.
 
-2. **P1 — Adicionar invariante #18 no CLAUDE.md**. Custo ~5min. Faz
+2. **P1 — Adicionar invariante #18 à arquitetura**. Custo ~5min. Faz
    diferença em onboarding e em revisão de PRs futuros que toquem
    `bootstrap.ts:registerTransport` ou abram novo call site de
    `connectTo`.

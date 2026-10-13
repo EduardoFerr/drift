@@ -515,16 +515,16 @@ detection logic puro entre PWA e Tauri (DRY).
 
 ### Sessões de research (companion docs 2026-05-08)
 
-- [`Docs/sessions/auto-mode-detection-algorithm-2026-05-08.md`](../sessions/auto-mode-detection-algorithm-2026-05-08.md)
+- [`nota interna`](../sessions/auto-mode-detection-algorithm-2026-05-08.md)
   Robin algorithm — §2.1 capability gap (origem da decisão (A)
   Tauri-only), §4 algoritmo puro reusado em (c)+(d), §6 anti-
   manipulação cruzando AT-5/AT-9, §11 implementabilidade.
-- [`Docs/sessions/auto-mode-threat-model-2026-05-08.md`](../sessions/auto-mode-threat-model-2026-05-08.md)
+- [`nota interna`](../sessions/auto-mode-threat-model-2026-05-08.md)
   Barney threat model — AT-1 BLOCKED_ALL, AT-5 NUNCA probe clearnet
   em Tor, AT-9 manual confirmation, AT-10 sticky override, AT-11
   fundamental blocker (origem da decisão prompt-first), AT-12
   flapping, §3 5 mandatory mitigations.
-- [`Docs/sessions/15-e2e-testbed-scoping-2026-05-08.md`](../sessions/15-e2e-testbed-scoping-2026-05-08.md)
+- [`nota interna`](../sessions/15-e2e-testbed-scoping-2026-05-08.md)
   Robin scoping original — §3 cenários (a)+(b)+(d), §7 item 4
   (modo `auto` deferred — agora endereçado), §8 R1-R3 limites
   testbed.
@@ -538,7 +538,7 @@ detection logic puro entre PWA e Tauri (DRY).
 - [`Docs/drift-arquitetura-v4.md`](../drift-arquitetura-v4.md)
   §23.7 modo Tor 3 modos (legacy intent), §29.1 capability matrix
   Tauri vs PWA (validada por Robin §2.1), §32 transport.
-- [`Docs/sessions/webrtc-architecture-audit-2026-05-08.md`](../sessions/webrtc-architecture-audit-2026-05-08.md)
+- [`nota interna`](../sessions/webrtc-architecture-audit-2026-05-08.md)
   T1–T4 threats, defesas em `transport/policy/` reusadas em FSM.
 - [`Docs/runtime-pwa-vs-tauri.md`](../runtime-pwa-vs-tauri.md) — F8
   fonte canônica.

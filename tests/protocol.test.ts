@@ -6,7 +6,7 @@
  * signing or network. The contract under test:
  *
  *  - Each function produces the correct kind number
- *  - Tags are properly structured per Drift spec (CLAUDE.md §Os 4 kinds)
+ *  - Tags are properly structured per Drift spec (§Os 4 kinds)
  *  - POST content is valid JSON with subposts array
  *  - SPREAD/BURY/REPORT have correct e/p tags
  *  - drift-version tag is present on POST

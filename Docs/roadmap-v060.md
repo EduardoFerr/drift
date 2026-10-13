@@ -5,7 +5,7 @@
 Roteiro consolidado pós-`v0.6.0-alpha.3` até `v0.6.0` stable. Síntese de:
 - 5 personas HIMYM (Ted/Marshall/Barney/Lily/Robin) sobre propostas
   externas (`conversa.txt`, `dbdp.txt`)
-- Estado real das fases (`CLAUDE.md` "Estado da implementação")
+- Estado real das fases (convenção "Estado da implementação")
 - Backlog Lily acumulado das 10 sprints pós-auditoria
 
 ---
@@ -101,7 +101,7 @@ sobrevive ao cliente); manifesto declarado CC0.
 
 - Tags GPG-assinadas + pubkey publicada (~30min) — após primeiro
   co-maintainer ativo
-- Tests executáveis de invariantes #7/#8/#12 do CLAUDE.md (~3h) —
+- Tests executáveis de invariantes #7/#8/#12 (~3h) —
   oportuno quando próximo refactor tocar `moderation.ts` ou `events.ts`
 - DMCA agent registrado no US Copyright Office ($6) — só após
   documentar scope ("agente pra código no repositório, não conteúdo

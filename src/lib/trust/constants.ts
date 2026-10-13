@@ -1,7 +1,7 @@
 /**
  * Trust Lens — constantes hard-coded da Phase 1.
  *
- * Decisão Ted v2 (`Docs/sessions/trust-lens-L-parameter-ted-2026-05-17.md`):
+ * Decisão Ted v2 (`nota interna`):
  * estes parâmetros NÃO podem ser `user_prefs` porque PPR precisa ser
  * determinístico cross-device pra mesma identidade (manifesto §7).
  * User-tunável quebra convergência. Phase 2 telemetria pode override

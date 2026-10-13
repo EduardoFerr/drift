@@ -6,7 +6,7 @@
 oficial de moderação — é endorsement de **liberdade do operator** dentro
 dos limites do manifesto.
 **Fonte completa da deliberação:**
-[`Docs/sessions/relay-moderation-himym-research-2026-05-17.md`](sessions/relay-moderation-himym-research-2026-05-17.md)
+[`nota interna`](sessions/relay-moderation-himym-research-2026-05-17.md)
 
 ---
 
@@ -502,7 +502,7 @@ Crie `/var/www/html/nostr.json`:
 Cliente Drift lê `drift_policy.tier` e exibe badge correspondente
 (`ai-automated`, `ai-assisted`, `manual`, `none`) no card de relay em
 Settings > Relays > Descobrir. Detalhes da UX em
-[`Docs/sessions/relay-moderation-himym-research-2026-05-17.md`](sessions/relay-moderation-himym-research-2026-05-17.md)
+[`nota interna`](sessions/relay-moderation-himym-research-2026-05-17.md)
 seção Lily.
 
 Validação rápida:
@@ -756,7 +756,7 @@ versionada mensalmente. Pra entrar:
 4. Incluir no PR description: URL do policy, URL do audit log, link pro
    NIP-11 vivo (`curl` output OK), e demonstração de smoke test
 5. Review faz curador Drift (signed-off Robin persona, ver
-   `Docs/sessions/`)
+   `nota interna`)
 
 ### Critérios subjetivos (curador pode rejeitar)
 - Operator em jurisdição com track record forte de censura estatal

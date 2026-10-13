@@ -95,7 +95,7 @@ describe('passesSchemaCheck', () => {
       // Satoshi Gap C (bf76dda 2026-05-20): subposts vazio rejeitado
       // (NOP farming guard) — fixture usa subposts não-vazio pra
       // isolar a invariante real do test ("sem `d`"). Audit:
-      // Docs/sessions/marshall-baseline-failures-audit-2026-05-26.md
+      // nota interna
       const ev = makeEvent(
         DRIFT_KIND.POST,
         [['drift-version', '1']],

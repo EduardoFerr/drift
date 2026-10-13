@@ -43,7 +43,7 @@ Sem essa restrição, três falhas previsíveis aparecem:
 Há exceções controladas pra UPDATE/DELETE locais — `cache.ts:evictOldPosts`
 (eviction respeitando spreads + pinned, manifesto §16) e
 `moderation.ts:maybeModerate` (score = -999, manifesto §26). Ambas
-documentadas em CLAUDE.md invariante §1 e ambas chamam
+documentadas em invariante #1 e ambas chamam
 `invalidateFeed()` explicitamente.
 
 ## Decision
@@ -82,11 +82,11 @@ estado de domínio novo.
   relay → volta como subscribe → `onNostrEvent` persiste. Para
   cobrir: optimistic UI no componente (descartado quando confirmar).
 - Curva de aprendizado pra contributors: "por que não posso só
-  `db.run('INSERT ...')` aqui?". Documentação em CLAUDE.md §1 +
+  `db.run('INSERT ...')` aqui?". Documentação em invariante #1 +
   esta ADR mitigam.
 - Eviction e moderation precisam disciplina extra (chamar
   `invalidateFeed()` ou stale silencioso). Mitigado por revisão de
-  PR e doc explícito em CLAUDE.md §1.
+  PR e doc explícito em invariante #1.
 
 ## Alternatives considered
 
@@ -108,7 +108,7 @@ estado de domínio novo.
 
 - `src/lib/events.ts` — implementação de `onNostrEvent()`.
 - `tests/conformance-events-gate.test.ts` — lock estático (commit `346e6c4`).
-- `CLAUDE.md` invariante §1 — doc de contributor.
+- invariante #1 — doc de contributor.
 - `Docs/drift-arquitetura-v4.md` §30.10 (Zustand) — co-decisão (feed reativo via invalidate).
 - Manifesto §5 (eventos imutáveis), §6 (verdade por eventos), §7
   (determinismo).

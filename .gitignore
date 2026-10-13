@@ -117,3 +117,11 @@ sweep-*.jpeg
 verify-*.jpeg
 full-*.jpeg
 Docs/imagens/
+
+# notas de processo interno — sessões de review (personas LLM), auditorias
+# pontuais e planos de fases concluídas. Saíram do remoto em 2026-09-30 pelo
+# mesmo motivo de /local/: material de processo, não de protocolo. Continuam
+# existindo localmente; fonte canônica pública é Docs/ (raiz) + README.
+Docs/sessions/
+Docs/archive/
+CLAUDE.md

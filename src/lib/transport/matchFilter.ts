@@ -12,7 +12,7 @@
  *   - Campo presente com array vazio (ex: `kinds: []`) NÃO casa nenhum.
  *   - `since`/`until` são INCLUSIVOS (Barney peer review #6).
  *   - Tag filters (`#e`, `#p`, `#a`, etc) são single-letter por NIP-01.
- *     Drift respeita invariante #14 (CLAUDE.md): não inventa multi-char.
+ *     Drift respeita invariante #14: não inventa multi-char.
  *
  * Determinismo: dado o mesmo evento + filtro, retorna o mesmo bool.
  * Sem `Date.now()`, sem state. Manifesto §7 (determinismo).
