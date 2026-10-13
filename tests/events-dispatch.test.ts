@@ -451,10 +451,13 @@ describe('recalcAllScores — bulk pass (dev-seed)', () => {
     // spreads, buries, users), UPDATEs via db.batch (1 transação), depois
     // comments + reports. UPDATE não passa mais por db.run — vai pro batch.
     dbMock.exec.mockImplementation(async (sql: string) => {
-      if (/SELECT id, created_at, author_pub FROM posts/i.test(sql))
+      // `score` entra no SELECT desde a correção de D2: o bulk precisa
+      // dele pra derivar reports_confirmed(autor) = nº de posts seus
+      // já moderados, que alimenta REPORT_CONFIRMED no calculateWeight.
+      if (/SELECT id, created_at, author_pub, score FROM posts/i.test(sql))
         return [
-          { id: POST_A, created_at: 1714000000, author_pub: HEX('f') },
-          { id: POST_B, created_at: 1714000000, author_pub: HEX('f') },
+          { id: POST_A, created_at: 1714000000, author_pub: HEX('f'), score: 0 },
+          { id: POST_B, created_at: 1714000000, author_pub: HEX('f'), score: 0 },
         ]
       if (/DISTINCT post_id FROM reports/i.test(sql)) return [{ post_id: POST_A }]
       // spreads / buries / users / comments DISTINCT → vazio

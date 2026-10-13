@@ -83,7 +83,7 @@ export async function getGlobalFeed(limit = 50): Promise<Post[]> {
   const rows = await db.exec<PostRow>(
     `${POST_SELECT}
      WHERE p.score > -999
-     ORDER BY p.score DESC, p.created_at DESC
+     ORDER BY p.score DESC, p.created_at DESC, p.id ASC
      LIMIT ?`,
     [limit],
   )
@@ -106,7 +106,7 @@ export async function getFollowingFeed(limit = 50): Promise<Post[]> {
   const rows = await db.exec<PostRow>(
     `${POST_SELECT}
      WHERE p.score > -999 AND p.author_pub IN (${placeholders})
-     ORDER BY p.score DESC, p.created_at DESC
+     ORDER BY p.score DESC, p.created_at DESC, p.id ASC
      LIMIT ?`,
     [...followingSet, limit],
   )
@@ -125,7 +125,7 @@ export async function getTrendingFeed(limit = 50, now = Date.now()): Promise<Pos
   const rows = await db.exec<PostRow>(
     `${POST_SELECT}
      WHERE p.score > -999 AND p.created_at >= ?
-     ORDER BY p.score DESC, p.created_at DESC
+     ORDER BY p.score DESC, p.created_at DESC, p.id ASC
      LIMIT ?`,
     [cutoffSeconds, limit],
   )

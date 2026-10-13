@@ -45,6 +45,22 @@ export interface ScoreInput {
 
 export function calculateScore(input: ScoreInput): number {
   const { spreadWeight, buryWeight, createdAt, now } = input
+
+  // Guard de não-finito. Sem isto, um `createdAt` NULL/NaN vindo do
+  // SQLite propaga NaN até `UPDATE posts SET score = NaN`, e o post
+  // some do feed PERMANENTEMENTE: `WHERE score > -999` é false para
+  // NaN, e todo recálculo futuro recomputa o mesmo NaN. Espelha os
+  // guards já existentes em `trust/ppr.ts` (temporalDecay,
+  // normalizePpr) e `moderation.ts:calculateEffectiveReportWeight`.
+  if (
+    !Number.isFinite(spreadWeight) ||
+    !Number.isFinite(buryWeight) ||
+    !Number.isFinite(createdAt) ||
+    !Number.isFinite(now)
+  ) {
+    return 0
+  }
+
   const ageHours = Math.max(0, (now - createdAt) / 3600)
   const netEngagement = spreadWeight - buryWeight * 0.3
   return netEngagement / Math.pow(ageHours + 2, 1.5)
