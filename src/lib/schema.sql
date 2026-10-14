@@ -57,6 +57,25 @@ CREATE TABLE IF NOT EXISTS posts (
   -- Ranking continua monotônico em `score`. UI mostra spreads/buries como
   -- contadores ("3 espalharam"). Ver `events.ts:recalculateScore`.
   score           REAL DEFAULT 0,
+  -- `score_base` = NUMERADOR do score, sem o divisor temporal:
+  --   score_base = Σ weight(spreader) − 0.3 · Σ weight(burier)
+  --
+  -- Por que existe (correção de D1, auditoria 2026-10-13): `score` é
+  -- materializado e só era reescrito quando chegava evento NOVO naquele
+  -- post, então a idade congelava no instante do último spread. Um post
+  -- de 48h cujos spreads chegaram na 1ª hora ficava gravado 125× acima
+  -- do valor correto, para sempre.
+  --
+  -- `score_base` é INVARIANTE NO TEMPO: só muda quando chega evento.
+  -- O divisor `(idade+2)^1.5` passa a ser aplicado na LEITURA, no
+  -- ORDER BY do feed (`feed.ts`). Assim o decay acontece de verdade,
+  -- sem nenhum job periódico reescrevendo a tabela inteira.
+  --
+  -- `score` continua existindo e materializado porque três coisas
+  -- dependem do valor gravado: o sentinela MODERATED_SCORE (-999),
+  -- o VIRAL_PIN_THRESHOLD, e `reports_confirmed` (que conta posts do
+  -- autor com score = -999 por igualdade exata).
+  score_base      REAL DEFAULT 0,
   spreads         INTEGER DEFAULT 0,
   buries          INTEGER DEFAULT 0
 );

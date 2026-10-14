@@ -31,6 +31,53 @@ import type {
   UserPrefs,
 } from '../types/drift'
 
+/**
+ * Decay temporal aplicado na LEITURA (correção de D1, auditoria
+ * 2026-10-13).
+ *
+ * Antes, o feed ordenava por `posts.score`, uma coluna materializada que
+ * só era reescrita quando chegava evento novo NAQUELE post. A idade
+ * usada no cálculo congelava no instante do último spread, então o decay
+ * nunca acontecia: um post de 48h com spreads concentrados na 1ª hora
+ * ficava gravado 125× acima do valor correto, permanentemente. O feed
+ * virava um pódio imóvel — exatamente o que o manifesto §24 diz evitar.
+ *
+ * Agora `posts.score_base` guarda só o numerador (invariante no tempo) e
+ * o divisor é calculado aqui, a cada leitura. Nenhum job periódico
+ * reescreve a tabela; o tempo passa porque a query sabe que horas são.
+ *
+ * `now` entra por parâmetro, nunca via relógio implícito — manifesto §7
+ * (determinismo): mesma entrada, mesma saída.
+ *
+ * Réplica exata de `scoring.ts:decayDivisor`. A paridade entre as duas
+ * é travada por `tests/score-decay-parity.test.ts`, que roda a SQL e o
+ * TS sobre os mesmos inputs. `pow()` está disponível no build pinado do
+ * sqlite-wasm (verificado em runtime no Chromium).
+ */
+const DECAYED_SCORE = `(p.score_base / pow((? - p.created_at) / 3600.0 + 2, 1.5))`
+
+/**
+ * O valor decaído é SELECIONADO como `score_now` e é ele que vira
+ * `Post.score` em `rowToPost`. Isso não é detalhe de implementação: se
+ * a UI exibisse a coluna materializada enquanto o feed ordena pelo
+ * valor decaído, o número mostrado não explicaria a ordem — a mesma
+ * incoerência que o manifesto §22 (algoritmo legível) proíbe.
+ *
+ * Ordenar pelo ALIAS (e não repetir a expressão) mantém um único `?`
+ * de relógio por query, na posição do SELECT, que vem antes dos
+ * parâmetros do WHERE e do LIMIT.
+ */
+const SCORE_NOW = `${DECAYED_SCORE} AS score_now`
+
+/** Ordenação canônica do feed — manifesto §8 exige o `id ASC` final
+ *  como desempate determinístico. */
+const FEED_ORDER = `ORDER BY score_now DESC, p.created_at DESC, p.id ASC`
+
+/** Relógio em unix seconds, no formato que a SQL espera. */
+function nowSeconds(now: number): number {
+  return Math.floor(now / 1000)
+}
+
 const REFRESH_DEBOUNCE_MS = 150
 /** Janela do Trending — só posts publicados nas últimas N horas. */
 const TRENDING_WINDOW_HOURS = 24
@@ -46,7 +93,14 @@ interface PostRow {
   location: string | null
   client: string | null
   content_warning: string | null
+  /** Score materializado. Serve o sentinela -999, o VIRAL_PIN_THRESHOLD
+   *  e o `reports_confirmed`. NÃO é o que ordena o feed desde D1. */
   score: number
+  /** Numerador invariante no tempo, como gravado. */
+  score_base: number
+  /** Score COM o decay aplicado, calculado na query. É o que ordena o
+   *  feed e o que a UI exibe. */
+  score_now: number
   spreads: number
   buries: number
   /** raw_event JSON — usado pra extrair tags `imeta` no read path (B.2). */
@@ -73,19 +127,20 @@ interface PostRow {
  */
 const POST_SELECT = `SELECT
     p.id, p.author_pub, p.content, p.created_at, p.category, p.location,
-    p.client, p.content_warning, p.score, p.spreads, p.buries, p.raw_event,
+    p.client, p.content_warning, p.score, p.score_base, ${SCORE_NOW},
+    p.spreads, p.buries, p.raw_event,
     um.name AS author_name, um.display_name AS author_display_name,
     um.picture AS author_picture
   FROM posts p
   LEFT JOIN users_metadata um ON um.npub = p.author_pub`
 
-export async function getGlobalFeed(limit = 50): Promise<Post[]> {
+export async function getGlobalFeed(limit = 50, now = Date.now()): Promise<Post[]> {
   const rows = await db.exec<PostRow>(
     `${POST_SELECT}
      WHERE p.score > -999
-     ORDER BY p.score DESC, p.created_at DESC
+     ${FEED_ORDER}
      LIMIT ?`,
-    [limit],
+    [nowSeconds(now), limit],
   )
   return rows.map(rowToPost)
 }
@@ -98,7 +153,7 @@ export async function getGlobalFeed(limit = 50): Promise<Post[]> {
  * Se o user não segue ninguém, retorna vazio. Não há fallback "global"
  * — UI mostra estado vazio com call-to-action pra seguir.
  */
-export async function getFollowingFeed(limit = 50): Promise<Post[]> {
+export async function getFollowingFeed(limit = 50, now = Date.now()): Promise<Post[]> {
   const followingSet = useFollowsStore.getState().following
   if (followingSet.size === 0) return []
 
@@ -106,9 +161,9 @@ export async function getFollowingFeed(limit = 50): Promise<Post[]> {
   const rows = await db.exec<PostRow>(
     `${POST_SELECT}
      WHERE p.score > -999 AND p.author_pub IN (${placeholders})
-     ORDER BY p.score DESC, p.created_at DESC
+     ${FEED_ORDER}
      LIMIT ?`,
-    [...followingSet, limit],
+    [nowSeconds(now), ...followingSet, limit],
   )
   return rows.map(rowToPost)
 }
@@ -125,9 +180,9 @@ export async function getTrendingFeed(limit = 50, now = Date.now()): Promise<Pos
   const rows = await db.exec<PostRow>(
     `${POST_SELECT}
      WHERE p.score > -999 AND p.created_at >= ?
-     ORDER BY p.score DESC, p.created_at DESC
+     ${FEED_ORDER}
      LIMIT ?`,
-    [cutoffSeconds, limit],
+    [nowSeconds(now), cutoffSeconds, limit],
   )
   return rows.map(rowToPost)
 }
@@ -362,7 +417,8 @@ function rowToPost(row: PostRow): Post {
     location: parseLocation(row.location),
     client: row.client,
     contentWarning: row.content_warning,
-    score: row.score,
+    // O que a UI mostra é o valor decaído, o mesmo que ordena o feed.
+    score: row.score_now,
     spreads: row.spreads,
     buries: row.buries,
     authorAlias,

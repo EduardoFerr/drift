@@ -93,6 +93,24 @@ export const OPTIMISTIC_TIMEOUT_MS = 30_000
  *  spreads/buries chegam pelo subscribe. */
 export const SCORE_RECALC_DEBOUNCE_MS = 100
 
+/**
+ * Sentinela de "moderado pela comunidade" gravada em `posts.score`
+ * por `moderation.ts:maybeModerate` quando reports atingem o
+ * threshold dinâmico (manifesto §26). O feed filtra com
+ * `WHERE score > MODERATED_SCORE`.
+ *
+ * Invariante #13: isto ESCONDE do feed, não apaga do SQLite. Cliente
+ * alternativo pode exibir mesmo assim.
+ *
+ * Dívida conhecida: é um sentinela numérico, não um flag. Um post
+ * legitimamente enterrado por brigada de bury (buryWeight ≳ 9420 em
+ * idade 0) atravessa este valor e some do feed como se tivesse sido
+ * moderado, sem nenhum report — e `cache.ts` o evicta primeiro, já
+ * que ordena por `score ASC`. Separar o flag do valor é o fix
+ * definitivo.
+ */
+export const MODERATED_SCORE = -999
+
 /** Constantes de tempo em milissegundos. */
 export const MS_PER_DAY = 24 * 60 * 60 * 1000
 export const MS_PER_DAY_30 = 30 * MS_PER_DAY

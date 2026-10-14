@@ -406,6 +406,21 @@ function applyMigrations(schema: string) {
       column: 'created_at',
       sql: `ALTER TABLE lens_edges ADD COLUMN created_at INTEGER`,
     },
+    {
+      // D1 (auditoria 2026-10-13) — o decay temporal nunca rodava.
+      // `score_base` guarda o numerador (invariante no tempo) pra que o
+      // divisor `(idade+2)^1.5` possa ser aplicado na leitura.
+      //
+      // Backfill: DEFAULT 0 deixa posts antigos no fim do feed até o
+      // próximo recálculo. `recalcAllScores()` no boot popula todos de
+      // uma vez — ver `bootstrap.ts`. Preferido a tentar derivar o
+      // numerador do `score` gravado, que é justamente o valor
+      // corrompido pelo bug.
+      name: 'add_score_base_to_posts',
+      table: 'posts',
+      column: 'score_base',
+      sql: `ALTER TABLE posts ADD COLUMN score_base REAL DEFAULT 0`,
+    },
   ]
 
   let anyFailed = false

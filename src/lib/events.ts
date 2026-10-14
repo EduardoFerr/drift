@@ -27,8 +27,13 @@ import type { SignedEvent } from '../types/nostr'
 import { db } from './db'
 import { getTag } from './nostr'
 import { verifyEventAsync } from './verify'
-import { DRIFT_KIND, SCORE_RECALC_DEBOUNCE_MS, VIRAL_PIN_THRESHOLD } from '../config/constants'
-import { applyCommentReceived, calculateScore, calculateScoreNow } from './scoring'
+import {
+  DRIFT_KIND,
+  MODERATED_SCORE,
+  SCORE_RECALC_DEBOUNCE_MS,
+  VIRAL_PIN_THRESHOLD,
+} from '../config/constants'
+import { applyCommentReceived, calculateScore, calculateScoreNow, scoreNumerator } from './scoring'
 import { bumpUnseenCount, invalidateFeed } from './feed'
 import { getReportWeight, maybeModerate } from './moderation'
 import { calculateUserWeight, calculateWeight } from './weight'
@@ -1019,8 +1024,8 @@ export async function recalcAllScores(yieldEvery: number = 50): Promise<void> {
   // comments caem no path per-post provado (`recalculateScore`) num 2º passo
   // — raro no geral, ZERO no dev-seed (kinds 9078-9081, sem 1111). Score
   // idêntico: post sem comment → contribuição 0 → bulk == per-post.
-  const posts = await db.exec<{ id: string; created_at: number; author_pub: string }>(
-    `SELECT id, created_at, author_pub FROM posts`,
+  const posts = await db.exec<{ id: string; created_at: number; author_pub: string; score: number }>(
+    `SELECT id, created_at, author_pub, score FROM posts`,
   )
   if (posts.length === 0) return
   const spreads = await db.exec<{ post_id: string; spreader_pub: string; created_at: number }>(
@@ -1040,10 +1045,22 @@ export async function recalcAllScores(yieldEvery: number = 50): Promise<void> {
   // agregação que fetchUserAggsInChunks faz por user, computada de uma vez).
   const postAuthor = new Map<string, string>()
   for (const p of posts) postAuthor.set(p.id, p.author_pub)
+  // Exclui auto-spread (paridade com fetchUserAggsInChunks).
   const spreadsReceived = new Map<string, number>()
   for (const s of spreads) {
     const author = postAuthor.get(s.post_id)
-    if (author) spreadsReceived.set(author, (spreadsReceived.get(author) ?? 0) + 1)
+    if (author && s.spreader_pub !== author) {
+      spreadsReceived.set(author, (spreadsReceived.get(author) ?? 0) + 1)
+    }
+  }
+
+  // reports_confirmed(autor) = nº de posts seus já moderados (score
+  // -999). Mesma derivação de calculateUserWeight (weight.ts:200).
+  const reportsConfirmed = new Map<string, number>()
+  for (const p of posts) {
+    if (p.score === MODERATED_SCORE) {
+      reportsConfirmed.set(p.author_pub, (reportsConfirmed.get(p.author_pub) ?? 0) + 1)
+    }
   }
 
   // weight por user (fórmula pura, 1 `now` capturado → determinismo intra-run).
@@ -1054,6 +1071,7 @@ export async function recalcAllScores(yieldEvery: number = 50): Promise<void> {
       calculateWeight({
         createdAt: u.created_at * 1000,
         spreadsReceived: spreadsReceived.get(u.npub) ?? 0,
+        reportsConfirmed: reportsConfirmed.get(u.npub) ?? 0,
         lastActive: u.last_active !== null ? u.last_active * 1000 : null,
         now: nowMs,
       }),
@@ -1070,10 +1088,15 @@ export async function recalcAllScores(yieldEvery: number = 50): Promise<void> {
     }
     arr.push(row)
   }
-  for (const s of spreads)
+  // Ações do próprio autor não contam (paridade com recalculateScore).
+  for (const s of spreads) {
+    if (postAuthor.get(s.post_id) === s.spreader_pub) continue
     pushAction(s.post_id, { kind: 'spread', user_pub: s.spreader_pub, created_at: s.created_at })
-  for (const b of buries)
+  }
+  for (const b of buries) {
+    if (postAuthor.get(b.post_id) === b.burier_pub) continue
     pushAction(b.post_id, { kind: 'bury', user_pub: b.burier_pub, created_at: b.created_at })
+  }
 
   // score por post (§23 última-ação via selectLatestActionByUser) → UPDATE ops.
   const ops: Array<{ sql: string; params: unknown[] }> = []
@@ -1099,9 +1122,12 @@ export async function recalcAllScores(yieldEvery: number = 50): Promise<void> {
       createdAt: post.created_at,
       now: nowSec,
     })
+    // `score_base` = numerador sem o divisor temporal (D1). É o que o
+    // feed usa pra ordenar, aplicando o decay na leitura; `score` segue
+    // materializado pro sentinela -999, VIRAL_PIN e reports_confirmed.
     ops.push({
-      sql: `UPDATE posts SET score = ?, spreads = ?, buries = ? WHERE id = ?`,
-      params: [score, spreadCount, buryCount, post.id],
+      sql: `UPDATE posts SET score = ?, score_base = ?, spreads = ?, buries = ? WHERE id = ?`,
+      params: [score, scoreNumerator(spreadWeight, buryWeight), spreadCount, buryCount, post.id],
     })
   }
   // Flush em chunks (payload postMessage saudável + yield ao main entre eles).
@@ -1208,6 +1234,7 @@ interface UserAggRow {
   user_created_at: number
   last_active: number | null
   spreads_received: number
+  reports_confirmed: number
 }
 
 /**
@@ -1246,13 +1273,20 @@ async function recalculateScore(postId: string): Promise<void> {
   )
   if (!postRow) return
 
-  // 2. Todas as ações do post (spreads + buries) ordenadas por tempo
+  // 2. Todas as ações do post (spreads + buries) ordenadas por tempo.
+  // Exclui ações do próprio autor: auto-spread não é sinal social, é
+  // auto-promoção. Mesma defesa que `applyCommentsContribution` já
+  // aplica a self-comments (Barney HIGH #3); faltava no caminho de
+  // spreads/buries, o que viabilizava o loop de realimentação
+  // "auto-espalho → meu weight sobe → meus spreads valem mais".
   const actions = await db.exec<ActionRow>(
-    `SELECT 'spread' AS kind, spreader_pub AS user_pub, created_at FROM spreads WHERE post_id = ?
+    `SELECT 'spread' AS kind, spreader_pub AS user_pub, created_at FROM spreads
+       WHERE post_id = ? AND spreader_pub != ?
      UNION ALL
-     SELECT 'bury' AS kind, burier_pub AS user_pub, created_at FROM buries WHERE post_id = ?
+     SELECT 'bury' AS kind, burier_pub AS user_pub, created_at FROM buries
+       WHERE post_id = ? AND burier_pub != ?
      ORDER BY created_at ASC`,
-    [postId, postId],
+    [postId, postRow.author_pub, postId, postRow.author_pub],
   )
 
   // 3. Pra cada user, fica com ação mais recente. Lógica pura
@@ -1271,8 +1305,8 @@ async function recalculateScore(postId: string): Promise<void> {
       Date.now(),
     )
     await db.run(
-      `UPDATE posts SET score = ?, spreads = 0, buries = 0 WHERE id = ?`,
-      [withComments, postId],
+      `UPDATE posts SET score = ?, score_base = ?, spreads = 0, buries = 0 WHERE id = ?`,
+      [withComments, scoreNumerator(0, 0), postId],
     )
     invalidateFeed()
     return
@@ -1297,6 +1331,7 @@ async function recalculateScore(postId: string): Promise<void> {
     const weight = calculateWeight({
       createdAt: row.user_created_at * 1000, // unix seconds → ms
       spreadsReceived: row.spreads_received,
+      reportsConfirmed: row.reports_confirmed,
       lastActive: row.last_active !== null ? row.last_active * 1000 : null,
       now: recalcNow,
     })
@@ -1332,8 +1367,8 @@ async function recalculateScore(postId: string): Promise<void> {
     userWeightMap,
   )
   await db.run(
-    `UPDATE posts SET score = ?, spreads = ?, buries = ? WHERE id = ?`,
-    [score, spreadCount, buryCount, postId],
+    `UPDATE posts SET score = ?, score_base = ?, spreads = ?, buries = ? WHERE id = ?`,
+    [score, scoreNumerator(spreadWeight, buryWeight), spreadCount, buryCount, postId],
   )
   invalidateFeed()
   // Satoshi audit redundância 2026-05-21 — auto-pin IPFS de posts virais.
@@ -1445,6 +1480,7 @@ async function applyCommentsContribution(
       const weight = calculateWeight({
         createdAt: row.user_created_at * 1000,
         spreadsReceived: row.spreads_received,
+        reportsConfirmed: row.reports_confirmed,
         lastActive: row.last_active !== null ? row.last_active * 1000 : null,
         now: recalcNow,
       })
@@ -1487,13 +1523,22 @@ async function fetchUserAggsInChunks(userPubs: string[]): Promise<UserAggRow[]> 
     const chunk = userPubs.slice(i, i + RECALC_USER_CHUNK_SIZE)
     const placeholders = chunk.map(() => '?').join(',')
     const rows = await db.exec<UserAggRow>(
+      // `spreads_received` exclui auto-spreads (`s.spreader_pub !=
+      // u.npub`): sem isso, 6 posts auto-espalhados saturam
+      // ENGAGEMENT_MAX e dão weight 60 a uma identidade de idade zero.
+      // `reports_confirmed` precisa estar aqui, senão REPORT_CONFIRMED
+      // (-15) vira código morto no único cálculo que afeta o ranking —
+      // e diverge de `calculateUserWeight` (weight.ts), que o inclui.
       `SELECT
          u.npub AS npub,
          u.created_at AS user_created_at,
          u.last_active AS last_active,
          (SELECT COUNT(*) FROM spreads s
             INNER JOIN posts p ON p.id = s.post_id
-            WHERE p.author_pub = u.npub) AS spreads_received
+            WHERE p.author_pub = u.npub
+              AND s.spreader_pub != u.npub) AS spreads_received,
+         (SELECT COUNT(*) FROM posts
+            WHERE author_pub = u.npub AND score = -999) AS reports_confirmed
        FROM users u
        WHERE u.npub IN (${placeholders})`,
       chunk,
