@@ -76,6 +76,22 @@ CREATE TABLE IF NOT EXISTS posts (
   -- o VIRAL_PIN_THRESHOLD, e `reports_confirmed` (que conta posts do
   -- autor com score = -999 por igualdade exata).
   score_base      REAL DEFAULT 0,
+  -- Flag de moderação comunitária (manifesto §26). Separado do score
+  -- desde a correção de D4 (auditoria 2026-10-13).
+  --
+  -- Antes, "moderado" era codificado como `score = -999`. Isso fazia do
+  -- score um canal de censura: bastava `buryWeight ≥ 9419` (≈95 pessoas
+  -- de peso máximo) pra um post legítimo atravessar o sentinela e sumir
+  -- do feed EXATAMENTE como se tivesse sido reportado, contornando todo
+  -- o threshold dinâmico do §26. E como `cache.ts` evicta por
+  -- `score ASC`, as vítimas eram as primeiras a sair do disco.
+  --
+  -- Também violava §23: posts enterrados devem DESCER por gravidade,
+  -- não sumir abruptamente ao cruzar uma linha arbitrária.
+  --
+  -- Agora o score é livre pra ser negativo (um post muito enterrado
+  -- afunda, e só) e a moderação é um booleano explícito.
+  moderated       INTEGER NOT NULL DEFAULT 0,
   spreads         INTEGER DEFAULT 0,
   buries          INTEGER DEFAULT 0
 );
@@ -166,7 +182,8 @@ CREATE TABLE IF NOT EXISTS comments (
   content         TEXT NOT NULL,            -- texto plain UTF-8 (NIP-22 content)
   created_at      INTEGER NOT NULL,         -- unix seconds
   raw_event       TEXT NOT NULL,            -- JSON do evento original (imetas parsed daqui no read path — C.6.3)
-  score           REAL DEFAULT 0,           -- moderação: -999 esconde
+  score           REAL DEFAULT 0,           -- ranking; pode ser negativo
+  moderated       INTEGER NOT NULL DEFAULT 0, -- §26: flag explícito, NÃO o score (ver posts.moderated)
   content_warning TEXT                      -- C.6.2: 'nsfw'|'violence'|'spoiler'|'ad'|string livre, NIP-36 reuse
 );
 CREATE INDEX IF NOT EXISTS idx_comments_post  ON comments(post_id, created_at);

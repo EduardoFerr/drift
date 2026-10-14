@@ -5,7 +5,7 @@
  * font-display, body em font-mono, tokens drift-*. Card central ocupa
  * o viewport sob o header sticky.
  *
- * Comments moderados (score = -999) são filtrados em `buildThread`,
+ * Comments moderados (`moderated = 1`) são filtrados em `buildThread`,
  * mas se o caller passar um node oculto (cliente alternativo, override
  * UI-only), renderiza placeholder com botão "ver oculto" — manifesto
  * §17 (cliente NÃO deleta dados moderados; só esconde).
@@ -98,12 +98,12 @@ export function CommentCard({
   onTap,
 }: CommentCardProps) {
   // fix: CC-B2 moderation override (Track C debt) — states separados pra
-  // moderação (score<=-999) e CW. Compartilhar um mesmo override fazia o
+  // moderação (flag) e CW. Compartilhar um mesmo override fazia o
   // "ver mesmo assim" do CW desbloquear acidentalmente comment moderado.
   const [overrideMod, setOverrideMod] = useState(false)
   const [overrideCw, setOverrideCw] = useState(false)
   const [overrideBlur, setOverrideBlur] = useState(false)
-  const isHidden = node.score <= -999 && !overrideMod
+  const isHidden = node.moderated === true && !overrideMod
 
   // C.6.2 — applyContentFiltersComment: same logic as posts (block/mute
   // > content-warning > prefs). Determinístico (manifesto §7).

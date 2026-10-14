@@ -118,11 +118,11 @@ export async function runProbe(): Promise<Map<string, ProbeResult>> {
 
 async function pickRandomKnownEventIds(n: number): Promise<string[]> {
   // Sample de `posts.id` — que é `event.id` hex 64 (NIP-01).
-  // Posts moderados (-999) excluímos pra não disparar probe baseado em
+  // Posts moderados excluímos pra não disparar probe baseado em
   // evento que o relay legitimamente pode ter recusado.
   const rows = await db.exec<{ id: string }>(
     `SELECT id FROM posts
-     WHERE score > -999
+     WHERE moderated = 0
      ORDER BY RANDOM()
      LIMIT ?`,
     [n],

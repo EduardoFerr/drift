@@ -59,14 +59,14 @@ describe('runProbe — early returns', () => {
     expect(subscribeManyMock).not.toHaveBeenCalled()
   })
 
-  it('SELECT de sample exclui posts moderados (score > -999)', async () => {
+  it('SELECT de sample exclui posts moderados (flag, não score)', async () => {
     execMock.mockResolvedValue([])
     activeReadRelaysMock.mockReturnValue([])
     await runProbe()
     // O SELECT correto deve ter sido feito
     const sql = execMock.mock.calls[0]![0] as string
     expect(sql).toContain('FROM posts')
-    expect(sql).toContain('score > -999')
+    expect(sql).toContain('moderated = 0')
     expect(sql).toContain('RANDOM()')
   })
 })

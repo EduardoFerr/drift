@@ -57,6 +57,8 @@ interface CommentRow {
   content: string
   created_at: number
   score: number
+  /** §26 — flag de moderação. 0/1 no SQLite. */
+  moderated: number
   /** C.6.2 — content_warning. NULL em rows v8 pré-migração. */
   content_warning: string | null
   /**
@@ -89,6 +91,7 @@ function rowToRecord(r: CommentRow): CommentRecord {
     content: r.content,
     createdAt: r.created_at,
     score: r.score,
+    moderated: r.moderated === 1,
     contentWarning: r.content_warning,
     meta,
   }
@@ -104,10 +107,10 @@ function rowToRecord(r: CommentRow): CommentRecord {
  *   4. órfãos (parent ainda não chegou) ⇒ exibidos como top-level
  *      temporário até o parent aparecer (§16 disponibilidade).
  *
- * Score = -999 esconde do thread (manifesto §17). Filtra aqui.
+ * Comments moderados (`moderated = 1`) somem do thread (§17). Filtra aqui.
  */
 export function buildThread(rows: CommentRecord[]): CommentNode[] {
-  const visible = rows.filter((r) => r.score > -999)
+  const visible = rows.filter((r) => !r.moderated)
   const sorted = [...visible].sort(compareComments)
 
   const byId = new Map<string, CommentNode>()
@@ -120,6 +123,7 @@ export function buildThread(rows: CommentRecord[]): CommentNode[] {
       content: r.content,
       created_at: r.createdAt,
       score: r.score,
+      moderated: r.moderated,
       replies: [],
       content_warning: r.contentWarning ?? null,
       meta: r.meta,
@@ -226,7 +230,7 @@ export async function loadThread(postId: string): Promise<void> {
   })
 
   const rows = await db.exec<CommentRow>(
-    `SELECT id, post_id, reply_to, author_pub, content, created_at, score, content_warning, raw_event
+    `SELECT id, post_id, reply_to, author_pub, content, created_at, score, moderated, content_warning, raw_event
        FROM comments
       WHERE post_id = ?
       ORDER BY created_at ASC, id ASC

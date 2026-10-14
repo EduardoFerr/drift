@@ -30,6 +30,7 @@ function row(opts: {
   reply_to?: string
   created_at?: number
   score?: number
+  moderated?: boolean
 }): CommentRecord {
   return {
     id: opts.id,
@@ -39,6 +40,7 @@ function row(opts: {
     content: 'c-' + opts.id,
     createdAt: opts.created_at ?? 1000,
     score: opts.score ?? 0,
+    moderated: opts.moderated ?? false,
   }
 }
 
@@ -96,13 +98,25 @@ describe('buildThread / buildThreadIndex (determinístico)', () => {
     expect(index.childrenOf.get('r1')).toEqual(['c1a', 'c1b'])
   })
 
-  it('filtra score = -999 (manifesto §17)', () => {
+  it('filtra comments moderados pela flag (manifesto §17)', () => {
     const rows = [
       row({ id: 'r1', created_at: 100 }),
-      row({ id: 'r2', created_at: 200, score: -999 }),
+      row({ id: 'r2', created_at: 200, moderated: true }),
     ]
     const forest = buildThread(rows)
     expect(forest.map((n) => n.id)).toEqual(['r1'])
+  })
+
+  it('score muito negativo NÃO esconde — só a flag esconde (D4)', () => {
+    // Antes, qualquer comment com score <= -999 sumia, então uma brigada
+    // de bury conseguia censurar sem nenhum report. Agora o score é só
+    // ranking: afunda, mas continua visível.
+    const rows = [
+      row({ id: 'r1', created_at: 100 }),
+      row({ id: 'enterrado', created_at: 200, score: -5000 }),
+    ]
+    const forest = buildThread(rows)
+    expect(forest.map((n) => n.id)).toEqual(['r1', 'enterrado'])
   })
 
   it('órfão (parent ainda não chegou) vira top-level temporário', () => {

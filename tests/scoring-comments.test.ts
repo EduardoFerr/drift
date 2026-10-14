@@ -123,7 +123,7 @@ describe('COMMENTS_SCORE_CAP constant', () => {
  * Self-comment exclusion (Barney HIGH #3).
  *
  * A query SQL em events.ts:applyCommentsContribution faz:
- *   WHERE c.author_pub != ? AND c.score > -999
+ *   WHERE c.author_pub != ? AND c.moderated = 0
  *
  * Validação aqui é estrutural — tests de integração com SQLite real
  * vivem em e2e manual. Garantimos que o filtro está na string SQL —
@@ -142,8 +142,9 @@ describe('Self-comment exclusion (regression guard, Barney HIGH #3)', () => {
     expect(source).toMatch(
       /FROM comments[\s\S]*WHERE\s+post_id\s*=\s*\?\s+AND\s+author_pub\s*!=\s*\?/,
     )
-    // Filtro de moderação (score > -999) também presente — manifesto §17
-    expect(source).toMatch(/score\s*>\s*-999/)
+    // Filtro de moderação também presente — manifesto §17. Desde D4 é
+    // flag explícita, não o score (que voltou a ser só ranking).
+    expect(source).toMatch(/moderated\s*=\s*0/)
   })
 
   it('events.ts seleciona DISTINCT author_pub (dedup commenters)', async () => {

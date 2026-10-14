@@ -241,7 +241,8 @@ export type ReportReason = 'illegal' | 'spam' | 'harassment'
  * `replyTo === postId` ⇒ comment top-level (resposta direta ao post).
  * `replyTo !== postId` ⇒ resposta a outro comment (cuja id é `replyTo`).
  *
- * Score = -999 esconde do thread (mesmo mecanismo de posts, manifesto §17).
+ * Comments moderados (`moderated = 1`) somem do thread — mesmo mecanismo
+ * de posts (manifesto §17), e separado do score desde a correção de D4.
  */
 export interface CommentRecord {
   id: string
@@ -251,6 +252,8 @@ export interface CommentRecord {
   content: string
   createdAt: number
   score: number
+  /** §26 — moderado pela comunidade. NÃO é derivado do score. */
+  moderated?: boolean
   /**
    * C.6.2 — Aviso de conteúdo declarado pelo autor do comment (manifesto
    * §27, NIP-36 reuse). `null` = sem aviso. UI aplica blur/hide via

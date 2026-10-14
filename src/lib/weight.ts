@@ -197,7 +197,7 @@ export async function calculateUserWeight(
        (SELECT COUNT(*) FROM spreads s
           INNER JOIN posts p ON p.id = s.post_id
           WHERE p.author_pub = ?) AS spreads_received,
-       (SELECT COUNT(*) FROM posts WHERE author_pub = ? AND score = -999) AS reports_confirmed
+       (SELECT COUNT(*) FROM posts WHERE author_pub = ? AND moderated = 1) AS reports_confirmed
      FROM users u
      WHERE u.npub = ?`,
     [npub, npub, npub],

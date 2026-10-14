@@ -281,6 +281,10 @@ interface ColumnMigration {
   table: string
   column: string
   sql: string
+  /** SQL opcional rodado UMA vez logo após o ALTER, pra popular a coluna
+   *  nova a partir de dados existentes. Só executa quando o ALTER
+   *  acontece de fato (coluna ausente), nunca em boot subsequente. */
+  backfill?: string
 }
 
 function applyMigrations(schema: string) {
@@ -421,6 +425,34 @@ function applyMigrations(schema: string) {
       column: 'score_base',
       sql: `ALTER TABLE posts ADD COLUMN score_base REAL DEFAULT 0`,
     },
+    {
+      // D4 (auditoria 2026-10-13) — "moderado" deixa de ser codificado
+      // como `score = -999`.
+      //
+      // O backfill usa IGUALDADE EXATA, não `<=`, e isso é deliberado:
+      // `moderation.ts` sempre gravou o literal -999, então quem está
+      // ABAIXO disso chegou lá por acúmulo de bury, não por report. Usar
+      // `<=` perpetuaria a censura por brigada que esta correção existe
+      // pra desfazer — as vítimas voltam a ficar visíveis, que é o
+      // comportamento correto segundo §26 (só report modera).
+      //
+      // Risco teórico: um score que caia exatamente em -999.0 por
+      // coincidência de ponto flutuante seria marcado como moderado.
+      // Desprezível, e infinitamente preferível a manter todas as
+      // vítimas de brigada escondidas para sempre.
+      name: 'add_moderated_to_posts',
+      table: 'posts',
+      column: 'moderated',
+      sql: `ALTER TABLE posts ADD COLUMN moderated INTEGER NOT NULL DEFAULT 0`,
+      backfill: `UPDATE posts SET moderated = 1 WHERE score = -999`,
+    },
+    {
+      name: 'add_moderated_to_comments',
+      table: 'comments',
+      column: 'moderated',
+      sql: `ALTER TABLE comments ADD COLUMN moderated INTEGER NOT NULL DEFAULT 0`,
+      backfill: `UPDATE comments SET moderated = 1 WHERE score = -999`,
+    },
   ]
 
   let anyFailed = false
@@ -445,6 +477,14 @@ function applyMigrations(schema: string) {
 
     try {
       db.exec(m.sql)
+      // Backfill roda SÓ aqui, dentro do branch "coluna não existia".
+      // Em boot subsequente a coluna já existe e o `continue` acima
+      // impede qualquer re-execução — importante porque um backfill
+      // repetido poderia sobrescrever estado legítimo posterior.
+      if (m.backfill) {
+        db.exec(m.backfill)
+        log(`backfill aplicado: ${m.name}`)
+      }
       log(`migração aplicada: ${m.name}`)
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)

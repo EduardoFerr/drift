@@ -4,7 +4,7 @@
  * Cliente oficial NÃO escaneia conteúdo automaticamente (manifesto §25).
  * Conteúdo problemático é moderado pela comunidade via reports
  * (kind 9081). Quando o peso acumulado dos reports supera um threshold
- * dinâmico, o post recebe `score = -999` localmente e some do feed
+ * dinâmico, o post recebe `moderated = 1` localmente e some do feed
  * default — MAS continua nos relays e no SQLite local (manifesto §10
  * + invariante #13). Cliente alternativo pode exibir.
  *
@@ -209,8 +209,11 @@ export async function aggregateReports(
  * dados não duplicam efeito.
  *
  * Quando moderado:
- *   - `posts.score` vira -999 (esconde do feed default — query usa
- *     `WHERE score > -999`)
+ *   - `posts.moderated` vira 1 (esconde do feed default — query usa
+ *     `WHERE moderated = 0`). NÃO mexe no score: desde a correção de
+ *     D4 moderação e ranking são grandezas separadas, porque codificar
+ *     "moderado" como `score = -999` transformava o score num canal de
+ *     censura (brigada de bury atravessava o sentinela sem report).
  *   - O evento POST permanece no banco e nos relays (manifesto §16,
  *     invariante #13)
  *   - Cliente alternativo pode exibir mesmo assim — feature, não bug
@@ -244,11 +247,11 @@ export async function maybeModerate(postId: string, now: number): Promise<void> 
   for (const reason of reasons) {
     const t = getReportThreshold(activeUsers, reason, override)
     if (byReason[reason] >= t) {
-      await db.run(`UPDATE posts SET score = -999 WHERE id = ?`, [postId])
+      await db.run(`UPDATE posts SET moderated = 1 WHERE id = ?`, [postId])
       // Invariante #1: UPDATE em domínio fora de
       // `events.ts:onNostrEvent` é exceção autorizada (eviction +
       // moderação), MAS exige `invalidateFeed()` pra que UI reflita.
-      // Sem isso, post fica `score: -999` no banco mas o store
+      // Sem isso, post fica `moderated: 1` no banco mas o store
       // `useFeedStore` só atualiza quando próximo evento chegar.
       invalidateFeed()
       return
@@ -258,7 +261,7 @@ export async function maybeModerate(postId: string, now: number): Promise<void> 
   // Threshold combinado (qualquer mistura de razões) — mais conservador.
   const combinedThreshold = getReportThreshold(activeUsers, 'spam', override)
   if (totalWeight >= combinedThreshold) {
-    await db.run(`UPDATE posts SET score = -999 WHERE id = ?`, [postId])
+    await db.run(`UPDATE posts SET moderated = 1 WHERE id = ?`, [postId])
     invalidateFeed()
   }
 }

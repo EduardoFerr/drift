@@ -128,11 +128,35 @@ describe('invariante #13: "Cliente NÃO deleta dados moderados do SQLite"', () =
     ).toEqual([])
   })
 
-  it('moderation.ts modera via UPDATE score = -999 (mantém compromisso #13)', () => {
+  it('moderation.ts modera via flag, nunca por DELETE (compromisso #13)', () => {
     const file = join(SRC_ROOT, 'lib', 'moderation.ts')
     const content = readFileSync(file, 'utf8')
     // Espera-se ao menos uma ocorrência da operação canônica.
-    expect(content).toMatch(/UPDATE\s+posts\s+SET\s+score\s*=\s*-999/i)
+    expect(content).toMatch(/UPDATE\s+posts\s+SET\s+moderated\s*=\s*1/i)
+  })
+
+  it('moderação NÃO usa mais o score como flag (correção de D4)', () => {
+    // Codificar "moderado" como `score = -999` transformava o ranking num
+    // canal de censura: com `buryWeight >= 9419` (≈95 pessoas de peso
+    // máximo) um post legítimo atravessava o sentinela e sumia do feed
+    // como se tivesse sido reportado, contornando o threshold do §26.
+    // E `cache.ts` evicta por `score ASC`, então as vítimas eram as
+    // primeiras a sair do disco.
+    //
+    // Também violava §23: enterrar deve fazer o post DESCER por
+    // gravidade, não sumir ao cruzar uma linha arbitrária.
+    const file = join(SRC_ROOT, 'lib', 'moderation.ts')
+    const content = readFileSync(file, 'utf8')
+    const code = content
+      .split('\n')
+      .filter((l) => {
+        const t = l.trim()
+        return !t.startsWith('*') && !t.startsWith('//') && !t.startsWith('/*')
+      })
+      .join('\n')
+    expect(code, 'moderação voltou a escrever -999 no score').not.toMatch(
+      /UPDATE\s+posts\s+SET\s+score\s*=\s*-999/i,
+    )
   })
 })
 

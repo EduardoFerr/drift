@@ -34,6 +34,9 @@ export interface CommentNode {
   content: string
   created_at: number
   score: number
+  /** §26 — moderado pela comunidade. Separado do score desde D4: usar
+   *  o score como flag fazia brigada de bury virar canal de censura. */
+  moderated?: boolean
   replies: CommentNode[]
   /** C.6.2 — content-warning declarado pelo autor. Propaga de CommentRecord. */
   content_warning?: string | null

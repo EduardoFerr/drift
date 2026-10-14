@@ -26,7 +26,7 @@ import { db } from './db'
 // ─── Store ───────────────────────────────────────────────────────────
 
 interface CommentCountsState {
-  /** postId → count de comments visíveis (score > -999). */
+  /** postId → count de comments visíveis (não moderados). */
   countByPost: Record<string, number>
 }
 
@@ -102,14 +102,14 @@ interface IdRow {
  * subscribe ativo seriam contados de novo. Custo: ~64 bytes × N
  * comments ≤ 10k = 640KB worst-case (teto pelo cap). Aceitável.
  *
- * Filtra `score > -999` pra alinhar com `buildThread` (manifesto §17:
+ * Filtra `moderated = 0` pra alinhar com `buildThread` (manifesto §17:
  * comments moderados não contam pra UI).
  */
 export async function loadCommentCounts(): Promise<void> {
   const counts = await db.exec<CountRow>(
     `SELECT post_id, COUNT(*) AS n
        FROM comments
-      WHERE score > -999
+      WHERE moderated = 0
       GROUP BY post_id`,
   )
   const next: Record<string, number> = {}
@@ -124,7 +124,7 @@ export async function loadCommentCounts(): Promise<void> {
   // contar 1 vez extra cada (raro, aceitável v1).
   const ids = await db.exec<IdRow>(
     `SELECT id FROM comments
-      WHERE score > -999
+      WHERE moderated = 0
       LIMIT ?`,
     [SEEN_COMMENT_IDS_CAP],
   )

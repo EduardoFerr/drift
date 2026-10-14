@@ -29,7 +29,6 @@ import { getTag } from './nostr'
 import { verifyEventAsync } from './verify'
 import {
   DRIFT_KIND,
-  MODERATED_SCORE,
   SCORE_RECALC_DEBOUNCE_MS,
   VIRAL_PIN_THRESHOLD,
 } from '../config/constants'
@@ -695,7 +694,7 @@ async function persistCommentRow(event: SignedEvent, deferSideEffects: boolean):
   // `applyCommentReceived` em `recalculateScore`. Igual spreads/buries,
   // usa debounce de SCORE_RECALC_DEBOUNCE_MS pra rajadas (post viral
   // recebendo dezenas de replies em sequência → 1 recálculo no fim).
-  // Self-comments e moderation (score = -999) são filtrados na query
+  // Self-comments e moderation são filtrados na query
   // SQL dentro de recalculateScore (Barney HIGH #3).
   scheduleScoreRecalc(parsed.rootEventId)
 }
@@ -1024,9 +1023,12 @@ export async function recalcAllScores(yieldEvery: number = 50): Promise<void> {
   // comments caem no path per-post provado (`recalculateScore`) num 2º passo
   // — raro no geral, ZERO no dev-seed (kinds 9078-9081, sem 1111). Score
   // idêntico: post sem comment → contribuição 0 → bulk == per-post.
-  const posts = await db.exec<{ id: string; created_at: number; author_pub: string; score: number }>(
-    `SELECT id, created_at, author_pub, score FROM posts`,
-  )
+  const posts = await db.exec<{
+    id: string
+    created_at: number
+    author_pub: string
+    moderated: number
+  }>(`SELECT id, created_at, author_pub, moderated FROM posts`)
   if (posts.length === 0) return
   const spreads = await db.exec<{ post_id: string; spreader_pub: string; created_at: number }>(
     `SELECT post_id, spreader_pub, created_at FROM spreads`,
@@ -1054,11 +1056,11 @@ export async function recalcAllScores(yieldEvery: number = 50): Promise<void> {
     }
   }
 
-  // reports_confirmed(autor) = nº de posts seus já moderados (score
-  // -999). Mesma derivação de calculateUserWeight (weight.ts:200).
+  // reports_confirmed(autor) = nº de posts seus já moderados.
+  // Mesma derivação de calculateUserWeight (weight.ts).
   const reportsConfirmed = new Map<string, number>()
   for (const p of posts) {
-    if (p.score === MODERATED_SCORE) {
+    if (p.moderated === 1) {
       reportsConfirmed.set(p.author_pub, (reportsConfirmed.get(p.author_pub) ?? 0) + 1)
     }
   }
@@ -1440,7 +1442,7 @@ async function maybeAutoPinViralBlobs(postId: string, score: number): Promise<vo
  * Track C.5 — agrega contribuição de comments ao score base.
  *
  * Issue Barney HIGH #3: SELECT exclui self-comments (`author_pub !=
- * post.author_pub`) e comments moderados (`score > -999`).
+ * post.author_pub`) e comments moderados (`moderated = 1`).
  *
  * Issue Ted #3: weight é current (no `now` passado), espelhando o
  * pipeline de spreads. Se commenter já estava no `userWeightMap`
@@ -1458,10 +1460,10 @@ async function applyCommentsContribution(
   prefetchedWeights?: Map<string, number>,
 ): Promise<number> {
   // SELECT DISTINCT author_pub: já dedup. Filtros: !=author (Barney H#3)
-  // e score > -999 (moderação esconde commenter inteiro do agregado).
+  // e não-moderado (moderação esconde commenter inteiro do agregado).
   const commenterRows = await db.exec<CommenterRow>(
     `SELECT DISTINCT author_pub FROM comments
-     WHERE post_id = ? AND author_pub != ? AND score > -999`,
+     WHERE post_id = ? AND author_pub != ? AND moderated = 0`,
     [postId, postAuthorPub],
   )
   if (commenterRows.length === 0) return baseScore
@@ -1538,7 +1540,7 @@ async function fetchUserAggsInChunks(userPubs: string[]): Promise<UserAggRow[]> 
             WHERE p.author_pub = u.npub
               AND s.spreader_pub != u.npub) AS spreads_received,
          (SELECT COUNT(*) FROM posts
-            WHERE author_pub = u.npub AND score = -999) AS reports_confirmed
+            WHERE author_pub = u.npub AND moderated = 1) AS reports_confirmed
        FROM users u
        WHERE u.npub IN (${placeholders})`,
       chunk,

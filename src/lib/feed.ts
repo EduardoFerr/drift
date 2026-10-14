@@ -4,7 +4,7 @@
  * Esta camada existe para que a UI nunca toque em SQL diretamente.
  * Mantém o resto do app desacoplado do schema.
  *
- * Filtra posts moderados (score = -999) e ordena por score DESC.
+ * Filtra posts moderados (`moderated = 1`) e ordena por score decaído.
  * Para MVP suportamos apenas a aba 'global' — 'following' e 'trending'
  * entram na Fase 4.
  *
@@ -93,8 +93,8 @@ interface PostRow {
   location: string | null
   client: string | null
   content_warning: string | null
-  /** Score materializado. Serve o sentinela -999, o VIRAL_PIN_THRESHOLD
-   *  e o `reports_confirmed`. NÃO é o que ordena o feed desde D1. */
+  /** Score materializado. Serve o VIRAL_PIN_THRESHOLD. NÃO é o que
+   *  ordena o feed (desde D1) nem o que esconde moderados (desde D4). */
   score: number
   /** Numerador invariante no tempo, como gravado. */
   score_base: number
@@ -137,7 +137,7 @@ const POST_SELECT = `SELECT
 export async function getGlobalFeed(limit = 50, now = Date.now()): Promise<Post[]> {
   const rows = await db.exec<PostRow>(
     `${POST_SELECT}
-     WHERE p.score > -999
+     WHERE p.moderated = 0
      ${FEED_ORDER}
      LIMIT ?`,
     [nowSeconds(now), limit],
@@ -160,7 +160,7 @@ export async function getFollowingFeed(limit = 50, now = Date.now()): Promise<Po
   const placeholders = Array.from(followingSet).map(() => '?').join(',')
   const rows = await db.exec<PostRow>(
     `${POST_SELECT}
-     WHERE p.score > -999 AND p.author_pub IN (${placeholders})
+     WHERE p.moderated = 0 AND p.author_pub IN (${placeholders})
      ${FEED_ORDER}
      LIMIT ?`,
     [nowSeconds(now), ...followingSet, limit],
@@ -179,7 +179,7 @@ export async function getTrendingFeed(limit = 50, now = Date.now()): Promise<Pos
   const cutoffSeconds = Math.floor((now - TRENDING_WINDOW_HOURS * 3600 * 1000) / 1000)
   const rows = await db.exec<PostRow>(
     `${POST_SELECT}
-     WHERE p.score > -999 AND p.created_at >= ?
+     WHERE p.moderated = 0 AND p.created_at >= ?
      ${FEED_ORDER}
      LIMIT ?`,
     [nowSeconds(now), cutoffSeconds, limit],
