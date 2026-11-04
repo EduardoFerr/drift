@@ -1,9 +1,10 @@
 /**
  * Sincronização Nostr → SQLite.
  *
- * Mantém uma única subscription para os 4 kinds Drift em todos os
- * relays. Cada evento (incluindo os próprios eventos publicados pelo
- * cliente, devolvidos pelos relays) passa por onNostrEvent().
+ * Mantém as subscriptions globais (kinds Drift, comentários NIP-22 em
+ * posts Drift, provas OTS NIP-03) em todos os relays. Cada evento
+ * (incluindo os próprios eventos publicados pelo cliente, devolvidos
+ * pelos relays) passa por onNostrEvent().
  *
  * Persiste cursor (`last_since`) periodicamente em `sync_log` para que
  * a próxima sessão sincronize incrementalmente.
@@ -18,7 +19,7 @@
 
 import { create } from 'zustand'
 import { pool, getTag } from './nostr'
-import { onNostrEvent } from './events'
+import { onNostrEvent, NIP22_COMMENT_KIND, OTS_ATTESTATION_KIND, OTS_TARGET_KINDS } from './events'
 import { db } from './db'
 import { DRIFT_KIND } from '../config/constants'
 import { activeReadRelays } from './relays'
@@ -239,7 +240,9 @@ export async function startSync(): Promise<SyncStatus> {
     `SELECT MAX(last_since) AS since FROM sync_log WHERE namespace = ?`,
     [NAMESPACE],
   )
-  const savedCursor = row?.since ?? 0
+  // Clamp no presente: cura bancos cujo cursor já foi envenenado por um
+  // evento datado no futuro antes do gate de `MAX_FUTURE_SKEW_SECONDS`.
+  const savedCursor = Math.min(row?.since ?? 0, Math.floor(Date.now() / 1000))
   const fallback = Math.floor(Date.now() / 1000) - INITIAL_WINDOW_SECONDS
   const since = Math.max(savedCursor, fallback)
 
@@ -251,25 +254,12 @@ export async function startSync(): Promise<SyncStatus> {
   // dedup adicional natural no SQLite via INSERT OR IGNORE em onNostrEvent.
   // Manifesto §12 (múltiplos transportes), invariante #1 (onNostrEvent
   // continua única porta de escrita pra tabelas de domínio).
-  subscription = orchestrator.subscribe(
-    {
-      kinds: [
-        DRIFT_KIND.POST,
-        DRIFT_KIND.SPREAD,
-        DRIFT_KIND.BURY,
-        DRIFT_KIND.REPORT,
-      ],
-      since,
-      // Cap de stored events por relay — ver doc-comment de
-      // SUBSCRIBE_LIMIT acima. Boot inicial não martela pipeline.
-      limit: SUBSCRIBE_LIMIT,
-    },
-    {
+  const handlers = {
       onevent: (event: SignedEvent) => {
         setStatus((s) => ({
           ...s,
           eventsReceived: s.eventsReceived + 1,
-          cursor: Math.max(s.cursor, event.created_at),
+          cursor: advanceCursor(s.cursor, event.created_at),
           recent: pushRecent(s.recent, event),
         }))
         // Enfileira em vez de `await onNostrEvent` direto: drena em batches
@@ -281,8 +271,38 @@ export async function startSync(): Promise<SyncStatus> {
       oneose: () => {
         // EOSE = end of stored events. Daqui em diante é tempo real.
       },
-    },
-  )
+  }
+  // Três filtros (um REQ cada — `#K`/`#k` não podem ir no mesmo filtro dos
+  // kinds Drift, que não carregam essas tags):
+  //  1. kinds Drift (post/spread/bury/report);
+  //  2. comentários NIP-22 em posts Drift. Antes só chegavam ao abrir a
+  //     thread, então o score de um post dependia de quem abriu o quê
+  //     (auditoria 2026-11-03, C2). Agora entram no ranking → sync global;
+  //  3. provas OpenTimestamps (NIP-03, kind 1040) de eventos Drift — âncora
+  //     de antiguidade (`ranking.ts`).
+  const unsubs = [
+    orchestrator.subscribe(
+      {
+        kinds: [DRIFT_KIND.POST, DRIFT_KIND.SPREAD, DRIFT_KIND.BURY, DRIFT_KIND.REPORT],
+        since,
+        // Cap de stored events por relay — ver doc-comment de
+        // SUBSCRIBE_LIMIT acima. Boot inicial não martela pipeline.
+        limit: SUBSCRIBE_LIMIT,
+      },
+      handlers,
+    ),
+    orchestrator.subscribe(
+      { kinds: [NIP22_COMMENT_KIND], '#K': [String(DRIFT_KIND.POST)], since, limit: SUBSCRIBE_LIMIT },
+      handlers,
+    ),
+    orchestrator.subscribe(
+      { kinds: [OTS_ATTESTATION_KIND], '#k': OTS_TARGET_KINDS, since, limit: SUBSCRIBE_LIMIT },
+      handlers,
+    ),
+  ]
+  subscription = () => {
+    for (const u of unsubs) u()
+  }
 
   if (!flushTimer) {
     flushTimer = setInterval(() => {
@@ -336,6 +356,22 @@ export function pushRecent(prev: RecentEvent[], event: SignedEvent): RecentEvent
     ref,
   }
   return [entry, ...prev].slice(0, RECENT_EVENTS_CAP)
+}
+
+/**
+ * Avança o cursor de sync sem nunca passar do presente.
+ *
+ * O cursor vira o `since` do próximo boot. Antes era
+ * `max(cursor, event.created_at)` — um único evento datado no futuro
+ * (campo livre de quem assina) fazia o próximo boot pedir só eventos
+ * posteriores àquela data, e o cliente parava de receber histórico
+ * (auditoria 2026-11-03, P1). O gate de `onNostrEvent` já descarta
+ * eventos muito no futuro, mas o cursor é atualizado ANTES do gate
+ * (na chegada), então o clamp precisa existir aqui também.
+ */
+export function advanceCursor(cursor: number, createdAt: number, nowMs = Date.now()): number {
+  if (!Number.isFinite(createdAt)) return cursor
+  return Math.max(cursor, Math.min(createdAt, Math.floor(nowMs / 1000)))
 }
 
 async function flushCursor(): Promise<void> {
@@ -416,7 +452,7 @@ export async function rebuildIdentityHistory(npub: string): Promise<void> {
           setStatus((s) => ({
             ...s,
             eventsReceived: s.eventsReceived + 1,
-            cursor: Math.max(s.cursor, event.created_at),
+            cursor: advanceCursor(s.cursor, event.created_at),
             recent: pushRecent(s.recent, event),
           }))
           // Mesma fila com yield do subscribe principal (bug #4): rebuild

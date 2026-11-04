@@ -22,6 +22,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { calculateScore } from '../src/lib/scoring'
+import { computeRanking } from '../src/lib/ranking'
 import { MODERATED_SCORE } from '../src/config/constants'
 
 const ROOT = join(__dirname, '..')
@@ -124,35 +125,52 @@ describe('Pipeline — invariantes que só existem no texto da SQL', () => {
     expect(usos.length, 'Global, Seguindo e Em alta devem usar FEED_ORDER').toBe(3)
   })
 
-  it('D3: spreads_received exclui auto-spread', () => {
-    const events = read('src/lib/events.ts')
-    const temAgregacao = /spreads_received/.test(events)
-    expect(temAgregacao, 'events.ts deve agregar spreads_received').toBe(true)
-    // Sem este filtro, 6 posts auto-espalhados saturam ENGAGEMENT_MAX
-    // (60 / POST_SPREAD 10) e dão weight 60 a uma identidade de idade
-    // zero — vencendo usuário legítimo com 1 spreader real de peso 50.
-    expect(
-      events,
-      'subquery de spreads_received deve excluir o próprio autor',
-    ).toMatch(/s\.spreader_pub\s*!=\s*u\.npub/)
+  // D2/D3 eram verificados procurando strings na SQL de events.ts. O
+  // peso agora vive no motor puro `ranking.ts`; as mesmas regras são
+  // verificadas pelo COMPORTAMENTO (e ponta a ponta em
+  // tests/algorithm-invariants.test.ts).
+  const YEAR_AGO = 1_790_000_000 - 365 * 86_400
+  const rank = (extra: Partial<Parameters<typeof computeRanking>[0]>) =>
+    computeRanking({
+      nowMs: 1_790_000_000_000,
+      posts: [],
+      spreads: [],
+      buries: [],
+      comments: [],
+      reports: [],
+      users: [],
+      anchors: new Map(),
+      ...extra,
+    })
+
+  it('D3: auto-spread não dá engajamento ao autor', () => {
+    const posts = Array.from({ length: 6 }, (_, i) => ({ id: `p${i}`, author_pub: 'a', created_at: 1_790_000_000 }))
+    const spreads = posts.map((p) => ({ post_id: p.id, user_pub: 'a', created_at: 1_790_000_000, event_id: `s${p.id}` }))
+    const out = rank({ posts, spreads, anchors: new Map([['a', YEAR_AGO]]) })
+    expect(out.weights.get('a')).toBe(40) // só antiguidade
   })
 
-  it('D2: o pipeline de score passa reportsConfirmed ao calculateWeight', () => {
-    const events = read('src/lib/events.ts')
-    const chamadas = events.match(/calculateWeight\(\{[\s\S]*?\}\)/g) ?? []
-    expect(chamadas.length, 'events.ts deve chamar calculateWeight').toBeGreaterThan(0)
-    for (const c of chamadas) {
-      // Omitir o campo faz `calculateWeight` aplicar `?? 0`, tornando
-      // REPORT_CONFIRMED (-15) código morto no único cálculo que afeta
-      // o ranking — e divergindo de calculateUserWeight (weight.ts),
-      // que a UI do perfil usa e que SEMPRE inclui a penalidade.
-      expect(c, `calculateWeight sem reportsConfirmed:\n${c}`).toMatch(/reportsConfirmed:/)
-    }
-  })
-
-  it('D2: a SQL de agregação seleciona reports_confirmed', () => {
-    const events = read('src/lib/events.ts')
-    expect(events).toMatch(/AS reports_confirmed/)
+  it('D2: post moderado custa REPORT_CONFIRMED (−15) no peso que afeta o ranking', () => {
+    const reporters = Array.from({ length: 7 }, (_, i) => `r${i}`)
+    const anchors = new Map<string, number>([
+      ['a', YEAR_AGO],
+      ...reporters.map((r) => [r, YEAR_AGO] as [string, number]),
+      ...Array.from({ length: 6 }, (_, i) => [`fan${i}`, YEAR_AGO] as [string, number]),
+    ])
+    const posts = [
+      ...Array.from({ length: 6 }, (_, i) => ({ id: `liked${i}`, author_pub: 'a', created_at: 1_790_000_000 })),
+      { id: 'bad', author_pub: 'a', created_at: 1_790_000_000 },
+    ]
+    // 6 fãs × 1 post × 10 × 40/100 = 24 (longe da saturação em 60).
+    const spreads = posts
+      .filter((p) => p.id === 'liked0')
+      .flatMap((p) => Array.from({ length: 6 }, (_, i) => ({ post_id: p.id, user_pub: `fan${i}`, created_at: 1_790_000_000, event_id: `${p.id}${i}` })))
+    const reports = reporters.map((r) => ({ post_id: 'bad', reporter_pub: r, reason: 'spam' as const, created_at: 1_790_000_000 }))
+    const sem = rank({ posts, spreads, anchors })
+    const com = rank({ posts, spreads, anchors, reports })
+    expect(com.posts.get('bad')!.moderated).toBe(true)
+    expect(sem.weights.get('a')).toBeCloseTo(40 + 24, 9)
+    expect(com.weights.get('a')).toBeCloseTo(40 + 24 - 15, 9)
   })
 
   it('-999 é constante nomeada, não literal solto no pipeline de score', () => {

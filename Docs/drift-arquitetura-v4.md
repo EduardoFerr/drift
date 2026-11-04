@@ -532,16 +532,19 @@ async function getReportThreshold(): Promise<number> {
   return Math.max(5, Math.floor(count * 0.001))
 }
 
+// Auditoria 2026-11-03: contínuo, sem piso. Chave sem peso = 0 pts.
 function getReportWeight(userWeight: number): number {
-  if (userWeight < 20) return 0.5
-  if (userWeight < 50) return 1.0
-  if (userWeight < 75) return 1.5
-  return 2.0
+  return Math.max(0, Math.min(2, userWeight / 50))
 }
 ```
 
 Score = -999 esconde do feed. **Nunca apaga do SQLite local.** O
 evento permanece nos relays. Cliente alternativo pode exibir.
+
+A decisão é **derivada** em `ranking.ts:computeRanking` a cada
+recomputação global (reports + pesos atuais), não gravada por report —
+um recálculo de score nunca desfaz a moderação. Ver
+`Docs/algoritmos.md` §3.
 
 ---
 

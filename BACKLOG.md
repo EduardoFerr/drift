@@ -17,6 +17,19 @@ Formato:
 - Item aberto: `- [ ] <decisão> — contexto: <origem> — bloqueio: <quem/quê>`
 - Item fechado: `- [x] <decisão> — fechado YYYY-MM-DD em <commit-hash> — <1 linha resolução>`
 
+## Auditoria do algoritmo (2026-11-03)
+
+- [ ] **PoW opcional anti-spam de volume** — contexto: user perguntou se o próprio
+  autor poderia "minerar". Bitcoin: inviável. NIP-13 por evento: possível,
+  mas custo assimétrico (GPU ≫ celular) e §33 rejeita PoW pra reputação.
+  Pendente: decidir se vale como exigência OPCIONAL de relay contra volume.
+- [ ] **Partida a frio do peso** (known-limitations §5d) — rede recém-migrada
+  fica com pesos ~0 e moderação inerte por semanas. Pendente: decidir se
+  existe semente de confiança aceitável sem chave mestra.
+- [ ] **UI de status da âncora** — perfil mostra antiguidade/engajamento,
+  mas não "carimbo pendente / publicado / verificado". Pendente: desenho.
+- [ ] **Verificação de âncora em modo Tor** (known-limitations §5e).
+
 **📋 Sprint N+3 plan Satoshi (2026-05-21) — ZERO DÉBITO MADURO:**
 `nota interna`
 

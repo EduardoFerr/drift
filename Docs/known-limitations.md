@@ -141,7 +141,8 @@ audits só por feio. Defer documentado > silence.
   - Pref `UserPrefs.report_decay_enabled` (default OFF — opt-in até
     telemetria validar). Quando ON, `aggregateReports` aplica decay
     48h half-life sobre cada report
-  - `maybeModerate` lê pref + passa opts → reports antigos pesam menos
+  - O motor de ranking (`ranking.ts`) lê a pref via recomputação global
+    → reports antigos pesam menos
   - 8 conformance tests novos em `tests/moderation.test.ts`
 - **Surface residual (documentada nos próprios tests):**
   - **Brigada flash <1h:** decay 48h não pega (5 reports/1h = peso
@@ -155,6 +156,51 @@ audits só por feio. Defer documentado > silence.
   de GAP-CLUSTER detection.
 
 ---
+
+### 5d. Partida a frio do peso (âncora OpenTimestamps)
+
+- **Status:** ABERTO por design (auditoria 2026-11-03).
+- **O que é:** desde que a antiguidade passou a vir de prova
+  OpenTimestamps verificada no Bitcoin (antes: `created_at` forjável),
+  toda identidade começa com antiguidade 0 até carimbar — inclusive as
+  que já existiam, porque idade passada não carimbada não é provável.
+  O engajamento é ponderado pelo peso de quem espalhou, então numa rede
+  onde ninguém tem peso, ninguém ganha peso por spread.
+- **Consequências:**
+  - nas primeiras semanas após o deploy, scores ficam baixos e
+    próximos entre si (o ranking é dominado pelo decay temporal);
+  - moderação exige reporters com peso (pontos = peso/50): ~7
+    identidades com 40 semanas de âncora pra threshold 5. Nas primeiras
+    semanas a moderação comunitária efetivamente não dispara; filtros
+    locais (bloquear/silenciar) continuam valendo.
+- **Por que aceito:** qualquer atalho (piso de peso, antiguidade pelo
+  `created_at`, report de peso 0 valer algo) reabre Sybil gratuito —
+  10 chaves derrubavam qualquer post, 6 chaves davam peso 60.
+- **Reopener:** proposta de semente de confiança que não seja chave
+  mestra (§17) — ex.: lista de âncoras publicada e assinada por N
+  operadores independentes, opt-in por cliente.
+
+### 5e. Âncoras não verificadas em modo Tor
+
+- **Status:** ABERTO.
+- **O que é:** verificar uma prova OTS exige consultar exploradores
+  Bitcoin (clearnet). Com `network_mode ≠ clearnet` o cliente não
+  consulta, as provas ficam pendentes e as identidades correspondentes
+  têm antiguidade 0 **neste cliente** — o ranking dele diverge do de
+  clientes clearnet.
+- **Reopener:** explorador acessível via Tor/onion, ou headers Bitcoin
+  embarcados/sincronizados por P2P.
+
+### 5f. Convergência exige o mesmo conjunto de eventos
+
+- **Status:** ABERTO (limite de arquitetura, não bug).
+- **O que é:** o motor garante mesmo resultado pra mesmo conjunto de
+  eventos, em qualquer ordem. Clientes com conjuntos DIFERENTES (relays
+  diferentes, janela de sync de 7d, `limit 500` por relay) ainda podem
+  divergir. Mitigações shipadas: busca de post órfão por id, busca de
+  provas OTS por autor, rebroadcast com votos primeiro.
+- **Reopener:** paginação de histórico por `until` (TODO em `sync.ts`)
+  ou relays de arquivo dedicados.
 
 ## Anti-spam
 

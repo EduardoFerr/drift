@@ -253,17 +253,14 @@ describe('Marshall finding: sovereignty endpoints customizáveis via UserPrefs',
     const src = readFileSync('src/lib/moderation.ts', 'utf8')
     // Signature aceita override opcional
     expect(src).toMatch(/getReportThreshold\([^)]*override\?\s*:\s*number/)
-    // maybeModerate lê pref + passa pra getReportThreshold.
-    // Lock semântico (não sintático): aceita acesso direto
-    // `getPrefs().report_threshold_override` OU forma extracted
-    // `const prefs = getPrefs(); ...prefs.report_threshold_override`
-    // (refactor fc306c2 2026-05-21 Gap A decay extraiu const prefs
-    // pra reusar com report_decay_enabled). Invariante real é "ambos
-    // tokens presentes próximos no arquivo", não shape sintático.
-    // Audit: nota interna
-    expect(src).toMatch(/getPrefs\(\)/)
-    expect(src).toMatch(/\.report_threshold_override\b/)
-    expect(src).toMatch(/getReportThreshold\(activeUsers,\s*reason,\s*override\)/)
+    // A recomputação global (events.ts) lê a pref e a entrega ao motor
+    // puro (ranking.ts), que a repassa a getReportThreshold. Desde a
+    // auditoria 2026-11-03 a moderação é derivada lá, não em moderation.ts.
+    const events = readFileSync('src/lib/events.ts', 'utf8')
+    expect(events).toMatch(/getPrefs\(\)/)
+    expect(events).toMatch(/thresholdOverride:\s*prefs\.report_threshold_override\b/)
+    const ranking = readFileSync('src/lib/ranking.ts', 'utf8')
+    expect(ranking).toMatch(/getReportThreshold\(activeUsers,\s*reason,\s*opts\?\.thresholdOverride\)/)
   })
 
   it.todo('Quando IPFS gateway entrar (Fase 6+), endpoint vem de UserPrefs (não hardcoded)')

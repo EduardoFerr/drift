@@ -53,8 +53,14 @@ import type {
  * é travada por `tests/score-decay-parity.test.ts`, que roda a SQL e o
  * TS sobre os mesmos inputs. `pow()` está disponível no build pinado do
  * sqlite-wasm (verificado em runtime no Chromium).
+ *
+ * `max(0, idade)` espelha o `Math.max(0, ageHours)` do TS. Sem ele
+ * (auditoria 2026-11-03, C1), `created_at` no futuro dava divisor < 2^1.5
+ * — boost de até ~89× com +1h54 — e, além de +2h, `pow` de base negativa
+ * virava NULL e jogava o post pro fim. O gate de `MAX_FUTURE_SKEW_SECONDS`
+ * já barra o grosso; o clamp fecha a janela de tolerância.
  */
-const DECAYED_SCORE = `(p.score_base / pow((? - p.created_at) / 3600.0 + 2, 1.5))`
+const DECAYED_SCORE = `(p.score_base / pow(max(0, (? - p.created_at) / 3600.0) + 2, 1.5))`
 
 /**
  * O valor decaído é SELECIONADO como `score_now` e é ele que vira

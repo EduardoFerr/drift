@@ -11,10 +11,12 @@
  * dele. Se um relay original cair ou for bloqueado, posts continuam
  * acessíveis via os clientes que espalharam.
  *
- * **Seleção:**
+ * **Seleção** (ordem de prioridade em `collectMyEvents`):
+ *   - Provas OTS da própria identidade (âncora de antiguidade)
+ *   - Os spreads/buries do próprio user (votos)
+ *   - Comentários próprios
  *   - Posts próprios (author_pub = currentNpub)
  *   - Posts que o user espalhou (existe spread.spreader_pub = currentNpub)
- *   - Os spreads/buries do próprio user (republica os eventos de ação)
  *
  * **NÃO inclui:**
  *   - Reports — privacidade do reporter (manifesto §26 não obriga
@@ -34,9 +36,9 @@ import { db } from './db'
 import { pool } from './transport/wss'
 import type { SignedEvent } from '../types/nostr'
 
-const PUBLISH_GAP_MS = 50 // 50ms entre publishes pra não floodar
-const MAX_EVENTS_PER_RUN = 200 // limite alto, mas não infinito
-const REBROADCAST_TIMEOUT_MS = 8000 // tempo total máximo por run
+const PUBLISH_GAP_MS = 20 // entre publishes pra não floodar
+const MAX_EVENTS_PER_RUN = 2000 // por categoria; limite alto, mas não infinito
+const REBROADCAST_TIMEOUT_MS = 60_000 // tempo total máximo por run
 
 interface RawEventRow {
   raw_event: string | null
@@ -88,25 +90,48 @@ export async function rebroadcastToRelay(
   return { sent, failed, durationMs: Date.now() - start }
 }
 
+/**
+ * Ordem de prioridade (auditoria 2026-11-03, P3). Antes era um único
+ * `UNION ALL … LIMIT 200` com posts próprios primeiro: quem tinha >200
+ * posts nunca republicava um spread/bury — e são os votos que definem o
+ * ranking. Agora cada categoria tem seu próprio teto e vem nesta ordem:
+ *   1. provas OTS próprias (âncora de antiguidade — sem elas o peso some);
+ *   2. spreads + buries próprios (votos; eventos pequenos);
+ *   3. comentários próprios;
+ *   4. posts próprios, mais recentes primeiro;
+ *   5. posts que o user espalhou (seedear, §16).
+ */
 async function collectMyEvents(npub: string): Promise<SignedEvent[]> {
-  // Posts próprios + posts espalhados pelo user (via JOIN com spreads)
-  // + spreads + buries do user. Ignora rows sem raw_event (eventos
-  // antigos pré-Fase-5 sem coluna).
-  const rows = await db.exec<RawEventRow>(
-    `
-    SELECT raw_event FROM posts WHERE author_pub = ? AND raw_event IS NOT NULL
-    UNION ALL
-    SELECT p.raw_event FROM posts p
-      INNER JOIN spreads s ON s.post_id = p.id
-      WHERE s.spreader_pub = ? AND p.raw_event IS NOT NULL
-    UNION ALL
-    SELECT raw_event FROM spreads WHERE spreader_pub = ? AND raw_event IS NOT NULL
-    UNION ALL
-    SELECT raw_event FROM buries WHERE burier_pub = ? AND raw_event IS NOT NULL
-    LIMIT ?
-    `,
-    [npub, npub, npub, npub, MAX_EVENTS_PER_RUN],
-  )
+  const q = (sql: string, params: unknown[]) => db.exec<RawEventRow>(sql, [...params, MAX_EVENTS_PER_RUN])
+  const groups = await Promise.all([
+    q(
+      `SELECT raw_event FROM ots_proofs
+       WHERE target_event_id IN (SELECT target_event_id FROM ots_anchors WHERE author_pub = ?)
+       LIMIT ?`,
+      [npub],
+    ),
+    q(
+      `SELECT raw_event FROM (
+         SELECT raw_event, created_at FROM spreads WHERE spreader_pub = ? AND raw_event IS NOT NULL
+         UNION ALL
+         SELECT raw_event, created_at FROM buries WHERE burier_pub = ? AND raw_event IS NOT NULL
+       ) ORDER BY created_at DESC LIMIT ?`,
+      [npub, npub],
+    ),
+    q(`SELECT raw_event FROM comments WHERE author_pub = ? ORDER BY created_at DESC LIMIT ?`, [npub]),
+    q(
+      `SELECT raw_event FROM posts WHERE author_pub = ? AND raw_event IS NOT NULL
+       ORDER BY created_at DESC LIMIT ?`,
+      [npub],
+    ),
+    q(
+      `SELECT p.raw_event FROM posts p INNER JOIN spreads s ON s.post_id = p.id
+       WHERE s.spreader_pub = ? AND p.raw_event IS NOT NULL
+       ORDER BY s.created_at DESC LIMIT ?`,
+      [npub],
+    ),
+  ])
+  const rows = groups.flat()
 
   const seen = new Set<string>()
   const events: SignedEvent[] = []

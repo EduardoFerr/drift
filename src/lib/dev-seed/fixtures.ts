@@ -33,6 +33,7 @@
  * erradas. `CASCADE` exporta a sequência esperada pra assert.
  */
 
+import { getReportThreshold, getReportWeight } from '../moderation'
 import { finalizeEvent, getPublicKey } from 'nostr-tools/pure'
 import * as nip19 from 'nostr-tools/nip19'
 import { sha256 } from '@noble/hashes/sha2.js'
@@ -728,10 +729,7 @@ function buildWithDelta(mode: SeedMode, delta: number): SeedEventSet {
   //    o threshold §26 (score = -999). Base ativa do seed é pequena
   //    (~58 users ativos) → threshold dinâmico = max(5, floor(0.058)) = 5
   //    pra spam/harassment; 'illegal' = max(3, floor(5/2)) = 3.
-  //    Damos 8 reporters distintos a cada alvo pra folga acima do
-  //    threshold mesmo com pesos baixos de reporters (getReportWeight
-  //    mínimo 0.5 → 8×0.5 = 4 < 5; por isso usamos reporters antigos +
-  //    'illegal' nos primeiros, garantindo cruzamento — ver test).
+  //    Reporters escolhidos pela antiguidade até cruzar com folga (abaixo).
   // Alvos: 3 posts distintos, fora do hot/bury (índices crescentes). full
   // usa 200/210/220; lite escolhe 3 posts perto do fim do bloco de conteúdo
   // (ainda dentro de 0..contentPosts-1), distintos entre si.
@@ -744,26 +742,30 @@ function buildWithDelta(mode: SeedMode, delta: number): SeedEventSet {
           contentPosts[TOTAL_CONTENT_POSTS - 1]!,
         ]
   let reportCount = 0
-  // Reporters preferencialmente "pesados" (named + seeds antigos) pra
-  // garantir soma de pesos ≥ threshold. Os 8 named bastam pra cruzar
-  // ('illegal'=3, 'spam'=5); seeds antigos só reforçam. lite usa só os
-  // named (seeds 35/40 não estão no subset ativo).
-  const heavyReporters: SeedIdentity[] =
-    mode === 'full'
-      ? [
-          ...NAMED_IDENTITIES, // 8 named (antiguidade alta → peso ≥ 1.0)
-          SEED_IDENTITIES[35]!, // bg-35 (weeksOld = (35*7)%41 = 8) — médio
-          SEED_IDENTITIES[40]!, // bg-40 ((40*7)%41 = 28 wk) — alto
-        ]
-      : [...NAMED_IDENTITIES] // 8 named: spam(5) cruza com 8 reporters ≥0.5
+  // Reporters: as identidades ativas MAIS ANTIGAS, em ordem, até a soma de
+  // pontos cruzar o threshold com folga de 30%. Desde a auditoria
+  // 2026-11-03 o ponto de um report é peso/50 (chave sem peso vale 0) —
+  // o piso antigo de 0.5 por report tornava brigada de chaves novas
+  // gratuita. Aqui contamos só a antiguidade (lower bound; o engajamento
+  // real do seed só soma), medida na base da timeline.
+  const byAge = [...activeIdentities].sort((a, b) => a.createdAt - b.createdAt || (a.pub < b.pub ? -1 : 1))
+  const reportPoints = (id: SeedIdentity) =>
+    getReportWeight(Math.min(40, Math.max(0, (TS_BASE - id.createdAt) / WEEK)))
   for (let t = 0; t < reportTargets.length; t++) {
     const target = reportTargets[t]!
-    // alvo 0 + 1 usam 'illegal' (threshold 3, cruza fácil); alvo 2 'spam'.
+    // alvo 0 + 1 usam 'illegal' (threshold 3); alvo 2 'spam' (threshold 5).
     const reason: ReportReason = t < 2 ? 'illegal' : 'spam'
-    const reportersForTarget = t < 2 ? 8 : heavyReporters.length
-    for (let r = 0; r < reportersForTarget; r++) {
-      const reporter = heavyReporters[r % heavyReporters.length]!
-      if (reporter.pub === target.authorPub) continue
+    const needed = getReportThreshold(activeIdentities.length, reason) * 1.3
+    let acc = 0
+    const reporters: SeedIdentity[] = []
+    for (const id of byAge) {
+      if (acc >= needed) break
+      if (id.pub === target.authorPub) continue
+      reporters.push(id)
+      acc += reportPoints(id)
+    }
+    for (let r = 0; r < reporters.length; r++) {
+      const reporter = reporters[r]!
       // Reports chegam APÓS o post-alvo (causalidade), escalonados por hora
       // (denúncias pingam ao longo de ~1 dia, não num instante).
       const createdAt =

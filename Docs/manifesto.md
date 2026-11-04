@@ -718,9 +718,11 @@ quando esconder do feed default.
   isso (§17)
 - Não censuram retroativamente histórico do reporter
 
-**Implementação:** `processReport` em `events.ts` (Fase 4),
-`getReportThreshold` em `moderation.ts`, `getReportWeight` em
-`moderation.ts`. Ver arquitetura §10.
+**Implementação:** reports entram por `events.ts` (upsert por
+reporter); a decisão de moderar é derivada em `ranking.ts` a cada
+recomputação, com `getReportThreshold` e `getReportWeight`
+(pontos = peso/50) de `moderation.ts`. Ver arquitetura §10 e
+`Docs/algoritmos.md` §3.
 
 ### 27. Auto-Classificação Voluntária + Filtros Locais
 

@@ -32,26 +32,9 @@ vi.mock('../src/lib/nostr', async () => {
 vi.mock('../src/lib/verify', () => ({
   verifyEventAsync: vi.fn(async () => true),
 }))
-vi.mock('../src/lib/scoring', () => ({
-  calculateScoreNow: vi.fn(() => 0),
-  // Bulk recalcAllScores (2026-05-29) usa calculateScore puro direto.
-  calculateScore: vi.fn(() => 0),
-  // D1 (2026-10-13): o numerador é persistido em `posts.score_base` pra
-  // que o decay seja aplicado na leitura. Mock fiel à fórmula real.
-  scoreNumerator: vi.fn((s: number, b: number) => s - b * 0.3),
-  applyCommentReceived: vi.fn((args: { currentScore: number }) => args.currentScore),
-}))
 vi.mock('../src/lib/feed', () => ({
   invalidateFeed: vi.fn(),
   bumpUnseenCount: vi.fn(),
-}))
-vi.mock('../src/lib/moderation', () => ({
-  getReportWeight: vi.fn(() => 1),
-  maybeModerate: vi.fn(),
-}))
-vi.mock('../src/lib/weight', () => ({
-  calculateUserWeight: vi.fn(async () => ({ weight: 0.5 })),
-  calculateWeight: vi.fn(() => 0),
 }))
 vi.mock('../src/lib/comment-counts', () => ({
   bumpCommentCount: vi.fn(),
@@ -65,7 +48,6 @@ import {
 } from '../src/lib/events'
 import { db } from '../src/lib/db'
 import { invalidateFeed } from '../src/lib/feed'
-import { maybeModerate } from '../src/lib/moderation'
 import { verifyEventAsync } from '../src/lib/verify'
 import { DRIFT_KIND } from '../src/config/constants'
 import type { SignedEvent } from '../src/types/nostr'
@@ -78,7 +60,6 @@ const dbMock = db as unknown as {
 }
 const verifyMock = verifyEventAsync as unknown as ReturnType<typeof vi.fn>
 const invalidateFeedMock = invalidateFeed as unknown as ReturnType<typeof vi.fn>
-const maybeModerateMock = maybeModerate as unknown as ReturnType<typeof vi.fn>
 
 const HEX = (c: string) => c.repeat(64)
 const POST_ID = HEX('a')
@@ -97,8 +78,6 @@ beforeEach(() => {
   verifyMock.mockReset()
   verifyMock.mockResolvedValue(true)
   invalidateFeedMock.mockReset()
-  maybeModerateMock.mockReset()
-  maybeModerateMock.mockResolvedValue(undefined)
 })
 
 function makeEvent(opts: {
@@ -230,19 +209,19 @@ describe('KIND_DISPATCH — kinds conhecidos roteiam pro persist correto', () =>
 
   it('kind 9079 (SPREAD) → INSERT INTO spreads', async () => {
     await onNostrEvent(makeSpread())
-    expect(runCallsMatching(/INSERT OR IGNORE INTO spreads\b/i).length).toBe(1)
+    expect(runCallsMatching(/INSERT INTO spreads\b/i).length).toBe(1)
     expect(runCallsMatching(/INSERT.+INTO (?:posts|buries|reports|comments)\b/i).length).toBe(0)
   })
 
   it('kind 9080 (BURY) → INSERT INTO buries', async () => {
     await onNostrEvent(makeBury())
-    expect(runCallsMatching(/INSERT OR IGNORE INTO buries\b/i).length).toBe(1)
+    expect(runCallsMatching(/INSERT INTO buries\b/i).length).toBe(1)
     expect(runCallsMatching(/INSERT.+INTO (?:posts|spreads|reports|comments)\b/i).length).toBe(0)
   })
 
   it('kind 9081 (REPORT) → INSERT INTO reports', async () => {
     await onNostrEvent(makeReport())
-    expect(runCallsMatching(/INSERT OR IGNORE INTO reports\b/i).length).toBe(1)
+    expect(runCallsMatching(/INSERT INTO reports\b/i).length).toBe(1)
     expect(runCallsMatching(/INSERT.+INTO (?:posts|spreads|buries|comments)\b/i).length).toBe(0)
   })
 
@@ -287,7 +266,7 @@ describe('KIND_DISPATCH — pipeline cheap → expensive → persist', () => {
   it('schema válido + verify ok → persist roda', async () => {
     await onNostrEvent(makeSpread())
     expect(verifyMock).toHaveBeenCalledTimes(1)
-    expect(runCallsMatching(/INSERT OR IGNORE INTO spreads\b/i).length).toBe(1)
+    expect(runCallsMatching(/INSERT INTO spreads\b/i).length).toBe(1)
   })
 })
 
@@ -302,7 +281,7 @@ describe('KIND_DISPATCH — fonte única de verdade (sem dois switches paralelos
     const validSpread = makeSpread()
     expect(passesSchemaCheck(validSpread)).toBe(true)
     await onNostrEvent(validSpread)
-    expect(runCallsMatching(/INSERT OR IGNORE INTO spreads\b/i).length).toBe(1)
+    expect(runCallsMatching(/INSERT INTO spreads\b/i).length).toBe(1)
   })
 
   it('passesSchemaCheck e onNostrEvent concordam: schema inválido → ambos rejeitam', async () => {
@@ -356,20 +335,19 @@ describe('deferSideEffects — persist roda, side-effects são adiados', () => {
 
   it('SPREAD com deferSideEffects: true → INSERT roda, invalidateFeed NÃO', async () => {
     await onNostrEvent(makeSpread(), { deferSideEffects: true })
-    expect(runCallsMatching(/INSERT OR IGNORE INTO spreads\b/i).length).toBe(1)
+    expect(runCallsMatching(/INSERT INTO spreads\b/i).length).toBe(1)
     expect(invalidateFeedMock).not.toHaveBeenCalled()
   })
 
   it('BURY com deferSideEffects: true → INSERT roda, invalidateFeed NÃO', async () => {
     await onNostrEvent(makeBury(), { deferSideEffects: true })
-    expect(runCallsMatching(/INSERT OR IGNORE INTO buries\b/i).length).toBe(1)
+    expect(runCallsMatching(/INSERT INTO buries\b/i).length).toBe(1)
     expect(invalidateFeedMock).not.toHaveBeenCalled()
   })
 
-  it('REPORT com deferSideEffects: true → INSERT roda, maybeModerate + invalidateFeed NÃO', async () => {
+  it('REPORT com deferSideEffects: true → INSERT roda, invalidateFeed NÃO', async () => {
     await onNostrEvent(makeReport(), { deferSideEffects: true })
-    expect(runCallsMatching(/INSERT OR IGNORE INTO reports\b/i).length).toBe(1)
-    expect(maybeModerateMock).not.toHaveBeenCalled() // adiado pro bulk pass
+    expect(runCallsMatching(/INSERT INTO reports\b/i).length).toBe(1)
     expect(invalidateFeedMock).not.toHaveBeenCalled()
   })
 
@@ -403,7 +381,7 @@ describe('skipVerify — pula verify CARO mas mantém cheap checks (DEV-seed)', 
   it('SPREAD com skipVerify: true → verify NÃO roda, mas INSERT roda', async () => {
     await onNostrEvent(makeSpread(), { skipVerify: true, deferSideEffects: true })
     expect(verifyMock).not.toHaveBeenCalled() // passo CARO pulado
-    expect(runCallsMatching(/INSERT OR IGNORE INTO spreads\b/i).length).toBe(1)
+    expect(runCallsMatching(/INSERT INTO spreads\b/i).length).toBe(1)
   })
 
   it('POST com skipVerify: true → verify NÃO roda, INSERT roda', async () => {
@@ -437,7 +415,7 @@ describe('skipVerify — pula verify CARO mas mantém cheap checks (DEV-seed)', 
   it('default (sem skipVerify) ainda VERIFICA — sync real intacto', async () => {
     await onNostrEvent(makeSpread())
     expect(verifyMock).toHaveBeenCalledTimes(1)
-    expect(runCallsMatching(/INSERT OR IGNORE INTO spreads\b/i).length).toBe(1)
+    expect(runCallsMatching(/INSERT INTO spreads\b/i).length).toBe(1)
   })
 
   it('skipVerify: false explícito ainda VERIFICA', async () => {
@@ -446,43 +424,57 @@ describe('skipVerify — pula verify CARO mas mantém cheap checks (DEV-seed)', 
   })
 })
 
-describe('recalcAllScores — bulk pass (dev-seed)', () => {
-  it('recalcula todos os posts + modera reportados (recalc antes de moderação §26)', async () => {
-    const POST_A = HEX('a')
-    const POST_B = HEX('b')
-    // BULK pass (2026-05-29): 3 reads (posts c/ created_at+author_pub,
-    // spreads, buries, users), UPDATEs via db.batch (1 transação), depois
-    // comments + reports. UPDATE não passa mais por db.run — vai pro batch.
-    dbMock.exec.mockImplementation(async (sql: string) => {
-      // `score` entra no SELECT desde a correção de D2: o bulk precisa
-      // dele pra derivar reports_confirmed(autor) = nº de posts seus
-      // já moderados, que alimenta REPORT_CONFIRMED no calculateWeight.
-      if (/SELECT id, created_at, author_pub, score FROM posts/i.test(sql))
-        return [
-          { id: POST_A, created_at: 1714000000, author_pub: HEX('f'), score: 0 },
-          { id: POST_B, created_at: 1714000000, author_pub: HEX('f'), score: 0 },
-        ]
-      if (/DISTINCT post_id FROM reports/i.test(sql)) return [{ post_id: POST_A }]
-      // spreads / buries / users / comments DISTINCT → vazio
-      return []
-    })
+describe('recalcAllScores — recomputação global', () => {
+  // A lógica (pesos, moderação) é coberta de ponta a ponta com SQLite real
+  // em tests/algorithm-invariants.test.ts. Aqui só o contrato de I/O:
+  // lê todas as fontes, grava SÓ o que mudou, em batch.
+  const POST_A = HEX('a')
+  const POST_B = HEX('b')
+  const AUTHOR = HEX('f')
+  const YEAR_AGO = Math.floor(Date.now() / 1000) - 365 * 86400
+  const reporters = Array.from({ length: 7 }, (_, i) => String(i).repeat(64))
 
-    await recalcAllScores()
-
-    // Cada post recebeu UPDATE de score via db.batch (bulk). Conta ops
-    // UPDATE em todas as chamadas de batch.
-    const batchedUpdates = dbMock.batch.mock.calls
-      .flatMap((c) => (c[0] as Array<{ sql: string }>))
+  const fixture = (moderatedAlready: boolean) => async (sql: string) => {
+    if (/FROM posts/i.test(sql))
+      return [
+        { id: POST_A, created_at: 1714000000, author_pub: AUTHOR, score: moderatedAlready ? -999 : 0, score_base: 0, spreads: 0, buries: 0 },
+        { id: POST_B, created_at: 1714000000, author_pub: AUTHOR, score: 0, score_base: 0, spreads: 0, buries: 0 },
+      ]
+    if (/FROM reports/i.test(sql))
+      return reporters.map((r) => ({ post_id: POST_A, reporter_pub: r, reason: 'spam', created_at: 1714000000 }))
+    if (/FROM ots_anchors/i.test(sql)) return reporters.map((r) => ({ author_pub: r, t: YEAR_AGO }))
+    return []
+  }
+  const postUpdates = () =>
+    dbMock.batch.mock.calls
+      .flatMap((c) => c[0] as Array<{ sql: string; params: unknown[] }>)
       .filter((op) => /UPDATE posts SET score/i.test(op.sql))
-    expect(batchedUpdates.length).toBe(2)
-    // Post reportado passou por moderação — DEPOIS do recalc (§26 -999 último).
-    expect(maybeModerateMock).toHaveBeenCalledTimes(1)
-    expect(maybeModerateMock).toHaveBeenCalledWith(POST_A, expect.any(Number))
+
+  it('lê posts, votos, comentários, reports, users e âncoras OTS', async () => {
+    dbMock.exec.mockImplementation(fixture(false))
+    await recalcAllScores()
+    const sqls = dbMock.exec.mock.calls.map((c) => String(c[0]))
+    for (const t of ['posts', 'spreads', 'buries', 'comments', 'reports', 'users', 'ots_anchors'])
+      expect(sqls.some((q) => new RegExp(`FROM ${t}\\b`).test(q)), t).toBe(true)
+  })
+
+  it('grava só o post cuja moderação mudou (7 reporters ancorados → -999)', async () => {
+    dbMock.exec.mockImplementation(fixture(false))
+    await recalcAllScores()
+    const ups = postUpdates()
+    expect(ups).toHaveLength(1)
+    expect(ups[0]!.params).toEqual([-999, 0, 0, 0, POST_A])
+  })
+
+  it('estado já correto → nenhuma escrita de post', async () => {
+    dbMock.exec.mockImplementation(fixture(true))
+    await recalcAllScores()
+    expect(postUpdates()).toHaveLength(0)
   })
 
   it('banco vazio → noop sem throw', async () => {
     dbMock.exec.mockResolvedValue([])
     await expect(recalcAllScores()).resolves.toBeUndefined()
-    expect(maybeModerateMock).not.toHaveBeenCalled()
+    expect(dbMock.batch).not.toHaveBeenCalled()
   })
 })

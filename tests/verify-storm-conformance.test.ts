@@ -152,7 +152,7 @@ describe('verify-storm — 500 events boot típico', () => {
     expect(elapsed).toBeLessThan(2000)
     // Esperamos 500 INSERTs em spreads
     const spreadInserts = dbRunMock.mock.calls.filter((c) =>
-      /INSERT OR IGNORE INTO spreads\b/i.test(String(c[0])),
+      /INSERT INTO spreads\b/i.test(String(c[0])),
     )
     expect(spreadInserts.length).toBe(500)
   })
@@ -169,7 +169,7 @@ describe('verify-storm — 500 events boot típico', () => {
     // todos; SQLite real é que faria o dedup). Confirma só
     // throughput/no-throw.
     const spreadInserts = dbRunMock.mock.calls.filter((c) =>
-      /INSERT OR IGNORE INTO spreads\b/i.test(String(c[0])),
+      /INSERT INTO spreads\b/i.test(String(c[0])),
     )
     expect(spreadInserts.length).toBe(100)
   })
@@ -283,7 +283,7 @@ describe('verify-storm — 10k events rajada hostil (cap + drops)', () => {
     // Ainda nenhum INSERT — verify pendente pros 5000, false pros
     // 200. Persist só roda quando verify resolve true.
     const inserts0 = dbRunMock.mock.calls.filter((c) =>
-      /INSERT OR IGNORE INTO spreads\b/i.test(String(c[0])),
+      /INSERT INTO spreads\b/i.test(String(c[0])),
     )
     expect(inserts0.length).toBe(0)
     // Libera worker — pendentes resolvem e persistem
@@ -300,7 +300,7 @@ describe('verify-storm — 10k events rajada hostil (cap + drops)', () => {
     await Promise.all(inFlight)
     // 5000 inserts (os 200 dropados nunca chegaram ao persist)
     const insertsFinal = dbRunMock.mock.calls.filter((c) =>
-      /INSERT OR IGNORE INTO spreads\b/i.test(String(c[0])),
+      /INSERT INTO spreads\b/i.test(String(c[0])),
     )
     expect(insertsFinal.length).toBe(5000)
   }, 30000)

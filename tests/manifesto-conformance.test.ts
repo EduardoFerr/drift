@@ -100,15 +100,19 @@ describe('Manifesto §7 / #3: funções puras críticas não usam relógio impl�
     expect(stripped, 'applyContentFilters must not call db.exec/get/run').not.toMatch(/\bdb\.(exec|get|run)\b/)
   })
 
-  it('selectLatestActionByUser (events.ts) é puro', () => {
-    const src = readFileSync(join(SRC, 'lib', 'events.ts'), 'utf8')
-    const body = extractFunctionBody(src, 'selectLatestActionByUser')
-    expect(body, 'selectLatestActionByUser body not extracted').toBeTruthy()
-    const stripped = stripComments(body!)
-    expect(stripped).not.toMatch(/\bDate\.now\b/)
-    expect(stripped).not.toMatch(/performance\.now/)
-    expect(stripped).not.toMatch(/Math\.random/)
-    expect(stripped).not.toMatch(/\bdb\.(exec|get|run)\b/)
+  it('selectLatestActionByUser e computeRanking (ranking.ts) são puros', () => {
+    const src = readFileSync(join(SRC, 'lib', 'ranking.ts'), 'utf8')
+    for (const name of ['selectLatestActionByUser', 'computeRanking']) {
+      const body = extractFunctionBody(src, name)
+      expect(body, `${name} body not extracted`).toBeTruthy()
+      const stripped = stripComments(body!)
+      expect(stripped).not.toMatch(/\bDate\.now\b/)
+      expect(stripped).not.toMatch(/performance\.now/)
+      expect(stripped).not.toMatch(/Math\.random/)
+      expect(stripped).not.toMatch(/\bdb\.(exec|get|run)\b/)
+    }
+    // O módulo inteiro não importa db nem lê relógio.
+    expect(stripComments(src)).not.toMatch(/from '\.\/db'|\bDate\.now\b/)
   })
 
   it('getReportThreshold e getReportWeight (moderation.ts) são puros', () => {

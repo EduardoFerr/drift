@@ -94,6 +94,22 @@ export const OPTIMISTIC_TIMEOUT_MS = 30_000
 export const SCORE_RECALC_DEBOUNCE_MS = 100
 
 /**
+ * Tolerância de relógio pra eventos com `created_at` no FUTURO.
+ *
+ * `created_at` é escolhido livremente por quem assina. Sem este teto,
+ * um único evento datado no futuro (auditoria 2026-11-03):
+ *  - envenena o cursor de sync (`sync.ts`), que passa a pedir só eventos
+ *    "de depois" daquele instante — o cliente para de receber histórico;
+ *  - ganha boost multiplicativo no feed (divisor `(idade+2)^1.5` com idade
+ *    negativa), até ~89× com +1h54.
+ *
+ * 15 min é a tolerância usual de relays Nostr pra drift de relógio
+ * honesto. Eventos além disso são descartados no gate barato de
+ * `onNostrEvent`, antes da verificação de assinatura.
+ */
+export const MAX_FUTURE_SKEW_SECONDS = 15 * 60
+
+/**
  * Sentinela de "moderado pela comunidade" gravada em `posts.score`
  * por `moderation.ts:maybeModerate` quando reports atingem o
  * threshold dinâmico (manifesto §26). O feed filtra com

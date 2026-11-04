@@ -1555,6 +1555,24 @@ export function SovereigntyCard({ onClose }: CardProps) {
             onCommit={commitThreshold}
           />
         </SettingExplainer>
+
+        <SettingExplainer
+          accordionId="sov-ots"
+          label="âncora de antiguidade no Bitcoin"
+          description="O app carimba seu primeiro evento no Bitcoin via OpenTimestamps (grátis, sem carteira). É isso que prova há quanto tempo sua identidade existe — a data do evento em si qualquer um poderia falsificar."
+          impact="Ligado: o app contata calendários OpenTimestamps públicos (eles veem só um hash embaralhado, não seu post) e, horas depois, publica a prova. Desligado: sua antiguidade fica 0 — seus spreads e denúncias valem só o que você recebeu de quem já tem peso. Em modo Tor/onion o carimbo nunca roda."
+          defaultExplained="Ligado — sem âncora não existe antiguidade, e anti-Sybil sem tempo provado não funciona."
+          reversible
+          level="advanced"
+          reference="manifesto §32 — anti-Sybil sem prova de identidade"
+        >
+          <Toggle
+            label="carimbar no Bitcoin"
+            hint="OpenTimestamps · NIP-03"
+            value={prefs.ots_stamping_enabled}
+            onChange={(v) => void setPref('ots_stamping_enabled', v)}
+          />
+        </SettingExplainer>
         </AccordionGroup>
       </div>
     </FullPageCard>

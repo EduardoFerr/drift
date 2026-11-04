@@ -287,14 +287,20 @@ coletiva. Você não pode "cancelar" alguém pra todo mundo via bloqueio.
 
    | Seu peso | Sua denúncia vale |
    |---:|---:|
-   | < 20 | 0.5 pts |
-   | < 50 | 1.0 pts |
-   | < 75 | 1.5 pts |
-   | ≥ 75 | 2.0 pts |
+   | 0 | 0 pts |
+   | 25 | 0.5 pts |
+   | 50 | 1.0 pts |
+   | 100 | 2.0 pts |
+
+   (pontos = peso ÷ 50). Uma chave recém-criada, sem peso, não modera
+   sozinha — senão qualquer um criaria 10 chaves e derrubaria o que
+   quisesse.
 
 5. Quando o **total de pontos** ultrapassa o threshold dinâmico
    (baseado no tamanho da base ativa de users), o post recebe
-   `score = -999` e **some do feed default**.
+   `score = -999` e **some do feed default**. Isso é recalculado a
+   partir de todas as denúncias sempre que algo muda — um spread novo
+   não "desmodera" o post.
 
    - Base ativa 1.000 users → threshold 5 pts pra `spam`, 3 pts pra `illegal`
    - Base ativa 100.000 users → threshold 100 pts (defesa contra
@@ -421,13 +427,25 @@ Cada identidade Drift tem um número 0-100 (`weight`) calculado por
 ```
 weight = antiquity (0-40) + engagement (0-60)
 
-antiquity = semanas desde criação (cap 40 ≈ 9 meses)
-engagement = spreads recebidos × 10
-           + comentários recebidos × 1
-           − reports confirmados × 15
+antiquity  = semanas desde a ÂNCORA da sua identidade no Bitcoin (cap 40)
+engagement = Σ spreads recebidos × 10 × (peso de quem espalhou ÷ 100)
+           + Σ comentários recebidos × 1 × (peso de quem comentou ÷ 100)
+           − posts seus moderados × 15
            − dias inativo × 1
            (clamped 0-60)
 ```
+
+**A âncora:** o app carimba automaticamente o seu primeiro evento no
+Bitcoin via OpenTimestamps (sem custo, sem carteira). Leva algumas horas
+até o bloco confirmar; depois disso sua antiguidade começa a contar. Ela
+não pode ser falsificada para trás — nem por você, nem por ninguém —
+e todo cliente Drift enxerga a mesma data. Dá para desligar em
+Ajustes → soberania → "âncora de antiguidade no Bitcoin" (sem âncora,
+sua antiguidade fica 0). Em modo Tor/onion o
+carimbo não roda, porque ele faria uma conexão clearnet.
+
+**Um spread vale o peso de quem espalhou.** Uma conta nova espalhando
+você não te dá peso; uma conta estabelecida, sim.
 
 **O que isso faz:**
 

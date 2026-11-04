@@ -16,7 +16,7 @@
 
 import { create } from 'zustand'
 import type { DriftIdentity } from '../types/drift'
-import { db, initDb, type StorageMode } from './db'
+import { initDb, type StorageMode } from './db'
 import { getOrCreateIdentity } from './identity'
 import { checkRelayConnectivity, setHermeticPublish, type RelayHealth } from './nostr'
 import { startSync } from './sync'
@@ -640,19 +640,24 @@ async function doBootstrap(): Promise<void> {
     // dev-seed (hermético — não fala com relays reais).
     if (!wantsDevSeed) startProbe()
 
-    // Backfill de `score_base` (D1). Bancos criados antes da migração
-    // têm a coluna zerada por DEFAULT, o que jogaria todos os posts
-    // antigos pro fim do feed. Um único `recalcAllScores()` popula tudo.
-    //
-    // NÃO é um job periódico: roda uma vez, só quando sobrou algum post
-    // com `score_base = 0` mas engajamento real (`spreads > 0`). Depois
-    // disso o decay acontece na leitura, sem escrita nenhuma. Em idle
-    // porque o boot já é pesado.
+    // Recomputação global do ranking no boot. Bancos de versões
+    // anteriores têm `score`/`score_base`/`users.weight` calculados com a
+    // semântica antiga (peso por COUNT, antiguidade forjável, moderação
+    // gravada) — uma passada do motor (`ranking.ts`) re-deriva tudo do
+    // conjunto de eventos. Barato: lê o banco 1× e só grava o que mudou.
+    // Em idle porque o boot já é pesado. Dev-seed faz a própria passada.
     if (!wantsDevSeed) {
       scheduleIdle(() => {
-        void backfillScoreBase().catch((err) => {
-          console.warn('[bootstrap] backfill de score_base falhou:', err)
+        void recalcAllScores().catch((err) => {
+          console.warn('[bootstrap] recomputação do ranking falhou:', err)
         })
+      })
+      // Âncora OpenTimestamps da identidade ativa (antiguidade). Fora do
+      // dev-seed: o seed é hermético e não fala com calendários/exploradores.
+      scheduleIdle(() => {
+        void import('./ots-stamper').then(({ startOtsStamper }) =>
+          startOtsStamper(async () => (await import('./identity')).getCurrentNpub()),
+        )
       })
     }
   } catch (err) {
@@ -702,31 +707,6 @@ function scheduleIdle(fn: () => void): void {
   } else {
     setTimeout(fn, 0)
   }
-}
-
-/**
- * Backfill único de `posts.score_base` (correção de D1).
- *
- * A migração cria a coluna com DEFAULT 0. Posts gravados antes dela
- * ficariam com numerador zero e cairiam pro fim do feed, mesmo tendo
- * engajamento real. `recalcAllScores()` recomputa tudo a partir dos
- * eventos já persistidos e preenche a coluna.
- *
- * Roda NO MÁXIMO uma vez por boot, e só quando há evidência de
- * pendência: algum post com `spreads > 0` mas `score_base = 0`. Posts
- * legitimamente sem engajamento têm numerador 0 e não disparam nada.
- *
- * Isto NÃO é o recálculo periódico que a auditoria descartou. Depois do
- * backfill o decay acontece na leitura (`feed.ts`), sem nenhuma escrita
- * recorrente.
- */
-async function backfillScoreBase(): Promise<void> {
-  const row = await db.get<{ n: number }>(
-    `SELECT COUNT(*) AS n FROM posts WHERE score_base = 0 AND spreads > 0`,
-  )
-  if (!row || row.n === 0) return
-  console.log(`[bootstrap] backfill de score_base: ${row.n} posts pendentes`)
-  await recalcAllScores()
 }
 
 let evictionTimer: ReturnType<typeof setInterval> | null = null
