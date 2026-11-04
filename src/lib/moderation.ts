@@ -23,9 +23,10 @@
  *
  * ─── Peso do reporter ────────────────────────────────────────────────
  *
- * Pontos de um report = peso do reporter / 50, em [0, 2].
+ * Pontos de um report = peso do reporter / 50, em [0, 2], e 0 abaixo de
+ * `REPORT_MIN_WEIGHT` (20).
  *
- *   peso   0  → 0.0  (chave sem âncora/engajamento — não modera)
+ *   peso < 20 → 0.0  (chave nova/sem âncora — não modera)
  *   peso  25  → 0.5
  *   peso  50  → 1.0
  *   peso 100  → 2.0
@@ -35,7 +36,7 @@
  * derrubavam qualquer post (6 com reason=illegal). Auditoria 2026-11-03,
  * M3. Peso agora exige tempo ancorado no Bitcoin ou spread de quem já
  * tem peso (`ranking.ts`), então report de peso 0 contar 0 é a única
- * escolha consistente com §32.
+ * escolha consistente com §33.
  *
  *
  * ─── Categoria 'illegal' acelera ─────────────────────────────────────
@@ -68,9 +69,17 @@ export interface ReportRecord {
  * @param reporterWeight - Peso da identidade (0..100), de `weight.ts`
  * @returns Multiplicador a ser somado ao total de reports do post
  */
+/**
+ * Peso mínimo de um reporter pra o report contar (revisão pré-merge, A7).
+ * Sem mínimo, a soma era linear em chaves: 1200 chaves ancoradas há 1 dia
+ * (peso ~0,13 cada) moderavam qualquer post `illegal`. 20 ≈ 20 semanas de
+ * âncora, ou endosso substancial de quem já tem peso.
+ */
+export const REPORT_MIN_WEIGHT = 20
+
 export function getReportWeight(reporterWeight: number): number {
-  if (!Number.isFinite(reporterWeight)) return 0
-  return Math.max(0, Math.min(2, reporterWeight / 50))
+  if (!Number.isFinite(reporterWeight) || reporterWeight < REPORT_MIN_WEIGHT) return 0
+  return Math.min(2, reporterWeight / 50)
 }
 
 /**

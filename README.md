@@ -34,6 +34,10 @@ OTIMISMO: UI ← React useState (descartado quando SQLite confirma)
 | 9080 | BURY   | `tags: [e]`, content = `''` |
 | 9081 | REPORT | `tags: [e, p, reason]`, content = `''` |
 
+Kinds Nostr padrão que o Drift também consome: **1111** (comentários
+NIP-22 em posts Drift, entram no score) e **1040** (provas
+OpenTimestamps NIP-03 — âncora de antiguidade de identidade no Bitcoin).
+
 Regular events imutáveis (faixa 1–9999). Drift roda em qualquer relay Nostr padrão. Identidades Drift funcionam em Damus/Snort/Coracle/Iris.
 
 ## Compromissos (não aspirações — mas com status honesto)

@@ -47,10 +47,13 @@ ou **Por persona** pra pular direto.
 
 ### Postura legal & continuidade (Track C.5)
 - **[../SECURITY.md](../SECURITY.md)** — escopo de vulnerabilidades (código deste repo), sem SLA, patches via PR
-- **[../PRIVACY.md](../PRIVACY.md)** — framing software-not-service; lista terceiros (Vercel, nostr.build, CARTO, relays); LGPD/GDPR/Marco Civil informativo
+- **[../PRIVACY.md](../PRIVACY.md)** — framing software-not-service; lista terceiros (Vercel, nostr.build, CARTO, relays, calendários OpenTimestamps, exploradores Bitcoin); LGPD/GDPR/Marco Civil informativo
 - **[../CONTRIBUTING.md](../CONTRIBUTING.md)** — DCO sign-off obrigatório, sem CLA; multi-maintainer como objetivo
 - **[continuity.md](continuity.md)** — reprodução de release sem cooperação de nenhum contributor; mirrors; cenário "repositório derrubado"
-- **[protocol-spec.md](protocol-spec.md)** — kinds 9078–9081 standalone (CC0); protocolo sobrevive ao cliente
+- **[protocol-spec.md](protocol-spec.md)** — kinds 9078–9081 standalone (CC0); protocolo sobrevive ao cliente. Inclui score/peso determinísticos e âncora NIP-03
+- **[algoritmos.md](algoritmos.md)** — todas as fórmulas (score, peso, moderação, Trust Lens) com exemplos e simulações
+- **[auditoria-algoritmo-2026-11.md](auditoria-algoritmo-2026-11.md)** — auditoria do algoritmo com prova e contra-prova; status das correções
+- **[known-limitations.md](known-limitations.md)** — gaps conhecidos com condições de reabertura
 
 ### Operacional
 - **[tauri-setup.md](tauri-setup.md)** — setup do shell desktop Tauri (Fase 6.5 ✅ validado 2026-04-29). Pré-requisitos Rust, `npm run tauri:dev/build`, permissões mínimas (manifesto §17).

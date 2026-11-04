@@ -48,6 +48,8 @@ substituível:
 | CARTO tiles (mapa, opt-in) | Quando usuário abre mapa | Viewport solicitado, IP | Tiles OSM diretos; ou desabilitar mapa |
 | Relays Nostr | Sempre que cliente conecta | Eventos publicados, `pubkey`, IP | Lista totalmente configurável; rodar o próprio é suportado |
 | Gateway IPFS (Fase 7+, opcional) | Fetch de blobs sem peer local | Hash solicitado, IP | Helia local; outro gateway |
+| Calendários OpenTimestamps (`a/b.pool.opentimestamps.org`, `a.pool.eternitywall.com`, `ots.btc.catallaxy.com` + hosts de upgrade `alice/bob.btc.calendar.opentimestamps.org`, `finney.calendar.eternitywall.com`, `btc.calendar.catallaxy.com`) | Carimbo da âncora de antiguidade da identidade ativa (default ligado; só em clearnet) | IP + um hash com nonce. **Depois que a prova (kind 1040) é publicada, o hash fica ligável ao seu evento e à sua npub** — o calendário passa a poder associar aquele IP à sua identidade | Ajustes → soberania → "âncora de antiguidade no Bitcoin" (desligar), ou modo Tor |
+| Exploradores Bitcoin (`mempool.space`, `blockstream.info`) | Verificar provas OTS recebidas de qualquer identidade (independe do toggle de carimbo; só em clearnet) | IP + altura de bloco consultada | Modo Tor/onion (provas ficam pendentes — `Docs/known-limitations.md` §5e) |
 | Tor (`arti`, Fase 6.4, opt-in) | Quando `NetworkMode=tor`/`onion-only` | Substitui IP visível por exit relay Tor | — |
 
 **A combinação destes terceiros depende de qual distribuição está

@@ -5,6 +5,14 @@
 (moderação reativa), §27 (auto-classificação), §29 (compat Nostr).
 **License:** CC0 1.0 Universal (manifesto + spec do Drift são domínio público).
 
+> **Nota de status (2026-11-03, auditoria do algoritmo):** partes deste
+> RFC descrevem a implementação de então. Hoje (a) comentários kind 1111
+> em posts Drift são sincronizados **globalmente** (filtro `#K: 9078` em
+> `sync.ts`), não só ao abrir a thread; e (b) a contribuição ao score é
+> calculada em `ranking.ts:computeRanking` (numerador, cap 30, ponderada
+> pelo peso dos comentaristas distintos), não por `applyCommentReceived`
+> sobre o score já decaído. Ver `Docs/algoritmos.md` §1.
+
 > v0.3 documenta as extensões de polish do C.6: `content-warning`
 > (NIP-36 reuse) e `imeta` (NIP-94 reuse, integração Track B). Sem
 > mudança no kind nem na pipeline de persist; comentários ganham

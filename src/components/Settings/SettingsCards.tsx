@@ -1537,7 +1537,7 @@ export function SovereigntyCard({ onClose }: CardProps) {
           label="quantos reports pra esconder um post"
           description="Quando muitos usuários reportam o mesmo post, o app esconde ele do feed local (não apaga — só esconde). Esse número é dinâmico por padrão (ajusta com volume da rede). Você pode forçar um valor fixo."
           impact="Threshold baixo (ex: 3) = mais posts somem do feed cedo (sensível a abusos coordenados). Threshold alto (ex: 50) = posts ficam por mais tempo (resiste a campanha de reports). Empty/0 = volta pro algoritmo dinâmico."
-          defaultExplained="Dinâmico — calculado com base em volume médio de reports na rede + threshold mínimo configurado em config/constants. Funciona bem na maioria dos casos."
+          defaultExplained="Dinâmico — 0,1% dos usuários ativos nos últimos 30 dias, mínimo 5 pontos (3 pra ilegal). Funciona bem na maioria dos casos."
           reversible
           level="advanced"
           reference="manifesto §26 — moderação comunitária"
@@ -1560,11 +1560,11 @@ export function SovereigntyCard({ onClose }: CardProps) {
           accordionId="sov-ots"
           label="âncora de antiguidade no Bitcoin"
           description="O app carimba seu primeiro evento no Bitcoin via OpenTimestamps (grátis, sem carteira). É isso que prova há quanto tempo sua identidade existe — a data do evento em si qualquer um poderia falsificar."
-          impact="Ligado: o app contata calendários OpenTimestamps públicos (eles veem só um hash embaralhado, não seu post) e, horas depois, publica a prova. Desligado: sua antiguidade fica 0 — seus spreads e denúncias valem só o que você recebeu de quem já tem peso. Em modo Tor/onion o carimbo nunca roda."
-          defaultExplained="Ligado — sem âncora não existe antiguidade, e anti-Sybil sem tempo provado não funciona."
+          impact="Ligado: o app envia um hash do seu post mais antigo a calendários OpenTimestamps públicos (eles veem seu IP e esse hash; depois que a prova é publicada, dá pra ligar o hash à sua conta) e, horas depois, publica a prova. Desligado: o app não carimba. Se você ainda não tem âncora, sua antiguidade fica 0 e seu DRIFT e suas denúncias pesam só o que pessoas com peso te deram. Uma âncora já publicada continua valendo. Pra conferir âncoras de outras pessoas o app consulta mempool.space e blockstream.info (exceto em modo Tor/onion, onde nada disso roda)."
+          defaultExplained="Ligado — sem tempo provado, qualquer um criaria mil contas 'antigas' de graça."
           reversible
           level="advanced"
-          reference="manifesto §32 — anti-Sybil sem prova de identidade"
+          reference="manifesto §22 (score determinístico) + §33 (anti-spam pela mecânica social)"
         >
           <Toggle
             label="carimbar no Bitcoin"

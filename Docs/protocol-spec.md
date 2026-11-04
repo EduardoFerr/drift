@@ -203,28 +203,67 @@ que age em reports.
 
 ## 7. Score determinístico
 
-Score de um post é função pura de:
+Score de um post é função pura do **conjunto** de eventos (independe da
+ordem de chegada):
 
-- soma do `weight` dos `pubkey`s que espalharam (kind 9079);
-- subtração da soma do `weight` dos `pubkey`s que enterraram
-  (kind 9080) — peso simétrico, manifesto §23;
-- decay temporal por idade (`created_at` vs now);
-- override `score = -999` quando reports ultrapassam threshold
-  (manifesto §26).
+```
+score_base = Σ weight(ação líquida = spread, kind 9079)
+           − 0.3 × Σ weight(ação líquida = bury, kind 9080)
+           + min(Σ weight(comentaristas distintos, kind 1111), 30)
+score      = score_base / (max(0, idade_h) + 2)^1.5
+```
 
-Reference impl: `src/lib/scoring.ts` (Drift cliente). Qualquer cliente
-que produza ranking diferente sobre o mesmo conjunto de eventos
-diverge da spec — invariante forte, protege determinismo (manifesto §7).
+- **Ação líquida:** por (post, pubkey), só a ação de maior `created_at`
+  entre spread e bury (empate: bury, depois menor `id`). O autor do post
+  não conta (nem em spread, bury, comentário ou report).
+- **Votos elegíveis:** spread/bury/comentário só contam (e só endossam)
+  de `weight ≥ 4` com `≥ 2 semanas` de âncora própria.
+- **Moderação:** `score = -999` quando os pontos de report
+  (`weight/50`, em [0, 2], e 0 se `weight < 20` ou antiguidade < 8
+  semanas) atingem `max(5, ⌊0.1% × base ativa⌋)` (`illegal`: metade,
+  mínimo 3) — manifesto §26. Decisão conservadora sem ordem: candidatos =
+  acima do threshold sem penalidade; moderados = candidatos que seguem
+  acima com as penalidades de todos os candidatos aplicadas. Post não
+  moderado nunca fica ≤ −999.
 
-`weight` é função pura do histórico do `pubkey` (idade da identidade,
-diversidade de espalhamentos, etc.). Reference impl: `src/lib/weight.ts`.
+`weight` (0..100) de uma identidade:
+
+```
+epoch      = início do dia UTC
+antiquity  = clamp(0, 40, semanas entre a âncora e epoch)   // 0 sem âncora
+endosso(s→a) = min(c × weight(s)/100, 0.5 × weight(s) × fatia(s→a))
+               c = 10 se s deu spread em algum post de a, senão 1 se só comentou
+               fatia = peso da aresta (1 ou 0.1) / Σ pesos das arestas de s
+engagement = max(0, clamp(0, 60, Σ_s endosso(s→a))
+                    − 15 × posts próprios moderados − 1 × dias inativo)
+weight     = antiquity + engagement   (menor ponto fixo ≥ antiquity)
+```
+
+Uma aresta por par (s, a); só endossa quem é elegível a votar. Cada identidade distribui no máximo metade do
+próprio peso, então o peso total de qualquer grupo ≤ 2 × a antiguidade
+ancorada dele. Base ativa do threshold = Σ min(1, peso/20) dos ativos em
+30 dias. Laço moderação ↔ peso monótono (moderado não sai na rodada
+seguinte).
+
+**Âncora:** bloco Bitcoin mais antigo que uma prova OpenTimestamps
+(NIP-03, kind 1040) mostra conter um evento assinado por aquele
+`pubkey`. A prova é verificada contra o merkle root do header do bloco
+(o cliente de referência exige ≥2 fontes concordando). `created_at` não
+serve como idade: é escolhido por quem assina.
+
+Reference impl: `src/lib/ranking.ts` (motor), `src/lib/scoring.ts`,
+`src/lib/weight.ts`, `src/lib/moderation.ts`, `src/lib/ots.ts`.
+Qualquer cliente que produza ranking diferente sobre o mesmo conjunto de
+eventos e âncoras diverge da spec — invariante forte (manifesto §7).
+Explicação com exemplos: `Docs/algoritmos.md`.
 
 ## 8. Pipeline de processamento
 
 Ordem canônica (manifesto §5–9):
 
 ```
-1. Cheap: kind ∈ {9078, 9079, 9080, 9081}? Se não, descartar.
+1. Cheap: kind ∈ {9078, 9079, 9080, 9081, 1111, 1040, 1984, 0}? Se não, descartar.
+1b. Cheap: created_at > now + 15 min? Descartar (relógio livre de quem assina).
 2. Cheap: schema validation (presença de tags obrigatórias).
 3. Caro: verify Schnorr (NIP-01).
 4. Persistir + atualizar score derivado.
@@ -248,6 +287,10 @@ Drift respeita:
 - **NIP-65 (relay list):** kind 10002 pra discovery dinâmico de relays.
 - **NIP-94 (file metadata):** previsto pra distribuição de blobs
   (Track B do roadmap — `imeta` + IPFS CID).
+- **NIP-03 (OpenTimestamps):** kind 1040 é a âncora de antiguidade de
+  identidade (§7). Provas devem conter só attestations Bitcoin.
+- **NIP-22 (comments):** kind 1111 em posts Drift (`K = 9078`) entra no
+  score (§7).
 
 Drift **não** introduz NIPs novos. Tag `drift-version` é o único
 marker; restante é Nostr puro.
@@ -258,8 +301,9 @@ Um cliente é **Drift-conforme** se:
 
 - Implementa kinds 9078–9081 conforme §3–6.
 - Implementa pipeline §8 (com verificação Schnorr obrigatória).
-- Implementa score determinístico §7 (impl literal de
-  `lib/scoring.ts` ou equivalente verificável).
+- Implementa score e peso determinísticos §7 (impl literal de
+  `lib/ranking.ts` + `lib/scoring.ts` ou equivalente verificável),
+  incluindo a âncora de antiguidade NIP-03.
 - Não implementa "chave mestra" — manifesto §17 + invariante #12.
 - Não escaneia conteúdo automaticamente (PhotoDNA, ML, blocklists
   embutidas) — invariante #7, manifesto §25.

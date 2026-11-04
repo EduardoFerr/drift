@@ -85,10 +85,12 @@ import { viewMultiplier, computePpr } from '../src/lib/trust/ppr'
 import { computeInfluence } from '../src/lib/trust/edges'
 import { createPprRng } from '../src/lib/trust/rng'
 import { advanceCursor } from '../src/lib/sync'
-import { verifyPendingProofs } from '../src/lib/ots-anchors'
+import { maxPlausibleHeight, verifyPendingProofs } from '../src/lib/ots-anchors'
+import { computeRanking, ENDORSE_BUDGET, type RankingInput } from '../src/lib/ranking'
+import { getReportThreshold, getReportWeight } from '../src/lib/moderation'
 import { ensureOwnAnchor } from '../src/lib/ots-stamper'
 import { __resetOrphansForTest } from '../src/lib/orphans'
-import { bytesToBase64, bytesToHex, newOtsFile, parseOtsFile } from '../src/lib/ots'
+import { bytesToBase64, bytesToHex, newOtsFile, parseOtsFile, serializeOtsFile } from '../src/lib/ots'
 
 const ROOT = join(__dirname, '..')
 const SCHEMA = readFileSync(join(ROOT, 'src/lib/schema.sql'), 'utf8')
@@ -350,7 +352,7 @@ describe('2. Determinismo', () => {
 })
 
 // ════════════════════════════════════════════════════════════════════
-// 3. ANTI-SYBIL (§22, §32)
+// 3. ANTI-SYBIL (§22, §33)
 // ════════════════════════════════════════════════════════════════════
 describe('3. Peso de identidade e Sybil', () => {
   it('100 chaves novas espalhando contribuem 0', async () => {
@@ -429,14 +431,14 @@ describe('3. Peso de identidade e Sybil', () => {
   })
 
   it('peso acompanha o tempo: virada de dia re-deriva a antiguidade sem evento novo', async () => {
-    await veteran('u', 7) // 1 semana
+    await veteran('u', 35) // 5 semanas (acima do mínimo de voto)
     const p = post('autor', NOW)
     await ingest(p, spread('u', p.id, NOW))
     await settle()
-    expect(row(p.id)!.score_base).toBeCloseTo(weeksAtEpoch(NOW - 7 * DAY), 9)
+    expect(row(p.id)!.score_base).toBeCloseTo(weeksAtEpoch(NOW - 35 * DAY), 9)
     vi.setSystemTime((NOW + 70 * DAY) * 1000)
     await recalcAllScores()
-    expect(row(p.id)!.score_base).toBeCloseTo(weeksAtEpoch(NOW - 7 * DAY, NOW + 70 * DAY), 9)
+    expect(row(p.id)!.score_base).toBeCloseTo(weeksAtEpoch(NOW - 35 * DAY, NOW + 70 * DAY), 9)
     expect(row(p.id)!.score_base).toBeGreaterThan(10)
   })
 })
@@ -657,9 +659,11 @@ describe('6. Âncora OpenTimestamps', () => {
     expect(H.conn!.prepare(`SELECT status FROM ots_proofs`).get()).toEqual({ status: 'pending' })
   })
 
-  it('carimbador: carimba o evento mais antigo, espera o Bitcoin, publica kind 1040 só com attestation Bitcoin', async () => {
-    const meu = post('eu', NOW - DAY)
-    await ingest(meu, post('eu', NOW))
+  it('carimbador: carimba o evento mais RECENTE, espera o Bitcoin, publica kind 1040 só com attestation Bitcoin', async () => {
+    // Mais recente = o que os outros clientes já têm (sync de 7 dias): lá a
+    // prova chega reconhecida como do próprio autor (revisão A17).
+    const meu = post('eu', NOW)
+    await ingest(post('eu', NOW - DAY), meu)
     const published: Array<{ kind: number; tags: string[][]; content: string }> = []
     const pending = newOtsFile(new Uint8Array(32))
     pending.timestamp = { attestations: [{ type: 'pending', uri: 'https://alice.btc.calendar.opentimestamps.org' }], ops: [] }
@@ -754,5 +758,527 @@ describe('8. Trust Lens', () => {
   it('FoF vazio σ(-2) ≈ 0.119; follow puro σ(-0.5) ≈ 0.378', () => {
     expect(computeInfluence({ v: 1, follow: 0, mutual_spread: 0, my_spread: 0, my_bury: 0 })).toBeCloseTo(0.119, 3)
     expect(computeInfluence({ v: 1, follow: 1, mutual_spread: 0, my_spread: 0, my_bury: 0 })).toBeCloseTo(0.378, 3)
+  })
+})
+
+// ════════════════════════════════════════════════════════════════════
+// 9. REVISÃO PRÉ-MERGE (2026-11-04) — ataques da revisão viram invariantes
+// ════════════════════════════════════════════════════════════════════
+//
+// A primeira versão deste PR passava em todos os testes acima e ainda
+// assim deixava uma única âncora de 1 dia "fabricar" chaves de peso 60
+// sem limite (engajamento contado por post, sem orçamento). Os testes
+// abaixo travam as PROPRIEDADES que fecham essa classe de ataque, não
+// só os cenários específicos.
+describe('9. Revisão pré-merge: amplificação, moderação fechada, DoS OTS', () => {
+  const DAYS = (n: number) => n * DAY
+  const base = (extra: Partial<RankingInput>): RankingInput => ({
+    nowMs: NOW * 1000,
+    posts: [],
+    spreads: [],
+    buries: [],
+    comments: [],
+    reports: [],
+    users: [],
+    anchors: new Map(),
+    ...extra,
+  })
+  const act = (post_id: string, user_pub: string, i = 0) => ({ post_id, user_pub, created_at: NOW - 60, event_id: `${post_id}:${user_pub}:${i}` })
+
+  it('anel de 12 chaves + 1 âncora de 1,5 dia: peso total do anel ≤ 2× a antiguidade real dele', () => {
+    const ring = Array.from({ length: 12 }, (_, i) => `r${i}`)
+    const posts = ring.flatMap((a) => Array.from({ length: 20 }, (_, k) => ({ id: `${a}-${k}`, author_pub: a, created_at: NOW - HOUR })))
+    const spreads = ring.flatMap((s) => posts.filter((p) => p.author_pub !== s).map((p) => act(p.id, s)))
+    const anchors = new Map([['r0', NOW - Math.round(1.5 * DAY)]])
+    const out = computeRanking(base({ posts, spreads, anchors }))
+    const total = ring.reduce((acc, n) => acc + (out.weights.get(n) ?? 0), 0)
+    const seed = [...out.antiquity.values()].reduce((a, b) => a + b, 0)
+    expect(total).toBeLessThanOrEqual(seed / (1 - ENDORSE_BUDGET) + 1e-9)
+    expect(Math.max(...ring.map((n) => out.weights.get(n) ?? 0))).toBeLessThan(1)
+  })
+
+  it('PROPRIEDADE (contração): em 40 grafos aleatórios, Σ pesos ≤ Σ antiguidade / (1 − ENDORSE_BUDGET)', () => {
+    let seedR = 11
+    const rnd = () => ((seedR = (seedR * 1103515245 + 12345) % 2147483648) / 2147483648)
+    for (let trial = 0; trial < 40; trial++) {
+      const n = 5 + Math.floor(rnd() * 25)
+      const people = Array.from({ length: n }, (_, i) => `u${i}`)
+      const posts = people.flatMap((a) => Array.from({ length: 1 + Math.floor(rnd() * 5) }, (_, k) => ({ id: `${a}-${k}`, author_pub: a, created_at: NOW - HOUR })))
+      const spreads = []
+      const comments = []
+      for (let e = 0; e < n * 8; e++) {
+        const who = people[Math.floor(rnd() * n)]!
+        const p = posts[Math.floor(rnd() * posts.length)]!
+        if (rnd() < 0.8) spreads.push(act(p.id, who, e))
+        else comments.push({ post_id: p.id, author_pub: who, hidden: false })
+      }
+      const anchors = new Map<string, number>()
+      for (const u of people) if (rnd() < 0.3) anchors.set(u, NOW - Math.floor(rnd() * 400) * DAY)
+      const out = computeRanking(base({ posts, spreads, comments, anchors }))
+      const total = [...out.weights.values()].reduce((a, b) => a + b, 0)
+      const seed = [...out.antiquity.values()].reduce((a, b) => a + b, 0)
+      expect(total, `trial ${trial}`).toBeLessThanOrEqual(seed / (1 - ENDORSE_BUDGET) + 1e-6)
+    }
+  })
+
+  it('lavagem: 2 chaves (1 ancorada há 1,5 dia) não fabricam 50 chaves de peso relevante', () => {
+    const A = 'A', B = 'B'
+    const fresh = Array.from({ length: 50 }, (_, i) => `f${i}`)
+    const posts = [A, B, ...fresh].flatMap((a) => Array.from({ length: 20 }, (_, k) => ({ id: `${a}-${k}`, author_pub: a, created_at: NOW - HOUR })))
+    const spreads = [
+      ...posts.filter((p) => p.author_pub === B).map((p) => act(p.id, A)),
+      ...posts.filter((p) => p.author_pub === A).map((p) => act(p.id, B)),
+      ...posts.filter((p) => fresh.includes(p.author_pub) && Number(p.id.split('-')[1]) < 10).map((p) => act(p.id, B)),
+    ]
+    const out = computeRanking(base({ posts, spreads, anchors: new Map([[A, NOW - Math.round(1.5 * DAY)]]) }))
+    for (const f of fresh) expect(out.weights.get(f) ?? 0).toBeLessThan(0.05)
+  })
+
+  it('confiança de um veterano é DILUÍDA entre quem ele endossa, com teto por aresta', () => {
+    const v = 'vet'
+    const novatos = Array.from({ length: 20 }, (_, i) => `n${i}`)
+    const posts = novatos.map((a) => ({ id: `${a}-0`, author_pub: a, created_at: NOW - HOUR }))
+    const spreads = posts.map((p) => act(p.id, v))
+    const out = computeRanking(base({ posts, spreads, anchors: new Map([[v, NOW - DAYS(400)]]) }))
+    // Orçamento 0.5 × 40 = 20 pontos divididos por 20 → 1 ponto cada (teto da aresta = 4).
+    for (const nv of novatos) expect(out.weights.get(nv)).toBeCloseTo(1, 9)
+    const one = computeRanking(base({ posts: posts.slice(0, 1), spreads: spreads.slice(0, 1), anchors: new Map([[v, NOW - DAYS(400)]]) }))
+    expect(one.weights.get('n0')).toBeCloseTo(4, 9) // 1 só endossado: teto = 10 × 40/100
+  })
+
+  it('penalidade de moderação morde mesmo com engajamento saturado (−15 depois do teto)', () => {
+    const fans = Array.from({ length: 30 }, (_, i) => `fan${i}`)
+    const reps = Array.from({ length: 7 }, (_, i) => `rep${i}`)
+    const anchors = new Map<string, number>([['alvo', NOW - DAYS(400)], ...[...fans, ...reps].map((f) => [f, NOW - DAYS(400)] as [string, number])])
+    const posts = [{ id: 'bom', author_pub: 'alvo', created_at: NOW - HOUR }, { id: 'ruim', author_pub: 'alvo', created_at: NOW - HOUR }]
+    const spreads = fans.map((f) => act('bom', f)) // 30 × 4 = 120 → satura em 60
+    const sem = computeRanking(base({ posts, spreads, anchors }))
+    const com = computeRanking(base({ posts, spreads, anchors, reports: reps.map((r) => ({ post_id: 'ruim', reporter_pub: r, reason: 'spam', created_at: NOW })) }))
+    expect(sem.weights.get('alvo')).toBe(100)
+    expect(com.posts.get('ruim')!.moderated).toBe(true)
+    expect(com.weights.get('alvo')).toBe(85)
+  })
+
+  it('PROPRIEDADE (moderação sustentada): todo post moderado está acima do threshold com os pesos FINAIS', () => {
+    // Semântica conservadora (revisões A8/A19): um post só é moderado se
+    // resiste às penalidades de todos os candidatos. Logo, com os pesos
+    // finais (≥ pior caso), continua acima do threshold. O inverso
+    // ("fechada") NÃO é garantido de propósito: em ataque simétrico o
+    // motor prefere não moderar.
+    let seedR = 5
+    const rnd = () => ((seedR = (seedR * 1103515245 + 12345) % 2147483648) / 2147483648)
+    for (let trial = 0; trial < 40; trial++) {
+      const people = Array.from({ length: 16 }, (_, i) => `p${i}`)
+      const posts = people.flatMap((a) => [0, 1].map((k) => ({ id: `${a}-${k}`, author_pub: a, created_at: NOW - HOUR })))
+      const spreads = Array.from({ length: 60 }, (_, e) => act(posts[Math.floor(rnd() * posts.length)]!.id, people[Math.floor(rnd() * 16)]!, e))
+      const reports = Array.from({ length: 40 }, () => ({
+        post_id: posts[Math.floor(rnd() * posts.length)]!.id,
+        reporter_pub: people[Math.floor(rnd() * 16)]!,
+        reason: (rnd() < 0.5 ? 'spam' : 'illegal') as 'spam' | 'illegal',
+        created_at: NOW,
+      }))
+      const anchors = new Map(people.map((u) => [u, NOW - Math.floor(rnd() * 300) * DAY] as [string, number]))
+      const out = computeRanking(base({ posts, spreads, reports, anchors, users: people.map((npub) => ({ npub, last_active: NOW })) }))
+      for (const p of posts) {
+        const by: Record<string, number> = { spam: 0, illegal: 0, harassment: 0 }
+        const seen = new Set<string>()
+        for (const r of reports) {
+          if (r.post_id !== p.id || r.reporter_pub === p.author_pub || seen.has(r.reporter_pub)) continue
+          seen.add(r.reporter_pub) // UNIQUE(post, reporter) no banco
+          by[r.reason] +=
+            (out.antiquity.get(r.reporter_pub) ?? 0) >= 8 ? getReportWeight(out.weights.get(r.reporter_pub) ?? 0) : 0
+        }
+        const total = by.spam + by.illegal + by.harassment
+        const above =
+          by.illegal >= getReportThreshold(out.activeUsers, 'illegal') ||
+          by.spam >= getReportThreshold(out.activeUsers, 'spam') ||
+          total >= getReportThreshold(out.activeUsers, 'spam')
+        if (out.posts.get(p.id)!.moderated) expect(above, `trial ${trial} post ${p.id}`).toBe(true)
+      }
+    }
+  })
+
+  it('10k chaves de peso 0 não sobem o threshold de moderação (base ativa ponderada)', () => {
+    const users = Array.from({ length: 10_000 }, (_, i) => ({ npub: `z${i}`, last_active: NOW }))
+    const out = computeRanking(base({ users }))
+    expect(out.activeUsers).toBe(0)
+    expect(getReportThreshold(out.activeUsers, 'spam')).toBe(5)
+  })
+
+  it('decay de report (opt-in) não desfaz a moderação na virada do dia', () => {
+    const reps = Array.from({ length: 7 }, (_, i) => `rep${i}`)
+    const anchors = new Map(reps.map((r) => [r, NOW - DAYS(400)] as [string, number]))
+    const input = (nowMs: number) =>
+      base({
+        nowMs,
+        posts: [{ id: 'P', author_pub: 'autor', created_at: NOW - HOUR }],
+        reports: reps.map((r, i) => ({ post_id: 'P', reporter_pub: r, reason: 'spam', created_at: NOW - i * 60 })),
+        anchors,
+        moderation: { reportDecayHalfLifeMs: 48 * 3600 * 1000 },
+      })
+    expect(computeRanking(input(NOW * 1000)).posts.get('P')!.moderated).toBe(true)
+    expect(computeRanking(input((NOW + 3 * DAY) * 1000)).posts.get('P')!.moderated).toBe(true)
+  })
+
+  it('brigada de bury pesada num post NOVO não atravessa o sentinela (piso −998)', () => {
+    const buriers = Array.from({ length: 300 }, (_, i) => `b${i}`) // 300 × 40 × 0.3 = 3600
+    const anchors = new Map(buriers.map((b) => [b, NOW - DAYS(400)] as [string, number]))
+    const out = computeRanking(base({
+      posts: [{ id: 'P', author_pub: 'autor', created_at: NOW }],
+      buries: buriers.map((b) => act('P', b)),
+      anchors,
+    }))
+    const p = out.posts.get('P')!
+    expect(p.scoreBase).toBeLessThan(-999 * Math.pow(2, 1.5)) // sem piso, o score cruzaria −999
+    expect(p.moderated).toBe(false)
+    expect(p.score).toBeGreaterThan(-999)
+  })
+
+  it('o scheduler recomputa sozinho (sem chamada explícita) e não perde a rodada', async () => {
+    await veteran('v')
+    const p = post('autor', NOW)
+    await ingest(p, spread('v', p.id, NOW))
+    await new Promise((r) => setTimeout(r, 400)) // debounce 100ms + recomputação
+    expect(row(p.id)!.score_base).toBe(40)
+  })
+
+  // ── Fila de verificação OTS ──────────────────────────────────────
+  const realHeaderFor358391 = async (h: number) =>
+    h === 358391
+      ? { merkleRoot: '8a1b66ecb7cbd07d8139a7e7d7f2c41aab1f5009b8364aaf61d03ad245e47e00', time: 1432827678 }
+      : { merkleRoot: '00'.repeat(32), time: 1 }
+  const proofOf = (heights: number[]) => {
+    const f = newOtsFile(new Uint8Array(32).fill(7))
+    f.timestamp = { attestations: heights.map((height) => ({ type: 'bitcoin' as const, height })), ops: [] }
+    return bytesToBase64(serializeOtsFile(f))
+  }
+  const proofEv = (target: string, content: string, id?: string) => {
+    const e = ev(1040, 'qualquer', NOW, [['e', target], ['k', '9078']], content)
+    if (id) e.id = id
+    return e
+  }
+  const status = (id: string) => (H.conn!.prepare('SELECT status FROM ots_proofs WHERE proof_event_id = ?').get(id) as { status: string } | undefined)?.status
+
+  it('prova com mais de 4 attestations Bitcoin é inválida SEM consultar explorador', async () => {
+    const e = proofEv(hex(77), proofOf([800001, 800002, 800003, 800004, 800005]))
+    await ingest(e)
+    let calls = 0
+    await verifyPendingProofs({ getHeader: async () => (calls++, { merkleRoot: '00'.repeat(32), time: 1 }), resolveAuthor: async () => pk('x') })
+    expect(status(e.id)).toBe('invalid')
+    expect(calls).toBe(0)
+  })
+
+  it('altura de bloco impossível (acima do topo plausível) é inválida sem consulta', async () => {
+    const e = proofEv(hex(78), proofOf([maxPlausibleHeight(NOW * 1000) + 1]))
+    await ingest(e)
+    let calls = 0
+    await verifyPendingProofs({ getHeader: async () => (calls++, { merkleRoot: '00'.repeat(32), time: 1 }), resolveAuthor: async () => pk('x') })
+    expect(status(e.id)).toBe('invalid')
+    expect(calls).toBe(0)
+  })
+
+  it('falha transitória: backoff exponencial com teto, sem desistência (queda longa não mata prova)', async () => {
+    const proof = new Uint8Array(readFileSync(join(ROOT, 'tests/fixtures/ots/hello-world.txt.ots')))
+    const digest = bytesToHex(parseOtsFile(proof).digest)
+    const e = proofEv(digest, bytesToBase64(proof))
+    await ingest(e)
+    let calls = 0
+    const down = async () => {
+      calls++
+      throw new Error('explorador fora')
+    }
+    let t = NOW * 1000
+    await verifyPendingProofs({ nowMs: t, getHeader: down, resolveAuthor: async () => pk('x') })
+    await verifyPendingProofs({ nowMs: t + 60_000, getHeader: down, resolveAuthor: async () => pk('x') })
+    expect(calls).toBe(1) // dentro do backoff não re-tenta
+    for (let i = 0; i < 15; i++) {
+      t += 11 * 3600 * 1000 // > teto do backoff (~10,7 h)
+      await verifyPendingProofs({ nowMs: t, getHeader: down, resolveAuthor: async () => pk('x') })
+    }
+    expect(status(e.id)).toBe('pending') // nunca desiste
+    // Explorador volta → verifica.
+    await verifyPendingProofs({ nowMs: t + 12 * 3600 * 1000, getHeader: realHeaderFor358391, resolveAuthor: async () => pk('x') })
+    expect(status(e.id)).toBe('verified')
+  })
+
+  it('modo Tor/offline: nenhuma tentativa é queimada', async () => {
+    const e = proofEv(hex(81), proofOf([800001]))
+    await ingest(e)
+    await verifyPendingProofs({ networkAllowed: false })
+    expect(H.conn!.prepare('SELECT attempts, checked_at FROM ots_proofs WHERE proof_event_id = ?').get(e.id)).toEqual({ attempts: 0, checked_at: null })
+  })
+
+  it('ordem justa: 60 provas-lixo com id "000…" não impedem a prova honesta de ser verificada', async () => {
+    for (let i = 0; i < 60; i++) await ingest(proofEv(hex(1000 + i), proofOf([800001]), '000' + hex(1000 + i).slice(3)))
+    const proof = new Uint8Array(readFileSync(join(ROOT, 'tests/fixtures/ots/hello-world.txt.ots')))
+    const digest = bytesToHex(parseOtsFile(proof).digest)
+    const honest = { ...proofEv(digest, bytesToBase64(proof), 'f'.repeat(64)), pubkey: pk('honesto') }
+    await ingest(honest)
+    await verifyPendingProofs({
+      getHeader: async (h) =>
+        h === 358391
+          ? { merkleRoot: '8a1b66ecb7cbd07d8139a7e7d7f2c41aab1f5009b8364aaf61d03ad245e47e00', time: 1432827678 }
+          : { merkleRoot: '00'.repeat(32), time: 1 },
+      resolveAuthor: async (id) => (id === digest ? pk('honesto') : null),
+    })
+    expect(status(honest.id)).toBe('verified')
+  })
+
+  it('no máximo 3 provas guardadas por evento carimbado', async () => {
+    const target = hex(80)
+    for (let i = 0; i < 5; i++) await ingest(proofEv(target, proofOf([800001 + i])))
+    expect(H.conn!.prepare('SELECT COUNT(*) n FROM ots_proofs WHERE target_event_id = ?').get(target)).toEqual({ n: 3 })
+  })
+
+  it('só ots-anchors.ts (verificação) e o dev-seed gravam em ots_anchors', () => {
+    const { readdirSync, statSync } = require('node:fs') as typeof import('node:fs')
+    const walk = (d: string): string[] =>
+      readdirSync(d).flatMap((f) => {
+        const p = join(d, f)
+        return statSync(p).isDirectory() ? walk(p) : /\.(ts|tsx)$/.test(f) ? [p] : []
+      })
+    const writers = walk(join(ROOT, 'src'))
+      .filter((f) => /INSERT[^`]*INTO\s+ots_anchors|UPDATE\s+ots_anchors/.test(readFileSync(f, 'utf8')))
+      .map((f) => f.slice(ROOT.length + 1).replace(/\\/g, '/'))
+      .sort()
+    expect(writers).toEqual(['src/lib/dev-seed/seed.ts', 'src/lib/ots-anchors.ts'])
+  })
+})
+
+// ════════════════════════════════════════════════════════════════════
+// 10. SEGUNDA RODADA DE REVISÃO (2026-11-04) — ataques aos próprios fixes
+// ════════════════════════════════════════════════════════════════════
+describe('10. Segunda rodada: elegibilidade, moderação histórica, admissão OTS', () => {
+  const base = (extra: Partial<RankingInput>): RankingInput => ({
+    nowMs: NOW * 1000,
+    posts: [],
+    spreads: [],
+    buries: [],
+    comments: [],
+    reports: [],
+    users: [],
+    anchors: new Map(),
+    ...extra,
+  })
+  const act = (post_id: string, user_pub: string, t = NOW - 60) => ({ post_id, user_pub, created_at: t, event_id: `${post_id}:${user_pub}` })
+  const ids = (prefix: string, n: number) => Array.from({ length: n }, (_, i) => `${prefix}${i}`)
+
+  it('A7: 1200 chaves ancoradas há 1 dia não moderam nada (report exige peso ≥ 20)', () => {
+    const keys = ids('k', 1200)
+    const out = computeRanking(base({
+      posts: [{ id: 'P', author_pub: 'vet', created_at: NOW - HOUR }],
+      reports: keys.map((k) => ({ post_id: 'P', reporter_pub: k, reason: 'illegal', created_at: NOW })),
+      anchors: new Map([['vet', NOW - 300 * DAY], ...keys.map((k) => [k, NOW - DAY] as [string, number])]),
+      users: keys.map((npub) => ({ npub, last_active: NOW })),
+    }))
+    expect(out.posts.get('P')!.moderated).toBe(false)
+  })
+
+  it('A7: 10k chaves de 1 semana não movem o score (voto exige peso ≥ 4)', () => {
+    const keys = ids('k', 10_000)
+    const out = computeRanking(base({
+      posts: [{ id: 'P', author_pub: 'a', created_at: NOW - HOUR }],
+      spreads: keys.map((k) => act('P', k)),
+      anchors: new Map(keys.map((k) => [k, NOW - 7 * DAY] as [string, number])),
+    }))
+    expect(out.posts.get('P')!.scoreBase).toBe(0)
+  })
+
+  // Cenário do A8: o spammer x (peso 100) tem 4 spams denunciados por
+  // honestos; depois x + 2 cúmplices denunciam um post honesto Q.
+  const a8 = (qFirst: boolean) => {
+    const fans = ids('fan', 20)
+    const honest = ids('h', 5)
+    const accomplices = ['c1', 'c2']
+    const anchors = new Map<string, number>(
+      ['x', 'autorQ', ...fans, ...honest, ...accomplices].map((n) => [n, NOW - 400 * DAY] as [string, number]),
+    )
+    const posts = [
+      { id: 'xpost', author_pub: 'x', created_at: NOW - DAY },
+      ...[1, 2, 3, 4].map((i) => ({ id: `S${i}`, author_pub: 'x', created_at: NOW - DAY })),
+      { id: 'Q', author_pub: 'autorQ', created_at: NOW - DAY },
+    ]
+    const spreads = fans.map((f) => act('xpost', f)) // x: 40 + 60 = 100
+    const tSpam = qFirst ? NOW - 100 : NOW - 1000
+    const tQ = qFirst ? NOW - 1000 : NOW - 100
+    const reports = [
+      ...[1, 2, 3, 4].flatMap((i) => honest.map((h) => ({ post_id: `S${i}`, reporter_pub: h, reason: 'illegal' as const, created_at: tSpam }))),
+      ...['x', ...accomplices].map((r) => ({ post_id: 'Q', reporter_pub: r, reason: 'illegal' as const, created_at: tQ })),
+    ]
+    return computeRanking(base({ posts, spreads, reports, anchors }))
+  }
+
+  it('A8: spammer já punido NÃO derruba post honesto com peso cheio (penalidade vale antes da denúncia seguinte)', () => {
+    const out = a8(false)
+    for (const i of [1, 2, 3, 4]) expect(out.posts.get(`S${i}`)!.moderated).toBe(true)
+    expect(out.weights.get('x')).toBe(40) // 60 − 4×15 → 0 de engajamento
+    expect(out.posts.get('Q')!.moderated).toBe(false) // 0,8 + 2×0,8 = 2,4 < 3
+  })
+
+  it('A19: o resultado NÃO depende dos timestamps dos reports (atacante não escolhe a ordem)', () => {
+    // Antes, com ordem histórica, retrodatar os reports de x em Q fazia Q
+    // ser avaliado antes da punição de x — e moderado.
+    const a = a8(false)
+    const b = a8(true)
+    for (const id of ['S1', 'S2', 'S3', 'S4', 'Q']) expect(b.posts.get(id)!.moderated).toBe(a.posts.get(id)!.moderated)
+    expect(b.posts.get('Q')!.moderated).toBe(false)
+  })
+
+  it('A18: chaves abaixo do piso não endossam — 4700 chaves de 1 dia não fabricam concentrador', () => {
+    const keys = ids('k', 4700)
+    const out = computeRanking(base({
+      posts: [{ id: 'cpost', author_pub: 'C', created_at: NOW - HOUR }],
+      spreads: keys.map((k) => act('cpost', k)),
+      anchors: new Map([['C', NOW - DAY], ...keys.map((k) => [k, NOW - DAY] as [string, number])]),
+    }))
+    expect(out.weights.get('C')!).toBeLessThan(1)
+  })
+
+  it('A18: denunciar exige 8 semanas de âncora própria, mesmo com peso alto vindo de endosso', () => {
+    const fans = ids('fan', 30)
+    const anchors = new Map<string, number>([
+      ['novo', NOW - 14 * DAY], // 2 semanas, mas muito endossado → peso ~62
+      ...fans.map((f) => [f, NOW - 400 * DAY] as [string, number]),
+      ...ids('r', 3).map((r) => [r, NOW - 400 * DAY] as [string, number]),
+    ])
+    const posts = [{ id: 'np', author_pub: 'novo', created_at: NOW - HOUR }, { id: 'P', author_pub: 'alvo', created_at: NOW - HOUR }]
+    const spreads = fans.map((f) => act('np', f))
+    // 3 veteranos (0,8) = 2,4 < 3; com 'novo' (peso ~62 → 1,2) daria 3,6.
+    const reports = ['novo', 'r0', 'r1', 'r2'].map((r) => ({ post_id: 'P', reporter_pub: r, reason: 'illegal' as const, created_at: NOW }))
+    const out = computeRanking(base({ posts, spreads, reports, anchors }))
+    expect(out.weights.get('novo')!).toBeGreaterThan(50)
+    expect(out.posts.get('P')!.moderated).toBe(false)
+  })
+
+  it('A9: com decay ligado, report de peso 0 chegando agora não desfaz moderação antiga', () => {
+    const reps = ids('rep', 7)
+    const out = computeRanking(base({
+      posts: [{ id: 'P', author_pub: 'autor', created_at: NOW - 11 * DAY }],
+      reports: [
+        ...reps.map((r) => ({ post_id: 'P', reporter_pub: r, reason: 'spam' as const, created_at: NOW - 10 * DAY })),
+        { post_id: 'P', reporter_pub: 'nova', reason: 'spam' as const, created_at: NOW },
+      ],
+      anchors: new Map(reps.map((r) => [r, NOW - 400 * DAY] as [string, number])),
+      moderation: { reportDecayHalfLifeMs: 48 * 3600 * 1000 },
+    }))
+    expect(out.posts.get('P')!.moderated).toBe(true)
+  })
+
+  const junk = (target: string, publisher: string, i: number) => ({
+    ...ev(1040, publisher, NOW, [['e', target], ['k', '9078']], 'AAAA'),
+    id: hex(500_000 + i),
+  })
+  const stored = (id: string) => H.conn!.prepare('SELECT COUNT(*) n FROM ots_proofs WHERE proof_event_id = ?').get(id) as { n: number }
+
+  it('A11: 3 provas-lixo apontando pro evento da vítima não bloqueiam a prova DELA', async () => {
+    const vitimaPost = post('vitima', NOW - HOUR)
+    await ingest(vitimaPost)
+    for (let i = 0; i < 3; i++) await ingest(junk(vitimaPost.id, 'atacante', i))
+    const own = ev(1040, 'vitima', NOW, [['e', vitimaPost.id], ['k', '9078']], 'BBBB')
+    await ingest(own)
+    expect(stored(own.id).n).toBe(1)
+    expect(H.conn!.prepare('SELECT self_proof FROM ots_proofs WHERE proof_event_id = ?').get(own.id)).toEqual({ self_proof: 1 })
+  })
+
+  it('A11: provas inválidas não contam no teto por alvo', async () => {
+    const target = hex(91)
+    for (let i = 0; i < 3; i++) await ingest(junk(target, `atk${i}`, i))
+    H.conn!.prepare(`UPDATE ots_proofs SET status = 'invalid' WHERE target_event_id = ?`).run(target)
+    const third = ev(1040, 'terceiro', NOW, [['e', target], ['k', '9078']], 'CCCC')
+    await ingest(third)
+    expect(stored(third.id).n).toBe(1)
+  })
+
+  it('A12: fila lotada de lixo despeja o pior em vez de recusar prova nova; prova do autor sempre entra', async () => {
+    const ins = H.conn!.prepare(
+      `INSERT INTO ots_proofs (proof_event_id, target_event_id, proof_b64, raw_event, publisher_pub, self_proof, status, attempts, checked_at)
+       VALUES (?, ?, 'AAAA', '', ?, 0, 'pending', 3, ?)`,
+    )
+    for (let i = 0; i < 5000; i++) ins.run(hex(900_000 + i), hex(800_000 + i), `lixo${i % 300}`, NOW * 1000)
+    const vitimaPost = post('vitima', NOW - HOUR)
+    await ingest(vitimaPost)
+    const own = ev(1040, 'vitima', NOW, [['e', vitimaPost.id], ['k', '9078']], 'BBBB')
+    const third = ev(1040, 'terceiro', NOW, [['e', hex(92)], ['k', '9078']], 'CCCC')
+    await ingest(own, third)
+    expect(stored(own.id).n).toBe(1)
+    expect(stored(third.id).n).toBe(1)
+    const pending = H.conn!.prepare(`SELECT COUNT(*) n FROM ots_proofs WHERE status = 'pending'`).get() as { n: number }
+    expect(pending.n).toBe(5000)
+  })
+
+  it('A12: no máximo 20 provas pendentes por publicador (exceto do próprio autor)', async () => {
+    for (let i = 0; i < 30; i++) await ingest(junk(hex(700_000 + i), 'spammer', i))
+    expect(H.conn!.prepare(`SELECT COUNT(*) n FROM ots_proofs WHERE publisher_pub = ?`).get(pk('spammer'))).toEqual({ n: 20 })
+  })
+
+  it('A14: prova inválida tem o conteúdo apagado (só a linha fica, pra dedup)', async () => {
+    const e = junk(hex(93), 'atk', 1)
+    await ingest(e)
+    await verifyPendingProofs({ getHeader: async () => ({ merkleRoot: '00'.repeat(32), time: 1 }), resolveAuthor: async () => pk('x') })
+    expect(H.conn!.prepare('SELECT status, proof_b64, raw_event FROM ots_proofs WHERE proof_event_id = ?').get(e.id)).toEqual({
+      status: 'invalid',
+      proof_b64: '',
+      raw_event: '',
+    })
+  })
+
+  it('A15: altura acima do topo real + 6 é inválida sem consultar header', async () => {
+    const mk = (h: number) => {
+      const f = newOtsFile(new Uint8Array(32).fill(9))
+      f.timestamp = { attestations: [{ type: 'bitcoin' as const, height: h }], ops: [] }
+      return bytesToBase64(serializeOtsFile(f))
+    }
+    const digest = bytesToHex(new Uint8Array(32).fill(9)) // = digest das provas → só a altura decide
+    const above = ev(1040, 'p1', NOW, [['e', digest], ['k', '9078']], mk(900_007))
+    const atTip = ev(1040, 'p2', NOW, [['e', digest], ['k', '9078']], mk(900_006))
+    await ingest(above, atTip)
+    const asked: number[] = []
+    await verifyPendingProofs({
+      getTipHeight: async () => 900_000,
+      getHeader: async (h) => (asked.push(h), { merkleRoot: '00'.repeat(32), time: 1 }),
+      resolveAuthor: async () => pk('x'),
+    })
+    expect(H.conn!.prepare('SELECT status FROM ots_proofs WHERE proof_event_id = ?').get(above.id)).toEqual({ status: 'invalid' })
+    expect(asked).toEqual([900_006])
+  })
+
+  it('A17: orçamento de buscas na rede esgotado pula a prova SEM gastar tentativa', async () => {
+    const proof = new Uint8Array(readFileSync(join(ROOT, 'tests/fixtures/ots/hello-world.txt.ots')))
+    const digest = bytesToHex(parseOtsFile(proof).digest) // alvo NÃO está no banco local
+    const e = ev(1040, 'terceiro', NOW, [['e', digest], ['k', '9078']], bytesToBase64(proof))
+    await ingest(e)
+    let fetched = 0
+    const header = async () => ({ merkleRoot: '8a1b66ecb7cbd07d8139a7e7d7f2c41aab1f5009b8364aaf61d03ad245e47e00', time: 1432827678 })
+    await verifyPendingProofs({
+      networkAllowed: true,
+      networkLookupBudget: 0, // orçamento já esgotado
+      fetchAuthor: async () => (fetched++, pk('x')),
+      getTipHeight: async () => 900_000,
+      getHeader: header,
+    })
+    expect(fetched).toBe(0)
+    expect(H.conn!.prepare('SELECT status, attempts, checked_at FROM ots_proofs WHERE proof_event_id = ?').get(e.id)).toEqual({
+      status: 'pending',
+      attempts: 0,
+      checked_at: null,
+    })
+    // Com orçamento, a mesma prova é verificada.
+    await verifyPendingProofs({ networkAllowed: true, fetchAuthor: async () => pk('x'), getTipHeight: async () => 900_000, getHeader: header })
+    expect(H.conn!.prepare('SELECT status FROM ots_proofs WHERE proof_event_id = ?').get(e.id)).toEqual({ status: 'verified' })
+  })
+
+  it('A22: só a melhor prova de cada autor guarda conteúdo', async () => {
+    const proof = new Uint8Array(readFileSync(join(ROOT, 'tests/fixtures/ots/hello-world.txt.ots')))
+    const digest = bytesToHex(parseOtsFile(proof).digest)
+    // Âncora já existente MAIS ANTIGA pro mesmo autor (outra prova).
+    H.conn!.prepare(`INSERT INTO ots_anchors VALUES (?, ?, 1, ?, 'antiga')`).run(hex(96), pk('autorA22'), 1_300_000_000)
+    const e = ev(1040, 'qualquer', NOW, [['e', digest], ['k', '9078']], bytesToBase64(proof))
+    await ingest(e)
+    await verifyPendingProofs({
+      getTipHeight: async () => 900_000,
+      getHeader: async () => ({ merkleRoot: '8a1b66ecb7cbd07d8139a7e7d7f2c41aab1f5009b8364aaf61d03ad245e47e00', time: 1432827678 }),
+      resolveAuthor: async () => pk('autorA22'),
+    })
+    expect(H.conn!.prepare('SELECT status, proof_b64 FROM ots_proofs WHERE proof_event_id = ?').get(e.id)).toEqual({ status: 'verified', proof_b64: '' })
   })
 })

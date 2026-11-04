@@ -17,8 +17,10 @@ import {
 describe('getReportWeight — pontos = peso/50 em [0, 2]', () => {
   // Auditoria 2026-11-03 (M3): o piso de 0.5 pra peso < 20 tornava brigada
   // de chaves recém-criadas gratuita (10 chaves derrubavam qualquer post).
-  it('peso 0 (chave sem âncora/engajamento) → 0 — não modera', () => {
+  it('abaixo de REPORT_MIN_WEIGHT (20) → 0 — chave nova não modera', () => {
     expect(getReportWeight(0)).toBe(0)
+    expect(getReportWeight(19.99)).toBe(0)
+    expect(getReportWeight(20)).toBe(0.4)
   })
 
   it('linear: 25 → 0.5, 50 → 1.0, 75 → 1.5, 100 → 2.0', () => {

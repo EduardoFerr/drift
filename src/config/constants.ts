@@ -60,10 +60,9 @@ export const ENGAGEMENT_POINTS = {
  * de commenters viralizariam só por engajamento textual (Sybil de comments
  * + replies cross-talk inflam SUM(weight) sem refletir qualidade real).
  *
- * 30 espelha SPREADS_SCORE_CAP de spreads (manifesto §22 — score
- * determinístico, anti-Sybil). Aplicado em `applyCommentReceived`
- * (scoring.ts) — capa o weighted total ANTES de multiplicar por
- * `ENGAGEMENT_POINTS.COMMENT_RECEIVED`.
+ * Aplicado em `ranking.ts:computeRanking` — capa o total ponderado
+ * ANTES de multiplicar por `ENGAGEMENT_POINTS.COMMENT_RECEIVED` e somar
+ * ao numerador (`score_base`).
  */
 export const COMMENTS_SCORE_CAP = 30
 
@@ -111,19 +110,16 @@ export const MAX_FUTURE_SKEW_SECONDS = 15 * 60
 
 /**
  * Sentinela de "moderado pela comunidade" gravada em `posts.score`
- * por `moderation.ts:maybeModerate` quando reports atingem o
- * threshold dinâmico (manifesto §26). O feed filtra com
- * `WHERE score > MODERATED_SCORE`.
+ * pela recomputação global (`ranking.ts` decide, `events.ts` grava)
+ * quando os pontos de report atingem o threshold dinâmico (manifesto
+ * §26). O feed filtra com `WHERE score > MODERATED_SCORE`.
  *
  * Invariante #13: isto ESCONDE do feed, não apaga do SQLite. Cliente
  * alternativo pode exibir mesmo assim.
  *
- * Dívida conhecida: é um sentinela numérico, não um flag. Um post
- * legitimamente enterrado por brigada de bury (buryWeight ≳ 9420 em
- * idade 0) atravessa este valor e some do feed como se tivesse sido
- * moderado, sem nenhum report — e `cache.ts` o evicta primeiro, já
- * que ordena por `score ASC`. Separar o flag do valor é o fix
- * definitivo.
+ * É um sentinela numérico, não um flag. Post NÃO moderado nunca recebe
+ * score ≤ -999: `ranking.ts` aplica piso em -998, então brigada de bury
+ * não se confunde com moderação.
  */
 export const MODERATED_SCORE = -999
 

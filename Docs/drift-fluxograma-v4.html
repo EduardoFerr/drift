@@ -414,7 +414,7 @@ code {
       </div>
       <div class="module">
         <div class="module-name">moderation.ts</div>
-        <div class="module-desc"><span class="module-tag tag-fase4">F4</span> getReportThreshold (dinâmico via base ativa, 'illegal' 2x mais agressivo) · getReportWeight (anti-sybil) · maybeModerate (UPDATE score=-999)</div>
+        <div class="module-desc"><span class="module-tag tag-fase4">F4</span> getReportThreshold (dinâmico via base ativa, 'illegal' 2x mais agressivo) · getReportWeight (anti-sybil) · ranking.ts:computeRanking (moderação derivada) (UPDATE score=-999)</div>
       </div>
       <div class="module">
         <div class="module-name">cache.ts</div>
@@ -451,7 +451,7 @@ code {
       </div>
       <div class="module">
         <div class="module-name">events.ts</div>
-        <div class="module-desc"><strong>onNostrEvent — ÚNICA porta de escrita SQLite</strong>. Pipeline: kind check → schema check → verify Schnorr → persist → scheduleScoreRecalc + invalidateFeed. persistReport chama <code>maybeModerate</code></div>
+        <div class="module-desc"><strong>onNostrEvent — ÚNICA porta de escrita SQLite</strong>. Pipeline: kind check → schema check → verify Schnorr → persist → scheduleRankingRecompute + invalidateFeed. persistReport chama <code>ranking.ts:computeRanking (moderação derivada)</code></div>
       </div>
       <div class="module">
         <div class="module-name">nostr.ts</div>
@@ -587,7 +587,7 @@ code {
     <div class="step s-write"><div class="step-num">1</div><div class="step-layer">UI</div><div class="step-action">PostViewer: SwipeHandler detecta gesto vertical (threshold 80px ou v>200px/s) → onSpread/onBury</div></div>
     <div class="step s-protocol"><div class="step-num">2</div><div class="step-layer">Protocolo</div><div class="step-action">spreadPost(k:9079, tags=[e, p, location?]) ou buryPost(k:9080, tags=[e]) — sem 'p', sem 'reason' · manifesto §23</div></div>
     <div class="step s-write"><div class="step-num">3</div><div class="step-layer">Transporte</div><div class="step-action">wssTransport.publish em paralelo → relays</div></div>
-    <div class="step s-protocol"><div class="step-num">4</div><div class="step-layer">events.ts</div><div class="step-action">persistSpread/persistBury → INSERT OR IGNORE → scheduleScoreRecalc(postId)</div><div class="step-perf">debounced 100ms</div></div>
+    <div class="step s-protocol"><div class="step-num">4</div><div class="step-layer">events.ts</div><div class="step-action">persistSpread/persistBury → INSERT OR IGNORE → scheduleRankingRecompute(postId)</div><div class="step-perf">debounced 100ms</div></div>
     <div class="step s-protocol"><div class="step-num">5</div><div class="step-layer">scoring.ts</div><div class="step-action">recalculateScore: query consolidada (1 round-trip) → calculateScore (puro) → UPDATE posts.score</div></div>
     <div class="step s-read"><div class="step-num">6</div><div class="step-layer">UI</div><div class="step-action">invalidateFeed após recalc → Feed reordena</div></div>
   </div>
@@ -596,7 +596,7 @@ code {
     <div class="flow-title">⚠ Report — moderação reativa (manifesto §26)</div>
     <div class="step s-mod"><div class="step-num">1</div><div class="step-layer">UI</div><div class="step-action">User reporta com reason: 'illegal' | 'spam' | 'harassment' (Fase 4)</div></div>
     <div class="step s-protocol"><div class="step-num">2</div><div class="step-layer">Protocolo</div><div class="step-action">reportPost(k:9081, tags=[e, p, reason]) → publish</div></div>
-    <div class="step s-mod"><div class="step-num">3</div><div class="step-layer">events.ts</div><div class="step-action">persistReport → INSERT reports(post_id, reporter_pub, reason, weight) → maybeModerate(postId)</div></div>
+    <div class="step s-mod"><div class="step-num">3</div><div class="step-layer">events.ts</div><div class="step-action">persistReport → INSERT reports(post_id, reporter_pub, reason, weight) → ranking.ts:computeRanking (moderação derivada)(postId)</div></div>
     <div class="step s-mod"><div class="step-num">4</div><div class="step-layer">moderation.ts</div><div class="step-action">aggregateReports + countActiveUsers → getReportThreshold(activeUsers, reason). 'illegal' tem threshold 2x menor</div></div>
     <div class="step s-mod"><div class="step-num">5</div><div class="step-layer">SQLite</div><div class="step-action">Se threshold atingido → UPDATE posts SET score = -999 (esconde do feed default — NÃO apaga)</div></div>
     <div class="step s-read"><div class="step-num">6</div><div class="step-layer">UI</div><div class="step-action">Feed query <code>WHERE score > -999</code> remove naturalmente. Cliente alternativo pode exibir mesmo assim</div></div>

@@ -33,7 +33,67 @@
 
 Trade-offs novos e abertos: `Docs/known-limitations.md` §5d (partida a
 frio do peso), §5e (Tor não verifica âncoras), §5f (convergência exige
-mesmo conjunto de eventos).
+mesmo conjunto de eventos), §5g–§5k.
+
+### Revisão pré-merge (2026-11-04)
+
+Três pares de revisão independentes leram o diff antes do merge. A
+revisão adversarial provou que a primeira versão das correções ainda
+falhava no ponto central: o engajamento contava **uma aresta por post e
+sem orçamento**, então uma única âncora de 1 dia num anel de chaves
+saturava o anel inteiro em peso 60, e duas chaves assim "lavavam" um
+número ilimitado de outras. Os testes de invariante passavam porque só
+testavam o anel **sem** âncora. Corrigido e travado por propriedade:
+
+| Achado da revisão | Correção | Teste |
+|---|---|---|
+| Amplificação de peso (F1) | endosso com orçamento conservado (≤ 0,5 × peso, uma aresta por par) — contração | invariantes §9 "PROPRIEDADE (contração)", "anel de 12 + 1 âncora", "lavagem" |
+| Penalidade absorvida (F2) | −15/inatividade depois do teto | §9 "penalidade… morde" |
+| Laço de moderação oscila (F4) | iteração monótona `M ← M ∪ F(M)` | §9 "PROPRIEDADE (moderação fechada)" |
+| Chaves de peso 0 sobem threshold (F5) | base ativa ponderada | §9 "10k chaves de peso 0" |
+| Fila OTS travável / martela exploradores (F3) | ordem justa, backoff + `unresolved`, ≤ 4 attestations, altura plausível, ≤ 3 provas por alvo, teto de pendentes, concorrência 4 | §9 "ordem justa", "mais de 4 attestations", "altura impossível", "backoff", "3 provas" |
+| Decay desfaz moderação na virada do dia | meia-vida contra o report mais recente | §9 "decay… não desfaz" |
+| Órfãos × eviction em ciclo | busca só na janela de 7 dias; eviction limpa votos alheios órfãos | `tests/cache.test.ts` |
+| Tempestade de REQs | teto de 200 por recomputação, LRU, âncoras só de autores/reporters | — |
+| Snapshot não transacional | ações lidas antes dos posts | — |
+| Docs/UX (PRIVACY, protocol-spec, GuideCard, perfil, toggle) | atualizados | — |
+
+Aberto como follow-up: recomputação no main thread (known-limitations §5i).
+
+### Segunda rodada (2026-11-04)
+
+O revisor adversarial atacou a versão corrigida. A contração resistiu
+(não conseguiu passar de 2× a antiguidade ancorada; rede honesta usável:
+veteranos com mediana 48, novatos de 2 semanas com 10). Mas os próprios
+fixes abriram brechas, e uma de origem sobrou:
+
+| Achado | Correção | Teste (invariantes §10) |
+|---|---|---|
+| A7 antiguidade grátis e paralela: 1200 chaves de 1 dia moderam | voto ≥ peso 4, report ≥ peso 20 | "1200 chaves…", "10k chaves de 1 semana" |
+| A8 laço monótono over-modera | moderação em ordem histórica com penalidade imediata | "spammer já punido…" + contraprova |
+| A9 report de peso 0 "envelhece" os antigos (decay) | `latest` só sobre reports elegíveis | "report de peso 0 chegando agora…" |
+| A11 3 lixos bloqueiam a âncora da vítima | prova do próprio autor sempre aceita; inválidas fora do teto | "3 provas-lixo…", "inválidas não contam" |
+| A12 5000 lixos barram provas honestas | teto por publicador + despejo do pior | "fila lotada…", "20 por publicador" |
+| A13 Tor queima tentativas | sem rede nada é tentado; backoff com teto, sem desistência | "modo Tor/offline", "backoff… sem desistência" |
+| A14 inválidas crescem sem limite | conteúdo apagado + teto de linhas | "conteúdo apagado" |
+| A15 alturas inexistentes martelam exploradores | topo real consultado (≥2 exploradores) | "altura acima do topo real + 6" |
+| A16 eviction apaga a penalidade | documentado (known-limitations §5j) | — |
+
+### Terceira rodada (2026-11-04)
+
+A checagem das correções da segunda rodada confirmou A7–A15 no ataque
+original, mas achou 4 buracos novos abertos por elas:
+
+| Achado | Correção | Teste (invariantes §10) |
+|---|---|---|
+| A18 piso de peso contornado por concentração (4700 chaves de 1 dia → concentrador de peso 60) | piso também de antiguidade própria (votar/endossar ≥ 2 sem., denunciar ≥ 8 sem.); abaixo do piso não endossa | "chaves abaixo do piso não endossam", "denunciar exige 8 semanas" |
+| A19 ordem histórica escolhida pelo atacante (retrodatar reports) | moderação conservadora sem ordem | "o resultado NÃO depende dos timestamps" + "PROPRIEDADE (moderação sustentada)" |
+| A20 re-solução por post moderado (1000 → 18 s) | 3 soluções no total | bench do revisor: 0,35 s |
+| A17 orçamento esgotado queimava tentativas das honestas | SKIP sem custo; despejo por publicador; carimbo do evento mais recente | "orçamento… pula SEM gastar tentativa" |
+| A22 provas verificadas crescem sem limite | só a melhor por autor guarda conteúdo; teto por publicador pra todas | "só a melhor prova de cada autor" |
+
+Os 12 ataques escritos pelo revisor nas três rodadas falham contra o
+código final.
 
 ## Método
 

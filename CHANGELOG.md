@@ -17,7 +17,7 @@ semântica do peso** — ver "Changed".
   (calendários + headers Bitcoin cruzados em ≥2 exploradores),
   `ots-anchors.ts` (verifica provas recebidas), `ots-stamper.ts` (carimba
   a identidade ativa e publica a prova). Pref `ots_stamping_enabled`
-  (default on; nunca roda fora de clearnet) em Ajustes → soberania.
+  (default on; nunca roda fora de clearnet) em Configurações → soberania.
 - **Busca de órfãos (`orphans.ts`)** — post referenciado por voto ou
   comentário e ausente é pedido por id; provas OTS de autores sem âncora
   são pedidas por autor.
@@ -42,6 +42,48 @@ semântica do peso** — ver "Changed".
   a chegar).
 - Pesos medidos no início do dia UTC; recomputação automática na virada.
 - Rebroadcast publica provas e votos primeiro, com teto por categoria.
+- **Revisão pré-merge (2026-11-04)** — 3 pares de revisão; ataques
+  provados viraram invariantes:
+  - endosso com **orçamento conservado** e uma aresta por par: o peso
+    total de qualquer grupo ≤ 2× a antiguidade ancorada dele (antes, uma
+    âncora de 1 dia saturava um anel inteiro em peso 60);
+  - penalidade de moderação/inatividade depois do teto do engajamento;
+  - laço moderação ↔ peso monótono (podia oscilar e não moderar nada);
+  - base ativa do threshold ponderada por peso;
+  - fila de verificação OTS com ordem justa, backoff e desistência,
+    ≤ 4 attestations e altura plausível, ≤ 3 provas por alvo e teto de
+    pendentes;
+  - busca de órfãos só na janela de sync e com teto; LRU no lugar de
+    `clear()`; eviction do cache limpa votos/comentários alheios órfãos;
+  - decay de report medido contra o report mais recente.
+- **Segunda rodada de revisão (ataques aos próprios fixes):**
+  - mínimos de elegibilidade: voto conta a partir de peso 4, report a
+    partir de peso 20 (antes, 1200 chaves de 1 dia moderavam qualquer post);
+  - moderação decidida em ordem histórica, aplicando a penalidade de cada
+    post moderado antes do próximo (o laço monótono deixava spammer
+    punido derrubar post honesto com peso cheio);
+  - admissão de provas OTS: a do próprio autor do evento sempre entra e
+    tem prioridade; terceiros com teto por publicador (20) e por alvo (3,
+    sem contar inválidas); fila cheia despeja o pior em vez de recusar;
+  - sem rede (Tor) nenhuma tentativa é gasta; backoff com teto, sem
+    desistência definitiva;
+  - provas inválidas têm o conteúdo apagado; teto de linhas inválidas;
+  - topo real da cadeia consultado (cache 30 min) pra rejeitar alturas
+    inexistentes sem martelar exploradores.
+- **Terceira rodada:**
+  - mínimos também de ANTIGUIDADE própria: votar/endossar ≥ 2 semanas,
+    denunciar ≥ 8 semanas; abaixo do piso não endossa (chaves de 1 dia
+    concentravam peso 60 num "concentrador");
+  - moderação conservadora sem ordem (candidatos que resistem às
+    penalidades de todos os candidatos): timestamps de report não mudam
+    mais o resultado, e o custo caiu de 1 re-solução por post moderado
+    para 3 no total (1000 moderados: 18 s → 0,35 s);
+  - orçamento de buscas de autor esgotado não gasta tentativa; despejo
+    começa pelo publicador com mais pendentes; teto por publicador vale
+    também pras provas do próprio autor;
+  - carimbador mira o evento MAIS RECENTE da identidade (os outros
+    clientes já o têm → prova reconhecida como do próprio autor);
+  - só a melhor prova de cada autor guarda o conteúdo.
 
 ### Fixed
 - Evento com `created_at` > 15 min no futuro é descartado; cursor de sync

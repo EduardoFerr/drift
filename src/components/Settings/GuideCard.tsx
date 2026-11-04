@@ -252,7 +252,7 @@ function AcoesTopics() {
             accordionId="guia-acao-drift"
             label="DRIFT (↑) — amplificar"
             description="Gesto principal do Drift. Você faz swipe pra cima (ou toca no ↑) num post e ele ganha alcance — é como um repost com peso de score."
-            impact="O post recebe +1 no score global. Esse evento (kind 9079) é publicado em ≥2 relays e replicado pela rede. Se você tem GPS ligado, sua localização declarada vira um ponto no mapa do post."
+            impact="O post ganha o seu PESO no score global (só a partir de peso 4 e 2 semanas de âncora — cerca de 1 mês; antes disso seu DRIFT ainda não conta). Esse evento (kind 9079) é publicado em ≥2 relays e replicado pela rede. Se você tem GPS ligado, sua localização declarada vira um ponto no mapa do post."
             defaultExplained="Não tem default — é ação explícita do user. Cada DRIFT é um evento Nostr assinado com sua chave."
             reversible
             reference="manifesto §16 (disponibilidade via mecânica social)"
@@ -270,7 +270,7 @@ function AcoesTopics() {
             accordionId="guia-acao-sink"
             label="SINK (↓) — afundar"
             description="Gesto oposto do DRIFT. Swipe pra baixo (ou toca no ↓) e o post perde score."
-            impact="O post recebe -1 no score (kind 9080). NÃO é denúncia — é só 'esse post não merece estar no topo do meu feed'. Acumulando SINKs sem reports, o post some pra ranking mais baixo, mas continua acessível."
+            impact="O post perde 0,3 × o seu peso no score (kind 9080). NÃO é denúncia — é só 'esse post não merece estar no topo do meu feed'. Acumulando SINKs sem reports, o post some pra ranking mais baixo, mas continua acessível."
             defaultExplained="Não tem default. É voto negativo, não censura."
             reversible
             reference="manifesto §22 (sem reputação subjetiva)"
@@ -287,7 +287,7 @@ function AcoesTopics() {
             accordionId="guia-acao-report"
             label="denunciar (report)"
             description="Reporta o post como violação grave — spam, ilegal, abuso. Publica um evento kind 9081 com o motivo."
-            impact="Quando o post acumula reports suficientes (threshold dinâmico — varia por relay e por trust local), o score local cai pra -999 e ele some do feed. Reports são PÚBLICOS na rede Nostr — sua npub fica visível como quem denunciou."
+            impact="Cada denúncia vale peso ÷ 50 pontos, a partir de peso 20 e 8 semanas de âncora (antes disso vale 0). Quando a soma passa do threshold (5 pontos, ou mais em redes grandes; metade pra ilegal), o post recebe -999 e some do feed. Reports são PÚBLICOS na rede Nostr — sua npub fica visível como quem denunciou."
             defaultExplained="Não tem default. UI sempre mostra warning sobre privacidade do reporter ANTES de enviar."
             reversible={false}
             warning="Seu npub fica visível como reporter. Reports são eventos públicos Nostr — outras pessoas (e o autor do post) podem ver que você denunciou."
@@ -376,7 +376,7 @@ function AlgosTopics() {
           <SettingExplainer
             accordionId="guia-algo-score"
             label="score (popularidade do post)"
-            description="Quanto cada post 'vale' na rede. É a soma de DRIFTs menos SINKs, ajustada por decay temporal."
+            description="Quanto cada post 'vale' na rede. É a soma dos PESOS de quem deu DRIFT, menos 0,3 × o peso de quem deu SINK, mais o peso de quem comentou (até 30), dividido por um decay temporal."
             impact="Score determina ordem no feed Global. Sobe com DRIFTs, cai com SINKs, cai com o tempo (decay). Não há personalização — todo cliente Drift calcula o MESMO score pra cada post (manifesto §24)."
             defaultExplained="Função pura: mesma entrada, mesma saída. Não consulta servidor central — cada cliente calcula localmente a partir dos eventos Nostr que recebeu."
             reversible
@@ -393,34 +393,33 @@ function AlgosTopics() {
           <SettingExplainer
             accordionId="guia-algo-weight"
             label="weight (peso de perfil)"
-            description="Mede quão ativo um perfil é, baseado em DRIFTs que ele fez e recebeu. Usado em algumas visualizações (mapa) e como sinal opcional na lente."
-            impact="Perfis com weight alto aparecem maior no mapa global. Não afeta feed canônico — é só visualização. Manifesto §22 proíbe reputação subjetiva (boas/ruins): weight é puramente quantitativo."
-            defaultExplained="Calculado local. Não shared via Nostr. Cada cliente que aplique pesos define o seu critério."
+            description="Número de 0 a 100: há quanto tempo a identidade existe (provado no Bitcoin, até 40) + o quanto pessoas COM peso deram DRIFT e comentaram nos posts dela (até 60)."
+            impact="Seu DRIFT, SINK e denúncia valem proporcional ao seu peso. Conta nova vale ~0 até ganhar a âncora no Bitcoin ou receber DRIFT de quem já tem peso — por isso criar mil contas não adianta."
+            defaultExplained="Mesma fórmula em todo cliente Drift, calculada a partir dos eventos públicos. Manifesto §22 proíbe reputação subjetiva (boa/ruim): o peso é tempo provado + engajamento ponderado."
             reversible
             reference="manifesto §22 + Docs/algoritmos.md §2"
           >
             <P>
-              Weight NÃO é "perfil confiável". É só "perfil ativo".
-              Spammer pode ter weight alto. A defesa contra spam vem do
-              threshold dinâmico de reports (próximo item), não da
-              reputação.
+              Weight NÃO é "perfil confiável" — é "perfil que custou
+              tempo real ou foi endossado por quem já tem peso". Uma
+              conta antiga pode publicar spam; aí entram as denúncias
+              (próximo item), que também pesam pelo peso de quem denuncia.
             </P>
           </SettingExplainer>
 
           <SettingExplainer
             accordionId="guia-algo-threshold"
             label="threshold de moderação"
-            description="Quantos reports = post oculto (-999). Não é número fixo — varia em função da idade do post, do número de DRIFTs e da diversidade dos reporters."
-            impact="Post com 3 reports de pessoas diferentes (geograficamente diversas, com algum histórico) pode bastar; 30 reports de bots idênticos pode não bastar. Threshold é local — cada cliente Drift pode decidir o seu (manifesto §26)."
-            defaultExplained="Default conservador no cliente oficial. Configurable em settings (avançado)."
+            description="Quantos pontos de denúncia escondem um post (-999). Cada denúncia vale o peso de quem denunciou ÷ 50 (de 0 a 2 pontos; abaixo de peso 20, nada)."
+            impact="O mínimo é 5 pontos (3 pra ilegal); em redes grandes sobe pra 0,1% dos usuários ativos. Ex.: 3 veteranos de peso 100 bastam; 50 contas recém-criadas não somam nada."
+            defaultExplained="Dinâmico, igual pra todos. Você pode fixar outro valor só pro seu aparelho em Configurações → soberania (avançado)."
             reversible
             reference="manifesto §26 + Docs/algoritmos.md §3"
           >
             <Responsibility>
-              Threshold dinâmico depende da QUALIDADE dos reports, não só
-              da quantidade. Reports coordenados (mesma rede, mesmo
-              timing) pesam menos. É o desenho que evita brigada de
-              denúncia.
+              A defesa contra brigada de denúncia é o peso: conta nova
+              não modera sozinha. Quem tem peso tem responsabilidade —
+              sua denúncia é pública e conta de verdade.
             </Responsibility>
           </SettingExplainer>
 

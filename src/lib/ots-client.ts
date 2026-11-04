@@ -128,8 +128,10 @@ async function submitToCalendar(
  * fluxo do cliente oficial:
  *   digest → append(nonce 16 bytes) → sha256 = commitment
  *   commitment → POST em cada calendário → merge das respostas
- * O nonce impede que o calendário (público) aprenda o digest — ele só vê
- * sha256(digest ‖ nonce). `opts.nonce` existe para testes determinísticos.
+ * O nonce esconde o digest do calendário só ATÉ a prova ser publicada:
+ * a prova contém `append(nonce)`, então qualquer um (inclusive o
+ * calendário, que registrou o IP do pedido) recalcula o commitment e o
+ * liga ao evento/npub. Ver PRIVACY.md. `opts.nonce` existe para testes.
  *
  * Exige ≥ `minCalendars` (default 2) respostas úteis: com um único
  * calendário, se ele sumir antes de ancorar, a prova nunca completa.
@@ -298,6 +300,32 @@ export async function fetchBitcoinBlockHeader(
     throw new Error(`explorers disagree on block ${height}`)
   }
   return first
+}
+
+/**
+ * Altura do topo da cadeia segundo os exploradores (`/blocks/tip/height`,
+ * Esplora). Exige ≥ 2 respostas e devolve a MAIOR — o uso é como teto
+ * ("altura acima disso não existe"), então errar pra cima só deixa passar
+ * uma altura que ainda vai falhar no header; errar pra baixo invalidaria
+ * prova honesta recém-ancorada.
+ */
+export async function fetchBitcoinTipHeight(
+  opts: { explorers?: readonly string[]; fetch?: FetchFn } = {},
+): Promise<number> {
+  const explorers = opts.explorers ?? DEFAULT_EXPLORERS
+  const fetchFn = opts.fetch ?? globalThis.fetch.bind(globalThis)
+  const results = await Promise.allSettled(
+    explorers.map(async (api) => {
+      const res = await fetchFn(`${trimSlash(api)}/blocks/tip/height`)
+      if (!res.ok) throw new Error(`tip ${res.status}`)
+      const text = (await res.text()).trim()
+      if (!/^\d{1,9}$/.test(text)) throw new Error('tip malformado')
+      return Number(text)
+    }),
+  )
+  const ok = results.flatMap((r) => (r.status === 'fulfilled' ? [r.value] : []))
+  if (ok.length < 2) throw new Error(`need >= 2 explorers for tip, got ${ok.length}`)
+  return Math.max(...ok)
 }
 
 /**

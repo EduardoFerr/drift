@@ -50,9 +50,9 @@ let seeded = false
  *    cascata, geo variado (BR/EU/Ásia), spreads espalhados no tempo,
  *    posts com imagem, buries + 3 alvos que cruzam threshold §26, follows.
  *
- * Processa eventos de domínio SEQUENCIALMENTE (ordem por created_at) —
- * preserva first-seen estável de `users.created_at` (antiguidade/peso
- * conhecidos). Cada evento passa pelo pipeline real: kind → schema →
+ * Processa eventos de domínio SEQUENCIALMENTE (ordem por created_at).
+ * A antiguidade vem das âncoras OTS simuladas gravadas no fim
+ * (`seedSimulatedAnchors`), não da ordem de chegada. Cada evento passa pelo pipeline real: kind → schema →
  * persist (verify Schnorr SKIPADO no seed — ver abaixo).
  *
  * Performance (Ted+Lily 2026-05-28 → Ted+Marshall 2026-05-29):

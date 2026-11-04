@@ -86,7 +86,6 @@ vi.mock('../src/lib/feed', () => ({
 }))
 vi.mock('../src/lib/moderation', () => ({
   getReportWeight: vi.fn(() => 1),
-  maybeModerate: vi.fn(),
 }))
 vi.mock('../src/lib/weight', () => ({
   calculateUserWeight: vi.fn(async () => ({ weight: 0.5 })),

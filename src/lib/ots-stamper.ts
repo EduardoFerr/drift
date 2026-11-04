@@ -3,7 +3,7 @@
  * antiguidade que `ranking.ts` exige (auditoria 2026-11-03, S1/S3).
  *
  * Ciclo (idempotente, retomável entre sessões via `ots_local_stamps`):
- *   1. sem âncora e sem carimbo local → carimba o evento MAIS ANTIGO que
+ *   1. sem âncora e sem carimbo local → carimba o evento MAIS RECENTE que
  *      esta identidade tem no banco (post > comment > spread > bury);
  *      calendários OTS públicos agregam o digest numa transação Bitcoin;
  *   2. a cada `UPGRADE_EVERY_MS` tenta o upgrade (o calendário só devolve a
@@ -15,8 +15,10 @@
  * consegue carimbar no passado. Quem nunca agiu não tem o que carimbar —
  * e não precisa de peso.
  *
- * Privacidade (§28): o calendário vê só sha256(id ‖ nonce aleatório), não
- * o id do evento. Ainda assim é uma conexão clearnet — desligado fora de
+ * Privacidade (§28): o calendário vê o IP e sha256(id ‖ nonce). Depois que
+ * a prova kind 1040 é publicada (ela contém o nonce), o calendário pode
+ * ligar aquele IP ao evento e à npub — e, com várias identidades no mesmo
+ * aparelho, ligar as identidades entre si. Desligado fora de
  * `network_mode = 'clearnet'` e quando `ots_stamping_enabled = false`.
  */
 
@@ -69,7 +71,7 @@ export async function ensureOwnAnchor(npub: string, deps: StamperDeps = {}): Pro
   )
 
   if (!local) {
-    const target = await oldestOwnEvent(npub)
+    const target = await newestOwnEvent(npub)
     if (!target) return 'nothing'
     const file = await (deps.stamp ?? stampDigest)(hexToBytes(target.id))
     await db.run(
@@ -106,14 +108,22 @@ export async function ensureOwnAnchor(npub: string, deps: StamperDeps = {}): Pro
   return 'published'
 }
 
-async function oldestOwnEvent(npub: string): Promise<{ id: string; kind: number } | null> {
+/**
+ * Evento a carimbar: o MAIS RECENTE da identidade (post > comment > spread
+ * > bury). A antiguidade vem do bloco Bitcoin, não do evento — então
+ * qualquer evento serve, e o recente é o que os outros clientes já têm
+ * (janela de sync de 7 dias): lá a prova chega reconhecida como do
+ * próprio autor (prioridade, sem busca na rede). Carimbar o mais antigo
+ * obrigava cada cliente a buscá-lo na rede (revisão A17).
+ */
+async function newestOwnEvent(npub: string): Promise<{ id: string; kind: number } | null> {
   const row = await db.get<{ id: string; kind: number }>(
     `SELECT id, kind FROM (
        SELECT id, 9078 AS kind, created_at, 0 AS pref FROM posts WHERE author_pub = ?
        UNION ALL SELECT id, 1111, created_at, 1 FROM comments WHERE author_pub = ?
        UNION ALL SELECT event_id, 9079, created_at, 2 FROM spreads WHERE spreader_pub = ?
        UNION ALL SELECT event_id, 9080, created_at, 3 FROM buries WHERE burier_pub = ?
-     ) ORDER BY pref ASC, created_at ASC LIMIT 1`,
+     ) ORDER BY pref ASC, created_at DESC LIMIT 1`,
     [npub, npub, npub, npub],
   )
   return row ?? null

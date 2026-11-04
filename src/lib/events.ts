@@ -5,8 +5,9 @@
  * Recebe eventos do subscribe (que inclui os próprios eventos publicados
  * pelo cliente, devolvidos pelos relays) e materializa estado local.
  *
- * Idempotente: INSERT OR IGNORE garante que processar o mesmo evento
- * N vezes não duplica linhas.
+ * Idempotente: INSERT OR IGNORE (posts, comments, provas OTS) e upsert
+ * LWW (spreads, buries, reports — guarda a ação mais recente) garantem que
+ * processar o mesmo evento N vezes, em qualquer ordem, dá o mesmo estado.
  *
  * ─── Pipeline (ordem importa para performance) ──────────────────────
  *
@@ -65,6 +66,14 @@ export const OTS_TARGET_KINDS: string[] = ['9078', '9079', '9080', '9081', '1111
 
 /** Teto do content base64 de uma prova (provas reais têm ~1-5 KB). */
 const OTS_PROOF_MAX_B64 = 16_384
+/** Provas de TERCEIROS pendentes/verificadas por evento carimbado (prova honesta: 1). */
+const OTS_PROOFS_PER_TARGET = 3
+/** Provas pendentes por pubkey publicadora (exceto do próprio autor). */
+const OTS_PENDING_PER_PUBLISHER = 20
+/** Provas pendentes no total — acima disso a pior de terceiro é despejada. */
+const OTS_PENDING_CAP = 5_000
+/** Linhas de provas inválidas guardadas (só pra dedup; conteúdo já apagado). */
+const OTS_INVALID_CAP = 10_000
 
 /**
  * KIND_DISPATCH — lookup table que separa "qual handler usar" de
@@ -832,11 +841,56 @@ function isValidReason(v: string | null): v is ReportReason {
  * evento carimbado, resolvido na verificação.
  */
 async function persistOtsAttestation(event: SignedEvent, deferSideEffects: boolean): Promise<void> {
+  const target = getTag(event, 'e')!
+  // Admissão (revisões F3 + A11/A12). Prova publicada pelo PRÓPRIO autor do
+  // evento carimbado é sempre aceita — é o caso normal do Drift e ninguém
+  // mais consegue assinar como ele. As demais (terceiros, possivelmente
+  // lixo) entram só dentro de tetos:
+  //   - ≤ OTS_PROOFS_PER_TARGET provas pendentes/verificadas por evento
+  //     (inválidas não contam — senão 3 lixos bloqueavam a vítima pra sempre).
+  // Pra TODAS (inclusive do próprio autor): ≤ OTS_PENDING_PER_PUBLISHER
+  // pendentes por pubkey publicadora — um autor honesto precisa de 1.
+  // Fila cheia (OTS_PENDING_CAP) despeja de terceiros, começando pelo
+  // publicador com MAIS pendentes, em vez de recusar a nova — senão 5000
+  // lixos barravam toda prova honesta (A12), e despejar por tentativas
+  // punia justamente as honestas atrasadas pelo lixo (A17).
+  const { resolveLocalAuthor } = await import('./ots-anchors')
+  const author = await resolveLocalAuthor(target)
+  const selfProof = author !== null && author === event.pubkey ? 1 : 0
   await runWrite(
     `INSERT OR IGNORE INTO ots_proofs
-     (proof_event_id, target_event_id, proof_b64, raw_event, status)
-     VALUES (?, ?, ?, ?, 'pending')`,
-    [event.id, getTag(event, 'e')!, event.content, JSON.stringify(event)],
+     (proof_event_id, target_event_id, proof_b64, raw_event, publisher_pub, self_proof, status)
+     SELECT ?, ?, ?, ?, ?, ?, 'pending'
+     WHERE (SELECT COUNT(*) FROM ots_proofs
+              WHERE publisher_pub = ? AND status = 'pending') < ?
+       AND (? = 1 OR (SELECT COUNT(*) FROM ots_proofs
+              WHERE target_event_id = ? AND status IN ('pending', 'verified')) < ?)`,
+    [
+      event.id, target, event.content, JSON.stringify(event), event.pubkey, selfProof,
+      event.pubkey, OTS_PENDING_PER_PUBLISHER, selfProof, target, OTS_PROOFS_PER_TARGET,
+    ],
+  )
+  // Despejo: acima do teto, sai a pendente de terceiro com mais tentativas
+  // (e mais antiga). Provas do próprio autor nunca são despejadas.
+  await runWrite(
+    `DELETE FROM ots_proofs WHERE proof_event_id IN (
+       SELECT p.proof_event_id FROM ots_proofs p
+       WHERE p.status = 'pending' AND p.self_proof = 0
+       ORDER BY (SELECT COUNT(*) FROM ots_proofs q
+                   WHERE q.publisher_pub = p.publisher_pub AND q.status = 'pending') DESC,
+                p.attempts DESC, p.proof_event_id DESC
+       LIMIT MAX(0, (SELECT COUNT(*) FROM ots_proofs WHERE status = 'pending') - ?)
+     )`,
+    [OTS_PENDING_CAP],
+  )
+  // Inválidas já perderam o conteúdo; ainda assim, teto de linhas.
+  await runWrite(
+    `DELETE FROM ots_proofs WHERE proof_event_id IN (
+       SELECT proof_event_id FROM ots_proofs WHERE status = 'invalid'
+       ORDER BY checked_at ASC
+       LIMIT MAX(0, (SELECT COUNT(*) FROM ots_proofs WHERE status = 'invalid') - ?)
+     )`,
+    [OTS_INVALID_CAP],
   )
   if (deferSideEffects) return
   const { scheduleOtsVerification } = await import('./ots-anchors')
@@ -994,7 +1048,11 @@ function serializeLocation(event: SignedEvent): string | null {
 // motor puro `ranking.ts:computeRanking` e grava só as linhas que
 // mudaram. Mesmo conjunto de eventos → mesmo resultado, sempre.
 
-const RANKING_MAX_WAIT_MS = 2_000
+const RANKING_MAX_WAIT_MS = 5_000
+/** Votos mais velhos que isso não disparam busca de post órfão (= janela de sync). */
+const ORPHAN_WINDOW_SECONDS = 7 * 24 * 60 * 60
+/** Ids/autores pedidos à rede por recomputação. */
+const NETWORK_REQUEST_CAP = 200
 const RANKING_WRITE_CHUNK = 800
 
 let rankingTimer: ReturnType<typeof setTimeout> | null = null
@@ -1063,9 +1121,10 @@ interface StoredPostRow {
 
 async function recomputeRankingOnce(): Promise<void> {
   const nowMs = Date.now()
-  const posts = await db.exec<StoredPostRow>(
-    `SELECT id, author_pub, created_at, score, score_base, spreads, buries FROM posts`,
-  )
+  // Ordem das leituras importa (não há transação entre elas): ações
+  // PRIMEIRO, posts por último. Um post que chega no meio do snapshot
+  // aparece em `posts`; o contrário marcaria como órfão um post que já
+  // temos (REQ espúrio + id bloqueado por 1h — revisão Ted #9).
   const spreads = await db.exec<RankingAction>(
     `SELECT post_id, spreader_pub AS user_pub, created_at, event_id FROM spreads`,
   )
@@ -1086,6 +1145,9 @@ async function recomputeRankingOnce(): Promise<void> {
   }>(`SELECT npub, last_active, weight, engagement FROM users`)
   const anchorRows = await db.exec<{ author_pub: string; t: number }>(
     `SELECT author_pub, MIN(block_time) AS t FROM ots_anchors GROUP BY author_pub`,
+  )
+  const posts = await db.exec<StoredPostRow>(
+    `SELECT id, author_pub, created_at, score, score_base, spreads, buries FROM posts`,
   )
 
   const { getPrefs } = await import('./prefs')
@@ -1116,9 +1178,11 @@ async function recomputeRankingOnce(): Promise<void> {
   for (const row of posts) {
     const r = out.posts.get(row.id)
     if (!r) continue
-    const wasModerated = row.score === MODERATED_SCORE
+    // `<=`: linha legada com score < -999 (bury pesado no pipeline antigo)
+    // também está escondida e precisa ser reescrita (revisão Ted #10).
+    const wasHidden = (row.score ?? 0) <= MODERATED_SCORE
     const changed =
-      wasModerated !== r.moderated ||
+      wasHidden !== r.moderated ||
       Math.abs((row.score_base ?? 0) - r.scoreBase) > 1e-9 ||
       (row.spreads ?? 0) !== r.spreads ||
       (row.buries ?? 0) !== r.buries
@@ -1147,23 +1211,28 @@ async function recomputeRankingOnce(): Promise<void> {
 
   for (const [postId, score] of viral) void maybeAutoPinViralBlobs(postId, score)
 
-  // Votos e comentários sobre posts que não temos → pedir o post por id.
+  // Votos sobre posts que não temos → pedir o post por id. Só votos da
+  // janela de sync (7 dias): votos antigos de post evictado do cache não
+  // devem trazê-lo de volta (revisão Ted #3 — eviction × busca de órfãos
+  // entravam em ciclo). Comentários não têm created_at aqui; o post de um
+  // comentário recente chega pelo próprio sync global de 1111.
   const known = new Set(posts.map((p) => p.id))
+  const recentSec = Math.floor(nowMs / 1000) - ORPHAN_WINDOW_SECONDS
   const missing = new Set<string>()
-  for (const a of spreads) if (!known.has(a.post_id)) missing.add(a.post_id)
-  for (const a of buries) if (!known.has(a.post_id)) missing.add(a.post_id)
-  for (const c of comments) if (!known.has(c.post_id)) missing.add(c.post_id)
-  if (missing.size > 0) requestMissingEvents([...missing], nowMs)
+  for (const a of spreads) if (a.created_at >= recentSec && !known.has(a.post_id)) missing.add(a.post_id)
+  for (const a of buries) if (a.created_at >= recentSec && !known.has(a.post_id)) missing.add(a.post_id)
+  if (missing.size > 0) requestMissingEvents([...missing].sort().slice(0, NETWORK_REQUEST_CAP), nowMs)
 
-  // Autores ativos sem âncora OTS → pedir as provas que eles publicaram.
+  // Autores de post e reporters sem âncora OTS → pedir as provas que eles
+  // publicaram. Não pede de todo spreader: chave de peso 0 sem post nem
+  // report não muda nada no ranking, e pedir por todas era tempestade de
+  // REQs (revisão F6b). Teto por recomputação.
   const anchored = new Set(anchorRows.map((r) => r.author_pub))
   const actors = new Set<string>()
   for (const p of posts) actors.add(p.author_pub)
-  for (const a of spreads) actors.add(a.user_pub)
-  for (const a of buries) actors.add(a.user_pub)
   for (const r of reports) actors.add(r.reporter_pub)
-  const unanchored = [...actors].filter((n) => !anchored.has(n))
-  if (unanchored.length > 0) requestAnchorsFor(unanchored, nowMs)
+  const unanchored = [...actors].filter((n) => !anchored.has(n)).sort()
+  if (unanchored.length > 0) requestAnchorsFor(unanchored.slice(0, NETWORK_REQUEST_CAP), nowMs)
 
   scheduleDayRollover(out.epochMs)
 }

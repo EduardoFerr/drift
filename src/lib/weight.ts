@@ -3,22 +3,25 @@
  *
  * Manifesto §22 (Score Determinístico, Não Reputação Subjetiva):
  *  - Mesma fórmula em todos os clientes Drift
- *  - Inputs são eventos públicos verificáveis (created_at, spreads,
- *    reports confirmados, last_active)
+ *  - Inputs são eventos públicos verificáveis (âncora OpenTimestamps,
+ *    spreads/comentários recebidos, posts moderados, last_active)
  *  - Não há "afinidade pessoal" — peso é objetivo
  *
- * Arquitetura §9.
+ * Arquitetura §9. O cálculo GLOBAL (ponto fixo, quem pondera quem) vive
+ * em `ranking.ts`; aqui ficam as fórmulas por identidade.
  *
  * Componentes do peso (0..100):
  *
  *   weight = antiquity (0..40) + engagement (0..60)
  *
- *   antiquity = min(40, semanas-desde-criação)
- *   engagement = soma_pontos clamp(0, 60), onde:
- *     POST_SPREAD       +10   (alguém espalhou um post seu)
- *     COMMENT_RECEIVED  +1    (Fase 5 — quando comentários entrarem)
+ *   antiquity = min(40, semanas desde a âncora OTS)   — `createdAt` = bloco
+ *               Bitcoin; sem âncora o caller passa createdAt = now → 0
+ *   engagement = soma_pontos clamp(0, 60), onde (ranking.ts passa as
+ *   contagens JÁ PONDERADAS por peso/100 de quem deu):
+ *     POST_SPREAD       +10   × Σ w(spreader)/100
+ *     COMMENT_RECEIVED  +1    × Σ w(commenter)/100
  *     POST_BURIED        0    (bury NÃO penaliza — manifesto §23)
- *     REPORT_CONFIRMED -15    (report passou no threshold)
+ *     REPORT_CONFIRMED -15    por post próprio moderado
  *     DAILY_INACTIVE    -1    (por dia sem atividade)
  *
  * Determinismo: TODAS as funções aqui recebem `now` por parâmetro. Sem
@@ -33,11 +36,11 @@ import { DRIFT_LIMITS, ENGAGEMENT_POINTS, MS_PER_DAY, MS_PER_WEEK } from '../con
 import { db } from './db'
 
 export interface WeightInput {
-  /** Timestamp de criação da identidade (ms — vem do `identity.createdAt`). */
+  /** Âncora de antiguidade (ms): bloco Bitcoin da prova OTS mais antiga. */
   createdAt: number
-  /** Total de spreads recebidos pelos posts deste autor. */
+  /** Spreads recebidos, já ponderados: Σ weight(spreader)/100. */
   spreadsReceived: number
-  /** Comentários recebidos (Fase 5+). Default 0. */
+  /** Comentários recebidos, já ponderados: Σ weight(commenter)/100. Default 0. */
   commentsReceived?: number
   /** Reports confirmados (passaram no threshold). Default 0. */
   reportsConfirmed?: number
@@ -62,9 +65,10 @@ export function calculateAntiquity(createdAt: number, now: number): number {
 /**
  * Engajamento da identidade em "pontos de peso" (0..60, clamp).
  *
- * Soma ponderada de eventos públicos. Negativos (reports confirmados,
- * inatividade) descontam. Saturação em 60 — ninguém vira "rei
- * permanente do feed" só por ter espalhamento muito alto.
+ * Soma ponderada de eventos públicos, saturada em 60 — ninguém vira
+ * "rei permanente do feed" só por ter espalhamento muito alto. Os
+ * negativos (reports confirmados, inatividade) descontam DEPOIS da
+ * saturação, então sempre mordem.
  */
 export function calculateEngagement(input: WeightInput): number {
   const spreadPoints = input.spreadsReceived * ENGAGEMENT_POINTS.POST_SPREAD
@@ -74,8 +78,12 @@ export function calculateEngagement(input: WeightInput): number {
     (input.reportsConfirmed ?? 0) * ENGAGEMENT_POINTS.REPORT_CONFIRMED // negativo
   const inactivityPenalty = inactivityDays(input.lastActive, input.now) * ENGAGEMENT_POINTS.DAILY_INACTIVE // negativo
 
-  const raw = spreadPoints + commentPoints + reportPenalty + inactivityPenalty
-  return Math.max(0, Math.min(DRIFT_LIMITS.ENGAGEMENT_MAX, raw))
+  // Penalidades DEPOIS do teto do positivo (auditoria 2026-11-03, F2).
+  // Antes era clamp(positivo + penalidades): quem tinha engajamento bruto
+  // muito acima de 60 (anel de Sybil, ou veterano muito espalhado) ficava
+  // imune a moderação e inatividade — o −15 sumia dentro do excesso.
+  const positive = Math.min(DRIFT_LIMITS.ENGAGEMENT_MAX, spreadPoints + commentPoints)
+  return Math.max(0, positive + reportPenalty + inactivityPenalty)
 }
 
 /**

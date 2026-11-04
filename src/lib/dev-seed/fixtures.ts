@@ -138,9 +138,10 @@ function named(
  * espalhados e estáveis:
  *  - Alice criada 30 semanas antes da base → antiquity satura perto de 30.
  *  - Bob 12 semanas, Carol 6, Dave 2, etc.
- * Antiguidade (semanas, cap 40) + engagement (spreads recebidos × 10,
- * cap 60) determinam o weight. Ver `CASCADE_EXPECTED` pra os valores
- * calculados que a suite de score assere.
+ * O seed grava uma âncora OTS SIMULADA no genesis de cada identidade
+ * (`seed.ts:seedSimulatedAnchors`), então a antiguidade = semanas desde
+ * `createdAt` (cap 40). Engajamento = spreads recebidos × 10 × peso do
+ * spreader/100 (cap 60), resolvido por ponto fixo em `ranking.ts`.
  */
 export const NAMED_IDENTITIES: readonly SeedIdentity[] = Object.freeze([
   named('alice', geo(-15.79, -47.88, 'Brasília', 'BR'), [], TS_BASE - 30 * WEEK),
@@ -754,7 +755,10 @@ function buildWithDelta(mode: SeedMode, delta: number): SeedEventSet {
   for (let t = 0; t < reportTargets.length; t++) {
     const target = reportTargets[t]!
     // alvo 0 + 1 usam 'illegal' (threshold 3); alvo 2 'spam' (threshold 5).
-    const reason: ReportReason = t < 2 ? 'illegal' : 'spam'
+    // No lite, todos 'illegal': só identidades com peso ≥ 20 denunciam
+    // (REPORT_MIN_WEIGHT), e o subset lite não tem antiguidade somada
+    // suficiente pra cruzar 5 pontos com folga.
+    const reason: ReportReason = t < 2 || mode === 'lite' ? 'illegal' : 'spam'
     const needed = getReportThreshold(activeIdentities.length, reason) * 1.3
     let acc = 0
     const reporters: SeedIdentity[] = []

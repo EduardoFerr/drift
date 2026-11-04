@@ -7,12 +7,15 @@
  * existe ranking secreto, é tudo derivado de eventos públicos.
  *
  * Fórmula:
- *   score = (spreadWeight - buryWeight * 0.3) / (ageHours + 2) ^ 1.5
+ *   score = (spreadWeight - buryWeight * 0.3 + commentWeight) / (ageHours + 2) ^ 1.5
+ *   commentWeight = min(Σ weight(comentaristas), COMMENTS_SCORE_CAP) —
+ *   somado ao numerador por `ranking.ts:computeRanking`.
  *
  * Por quê:
  *  - spreadWeight = SOMA dos pesos dos spreaders (cada spreader
  *    contribui com seu próprio `weight` de identidade Drift, 0..100).
- *    Sybil novo tem weight ~0 → spread vale ~0 (manifesto §22 + §32).
+ *    Chave sem âncora OTS e sem endosso tem weight 0 → spread vale 0
+ *    (manifesto §22 + §33).
  *  - Buries idem com burier weight, multiplicado por 0.3 — enterro é
  *    julgamento estético, não punição. Reduz menos do que espalhar.
  *  - +2 nos ageHours evita divisão explosiva nos primeiros minutos.
@@ -28,7 +31,7 @@
  *
  * **Mudança "última ação vale"**: cada (post_id, user_pub) contribui
  * com APENAS sua ação líquida — última cronologicamente entre seus
- * spreads e buries. Implementado em `events.ts:recalculateScore`.
+ * spreads e buries. Implementado em `ranking.ts:selectLatestActionByUser`.
  * Manifesto §23 (mudança de opinião não pune retroativamente).
  */
 

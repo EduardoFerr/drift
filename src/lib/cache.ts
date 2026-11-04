@@ -82,11 +82,19 @@ export async function evictOldPosts(currentNpub: string): Promise<number> {
 
   const removed = result.length
   if (removed > 0) {
-    // Cleanup órfãos — buries de posts que sumiram não fazem mais
-    // sentido. Spreads/Reports do user atual ficam (ele continua
-    // querendo seedear/moderar mesmo se o post sumiu localmente).
+    // Cleanup órfãos — votos e comentários ALHEIOS de posts que sumiram
+    // não fazem mais sentido. Sem isso, a recomputação via esses votos
+    // como "post órfão" e o buscava de novo na rede, desfazendo a
+    // eviction em ciclo (revisão do algoritmo 2026-11-03). Spreads do
+    // user atual ficam (ele continua querendo seedear o post).
+    await db.run(`DELETE FROM buries WHERE post_id NOT IN (SELECT id FROM posts)`)
     await db.run(
-      `DELETE FROM buries WHERE post_id NOT IN (SELECT id FROM posts)`,
+      `DELETE FROM spreads WHERE spreader_pub != ? AND post_id NOT IN (SELECT id FROM posts)`,
+      [currentNpub],
+    )
+    await db.run(
+      `DELETE FROM comments WHERE author_pub != ? AND post_id NOT IN (SELECT id FROM posts)`,
+      [currentNpub],
     )
     invalidateFeed()
   }

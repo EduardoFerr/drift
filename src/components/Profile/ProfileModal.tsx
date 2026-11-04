@@ -133,7 +133,7 @@ export function ProfileModal({ identity, onClose }: ProfileModalProps) {
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <TierBadge tier={tier} />
                 <span className="font-mono text-[10px] text-drift-muted/50">
-                  há {ageWeeks} {ageWeeks === 1 ? 'semana' : 'semanas'}
+                  criada neste aparelho há {ageWeeks} {ageWeeks === 1 ? 'semana' : 'semanas'}
                 </span>
               </div>
             </div>
@@ -241,14 +241,17 @@ export function ProfileModal({ identity, onClose }: ProfileModalProps) {
                 </span>
               </div>
               <div className="mt-3 space-y-1.5 font-mono text-[11px]">
-                <Row label="antiquidade" value={userWeight.antiquity.toFixed(1)} />
+                <Row label="antiguidade (âncora Bitcoin)" value={userWeight.antiquity.toFixed(1)} />
                 <Row label="engajamento" value={userWeight.engagement.toFixed(1)} />
                 <Row label="max subposts" value={String(userWeight.maxSubposts)} />
               </div>
             </div>
             <p className="px-1 font-mono text-[10px] leading-relaxed text-drift-muted/60">
-              peso é função pura de antiquidade + spreads recebidos (§22).
-              qualquer cliente drift calcula o mesmo.
+              peso = semanas desde sua âncora no Bitcoin (máx. 40) +
+              engajamento ponderado pelo peso de quem deu DRIFT/comentou
+              (máx. 60). sem âncora ainda? a antiguidade fica 0 até o
+              carimbo confirmar (algumas horas com o app aberto). qualquer
+              cliente drift calcula o mesmo (§22).
             </p>
           </div>
         </Collapse>
@@ -345,7 +348,7 @@ function TierBadge({ tier }: { tier: WeightTier | null }) {
   return (
     <span
       className={`inline-flex items-center gap-1 rounded-lg border px-2 py-0.5 font-mono text-[11px] ${config.color}`}
-      title="weight é determinístico — função pura de antiquity (semanas) + spreads recebidos. §22."
+      title="peso determinístico — semanas desde a âncora no Bitcoin + engajamento ponderado pelo peso de quem deu DRIFT. §22."
     >
       <span aria-hidden>{config.emoji}</span>
       <span>{config.label}</span>

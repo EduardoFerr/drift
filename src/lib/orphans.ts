@@ -18,6 +18,8 @@ import type { Filter } from './transport'
 import type { SignedEvent } from '../types/nostr'
 
 const BATCH = 50
+/** Teto de ids por chamada (= ≤ 4 REQs simultâneos de BATCH ids). */
+const MAX_PER_CALL = 200
 const TIMEOUT_MS = 10_000
 const RETRY_MS = 60 * 60 * 1000
 const ATTEMPTED_CAP = 20_000
@@ -58,10 +60,19 @@ function requestBatched(
   nowMs: number,
   toFilter: (chunk: string[]) => Filter,
 ): void {
-  const todo = selectIdsToRequest([...new Set(keys)], nowMs)
+  const todo = selectIdsToRequest([...new Set(keys)], nowMs).slice(0, MAX_PER_CALL)
   if (todo.length === 0) return
-  if (attempted.size > ATTEMPTED_CAP) attempted.clear()
-  for (const id of todo) attempted.set(id, nowMs)
+  for (const id of todo) {
+    attempted.delete(id) // re-inserção move pro fim (ordem de inserção = LRU)
+    attempted.set(id, nowMs)
+  }
+  // LRU: descarta os mais antigos. Antes era `clear()` acima do teto, que
+  // liberava TODOS os ids de uma vez → rajada de centenas de REQs (revisão F6b).
+  while (attempted.size > ATTEMPTED_CAP) {
+    const oldest = attempted.keys().next().value
+    if (oldest === undefined) break
+    attempted.delete(oldest)
+  }
 
   for (let i = 0; i < todo.length; i += BATCH) {
     const chunk = todo.slice(i, i + BATCH)
