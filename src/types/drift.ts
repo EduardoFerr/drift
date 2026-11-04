@@ -498,9 +498,9 @@ export interface UserPrefs {
    * Time-window decay nos reports (Gap A insider brigada partial
    * mitigation — Barney devsec 2026-05-21). Default OFF.
    *
-   * Quando ON, `aggregateReports` aplica decay exponencial half-life 48h
-   * sobre o peso de cada report (`getReportWeight(reporter_weight) ×
-   * 2^(-age/48h)`). Reports antigos pesam menos no threshold dinâmico
+   * Quando ON, o motor de ranking (`ranking.ts`) aplica decay
+   * exponencial half-life 48h sobre os pontos de cada report
+   * (`getReportWeight(reporter_weight) × 2^(-age/48h)`). Reports antigos pesam menos no threshold dinâmico
    * de moderação (§26).
    *
    * Trade-off documentado em `known-limitations.md` §5c: defende brigada
@@ -513,6 +513,14 @@ export interface UserPrefs {
    * Local-only por contrato (cada cliente recomputa).
    */
   report_decay_enabled: boolean
+  /**
+   * Carimbo OpenTimestamps automático da identidade ativa (auditoria
+   * 2026-11-03). Default ON: sem âncora no Bitcoin a identidade tem
+   * antiguidade 0 e seus spreads/reports valem só o que ela recebeu de
+   * quem já tem peso. Contata calendários OTS públicos (veem só um hash
+   * com nonce). Ignorado fora de `network_mode = 'clearnet'`.
+   */
+  ots_stamping_enabled: boolean
   /**
    * Settings friction Phase 6 (2026-05-19 user pivot): substitui o
    * binário `show_advanced_settings` por 4 flags granulares. User
@@ -659,6 +667,7 @@ export const DEFAULT_USER_PREFS: UserPrefs = {
   lens_ppr_decay_enabled: false,
   lens_show_in_map: false,
   report_decay_enabled: false,
+  ots_stamping_enabled: true,
   menu_detail_show_details: true,
   menu_detail_show_manifesto: false,
   menu_detail_show_how_it_works: false,

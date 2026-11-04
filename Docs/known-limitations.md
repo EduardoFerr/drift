@@ -141,7 +141,8 @@ audits só por feio. Defer documentado > silence.
   - Pref `UserPrefs.report_decay_enabled` (default OFF — opt-in até
     telemetria validar). Quando ON, `aggregateReports` aplica decay
     48h half-life sobre cada report
-  - `maybeModerate` lê pref + passa opts → reports antigos pesam menos
+  - O motor de ranking (`ranking.ts`) lê a pref via recomputação global
+    → reports antigos pesam menos
   - 8 conformance tests novos em `tests/moderation.test.ts`
 - **Surface residual (documentada nos próprios tests):**
   - **Brigada flash <1h:** decay 48h não pega (5 reports/1h = peso
@@ -155,6 +156,136 @@ audits só por feio. Defer documentado > silence.
   de GAP-CLUSTER detection.
 
 ---
+
+### 5d. Partida a frio do peso (âncora OpenTimestamps)
+
+- **Status:** ABERTO por design (auditoria 2026-11-03).
+- **O que é:** desde que a antiguidade passou a vir de prova
+  OpenTimestamps verificada no Bitcoin (antes: `created_at` forjável),
+  toda identidade começa com antiguidade 0 até carimbar — inclusive as
+  que já existiam, porque idade passada não carimbada não é provável.
+  O engajamento é ponderado pelo peso de quem espalhou, então numa rede
+  onde ninguém tem peso, ninguém ganha peso por spread.
+- **Consequências:**
+  - nas primeiras semanas após o deploy, scores ficam baixos e
+    próximos entre si (o ranking é dominado pelo decay temporal);
+  - moderação exige reporters com **peso ≥ 20 e ≥ 8 semanas de âncora**.
+    Simulação da revisão (2000 usuários ancorados no deploy, cada um
+    espalhando 10 autores): ninguém reporta até a semana 8; 193 na
+    semana 8; 944 na 10; 1600 na 12 (7 reporters medianos bastam pra
+    `illegal`); 1973 na 16. Ou seja, **a moderação comunitária fica
+    desligada por ~10–12 semanas após o deploy**. Filtros locais
+    (bloquear/silenciar) continuam valendo o tempo todo.
+  - votos (DRIFT/SINK/comentário) só contam a partir de peso 4 com 2
+    semanas de âncora: na simulação, ninguém vota até a semana 4 (scores
+    todos 0) e todos votam na 6. **O feed fica ordenado só por recência
+    nas primeiras ~4–6 semanas.**
+- **Por que aceito:** qualquer atalho (piso de peso, antiguidade pelo
+  `created_at`, report de peso 0 valer algo) reabre Sybil gratuito —
+  10 chaves derrubavam qualquer post, 6 chaves davam peso 60.
+- **Reopener:** proposta de semente de confiança que não seja chave
+  mestra (§17) — ex.: lista de âncoras publicada e assinada por N
+  operadores independentes, opt-in por cliente.
+
+### 5e. Âncoras não verificadas em modo Tor
+
+- **Status:** ABERTO.
+- **O que é:** verificar uma prova OTS exige consultar exploradores
+  Bitcoin (clearnet). Com `network_mode ≠ clearnet` o cliente não
+  consulta, as provas ficam pendentes e as identidades correspondentes
+  têm antiguidade 0 **neste cliente** — o ranking dele diverge do de
+  clientes clearnet.
+- **Reopener:** explorador acessível via Tor/onion, ou headers Bitcoin
+  embarcados/sincronizados por P2P.
+
+### 5g. Endpoints OpenTimestamps fixos no código
+
+- **Status:** ABERTO.
+- **O que é:** calendários (`ots-client.ts:DEFAULT_CALENDARS`) e
+  exploradores Bitcoin (`DEFAULT_EXPLORERS`) não são configuráveis em
+  UserPrefs, ao contrário de upload e tiles (padrão "endpoints de
+  soberania"). Desligar o carimbo ou usar Tor evita os calendários; os
+  exploradores são evitados só em Tor.
+- **Reopener:** pedido de self-host de calendário/explorador, ou
+  `ots_calendars`/`btc_explorers` em UserPrefs.
+
+### 5h. Pré-envelhecimento de chaves é barato e paralelo
+
+- **Status:** ABERTO por design (inerente a antiguidade como time-lock).
+- **O que é:** hoje alguém gera N chaves, assina 1 evento de cada (sem
+  publicar) e carimba todos numa única raiz OTS. Antiguidade custa
+  TEMPO, não custo por identidade. Os mínimos de elegibilidade (voto ≥ 4,
+  report ≥ 20) convertem "muitas chaves × 1 dia" em "cada chave × semanas
+  reais": antes, 1200 chaves de 1 dia moderavam qualquer post `illegal`.
+  Medido na revisão (rodada 4): o ataque mais barato hoje são 3
+  "concentradores" com ~8,6 semanas de âncora, cada um endossado por ~100
+  chaves de ~4,3 semanas — ~300 chaves e **~9 semanas de preparação**
+  (paralelizável) pra moderar um post de veterano em rede pequena.
+- **Mitigação existente:** o orçamento conservado (`ranking.ts`) impede
+  que essas chaves gerem peso umas para as outras além de 2× a soma das
+  antiguidades; a base ativa ponderada faz cada uma também elevar o
+  threshold. A defesa contra 1M chaves pacientes é a soma delas ser
+  pública e auditável no Bitcoin (todas carimbadas na mesma raiz).
+- **Reopener:** custo por identidade que não seja PoW (§33) nem chave
+  mestra (§17) — ex.: carimbo exigindo prova de liquidez Lightning.
+
+### 5i. Recomputação global roda no main thread
+
+- **Status:** ABERTO — follow-up (revisão pré-merge, Ted #5 / Satoshi F6a).
+- **O que é:** `recalcAllScores` carrega todas as tabelas e roda
+  `computeRanking` na thread principal, com debounce de 100 ms e teto de
+  5 s sob tráfego contínuo. Medido no Node (desktop): ~0,9 s com 20k
+  usuários e 200k spreads em cadeia adversarial; ~100–300 ms em 10k posts
+  e 50–200k spreads. Celular: 3–5× mais lento.
+- **Reopener:** mover `computeRanking` (puro) para o db worker — também
+  elimina o clone das linhas entre threads.
+
+### 5j. Moderação derivada pode deixar de valer
+
+- **Status:** ABERTO por design.
+- **O que é:** a moderação é recalculada do conjunto de reports com os
+  pesos ATUAIS, de forma conservadora (só modera o que resiste às
+  penalidades de todos os candidatos). Em ataque simétrico — dois lados
+  se denunciando — nenhum dos dois é moderado. Provado na revisão: o
+  spammer x e 2 cúmplices (8+ semanas) denunciam um post Q do reporter
+  honesto h; h e outros denunciam o spam S de x; no pior caso x e h são
+  penalizados juntos e **S e Q escapam**. Custo: poder de report ≥
+  threshold sobre um post de cada reporter-alvo. Não funciona contra
+  reporters que valem só pela antiguidade (o −15 sai do engajamento): a
+  comunidade neutraliza com reporters veteranos.
+- **Eviction apaga a penalidade:** posts moderados (−999) são os primeiros
+  a sair do cache local (`cache.ts` ordena por score). Sem o post, os
+  reports dele deixam de contar e o −15 do autor some NESTE cliente. Um
+  flood de ~10k posts acelera. Reopener: materializar contagem de posts
+  moderados por autor, ou não despejar moderados antes de N dias.
+- **Além disso:** Se os reporters perderem peso (inatividade, moderação dos
+  próprios posts) ou a base ativa crescer e subir o threshold, um post
+  moderado pode voltar ao feed. Com `report_decay_enabled` a meia-vida é
+  medida contra o report mais recente, então a passagem do tempo sozinha
+  não desfaz.
+- **Reopener:** decisão de produto de tornar moderação "pegajosa"
+  (ex.: uma vez moderado, só desfaz por evento explícito).
+
+### 5k. Limites numéricos do motor
+
+- **Status:** ABERTO (aceitável).
+- **O que é:** o ponto fixo de pesos para em 200 iterações ou tolerância
+  relativa 1e-9 (a contração converge em ~35); o laço monótono de
+  moderação para em ≤ nº de posts reportados rodadas. Ambos são
+  determinísticos. Comentários com `score = -999` são excluídos do
+  ranking, mas nada grava esse valor hoje (moderação de comentário não
+  existe).
+
+### 5f. Convergência exige o mesmo conjunto de eventos
+
+- **Status:** ABERTO (limite de arquitetura, não bug).
+- **O que é:** o motor garante mesmo resultado pra mesmo conjunto de
+  eventos, em qualquer ordem. Clientes com conjuntos DIFERENTES (relays
+  diferentes, janela de sync de 7d, `limit 500` por relay) ainda podem
+  divergir. Mitigações shipadas: busca de post órfão por id, busca de
+  provas OTS por autor, rebroadcast com votos primeiro.
+- **Reopener:** paginação de histórico por `until` (TODO em `sync.ts`)
+  ou relays de arquivo dedicados.
 
 ## Anti-spam
 

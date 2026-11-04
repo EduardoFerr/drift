@@ -33,7 +33,7 @@ const ROOT = join(__dirname, '..')
  * literal (e não importada) de propósito: se alguém editar a do
  * `feed.ts`, o teste de sincronia abaixo acusa.
  */
-const SQL_DECAY = `(score_base / pow((:now - created_at) / 3600.0 + 2, 1.5))`
+const SQL_DECAY = `(score_base / pow(max(0, (:now - created_at) / 3600.0) + 2, 1.5))`
 
 interface Db {
   selectValue(sql: string, bind?: unknown): unknown
@@ -96,6 +96,13 @@ describe('Paridade SQL ↔ TS do decay temporal', () => {
     { nome: 'numerador negativo (mais SINK que DRIFT)', base: -30, ageHours: 3 },
     { nome: 'numerador zero', base: 0, ageHours: 12 },
     { nome: 'fração de hora', base: 123.456, ageHours: 0.25 },
+    // Idade NEGATIVA (created_at no futuro, dentro da tolerância de
+    // relógio). Sem o `max(0, …)` na SQL, -1.9h dava boost de ~89× e
+    // -5h dava NULL — a paridade só valia no domínio positivo
+    // (auditoria 2026-11-03, C1).
+    { nome: 'idade -15min (relógio adiantado)', base: 50, ageHours: -0.25 },
+    { nome: 'idade -1.9h', base: 50, ageHours: -1.9 },
+    { nome: 'idade -5h', base: 50, ageHours: -5 },
   ]
 
   for (const c of CASES) {
@@ -126,12 +133,12 @@ describe('Paridade SQL ↔ TS do decay temporal', () => {
 })
 
 describe('A expressão de decay do feed.ts não divergiu', () => {
-  it('feed.ts usa pow com o +2 e o expoente 1.5 sobre score_base', () => {
+  it('feed.ts usa pow com max(0, idade), o +2 e o expoente 1.5 sobre score_base', () => {
     const feed = readFileSync(join(ROOT, 'src/lib/feed.ts'), 'utf8')
     // Sem isto, qualquer edição na SQL passaria despercebida pelos
     // testes de paridade acima, que usam um literal próprio.
     expect(feed, 'feed.ts deve ordenar por score_base com decay').toMatch(
-      /score_base\s*\/\s*pow\(\(\?\s*-\s*p\.created_at\)\s*\/\s*3600\.0\s*\+\s*2,\s*1\.5\)/,
+      /score_base\s*\/\s*pow\(max\(0,\s*\(\?\s*-\s*p\.created_at\)\s*\/\s*3600\.0\)\s*\+\s*2,\s*1\.5\)/,
     )
   })
 

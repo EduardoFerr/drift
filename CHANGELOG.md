@@ -4,6 +4,93 @@ All notable changes to the Drift client. Uses [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+Auditoria do algoritmo (2026-11-03, `Docs/auditoria-algoritmo-2026-11.md`):
+14 defeitos com prova executável, todos corrigidos. **Mudança de
+semântica do peso** — ver "Changed".
+
+### Added
+- **Motor de ranking global (`src/lib/ranking.ts`)** — pesos, scores e
+  moderação derivados de uma vez do conjunto de eventos. Mesmo conjunto
+  em qualquer ordem → mesmo resultado (manifesto §7).
+- **Âncora de antiguidade OpenTimestamps (NIP-03, kind 1040)** —
+  `ots.ts` (formato .ots + verificação, sem dependências), `ots-client.ts`
+  (calendários + headers Bitcoin cruzados em ≥2 exploradores),
+  `ots-anchors.ts` (verifica provas recebidas), `ots-stamper.ts` (carimba
+  a identidade ativa e publica a prova). Pref `ots_stamping_enabled`
+  (default on; nunca roda fora de clearnet) em Configurações → soberania.
+- **Busca de órfãos (`orphans.ts`)** — post referenciado por voto ou
+  comentário e ausente é pedido por id; provas OTS de autores sem âncora
+  são pedidas por autor.
+- **Sync global de comentários (kind 1111 em posts Drift) e de provas OTS.**
+- **`tests/algorithm-invariants.test.ts`** — 45 invariantes no pipeline
+  real com SQLite real, incl. teste de propriedade (12 embaralhamentos de
+  uma rede aleatória → resultado idêntico). **`tests/ots.test.ts`** — 43
+  testes incl. prova real do bloco 358391.
+
+### Changed
+- **Antiguidade** vem do bloco Bitcoin mais antigo que prova um evento da
+  identidade, não do `created_at` (forjável) do primeiro evento visto.
+  Identidades existentes começam em 0 até carimbar (known-limitations §5d).
+- **Engajamento** ponderado: spread recebido vale `10 × peso(spreader)/100`
+  (antes +10 fixo por evento — 6 chaves novas davam peso 60).
+- **Pontos de report** = `peso/50` em [0, 2] (antes piso de 0.5 — 10 chaves
+  novas derrubavam qualquer post).
+- **Moderação** derivada a cada recomputação (antes `UPDATE -999` que o
+  recálculo seguinte apagava).
+- **Comentários** entram no numerador do score e portanto na ordem do feed.
+- **Spreads, buries e reports** são upsert LWW (antes guardavam o primeiro
+  a chegar).
+- Pesos medidos no início do dia UTC; recomputação automática na virada.
+- Rebroadcast publica provas e votos primeiro, com teto por categoria.
+- **Revisão pré-merge (2026-11-04)** — 3 pares de revisão; ataques
+  provados viraram invariantes:
+  - endosso com **orçamento conservado** e uma aresta por par: o peso
+    total de qualquer grupo ≤ 2× a antiguidade ancorada dele (antes, uma
+    âncora de 1 dia saturava um anel inteiro em peso 60);
+  - penalidade de moderação/inatividade depois do teto do engajamento;
+  - laço moderação ↔ peso monótono (podia oscilar e não moderar nada);
+  - base ativa do threshold ponderada por peso;
+  - fila de verificação OTS com ordem justa, backoff e desistência,
+    ≤ 4 attestations e altura plausível, ≤ 3 provas por alvo e teto de
+    pendentes;
+  - busca de órfãos só na janela de sync e com teto; LRU no lugar de
+    `clear()`; eviction do cache limpa votos/comentários alheios órfãos;
+  - decay de report medido contra o report mais recente.
+- **Segunda rodada de revisão (ataques aos próprios fixes):**
+  - mínimos de elegibilidade: voto conta a partir de peso 4, report a
+    partir de peso 20 (antes, 1200 chaves de 1 dia moderavam qualquer post);
+  - moderação decidida em ordem histórica, aplicando a penalidade de cada
+    post moderado antes do próximo (o laço monótono deixava spammer
+    punido derrubar post honesto com peso cheio);
+  - admissão de provas OTS: a do próprio autor do evento sempre entra e
+    tem prioridade; terceiros com teto por publicador (20) e por alvo (3,
+    sem contar inválidas); fila cheia despeja o pior em vez de recusar;
+  - sem rede (Tor) nenhuma tentativa é gasta; backoff com teto, sem
+    desistência definitiva;
+  - provas inválidas têm o conteúdo apagado; teto de linhas inválidas;
+  - topo real da cadeia consultado (cache 30 min) pra rejeitar alturas
+    inexistentes sem martelar exploradores.
+- **Terceira rodada:**
+  - mínimos também de ANTIGUIDADE própria: votar/endossar ≥ 2 semanas,
+    denunciar ≥ 8 semanas; abaixo do piso não endossa (chaves de 1 dia
+    concentravam peso 60 num "concentrador");
+  - moderação conservadora sem ordem (candidatos que resistem às
+    penalidades de todos os candidatos): timestamps de report não mudam
+    mais o resultado, e o custo caiu de 1 re-solução por post moderado
+    para 3 no total (1000 moderados: 18 s → 0,35 s);
+  - orçamento de buscas de autor esgotado não gasta tentativa; despejo
+    começa pelo publicador com mais pendentes; teto por publicador vale
+    também pras provas do próprio autor;
+  - carimbador mira o evento MAIS RECENTE da identidade (os outros
+    clientes já o têm → prova reconhecida como do próprio autor);
+  - só a melhor prova de cada autor guarda o conteúdo.
+
+### Fixed
+- Evento com `created_at` > 15 min no futuro é descartado; cursor de sync
+  nunca passa do presente (um evento datado no futuro parava o sync).
+- SQL do feed clampa idade negativa (boost de até ~89×; NULL além de +2h).
+- Cascata do mapa: distância de longitude pela volta curta (antimeridiano).
+
 ## [0.6.0-alpha.4] — 2026-05-04
 
 Release de hardening: Tier 1 legal posture, audit Docs/, fix de 2 gaps adversariais (Barney) e RFC Track B (Helia + NIP-94). 14 commits desde `alpha.3`. **+45 tests** (399 → 444 passing). Sem breaking changes; cliente continua compatível com posts existentes.

@@ -17,6 +17,29 @@ Formato:
 - Item aberto: `- [ ] <decisão> — contexto: <origem> — bloqueio: <quem/quê>`
 - Item fechado: `- [x] <decisão> — fechado YYYY-MM-DD em <commit-hash> — <1 linha resolução>`
 
+## Auditoria do algoritmo (2026-11-03)
+
+- [ ] **PoW opcional anti-spam de volume** — contexto: user perguntou se o próprio
+  autor poderia "minerar". Bitcoin: inviável. NIP-13 por evento: possível,
+  mas custo assimétrico (GPU ≫ celular) e §33 rejeita PoW pra reputação.
+  Pendente: decidir se vale como exigência OPCIONAL de relay contra volume.
+- [ ] **Partida a frio do peso** (known-limitations §5d) — rede recém-migrada
+  fica com pesos ~0 e moderação inerte por semanas. Pendente: decidir se
+  existe semente de confiança aceitável sem chave mestra.
+- [ ] **UI de status da âncora** — perfil mostra antiguidade/engajamento,
+  mas não "carimbo pendente / publicado / verificado". Pendente: desenho.
+- [ ] **Verificação de âncora em modo Tor** (known-limitations §5e).
+- [ ] **Motor de ranking no worker** — contexto: revisão pré-merge
+  (Ted #5, Satoshi F6a); ~0,9 s por recomputação em 200k spreads no main
+  thread (known-limitations §5i) — bloqueio: nenhum, trabalho a fazer.
+- [ ] **Aviso de queda de peso pós-atualização** — contexto: revisão
+  Lily M4; composer mostra "1/1" subpost sem explicar; avaliar aviso
+  único no boot + dica no composer — bloqueio: desenho.
+- [ ] **`useUserWeight` re-lê só quando `posts.length` muda** — contexto:
+  revisão Lily; âncora verificada/virada do dia não atualizam o composer
+  até chegar post novo — bloqueio: nenhum.
+- [ ] **Endpoints OTS configuráveis** (known-limitations §5g).
+
 **📋 Sprint N+3 plan Satoshi (2026-05-21) — ZERO DÉBITO MADURO:**
 `nota interna`
 

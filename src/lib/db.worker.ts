@@ -246,6 +246,11 @@ const DOMAIN_TABLES = [
   // é user-state (escolha explícita do user, igual blocked/muted/identities).
   'lens_edges',
   'lens_walks_cache',
+  // OTS (NIP-03): provas e âncoras são re-sincronizáveis da rede; headers
+  // são re-buscáveis. `ots_local_stamps` NÃO entra — é estado local.
+  'ots_proofs',
+  'ots_anchors',
+  'btc_headers',
 ] as const
 
 function rebuildDomainSchema(schema: string) {

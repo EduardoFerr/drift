@@ -3,22 +3,25 @@
  *
  * Manifesto §22 (Score Determinístico, Não Reputação Subjetiva):
  *  - Mesma fórmula em todos os clientes Drift
- *  - Inputs são eventos públicos verificáveis (created_at, spreads,
- *    reports confirmados, last_active)
+ *  - Inputs são eventos públicos verificáveis (âncora OpenTimestamps,
+ *    spreads/comentários recebidos, posts moderados, last_active)
  *  - Não há "afinidade pessoal" — peso é objetivo
  *
- * Arquitetura §9.
+ * Arquitetura §9. O cálculo GLOBAL (ponto fixo, quem pondera quem) vive
+ * em `ranking.ts`; aqui ficam as fórmulas por identidade.
  *
  * Componentes do peso (0..100):
  *
  *   weight = antiquity (0..40) + engagement (0..60)
  *
- *   antiquity = min(40, semanas-desde-criação)
- *   engagement = soma_pontos clamp(0, 60), onde:
- *     POST_SPREAD       +10   (alguém espalhou um post seu)
- *     COMMENT_RECEIVED  +1    (Fase 5 — quando comentários entrarem)
+ *   antiquity = min(40, semanas desde a âncora OTS)   — `createdAt` = bloco
+ *               Bitcoin; sem âncora o caller passa createdAt = now → 0
+ *   engagement = soma_pontos clamp(0, 60), onde (ranking.ts passa as
+ *   contagens JÁ PONDERADAS por peso/100 de quem deu):
+ *     POST_SPREAD       +10   × Σ w(spreader)/100
+ *     COMMENT_RECEIVED  +1    × Σ w(commenter)/100
  *     POST_BURIED        0    (bury NÃO penaliza — manifesto §23)
- *     REPORT_CONFIRMED -15    (report passou no threshold)
+ *     REPORT_CONFIRMED -15    por post próprio moderado
  *     DAILY_INACTIVE    -1    (por dia sem atividade)
  *
  * Determinismo: TODAS as funções aqui recebem `now` por parâmetro. Sem
@@ -33,11 +36,11 @@ import { DRIFT_LIMITS, ENGAGEMENT_POINTS, MS_PER_DAY, MS_PER_WEEK } from '../con
 import { db } from './db'
 
 export interface WeightInput {
-  /** Timestamp de criação da identidade (ms — vem do `identity.createdAt`). */
+  /** Âncora de antiguidade (ms): bloco Bitcoin da prova OTS mais antiga. */
   createdAt: number
-  /** Total de spreads recebidos pelos posts deste autor. */
+  /** Spreads recebidos, já ponderados: Σ weight(spreader)/100. */
   spreadsReceived: number
-  /** Comentários recebidos (Fase 5+). Default 0. */
+  /** Comentários recebidos, já ponderados: Σ weight(commenter)/100. Default 0. */
   commentsReceived?: number
   /** Reports confirmados (passaram no threshold). Default 0. */
   reportsConfirmed?: number
@@ -62,9 +65,10 @@ export function calculateAntiquity(createdAt: number, now: number): number {
 /**
  * Engajamento da identidade em "pontos de peso" (0..60, clamp).
  *
- * Soma ponderada de eventos públicos. Negativos (reports confirmados,
- * inatividade) descontam. Saturação em 60 — ninguém vira "rei
- * permanente do feed" só por ter espalhamento muito alto.
+ * Soma ponderada de eventos públicos, saturada em 60 — ninguém vira
+ * "rei permanente do feed" só por ter espalhamento muito alto. Os
+ * negativos (reports confirmados, inatividade) descontam DEPOIS da
+ * saturação, então sempre mordem.
  */
 export function calculateEngagement(input: WeightInput): number {
   const spreadPoints = input.spreadsReceived * ENGAGEMENT_POINTS.POST_SPREAD
@@ -74,8 +78,12 @@ export function calculateEngagement(input: WeightInput): number {
     (input.reportsConfirmed ?? 0) * ENGAGEMENT_POINTS.REPORT_CONFIRMED // negativo
   const inactivityPenalty = inactivityDays(input.lastActive, input.now) * ENGAGEMENT_POINTS.DAILY_INACTIVE // negativo
 
-  const raw = spreadPoints + commentPoints + reportPenalty + inactivityPenalty
-  return Math.max(0, Math.min(DRIFT_LIMITS.ENGAGEMENT_MAX, raw))
+  // Penalidades DEPOIS do teto do positivo (auditoria 2026-11-03, F2).
+  // Antes era clamp(positivo + penalidades): quem tinha engajamento bruto
+  // muito acima de 60 (anel de Sybil, ou veterano muito espalhado) ficava
+  // imune a moderação e inatividade — o −15 sumia dentro do excesso.
+  const positive = Math.min(DRIFT_LIMITS.ENGAGEMENT_MAX, spreadPoints + commentPoints)
+  return Math.max(0, positive + reportPenalty + inactivityPenalty)
 }
 
 /**
@@ -156,86 +164,36 @@ function inactivityDays(lastActive: number | null, now: number): number {
   return Math.floor((now - lastActive) / MS_PER_DAY)
 }
 
-// ─── Bridge SQLite (lê estado do banco, monta WeightInput, aplica
-//     funções puras) ────────────────────────────────────────────────
-
-interface UserAggregateRow {
-  created_at: number
-  last_active: number | null
-  spreads_received: number
-  reports_confirmed: number
-}
+// ─── Bridge SQLite ───────────────────────────────────────────────────
+//
+// O peso NÃO é mais calculado por user isolado. Ele depende do peso de
+// quem espalhou (ponto fixo global, `ranking.ts`) e da âncora
+// OpenTimestamps, então só existe como resultado da recomputação global
+// (`events.ts:recalcAllScores`), materializado em `users.weight`. Esta
+// bridge apenas lê esse valor.
+//
+// Antes, cada caller recomputava a partir de `users.created_at` ("first
+// seen by this client", forjável via created_at retroativo) e de um
+// COUNT de spreads sem ponderação — as duas raízes de S1/S2/S3 na
+// auditoria 2026-11-03.
 
 /**
- * Lê o estado atual do banco pra um npub e calcula peso/engagement/maxSubposts.
+ * Peso materializado de um npub + derivados pra UI (tier/maxSubposts).
  *
- * Cada chamada faz 1 query consolidada (sub-selects). Idempotente do
- * lado do SQL — sem effects.
- *
- * **Determinismo:** o resultado depende SÓ do estado atual do banco +
- * `now`. Mesma entrada → mesma saída. Os valores no banco vêm de
- * eventos Nostr verificados (manifesto §7 + §22).
- *
- * Convenções de unidade: timestamps em **unix seconds** no SQLite (vêm
- * de `event.created_at`); `now` aqui é em **ms** (consistente com
- * `weight.ts` puro). A função adapta — ver função `inferIdentityCreatedMs`.
- *
- * @param npub - Identidade Drift (hex pubkey, NÃO bech32)
- * @param now - Agora em ms (passado por parâmetro pra teste/determinismo)
- * @returns Pesos calculados + max subposts permitidos. Se o user não
- *   existe no banco (sem atividade conhecida), retorna peso 0 e
- *   maxSubposts = 1 (identidade nova-do-zero).
+ * @param npub - hex pubkey
+ * @param _now - mantido por compat de assinatura; o peso já é do dia corrente
+ * @returns user desconhecido → peso 0, maxSubposts 1
  */
 export async function calculateUserWeight(
   npub: string,
-  now: number,
-): Promise<{ weight: number; engagement: number; antiquity: number; maxSubposts: number }> {
-  const row = await db.get<UserAggregateRow>(
-    `SELECT
-       u.created_at AS created_at,
-       u.last_active AS last_active,
-       (SELECT COUNT(*) FROM spreads s
-          INNER JOIN posts p ON p.id = s.post_id
-          WHERE p.author_pub = ?) AS spreads_received,
-       (SELECT COUNT(*) FROM posts WHERE author_pub = ? AND score = -999) AS reports_confirmed
-     FROM users u
-     WHERE u.npub = ?`,
-    [npub, npub, npub],
-  )
-
-  if (!row) {
-    // Sem registro: identidade nova ou desconhecida pelo cliente.
-    return { weight: 0, engagement: 0, antiquity: 0, maxSubposts: 1 }
-  }
-
-  const createdAtMs = inferIdentityCreatedMs(row.created_at, row.last_active, now)
-  const input: WeightInput = {
-    createdAt: createdAtMs,
-    spreadsReceived: row.spreads_received,
-    reportsConfirmed: row.reports_confirmed,
-    lastActive: row.last_active !== null ? row.last_active * 1000 : null,
-    now,
-  }
-
-  const antiquity = calculateAntiquity(input.createdAt, input.now)
-  const engagement = calculateEngagement(input)
-  const weight = Math.min(DRIFT_LIMITS.WEIGHT_MAX, antiquity + engagement)
-  return { weight, engagement, antiquity, maxSubposts: getMaxSubposts(weight) }
-}
-
-/**
- * `users.created_at` no SQLite é "first seen by this client" em unix
- * seconds. Convertemos pra ms. Se for futuro (clock skew), aceita —
- * `calculateAntiquity` clampa em 0.
- *
- * Edge case: row existe mas ninguém atualizou `last_active` (reports
- * de outros sobre este post sem evento próprio do autor) — usa o
- * created_at sozinho.
- */
-function inferIdentityCreatedMs(
-  createdAtSec: number,
-  _lastActiveSec: number | null,
   _now: number,
-): number {
-  return createdAtSec * 1000
+): Promise<{ weight: number; engagement: number; antiquity: number; maxSubposts: number }> {
+  const row = await db.get<{ weight: number | null; engagement: number | null }>(
+    `SELECT weight, engagement FROM users WHERE npub = ?`,
+    [npub],
+  )
+  const weight = row?.weight ?? 0
+  const engagement = row?.engagement ?? 0
+  // weight = antiguidade + engajamento sem saturar (40 + 60 = 100).
+  return { weight, engagement, antiquity: weight - engagement, maxSubposts: getMaxSubposts(weight) }
 }

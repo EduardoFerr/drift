@@ -233,6 +233,60 @@ CREATE TABLE IF NOT EXISTS users (
   last_active INTEGER
 );
 
+-- ── OpenTimestamps (NIP-03) — âncora de antiguidade ─────────────
+-- Auditoria 2026-11-03 (S1/S3): antiguidade vinha de `users.created_at`
+-- = `created_at` do primeiro evento visto — campo livre de quem assina
+-- (backdating) e diferente em cada cliente. Agora a antiguidade de uma
+-- identidade é o tempo desde o bloco Bitcoin mais antigo que prova a
+-- existência de um evento dela (prova OTS publicada como kind 1040).
+-- Bitcoin é global e não reescreve o passado: infalsificável e igual em
+-- todos os clientes.
+
+-- Provas recebidas (kind 1040), verificadas de forma assíncrona.
+CREATE TABLE IF NOT EXISTS ots_proofs (
+  proof_event_id  TEXT PRIMARY KEY,         -- id do evento kind 1040
+  target_event_id TEXT NOT NULL,            -- evento carimbado (tag e)
+  proof_b64       TEXT NOT NULL,            -- arquivo .ots em base64 (content); '' se invalid
+  raw_event       TEXT NOT NULL,            -- '' se invalid (só a linha fica, pra dedup)
+  publisher_pub   TEXT NOT NULL DEFAULT '', -- quem publicou o kind 1040
+  self_proof      INTEGER NOT NULL DEFAULT 0, -- 1 = publicada pelo autor do evento carimbado
+  status          TEXT NOT NULL DEFAULT 'pending', -- pending | verified | invalid
+  checked_at      INTEGER,                  -- ms da última tentativa de verificação
+  attempts        INTEGER NOT NULL DEFAULT 0 -- falhas transitórias (backoff exponencial)
+);
+CREATE INDEX IF NOT EXISTS idx_ots_proofs_target ON ots_proofs(target_event_id);
+CREATE INDEX IF NOT EXISTS idx_ots_proofs_status ON ots_proofs(status);
+CREATE INDEX IF NOT EXISTS idx_ots_proofs_publisher ON ots_proofs(publisher_pub, status);
+
+-- Âncoras verificadas: o evento X (de author_pub) existia no bloco H.
+CREATE TABLE IF NOT EXISTS ots_anchors (
+  target_event_id TEXT PRIMARY KEY,
+  author_pub      TEXT NOT NULL,
+  block_height    INTEGER NOT NULL,
+  block_time      INTEGER NOT NULL,         -- unix seconds (header do bloco)
+  proof_event_id  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_ots_anchors_author ON ots_anchors(author_pub);
+
+-- Cache de headers Bitcoin já conferidos em ≥2 exploradores.
+CREATE TABLE IF NOT EXISTS btc_headers (
+  height      INTEGER PRIMARY KEY,
+  merkle_root TEXT NOT NULL,                -- hex em ordem de exibição
+  time        INTEGER NOT NULL              -- unix seconds
+);
+
+-- Carimbos pedidos por ESTE cliente pros eventos das identidades locais.
+-- Estado local (não é cache de rede): sobrevive ao reset de domínio.
+CREATE TABLE IF NOT EXISTS ots_local_stamps (
+  event_id   TEXT PRIMARY KEY,
+  npub       TEXT NOT NULL,
+  kind       INTEGER NOT NULL,
+  ots_b64    TEXT NOT NULL,                 -- prova parcial (pending) ou completa
+  created_at INTEGER NOT NULL,              -- ms
+  last_try   INTEGER,                       -- ms do último upgrade tentado
+  published  INTEGER NOT NULL DEFAULT 0     -- 1 = kind 1040 já publicado
+);
+
 -- ── Follows ──────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS follows (
   follower_pub  TEXT NOT NULL,

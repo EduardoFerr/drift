@@ -136,16 +136,22 @@ describe('evictOldPosts', () => {
     expect(cleanupSql).toContain('NOT IN (SELECT id FROM posts)')
   })
 
-  it('cleanup NÃO toca em spreads/reports do user (continua querendo seedear)', async () => {
+  it('cleanup remove votos/comentários ALHEIOS de posts evictados, preserva os do user', async () => {
     getMock.mockResolvedValue({ n: SOFT_LIMIT + 10 })
     execMock.mockResolvedValueOnce([{ id: 'a' }])
     await evictOldPosts(ME)
-    // Apenas 1 cleanup, e é em buries
-    const allSqls = runMock.mock.calls.map((c) => c[0] as string)
-    expect(allSqls).toHaveLength(1)
-    expect(allSqls[0]).toContain('DELETE FROM buries')
-    // Nenhum DELETE em spreads ou reports
-    expect(allSqls.every((s) => !s.includes('DELETE FROM spreads'))).toBe(true)
-    expect(allSqls.every((s) => !s.includes('DELETE FROM reports'))).toBe(true)
+    const calls = runMock.mock.calls.map((c) => ({ sql: c[0] as string, params: (c[1] ?? []) as unknown[] }))
+    expect(calls.some((c) => c.sql.includes('DELETE FROM buries'))).toBe(true)
+    // Spreads/comments órfãos de OUTROS saem (senão a recomputação os via
+    // como "post órfão" e buscava o post de novo — ciclo com a eviction)…
+    const spreadsDel = calls.find((c) => c.sql.includes('DELETE FROM spreads'))!
+    const commentsDel = calls.find((c) => c.sql.includes('DELETE FROM comments'))!
+    // …mas os do user atual ficam (ele continua querendo seedear).
+    expect(spreadsDel.sql).toContain('spreader_pub != ?')
+    expect(spreadsDel.params).toEqual([ME])
+    expect(commentsDel.sql).toContain('author_pub != ?')
+    expect(commentsDel.params).toEqual([ME])
+    // Reports nunca são apagados pela eviction.
+    expect(calls.every((c) => !c.sql.includes('DELETE FROM reports'))).toBe(true)
   })
 })

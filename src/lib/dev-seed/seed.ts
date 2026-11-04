@@ -30,6 +30,7 @@ import { invalidateFeed } from '../feed'
 import { db } from '../db'
 import { BOOT_BATCH_SIZE, drainInBatches } from '../scheduler'
 import { buildSeedEvents, type SeedMode } from './fixtures'
+import type { SignedEvent } from '../../types/nostr'
 
 // Re-export do contrato (fonte única em fixtures.ts). Lily/bootstrap
 // importam `NAMED_NSECS` daqui.
@@ -49,9 +50,9 @@ let seeded = false
  *    cascata, geo variado (BR/EU/Ásia), spreads espalhados no tempo,
  *    posts com imagem, buries + 3 alvos que cruzam threshold §26, follows.
  *
- * Processa eventos de domínio SEQUENCIALMENTE (ordem por created_at) —
- * preserva first-seen estável de `users.created_at` (antiguidade/peso
- * conhecidos). Cada evento passa pelo pipeline real: kind → schema →
+ * Processa eventos de domínio SEQUENCIALMENTE (ordem por created_at).
+ * A antiguidade vem das âncoras OTS simuladas gravadas no fim
+ * (`seedSimulatedAnchors`), não da ordem de chegada. Cada evento passa pelo pipeline real: kind → schema →
  * persist (verify Schnorr SKIPADO no seed — ver abaixo).
  *
  * Performance (Ted+Lily 2026-05-28 → Ted+Marshall 2026-05-29):
@@ -153,9 +154,8 @@ export async function seedDatabase(
   // ~5500 postMessages serializados (2 writes × ~2730 eventos) em ~dezenas →
   // full drena em segundos (era minutos no drain floor). setWriteSink é
   // SEMPRE desligado no finally (sync real volta a escrever direto). Flush no
-  // boundary garante que reads de persist* (persistReport → calculateUserWeight)
-  // vejam writes anteriores — reporters (genesis, primeiros no sort ASC) já
-  // estão no DB quando os reports (últimos) são processados.
+  // boundary mantém o buffer pequeno; nenhum persist* lê antes de escrever
+  // (pesos/moderação são derivados no fim, por `recalcAllScores`).
   const writeBuf: Array<{ sql: string; params?: unknown[] }> = []
   setWriteSink((sql, params) => writeBuf.push({ sql, params }))
   const flushWrites = async (): Promise<void> => {
@@ -177,6 +177,14 @@ export async function seedDatabase(
   }
   onProgress?.(total, total)
 
+  // Âncoras OpenTimestamps SIMULADAS (DEV-only, hermético). Em produção a
+  // antiguidade vem de prova OTS verificada contra o Bitcoin
+  // (`ots-anchors.ts`); o seed não fala com calendários nem exploradores,
+  // então grava direto a âncora que uma prova verificada produziria: o
+  // genesis de cada identidade "existia" no seu `createdAt`. Sem isto todo
+  // o seed teria antiguidade 0 e o feed de dev ficaria plano.
+  await seedSimulatedAnchors(domain)
+
   // Side-effects adiados: materializa TODOS os scores de uma vez (recalc
   // bulk + moderação §26 na ordem correta) e dispara 1 invalidateFeed.
   // Substitui o antigo `setTimeout(200)` + N timers de recalc avulsos —
@@ -191,6 +199,23 @@ export async function seedDatabase(
       .__driftSeedMeta
     if (meta) meta.drained = true
   }
+}
+
+async function seedSimulatedAnchors(domain: readonly SignedEvent[]): Promise<void> {
+  const genesis = new Map<string, SignedEvent>()
+  for (const ev of domain) {
+    if (ev.kind !== 9078) continue
+    const prev = genesis.get(ev.pubkey)
+    if (!prev || ev.created_at < prev.created_at) genesis.set(ev.pubkey, ev)
+  }
+  await db.batch(
+    [...genesis.values()].map((ev) => ({
+      sql: `INSERT OR IGNORE INTO ots_anchors
+            (target_event_id, author_pub, block_height, block_time, proof_event_id)
+            VALUES (?, ?, 0, ?, 'dev-seed')`,
+      params: [ev.id, ev.pubkey, ev.created_at],
+    })),
+  )
 }
 
 /** Reset do guard de sessão — útil em tests / re-seed manual. */

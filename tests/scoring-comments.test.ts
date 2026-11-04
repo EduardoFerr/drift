@@ -20,6 +20,7 @@
 
 import { describe, expect, it } from 'vitest'
 import { applyCommentReceived } from '../src/lib/scoring'
+import { computeRanking } from '../src/lib/ranking'
 import { COMMENTS_SCORE_CAP, ENGAGEMENT_POINTS } from '../src/config/constants'
 
 describe('applyCommentReceived (pure)', () => {
@@ -120,41 +121,46 @@ describe('COMMENTS_SCORE_CAP constant', () => {
 })
 
 /**
- * Self-comment exclusion (Barney HIGH #3).
- *
- * A query SQL em events.ts:applyCommentsContribution faz:
- *   WHERE c.author_pub != ? AND c.score > -999
- *
- * Validação aqui é estrutural — tests de integração com SQLite real
- * vivem em e2e manual. Garantimos que o filtro está na string SQL —
- * regression guard contra remoção acidental.
+ * Comentários no motor de ranking (Barney HIGH #3) — verificado pelo
+ * COMPORTAMENTO de `computeRanking`, não pelo texto da SQL. Antes estes
+ * testes procuravam strings no source: trocar a implementação quebrava o
+ * teste sem quebrar a regra, e quebrar a regra sem mudar a string passava.
  */
-describe('Self-comment exclusion (regression guard, Barney HIGH #3)', () => {
-  it('events.ts contém filtro author_pub != ? em comments query', async () => {
-    // Lê o source. Se alguém remover o filtro, o test falha.
-    const fs = await import('node:fs/promises')
-    const path = await import('node:path')
-    const source = await fs.readFile(
-      path.resolve(__dirname, '../src/lib/events.ts'),
-      'utf8',
-    )
-    // Filtro dentro do SELECT DISTINCT author_pub FROM comments
-    expect(source).toMatch(
-      /FROM comments[\s\S]*WHERE\s+post_id\s*=\s*\?\s+AND\s+author_pub\s*!=\s*\?/,
-    )
-    // Filtro de moderação (score > -999) também presente — manifesto §17
-    expect(source).toMatch(/score\s*>\s*-999/)
+describe('Comentários no ranking (Barney HIGH #3)', () => {
+  const DAY_S = 86_400
+  const YEAR_AGO = 1_790_000_000 - 365 * DAY_S
+  const base = (comments: Array<{ author_pub: string; hidden?: boolean }>) =>
+    computeRanking({
+      nowMs: 1_790_000_000_000,
+      posts: [{ id: 'P', author_pub: 'autor', created_at: 1_790_000_000 }],
+      spreads: [],
+      buries: [],
+      comments: comments.map((c) => ({ post_id: 'P', author_pub: c.author_pub, hidden: c.hidden ?? false })),
+      reports: [],
+      users: [],
+      anchors: new Map([
+        ['autor', YEAR_AGO],
+        ['c1', YEAR_AGO],
+        ['c2', YEAR_AGO],
+      ]),
+    }).posts.get('P')!.scoreBase
+
+  it('auto-comentário do autor não conta', () => {
+    expect(base([{ author_pub: 'autor' }])).toBe(0)
   })
 
-  it('events.ts seleciona DISTINCT author_pub (dedup commenters)', async () => {
-    const fs = await import('node:fs/promises')
-    const path = await import('node:path')
-    const source = await fs.readFile(
-      path.resolve(__dirname, '../src/lib/events.ts'),
-      'utf8',
+  it('100 comentários do mesmo user contam 1× o peso dele', () => {
+    const many = Array.from({ length: 100 }, () => ({ author_pub: 'c1' }))
+    expect(base(many)).toBe(base([{ author_pub: 'c1' }]))
+  })
+
+  it('comentário moderado não conta', () => {
+    expect(base([{ author_pub: 'c1', hidden: true }])).toBe(0)
+  })
+
+  it('soma de pesos é capada em COMMENTS_SCORE_CAP', () => {
+    expect(base([{ author_pub: 'c1' }, { author_pub: 'c2' }])).toBe(
+      COMMENTS_SCORE_CAP * ENGAGEMENT_POINTS.COMMENT_RECEIVED,
     )
-    // SELECT DISTINCT author_pub — garante 100 comments do mesmo
-    // user contam 1× weight (anti-Sybil de comments duplicados)
-    expect(source).toMatch(/SELECT\s+DISTINCT\s+author_pub\s+FROM\s+comments/)
   })
 })

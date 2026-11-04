@@ -14,25 +14,26 @@ import {
   calculateEffectiveReportWeight,
 } from '../src/lib/moderation'
 
-describe('getReportWeight', () => {
-  it('peso < 20 (identidade nova) → 0.5', () => {
-    expect(getReportWeight(0)).toBe(0.5)
-    expect(getReportWeight(19.99)).toBe(0.5)
+describe('getReportWeight — pontos = peso/50 em [0, 2]', () => {
+  // Auditoria 2026-11-03 (M3): o piso de 0.5 pra peso < 20 tornava brigada
+  // de chaves recém-criadas gratuita (10 chaves derrubavam qualquer post).
+  it('abaixo de REPORT_MIN_WEIGHT (20) → 0 — chave nova não modera', () => {
+    expect(getReportWeight(0)).toBe(0)
+    expect(getReportWeight(19.99)).toBe(0)
+    expect(getReportWeight(20)).toBe(0.4)
   })
 
-  it('20-49 (estabelecida) → 1.0', () => {
-    expect(getReportWeight(20)).toBe(1.0)
-    expect(getReportWeight(49.99)).toBe(1.0)
-  })
-
-  it('50-74 (longa data) → 1.5', () => {
-    expect(getReportWeight(50)).toBe(1.5)
-    expect(getReportWeight(74.99)).toBe(1.5)
-  })
-
-  it('75+ (veterana muito engajada) → 2.0', () => {
-    expect(getReportWeight(75)).toBe(2.0)
+  it('linear: 25 → 0.5, 50 → 1.0, 75 → 1.5, 100 → 2.0', () => {
+    expect(getReportWeight(25)).toBe(0.5)
+    expect(getReportWeight(50)).toBe(1.0)
+    expect(getReportWeight(75)).toBe(1.5)
     expect(getReportWeight(100)).toBe(2.0)
+  })
+
+  it('clamp em [0, 2] e não-finito → 0', () => {
+    expect(getReportWeight(-10)).toBe(0)
+    expect(getReportWeight(500)).toBe(2)
+    expect(getReportWeight(Number.NaN)).toBe(0)
   })
 
   it('é monotônico — peso maior do reporter dá peso de report >= ', () => {

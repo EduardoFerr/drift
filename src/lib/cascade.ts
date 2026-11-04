@@ -26,9 +26,15 @@ export interface CascadeNode {
   ts: number
 }
 
-/** Distância planar simples (lng/lat) — só pra COMPARAR proximidade relativa. */
+/**
+ * Distância planar (lng/lat) — só pra COMPARAR proximidade relativa.
+ * Longitude pela volta curta: sem isso Fiji (179°) e Samoa (−179°), a 2°
+ * de distância real, pareciam a 358° — o ponto mais longe do mapa
+ * (auditoria 2026-11-03).
+ */
 function planarDist(a: CascadeNode, b: CascadeNode): number {
-  return Math.hypot(a.lng - b.lng, a.lat - b.lat)
+  const dLng = Math.abs(a.lng - b.lng) % 360
+  return Math.hypot(Math.min(dLng, 360 - dLng), a.lat - b.lat)
 }
 
 /**

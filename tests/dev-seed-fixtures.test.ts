@@ -554,12 +554,16 @@ describe('moderação §26 — 3 posts-alvo cruzam threshold', () => {
     }
     expect(byTarget.size).toBe(3)
 
+    // Lower bound pela regra vigente: pontos = peso/50, peso ≥ antiguidade
+    // (semanas desde createdAt, na base da timeline).
+    const all = [...NAMED_IDENTITIES, ...SEED_IDENTITIES]
     for (const [tid, info] of byTarget) {
       const threshold = getReportThreshold(ACTIVE_USERS, info.reason)
-      // Cada reporter contribui ≥ 0.5 (getReportWeight mínimo). Lower
-      // bound conservador: distinct reporters × 0.5.
-      const distinctReporters = new Set(info.reporters).size
-      const lowerBoundWeight = distinctReporters * getReportWeight(0)
+      let lowerBoundWeight = 0
+      for (const pub of new Set(info.reporters)) {
+        const id = all.find((n) => n.pub === pub)!
+        lowerBoundWeight += getReportWeight(Math.min(40, (TS_BASE - id.createdAt) / (7 * 86400)))
+      }
       expect(
         lowerBoundWeight,
         `alvo ${tid} reason=${info.reason}: peso mínimo ${lowerBoundWeight} < threshold ${threshold}`,
@@ -709,7 +713,7 @@ describe('modo lite (boot rápido)', () => {
       const threshold = getReportThreshold(ACTIVE_USERS, info.reason)
       let sum = 0
       for (const pub of info.reporters) {
-        const id = NAMED_IDENTITIES.find((n) => n.pub === pub)
+        const id = [...NAMED_IDENTITIES, ...SEED_IDENTITIES].find((n) => n.pub === pub)
         const w = id
           ? calculateWeight({
               createdAt: id.createdAt * 1000,

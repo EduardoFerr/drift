@@ -287,14 +287,22 @@ coletiva. Você não pode "cancelar" alguém pra todo mundo via bloqueio.
 
    | Seu peso | Sua denúncia vale |
    |---:|---:|
-   | < 20 | 0.5 pts |
-   | < 50 | 1.0 pts |
-   | < 75 | 1.5 pts |
-   | ≥ 75 | 2.0 pts |
+   | abaixo de 20 | 0 pts |
+   | 25 | 0.5 pts |
+   | 50 | 1.0 pts |
+   | 100 | 2.0 pts |
+
+   (pontos = peso ÷ 50, a partir de peso 20 e com pelo menos 8 semanas
+   de âncora). Uma conta nova não modera — senão qualquer um criaria
+   milhares de contas e derrubaria o que quisesse. Seu DRIFT e seu SINK
+   passam a contar a partir de peso 4 e 2 semanas de âncora (cerca de 1
+   mês, ou antes se pessoas com peso espalharem você).
 
 5. Quando o **total de pontos** ultrapassa o threshold dinâmico
    (baseado no tamanho da base ativa de users), o post recebe
-   `score = -999` e **some do feed default**.
+   `score = -999` e **some do feed default**. Isso é recalculado a
+   partir de todas as denúncias sempre que algo muda — um spread novo
+   não "desmodera" o post.
 
    - Base ativa 1.000 users → threshold 5 pts pra `spam`, 3 pts pra `illegal`
    - Base ativa 100.000 users → threshold 100 pts (defesa contra
@@ -421,19 +429,45 @@ Cada identidade Drift tem um número 0-100 (`weight`) calculado por
 ```
 weight = antiquity (0-40) + engagement (0-60)
 
-antiquity = semanas desde criação (cap 40 ≈ 9 meses)
-engagement = spreads recebidos × 10
-           + comentários recebidos × 1
-           − reports confirmados × 15
+antiquity  = semanas desde a ÂNCORA da sua identidade no Bitcoin (cap 40)
+engagement = Σ spreads recebidos × 10 × (peso de quem espalhou ÷ 100)
+           + Σ comentários recebidos × 1 × (peso de quem comentou ÷ 100)
+           − posts seus moderados × 15
            − dias inativo × 1
            (clamped 0-60)
 ```
+
+**A âncora:** o app carimba automaticamente o seu post mais antigo (ou,
+se você ainda não postou, sua primeira ação) no Bitcoin via
+OpenTimestamps (sem custo, sem carteira). Quem nunca agiu não tem o que
+carimbar. O carimbo só avança com o app aberto. Os calendários
+OpenTimestamps veem seu IP; depois que a prova é publicada, dá para
+ligar esse IP à sua conta — ver `PRIVACY.md`. Leva algumas horas
+até o bloco confirmar; depois disso sua antiguidade começa a contar. Ela
+não pode ser falsificada para trás — nem por você, nem por ninguém —
+e todo cliente Drift enxerga a mesma data. Dá para desligar em
+Configurações → soberania → "âncora de antiguidade no Bitcoin" (sem âncora,
+sua antiguidade fica 0). Em modo Tor/onion o
+carimbo não roda, porque ele faria uma conexão clearnet.
+
+**Um spread vale o peso de quem espalhou.** Uma conta nova espalhando
+você não te dá peso; uma conta estabelecida, sim.
+
+**"Meu peso caiu para perto de 0 depois da atualização — por quê?"**
+Até a versão anterior, a antiguidade contava a partir da data que o
+próprio evento declarava — e qualquer um podia declarar uma data antiga.
+Agora ela só conta tempo **provado no Bitcoin**, e a idade de antes da
+atualização não tem como ser provada. O app carimba sua identidade
+sozinho (algumas horas com ele aberto); a partir daí ela cresce 1 ponto
+por semana, até 40. Enquanto isso, seu peso também sobe quando pessoas
+com peso espalham ou comentam seus posts. Seus posts, votos e denúncias
+antigos continuam todos lá — só o peso recomeçou.
 
 **O que isso faz:**
 
 - Seu spread "vale mais" quando você tem mais weight (a SOMA dos pesos
   é o que define score do post, não a COUNT de pessoas)
-- Sua denúncia vale mais (até 2× pts em vez de 0.5×)
+- Sua denúncia vale mais (0 pt abaixo de peso 20, até 2 pts com peso 100)
 - Você pode publicar mais subposts (até 8 em vez de 1)
 
 **Defesa anti-Sybil mecânica:**

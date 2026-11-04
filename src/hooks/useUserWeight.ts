@@ -6,7 +6,8 @@
  * → store atualiza. A store do feed serve de "tick" reativo grátis,
  * sem precisar de outro mecanismo.
  *
- * Cálculo é uma query agregada (sub-selects no SQLite) — barato.
+ * Lê `users.weight`/`users.engagement`, materializados pela recomputação
+ * global (`ranking.ts`) — 1 SELECT por PK, barato.
  * Mesmo assim, debounced via state local: re-render do feed dispara
  * useEffect, que faz a query, que atualiza state, que re-renderiza.
  */

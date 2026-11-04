@@ -546,12 +546,17 @@ calculada de forma diferente em cada cliente.
 **Regras:**
 - Score é calculado pela mesma fórmula em todos os clientes Drift
 - Peso de perfil é função pura de antiguidade + engajamento (eventos
-  públicos), não opinião subjetiva
+  públicos), não opinião subjetiva. Antiguidade = tempo provado no
+  Bitcoin (âncora OpenTimestamps, NIP-03), não o `created_at`, que quem
+  assina escolhe livremente. Engajamento = spreads/comentários recebidos
+  ponderados pelo peso de quem os deu
 - Cliente oficial expõe a fórmula; clientes alternativos podem usar
   outra mas perdem interoperabilidade de ranking
 
-**Implementação:** `calculateScore`, `calculateWeight` em
-`scoring.ts` / `weight.ts`. Ver arquitetura §8 e §9.
+**Implementação:** motor `computeRanking` em `ranking.ts` (pesos,
+scores e moderação derivados do conjunto de eventos), sobre as fórmulas
+puras de `scoring.ts` / `weight.ts`; âncora em `ots*.ts`. Ver
+arquitetura §8 e §9 e `Docs/algoritmos.md`.
 
 ### 23. Bury Não é Punição
 
@@ -585,21 +590,24 @@ Score do post deixou de contar **eventos** (`COUNT(*)` de spreads/buries)
 e passou a somar **pesos das identidades** dos spreaders/buriers:
 
 ```
-score = (Σ weight(spreader) − Σ weight(burier) × 0.3) / (idade+2)^1.5
+score = (Σ weight(spreader) − Σ weight(burier) × 0.3
+         + min(Σ weight(comentaristas), 30)) / (idade+2)^1.5
 ```
 
 Sybil engagement (1000 npubs novos auto-espalhando) deixa de inflar
-score — cada Sybil tem `weight ≈ 0`. Determinístico (mesma fórmula
+score — cada Sybil tem `weight = 0`, porque peso só vem de tempo provado
+no Bitcoin ou de spread de quem já tem peso (auditoria 2026-11-03; antes
+a idade era forjável e o engajamento contava eventos). Determinístico (mesma fórmula
 em todos os clientes), preserva §22 (sem reputação subjetiva) e §11
 (sem afinidade no feed). Detalhes em
 `Docs/conformance-conversa-29-04.md` §"Recomendação central".
 
-**Implementação:** `recalculateScore` em `events.ts` agora agrupa ações
-por `(post_id, user_pub)` via UNION + MAX(`created_at`), depois soma
-`calculateWeight(...)` por kind. `posts.spreads` e `posts.buries`
-permanecem como COUNT (UI mostra "3 espalharam"); `posts.score` usa
-soma de pesos. Sem chamada a `updateEngagement` no autor (§23 preservado).
-Ver arquitetura §8.
+**Implementação:** spreads/buries são upsert LWW por `(post_id,
+user_pub)` (guardam a ação mais recente); `ranking.ts:selectLatestActionByUser`
+escolhe a ação líquida e `computeRanking` soma os pesos por kind.
+`posts.spreads` e `posts.buries` contam pessoas (UI mostra "3
+espalharam"); `posts.score_base` usa soma de pesos. Bury não penaliza o
+autor (§23 preservado). Ver arquitetura §8.
 
 ### 24. Sem Algoritmo Personalizado de Feed
 
@@ -608,8 +616,9 @@ sem afinidade automática.
 
 **Regras:**
 - Ordem do feed é função pura: `score = (Σ weight(spreader) −
-  Σ weight(burier) × 0.3) / (idade + 2)^1.5`, depois `created_at`
-  desc, depois `id` asc (ver §23 "Score weighted" para detalhes)
+  Σ weight(burier) × 0.3 + min(Σ weight(comentaristas), 30)) /
+  (idade + 2)^1.5`, depois `created_at` desc, depois `id` asc (ver §23
+  "Score weighted" para detalhes)
 - Qualquer cliente Drift mostra a mesma ordem global
 - Não há scoring personalizado por usuário
 - Bloquear / silenciar / seguir são camada de filtragem **local** na
@@ -718,9 +727,11 @@ quando esconder do feed default.
   isso (§17)
 - Não censuram retroativamente histórico do reporter
 
-**Implementação:** `processReport` em `events.ts` (Fase 4),
-`getReportThreshold` em `moderation.ts`, `getReportWeight` em
-`moderation.ts`. Ver arquitetura §10.
+**Implementação:** reports entram por `events.ts` (upsert por
+reporter); a decisão de moderar é derivada em `ranking.ts` a cada
+recomputação, com `getReportThreshold` e `getReportWeight`
+(pontos = peso/50) de `moderation.ts`. Ver arquitetura §10 e
+`Docs/algoritmos.md` §3.
 
 ### 27. Auto-Classificação Voluntária + Filtros Locais
 

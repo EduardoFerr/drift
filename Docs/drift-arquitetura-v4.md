@@ -430,30 +430,26 @@ async function onNostrEvent(event: SignedEvent) {
   // 3. Caro: verify Schnorr — só agora
   if (!verifySignature(event)) return
 
-  // 4. Persiste
-  switch (event.kind) {
-    case DRIFT_KIND.POST:
-      await db.run(`INSERT OR IGNORE INTO posts (...) VALUES (?)`, [...])
-      scheduleScoreRecalc(getTag(event,'d')!)
-      invalidateFeed()
-      break
-    case DRIFT_KIND.SPREAD:
-      await db.run(`INSERT OR IGNORE INTO spreads (...) VALUES (?)`, [...])
-      scheduleScoreRecalc(getTag(event,'e')!)
-      break
-    case DRIFT_KIND.BURY:
-      await db.run(`INSERT OR IGNORE INTO buries (...) VALUES (?)`, [...])
-      scheduleScoreRecalc(getTag(event,'e')!)
-      break
-    case DRIFT_KIND.REPORT:
-      await processReport(event)
-      break
-  }
+  // 4. Persiste (handler por kind em KIND_DISPATCH)
+  //    POST          → INSERT OR IGNORE posts
+  //    SPREAD / BURY → upsert LWW por (post_id, user): guarda a ação mais recente
+  //    REPORT / 1984 → upsert LWW por (post_id, reporter)
+  //    COMMENT 1111  → INSERT OR IGNORE comments
+  //    OTS 1040      → ots_proofs 'pending' (verificação assíncrona, ots-anchors.ts)
+  await handler.persist(event)
+  scheduleRankingRecompute()
 }
 ```
 
-`scheduleScoreRecalc` faz debounce de 100ms por postId — em rajadas
-(50 spreads num post viral chegando juntos), recalcula 1 vez no fim.
+Antes da persistência há um gate barato de relógio: `created_at` mais de
+15 min no futuro (`MAX_FUTURE_SKEW_SECONDS`) é descartado.
+
+`scheduleRankingRecompute` faz debounce de 100ms (teto de espera 2s) e
+dispara UMA recomputação global (`recalcAllScores` → `ranking.ts:computeRanking`):
+carrega posts, votos, comentários, reports, users e âncoras OTS, deriva
+pesos + scores + moderação e grava só o que mudou. Em rajadas (50 spreads
+num post viral chegando juntos), recalcula 1 vez no fim. Na virada do dia
+UTC roda de novo sozinha (pesos dependem do dia).
 
 `invalidateFeed()` faz debounce de 150ms — re-query do SQLite e
 atualização da `useFeedStore` (Zustand). UI re-renderiza sozinha.
@@ -474,21 +470,14 @@ function calculateScore(input: { spreadWeight: number, buryWeight: number, creat
   return netEngagement / Math.pow(ageHours + 2, 1.5)
 }
 
-async function recalculateScore(postId: string) {
-  const row = await db.get(`
-    SELECT
-      p.created_at,
-      (SELECT COUNT(*) FROM spreads WHERE post_id = p.id) AS spreads,
-      (SELECT COUNT(*) FROM buries  WHERE post_id = p.id) AS buries
-    FROM posts p
-    WHERE p.id = ?
-  `, [postId])
-  if (!row) return
-
-  const score = calculateScoreNow(row.spreads, row.buries, row.created_at)
-  await db.run(`UPDATE posts SET score = ?, spreads = ?, buries = ? WHERE id = ?`,
-    [score, row.spreads, row.buries, postId])
-}
+// Auditoria 2026-11-03: não há mais recálculo por post. O numerador é
+// derivado globalmente em ranking.ts e materializado em posts.score_base;
+// o divisor é aplicado na LEITURA (feed.ts, com max(0, idade)):
+//
+//   score_base = Σ w(spread líquido) − 0.3·Σ w(bury líquido)
+//              + min(Σ w(comentaristas distintos), 30)
+//
+// Ação líquida = mais recente por (post, user); autor não conta.
 ```
 
 ---
@@ -496,10 +485,17 @@ async function recalculateScore(postId: string) {
 ## 9. SISTEMA DE PESO DO PERFIL
 
 ```typescript
-function calculateAntiquity(createdAt: number): number {
-  const weeks = (Date.now() - createdAt) / (7 * 24 * 3_600_000)
-  return Math.min(40, weeks)
+// Auditoria 2026-11-03: createdAt = bloco Bitcoin mais antigo que uma prova
+// OpenTimestamps (kind 1040) mostra conter um evento da identidade — NÃO o
+// created_at de evento (forjável). `now` = início do dia UTC. Sem âncora → 0.
+function calculateAntiquity(anchorMs: number, now: number): number {
+  const weeks = (now - anchorMs) / (7 * 24 * 3_600_000)
+  return Math.max(0, Math.min(40, weeks))
 }
+
+// Engajamento PONDERADO: cada spread recebido soma 10 × w(spreader)/100,
+// cada comentário 1 × w(commenter)/100. Como w depende de w, o peso é o
+// menor ponto fixo ≥ antiguidade (ranking.ts:solveWeights).
 
 const ENGAGEMENT_POINTS = {
   POST_SPREAD:      +10,
@@ -532,16 +528,19 @@ async function getReportThreshold(): Promise<number> {
   return Math.max(5, Math.floor(count * 0.001))
 }
 
+// Auditoria 2026-11-03: contínuo, sem piso. Chave sem peso = 0 pts.
 function getReportWeight(userWeight: number): number {
-  if (userWeight < 20) return 0.5
-  if (userWeight < 50) return 1.0
-  if (userWeight < 75) return 1.5
-  return 2.0
+  return Math.max(0, Math.min(2, userWeight / 50))
 }
 ```
 
 Score = -999 esconde do feed. **Nunca apaga do SQLite local.** O
 evento permanece nos relays. Cliente alternativo pode exibir.
+
+A decisão é **derivada** em `ranking.ts:computeRanking` a cada
+recomputação global (reports + pesos atuais), não gravada por report —
+um recálculo de score nunca desfaz a moderação. Ver
+`Docs/algoritmos.md` §3.
 
 ---
 
@@ -555,7 +554,10 @@ Schema em `src/lib/schema.sql`. Tabelas:
 - `users` — perfis agregados
 - `follows` — grafo social (camada de visualização local, não ranking)
 - `relays_user` — relays adicionados pelo usuário (Fase 5)
-- `sync_log` — cursor por (relay, namespace)
+- `sync_log` — cursor por (relay, namespace); nunca passa do presente
+- `ots_proofs`, `ots_anchors`, `btc_headers` — provas OpenTimestamps
+  recebidas, âncoras verificadas e cache de headers Bitcoin (antiguidade)
+- `ots_local_stamps` — carimbos pedidos por este cliente (estado local)
 - `user_prefs` — flags locais
 - `pinned` — eventos que o user se compromete a re-broadcast / seedear (Fase 5)
 
@@ -570,14 +572,17 @@ Schema em `src/lib/schema.sql`. Tabelas:
 async function startSync() {
   const { since } = await db.get(`SELECT MAX(last_since) as since FROM sync_log`) ?? { since: 0 }
 
-  pool.subscribeMany(activeRelays(),
-    [{ kinds: [9078, 9079, 9080, 9081], since: since ?? 0 }],
-    {
-      onevent: async (event) => { await onNostrEvent(event) }
-    }
-  )
+  // 3 filtros (orchestrator.subscribe), mesmo since/limit:
+  //   { kinds: [9078, 9079, 9080, 9081] }                     — kinds Drift
+  //   { kinds: [1111], '#K': ['9078'] }                       — comentários em posts Drift
+  //   { kinds: [1040], '#k': ['9078','9079','9080','9081','1111'] } — provas OTS
+  // cursor = max(cursor, min(event.created_at, agora)) — nunca no futuro
 }
 ```
+
+Votos/comentários sobre posts ausentes disparam busca do post por id, e
+autores sem âncora disparam busca das provas OTS publicadas por eles
+(`orphans.ts`).
 
 `activeRelays()` retorna seed list + relays adicionados pelo user
 (Fase 5) + relays descobertos via NIP-65 (Fase 5) + pelo menos 1
@@ -720,7 +725,13 @@ drift/
 │   │   ├── protocol.ts       createPost, spreadPost, buryPost, reportPost
 │   │   ├── sync.ts           startSync + rebuildIdentityHistory + useSyncStore
 │   │   ├── feed.ts           getGlobalFeed + useFeedStore + invalidateFeed
-│   │   ├── scoring.ts        calculateScore (pura)
+│   │   ├── scoring.ts        calculateScore + decay (pura)
+│   │   ├── ranking.ts        computeRanking — pesos, scores e moderação do conjunto de eventos (pura)
+│   │   ├── ots.ts            formato OpenTimestamps + verificação (pura)
+│   │   ├── ots-client.ts     calendários OTS + headers Bitcoin (rede, fetch injetável)
+│   │   ├── ots-anchors.ts    verifica provas kind 1040 → ots_anchors
+│   │   ├── ots-stamper.ts    carimba a identidade ativa e publica kind 1040
+│   │   ├── orphans.ts        busca por id de posts referenciados e ausentes
 │   │   ├── transport/        abstração de transporte (Fase 6)
 │   │   │   ├── index.ts      interface Transport
 │   │   │   ├── wss.ts        WSS clearnet (atual)
@@ -739,8 +750,8 @@ drift/
 │   │   ├── bip39.ts          NIP-06 derivação de nsec via 12 palavras (Fase 5)
 │   │   ├── passkey.ts        WebAuthn gate opt-in (Fase 5)
 │   │   ├── upload.ts         nostr.build retry+jitter (Fase 3)
-│   │   ├── weight.ts         peso de perfil + bridge SQLite (Fase 4)
-│   │   ├── moderation.ts     reports + threshold dinâmico (Fase 4) — manifesto §26
+│   │   ├── weight.ts         fórmula do peso de perfil + leitura de users.weight
+│   │   ├── moderation.ts     threshold dinâmico + pontos de report (puras) — manifesto §26
 │   │   ├── cache.ts          eviction respeita spreads + pinned (Fase 4) — manifesto §16
 │   │   ├── pin.ts            IPFS pin de posts virais (Fase 6)
 │   ├── types/        drift.ts, nostr.ts
@@ -945,7 +956,7 @@ e não entrega.
 - **Optimistic UI é React state local** — nunca SQLite
 - **Funções puras** — `calculateScore` etc. recebem `now` por parâmetro
 - **Verify lazy** — kind/schema check ANTES de verifyEvent
-- **Recalc com debounce** 100ms via `scheduleScoreRecalc`
+- **Recomputação global com debounce** 100ms (teto 2s) via `scheduleRankingRecompute` → `ranking.ts`
 - **Feed reativo via Zustand** — `invalidateFeed()`, sem poll
 - **Sem scan automático no cliente oficial padrão** — manifesto §25 (sem PhotoDNA, sem ML local de moderação embutido). Auto-classificação voluntária via tag `content-warning` (autor) + filtros locais opt-in (leitor).
 - **TypeScript strict** — sem `any`

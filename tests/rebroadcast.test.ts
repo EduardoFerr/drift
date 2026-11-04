@@ -102,23 +102,41 @@ describe('rebroadcastToRelay', () => {
     expect(stats.sent).toBe(1)
   })
 
-  it('SELECT cobre as 4 fontes (posts próprios, spreads-do-user, spreads-table, buries-table)', async () => {
+  it('seleciona provas OTS, votos, comentários, posts próprios e posts espalhados — nunca reports', async () => {
     execMock.mockResolvedValue([])
     await rebroadcastToRelay(RELAY, ME)
-    const sql = execMock.mock.calls[0]![0] as string
-    expect(sql).toContain('FROM posts')
-    expect(sql).toContain('FROM spreads')
-    expect(sql).toContain('FROM buries')
-    expect(sql).toContain('UNION ALL')
+    const sqls = execMock.mock.calls.map((c) => c[0] as string)
+    expect(sqls).toHaveLength(5)
+    expect(sqls[0]).toContain('FROM ots_proofs')
+    expect(sqls[1]).toContain('FROM spreads')
+    expect(sqls[1]).toContain('FROM buries')
+    expect(sqls[2]).toContain('FROM comments')
+    expect(sqls[3]).toContain('FROM posts')
+    expect(sqls[4]).toContain('INNER JOIN spreads')
     // Manifesto §16 — reports NÃO entram (privacidade do reporter)
-    expect(sql).not.toContain('FROM reports')
+    for (const sql of sqls) expect(sql).not.toContain('FROM reports')
   })
 
-  it('passa npub do user 4x como parâmetro do SELECT (filtra por author/spreader/burier)', async () => {
+  it('votos vêm antes dos posts: >200 posts próprios não impedem republicar spreads (auditoria P3)', async () => {
+    const vote = 'a1'.repeat(32)
+    execMock.mockImplementation(async (sql: string) => {
+      if (sql.includes('FROM spreads WHERE spreader_pub')) return [{ raw_event: makeRawEvent(vote) }]
+      if (sql.includes('FROM posts WHERE author_pub'))
+        return Array.from({ length: 250 }, (_, i) => ({ raw_event: makeRawEvent(i.toString(16).padStart(64, '0')) }))
+      return []
+    })
+    await rebroadcastToRelay(RELAY, ME)
+    expect((publishMock.mock.calls[0]![1] as { id: string }).id).toBe(vote)
+    expect(publishMock).toHaveBeenCalledTimes(251)
+  }, 20_000) // 251 publishes × gap de 20ms
+
+  it('filtra cada fonte pelo npub do user', async () => {
     execMock.mockResolvedValue([])
     await rebroadcastToRelay(RELAY, ME)
-    const params = execMock.mock.calls[0]![1] as unknown[]
-    // Os 4 primeiros são o npub; o 5º é LIMIT
-    expect(params.slice(0, 4)).toEqual([ME, ME, ME, ME])
+    for (const call of execMock.mock.calls) {
+      const params = call[1] as unknown[]
+      expect(params.slice(0, -1).every((p) => p === ME)).toBe(true)
+      expect(typeof params.at(-1)).toBe('number') // LIMIT por categoria
+    }
   })
 })

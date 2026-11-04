@@ -123,6 +123,9 @@ function applyRow(target: UserPrefs, key: string, value: string): void {
     case 'report_decay_enabled':
       target.report_decay_enabled = value === '1'
       return
+    case 'ots_stamping_enabled':
+      target.ots_stamping_enabled = value === '1'
+      return
     case 'menu_detail_show_details':
       target.menu_detail_show_details = value === '1'
       return

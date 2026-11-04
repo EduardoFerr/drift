@@ -23,13 +23,20 @@
  *
  * ─── Peso do reporter ────────────────────────────────────────────────
  *
- * Um report de identidade nova vale menos que de identidade estabelecida.
- * Defesa anti-sybil sem confiar em prova de identidade.
+ * Pontos de um report = peso do reporter / 50, em [0, 2], e 0 abaixo de
+ * `REPORT_MIN_WEIGHT` (20).
  *
- *   peso < 20  → 0.5  (identidade nova/sem engajamento)
- *   peso < 50  → 1.0  (identidade ativa estabelecida)
- *   peso < 75  → 1.5  (identidade ativa de longa data)
- *   peso ≥ 75  → 2.0  (identidade veterana muito engajada)
+ *   peso < 20 → 0.0  (chave nova/sem âncora — não modera)
+ *   peso  25  → 0.5
+ *   peso  50  → 1.0
+ *   peso 100  → 2.0
+ *
+ * Antes havia piso de 0.5 pra peso < 20. Como chave Nostr custa zero,
+ * qualquer piso > 0 vira brigada gratuita: 10 chaves recém-criadas
+ * derrubavam qualquer post (6 com reason=illegal). Auditoria 2026-11-03,
+ * M3. Peso agora exige tempo ancorado no Bitcoin ou spread de quem já
+ * tem peso (`ranking.ts`), então report de peso 0 contar 0 é a única
+ * escolha consistente com §33.
  *
  *
  * ─── Categoria 'illegal' acelera ─────────────────────────────────────
@@ -42,10 +49,7 @@
  * priorizando uma categoria que ela própria classificou.
  */
 
-import { db } from './db'
-import { invalidateFeed } from './feed'
 import type { ReportReason } from '../types/drift'
-import { MS_PER_DAY_30, REPORT_DECAY_HALF_LIFE_MS } from '../config/constants'
 
 // ─── Tipos ───────────────────────────────────────────────────────────
 
@@ -65,11 +69,17 @@ export interface ReportRecord {
  * @param reporterWeight - Peso da identidade (0..100), de `weight.ts`
  * @returns Multiplicador a ser somado ao total de reports do post
  */
+/**
+ * Peso mínimo de um reporter pra o report contar (revisão pré-merge, A7).
+ * Sem mínimo, a soma era linear em chaves: 1200 chaves ancoradas há 1 dia
+ * (peso ~0,13 cada) moderavam qualquer post `illegal`. 20 ≈ 20 semanas de
+ * âncora, ou endosso substancial de quem já tem peso.
+ */
+export const REPORT_MIN_WEIGHT = 20
+
 export function getReportWeight(reporterWeight: number): number {
-  if (reporterWeight < 20) return 0.5
-  if (reporterWeight < 50) return 1.0
-  if (reporterWeight < 75) return 1.5
-  return 2.0
+  if (!Number.isFinite(reporterWeight) || reporterWeight < REPORT_MIN_WEIGHT) return 0
+  return Math.min(2, reporterWeight / 50)
 }
 
 /**
@@ -134,131 +144,9 @@ export function getReportThreshold(
   return base
 }
 
-// ─── Integração com SQLite (impuro — usa db.ts) ──────────────────────
-
-/**
- * Conta usuários ativos nos últimos 30 dias. Base do threshold dinâmico.
- *
- * Impuro porque consulta SQLite. A função pura é `getReportThreshold`;
- * esta é só o "leitor" do estado atual.
- */
-export async function countActiveUsers(now: number): Promise<number> {
-  const cutoff = Math.floor((now - MS_PER_DAY_30) / 1000)
-  const row = await db.get<{ n: number }>(
-    `SELECT COUNT(*) AS n FROM users WHERE last_active IS NOT NULL AND last_active > ?`,
-    [cutoff],
-  )
-  return row?.n ?? 0
-}
-
-/**
- * Soma o peso de todos os reports de um post, agrupado por reason.
- *
- * Reports são agregados localmente — cada cliente computa seu próprio
- * total a partir dos events kind 9081 que recebeu. Determinismo: dada
- * a mesma rede de eventos, todos os clientes chegam ao mesmo total.
- */
-export async function aggregateReports(
-  postId: string,
-  opts?: { now?: number; decayHalfLifeMs?: number },
-): Promise<{ totalWeight: number; byReason: Record<ReportReason, number> }> {
-  // Backward compat: sem opts ou halfLife=0 ⇒ comportamento bit-exact
-  // pré-Gap-A (sem decay, SELECT sem created_at). Pref `report_decay_enabled`
-  // default OFF preserva isso pra todos users existentes.
-  const decayEnabled =
-    typeof opts?.decayHalfLifeMs === 'number' && opts.decayHalfLifeMs > 0
-  const rows = decayEnabled
-    ? await db.exec<{ reason: ReportReason; weight: number; created_at: number }>(
-        `SELECT reason, weight, created_at FROM reports WHERE post_id = ?`,
-        [postId],
-      )
-    : await db.exec<{ reason: ReportReason; weight: number; created_at?: number }>(
-        `SELECT reason, weight FROM reports WHERE post_id = ?`,
-        [postId],
-      )
-  const byReason: Record<ReportReason, number> = {
-    illegal: 0,
-    spam: 0,
-    harassment: 0,
-  }
-  let totalWeight = 0
-  const nowMs = opts?.now ?? Date.now()
-  for (const row of rows) {
-    if (!(row.reason in byReason)) continue
-    let effective = row.weight
-    if (decayEnabled && typeof row.created_at === 'number') {
-      // reports.created_at é unix seconds (NIP-01). Converte pra ms.
-      const ageMs = nowMs - row.created_at * 1000
-      effective = calculateEffectiveReportWeight(
-        row.weight,
-        ageMs,
-        opts!.decayHalfLifeMs!,
-      )
-    }
-    byReason[row.reason] += effective
-    totalWeight += effective
-  }
-  return { totalWeight, byReason }
-}
-
-/**
- * Aplica moderação se o threshold foi atingido.
- *
- * Chamado por `events.ts:persistReport` depois de inserir um novo
- * report. Idempotente — chamadas repetidas no mesmo post com mesmos
- * dados não duplicam efeito.
- *
- * Quando moderado:
- *   - `posts.score` vira -999 (esconde do feed default — query usa
- *     `WHERE score > -999`)
- *   - O evento POST permanece no banco e nos relays (manifesto §16,
- *     invariante #13)
- *   - Cliente alternativo pode exibir mesmo assim — feature, não bug
- *
- * @param postId - event.id hex 64 do post (NIP-01)
- * @param now - Agora (ms) — passado pra teste/determinismo
- */
-export async function maybeModerate(postId: string, now: number): Promise<void> {
-  // Sovereignty (Marshall NEEDS-FIX C 2026-05-17): user pode override
-  // o threshold dinâmico via UserPrefs. Útil pra comunidades fechadas
-  // que querem moderação mais/menos agressiva. Lazy require pra evitar
-  // dep cycle (prefs → db → events → moderation).
-  const { getPrefs } = await import('./prefs')
-  const prefs = getPrefs()
-  const override = prefs.report_threshold_override
-  // Gap A 2026-05-21 (Barney devsec): quando opt-in `report_decay_enabled`
-  // true, aggregateReports aplica decay 48h half-life em cada report.
-  // Reports antigos pesam menos no threshold (defesa parcial vs brigada
-  // slow-burn). Pref default OFF preserva backward compat bit-exact.
-  // Layer separado do `report_threshold_override` (sovereignty independente).
-  const aggregateOpts = prefs.report_decay_enabled
-    ? { now, decayHalfLifeMs: REPORT_DECAY_HALF_LIFE_MS }
-    : undefined
-  const { totalWeight, byReason } = await aggregateReports(postId, aggregateOpts)
-
-  const activeUsers = await countActiveUsers(now)
-
-  // Verifica cada categoria contra seu threshold próprio. Se qualquer
-  // uma passar, modera. 'illegal' tem threshold mais agressivo.
-  const reasons: ReportReason[] = ['illegal', 'spam', 'harassment']
-  for (const reason of reasons) {
-    const t = getReportThreshold(activeUsers, reason, override)
-    if (byReason[reason] >= t) {
-      await db.run(`UPDATE posts SET score = -999 WHERE id = ?`, [postId])
-      // Invariante #1: UPDATE em domínio fora de
-      // `events.ts:onNostrEvent` é exceção autorizada (eviction +
-      // moderação), MAS exige `invalidateFeed()` pra que UI reflita.
-      // Sem isso, post fica `score: -999` no banco mas o store
-      // `useFeedStore` só atualiza quando próximo evento chegar.
-      invalidateFeed()
-      return
-    }
-  }
-
-  // Threshold combinado (qualquer mistura de razões) — mais conservador.
-  const combinedThreshold = getReportThreshold(activeUsers, 'spam', override)
-  if (totalWeight >= combinedThreshold) {
-    await db.run(`UPDATE posts SET score = -999 WHERE id = ?`, [postId])
-    invalidateFeed()
-  }
-}
+// ─── Aplicação ───────────────────────────────────────────────────────
+//
+// A decisão "este post está moderado?" vive em `ranking.ts:computeRanking`,
+// que a deriva do conjunto de reports + pesos a cada recomputação. Antes
+// ela era um `UPDATE posts SET score = -999` disparado por report, que o
+// recálculo de score seguinte apagava (auditoria 2026-11-03, M1/M2).

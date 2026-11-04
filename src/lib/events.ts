@@ -5,15 +5,16 @@
  * Recebe eventos do subscribe (que inclui os próprios eventos publicados
  * pelo cliente, devolvidos pelos relays) e materializa estado local.
  *
- * Idempotente: INSERT OR IGNORE garante que processar o mesmo evento
- * N vezes não duplica linhas.
+ * Idempotente: INSERT OR IGNORE (posts, comments, provas OTS) e upsert
+ * LWW (spreads, buries, reports — guarda a ação mais recente) garantem que
+ * processar o mesmo evento N vezes, em qualquer ordem, dá o mesmo estado.
  *
  * ─── Pipeline (ordem importa para performance) ──────────────────────
  *
  *   1. Cheap kind check       (KIND_DISPATCH lookup, O(1))
  *   2. Cheap schema check     (handler.validate — tag lookup, JSON.parse só p/ POST)
  *   3. Caro: verify Schnorr   (~1ms/evento — só rodar no que vai ficar)
- *   4. Persist (handler.persist — INSERT OR IGNORE + invalidateFeed + scheduleScoreRecalc)
+ *   4. Persist (handler.persist — upsert idempotente + invalidateFeed + scheduleRankingRecompute)
  *
  * Em situações onde N% do tráfego é não-Drift, descartamos antes do
  * verify — economia significativa.
@@ -29,14 +30,16 @@ import { getTag } from './nostr'
 import { verifyEventAsync } from './verify'
 import {
   DRIFT_KIND,
+  MAX_FUTURE_SKEW_SECONDS,
   MODERATED_SCORE,
+  MS_PER_DAY,
+  REPORT_DECAY_HALF_LIFE_MS,
   SCORE_RECALC_DEBOUNCE_MS,
   VIRAL_PIN_THRESHOLD,
 } from '../config/constants'
-import { applyCommentReceived, calculateScore, calculateScoreNow, scoreNumerator } from './scoring'
 import { bumpUnseenCount, invalidateFeed } from './feed'
-import { getReportWeight, maybeModerate } from './moderation'
-import { calculateUserWeight, calculateWeight } from './weight'
+import { computeRanking, type RankingAction, type RankingReport } from './ranking'
+import { requestAnchorsFor, requestMissingEvents } from './orphans'
 import { bumpCommentCount } from './comment-counts'
 import { addCommentToStore } from './comments'
 import { parseImetaTags } from './nip94'
@@ -49,6 +52,28 @@ import type { CommentRecord, ContentWarning, ReportReason } from '../types/drift
  * proprietário; Drift reusa pra threads (Track C, manifesto §29).
  */
 export const NIP22_COMMENT_KIND = 1111
+
+/**
+ * NIP-03 — prova OpenTimestamps de um evento (content = arquivo .ots em
+ * base64, tag `e` = evento carimbado, tag `k` = kind dele). É a âncora de
+ * antiguidade das identidades (`ranking.ts`): Bitcoin prova que o evento
+ * existia no bloco H, então a chave existia desde então.
+ */
+export const OTS_ATTESTATION_KIND = 1040
+
+/** Kinds cujas provas OTS interessam ao Drift (filtro `#k` do sync). */
+export const OTS_TARGET_KINDS: string[] = ['9078', '9079', '9080', '9081', '1111']
+
+/** Teto do content base64 de uma prova (provas reais têm ~1-5 KB). */
+const OTS_PROOF_MAX_B64 = 16_384
+/** Provas de TERCEIROS pendentes/verificadas por evento carimbado (prova honesta: 1). */
+const OTS_PROOFS_PER_TARGET = 3
+/** Provas pendentes por pubkey publicadora (exceto do próprio autor). */
+const OTS_PENDING_PER_PUBLISHER = 20
+/** Provas pendentes no total — acima disso a pior de terceiro é despejada. */
+const OTS_PENDING_CAP = 5_000
+/** Linhas de provas inválidas guardadas (só pra dedup; conteúdo já apagado). */
+const OTS_INVALID_CAP = 10_000
 
 /**
  * KIND_DISPATCH — lookup table que separa "qual handler usar" de
@@ -93,13 +118,12 @@ interface KindHandler {
   /**
    * Persiste no SQLite. Roda APÓS `verifyEventAsync` ter passado.
    * DEVE ser idempotente (`INSERT OR IGNORE`). Responsável por chamar
-   * `invalidateFeed()` e `scheduleScoreRecalc(postId)` quando aplicável
-   * (cada handler decide a semântica — REPORT chama `maybeModerate`,
-   * COMMENT propaga score do post recebedor, etc.).
+   * `invalidateFeed()` e `scheduleRankingRecompute()` quando o evento
+   * afeta ranking (post, spread, bury, comment, report, prova OTS).
    *
    * `deferSideEffects` (default false): quando true, o handler PERSISTE
    * normalmente (INSERT + updateUserActivity) mas SUPRIME os side-effects
-   * pós-persist `scheduleScoreRecalc(postId)` + `invalidateFeed()`. Usado
+   * pós-persist `scheduleRankingRecompute()` + `invalidateFeed()`. Usado
    * pelo dev-seed (`lib/dev-seed/seed.ts`) pra drenar milhares de eventos
    * sem disparar uma storm de recalc/invalidate por evento — o caller faz
    * 1 `recalcAllScores()` + 1 `invalidateFeed()` no fim. Determinismo §7
@@ -163,6 +187,14 @@ const KIND_DISPATCH: Readonly<Record<number, KindHandler>> = {
     validate: validateCommentShape,
     persist: persistCommentRow,
   },
+  // NIP-03 — prova OpenTimestamps (âncora de antiguidade, auditoria
+  // 2026-11-03). Persistida como 'pending'; a verificação contra headers
+  // Bitcoin é assíncrona (`ots-anchors.ts`) porque precisa de rede.
+  [OTS_ATTESTATION_KIND]: {
+    name: 'OTS_ATTESTATION',
+    validate: validateOtsAttestationShape,
+    persist: persistOtsAttestation,
+  },
   // Kind 0 NIP-01 — profile metadata (opt-in identity).
   // Replaceable event: ingestão LWW por created_at. NUNCA participa de
   // score/weight (LOCK_VIA_TEST). Manifesto §5.3 / §28.
@@ -193,8 +225,8 @@ const KIND_DISPATCH: Readonly<Record<number, KindHandler>> = {
 // preservado: writes ainda nascem de onNostrEvent→persist*). Sync real
 // (relays/WebRTC) NUNCA seta sink → comportamento direto intacto.
 //
-// CUIDADO: persist* que LEEM antes de escrever (ex: persistReport →
-// calculateUserWeight) dependem dos writes anteriores já estarem flushados.
+// Nenhum persist* lê o banco antes de escrever desde a recomputação global
+// (ranking.ts) — pesos/moderação são derivados no fim, sobre o conjunto.
 // O seed flusha no boundary de cada batch; como o domain é ordenado por
 // created_at ASC e reports vêm por último, os users dos reporters (genesis,
 // primeiros) já foram flushados quando os reports são processados.
@@ -225,6 +257,11 @@ export async function onNostrEvent(
   const handler = KIND_DISPATCH[event.kind]
   if (!handler) return
 
+  // 1b. Cheap: teto de relógio. `created_at` no futuro além da tolerância
+  //     é descartado — ver `MAX_FUTURE_SKEW_SECONDS`. Também rejeita
+  //     não-inteiros/NaN, que propagariam NaN pro score e pro cursor.
+  if (!isAcceptableCreatedAt(event.created_at, Math.floor(Date.now() / 1000))) return
+
   // 2. Cheap: schema check (sem db, sem crypto). SYNC pela mesma razão.
   if (!handler.validate(event)) return
 
@@ -249,6 +286,19 @@ export async function onNostrEvent(
   //    `deferSideEffects` (default false) adia recalc/invalidate pós-persist
   //    — caller bulk-aware (dev-seed) consolida no fim.
   await handler.persist(event, options?.deferSideEffects ?? false)
+}
+
+/**
+ * `created_at` aceitável: inteiro não-negativo e no máximo
+ * `MAX_FUTURE_SKEW_SECONDS` à frente de `nowSec`. Pura — exportada pra
+ * teste e pra `sync.ts` aplicar a mesma regra ao cursor.
+ */
+export function isAcceptableCreatedAt(createdAt: number, nowSec: number): boolean {
+  return (
+    Number.isSafeInteger(createdAt) &&
+    createdAt >= 0 &&
+    createdAt <= nowSec + MAX_FUTURE_SKEW_SECONDS
+  )
 }
 
 // ─── Schema check (cheap, before verify) ─────────────────────────────
@@ -317,6 +367,21 @@ function validateBuryShape(event: SignedEvent): boolean {
  */
 function validateReportShape(event: SignedEvent): boolean {
   return isHex64(getTag(event, 'e')) && getTag(event, 'reason') !== null
+}
+
+/**
+ * NIP-03: `e` hex 64 + content base64 não-vazio e limitado. A prova em
+ * si (parse + Bitcoin) só é checada depois, fora do caminho quente.
+ */
+function validateOtsAttestationShape(event: SignedEvent): boolean {
+  if (!isHex64(getTag(event, 'e'))) return false
+  const c = event.content
+  return (
+    typeof c === 'string' &&
+    c.length > 0 &&
+    c.length <= OTS_PROOF_MAX_B64 &&
+    /^[A-Za-z0-9+/]+={0,2}$/.test(c)
+  )
 }
 
 /**
@@ -522,31 +587,43 @@ async function persistPost(event: SignedEvent, deferSideEffects: boolean): Promi
   // post novo: feed precisa aparecer no topo (score 0 + recente)
   if (deferSideEffects) return // dev-seed: bulk recalc + invalidate no fim
   invalidateFeed()
-  scheduleScoreRecalc(postId)
+  scheduleRankingRecompute()
 }
 
 async function persistSpread(event: SignedEvent, deferSideEffects: boolean): Promise<void> {
   const postId = getTag(event, 'e')!
   await runWrite(
-    `INSERT OR IGNORE INTO spreads
+    // LWW por (post_id, spreader_pub): guarda o spread MAIS RECENTE.
+    // Antes era `INSERT OR IGNORE`, que guardava o PRIMEIRO a chegar —
+    // spread→bury→spread contava bury, e a mesma rede de eventos dava
+    // scores diferentes conforme a ordem de chegada (auditoria
+    // 2026-11-03, A1/A2). Empate de created_at: menor event_id vence,
+    // determinístico entre clientes.
+    `INSERT INTO spreads
      (post_id, spreader_pub, created_at, location, event_id, raw_event)
-     VALUES (?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT(post_id, spreader_pub) DO UPDATE SET
+       created_at = excluded.created_at,
+       location   = excluded.location,
+       event_id   = excluded.event_id,
+       raw_event  = excluded.raw_event
+     WHERE excluded.created_at > spreads.created_at
+        OR (excluded.created_at = spreads.created_at AND excluded.event_id < spreads.event_id)`,
     [postId, event.pubkey, event.created_at, serializeLocation(event), event.id, JSON.stringify(event)],
   )
   await updateUserActivity(event.pubkey, event.created_at)
-  // invalidateFeed direto + recalc agendado.
+  // invalidateFeed direto + recomputação agendada.
   //
-  // Por que invalidar AQUI também (e não só após recalc): se este
-  // cliente recebeu o spread ANTES de receber o post (race comum em
-  // feeds que sincronizam de relays diferentes), recalculateScore
-  // dá early-return porque `posts WHERE id = postId` retorna null —
-  // não roda UPDATE, não chama invalidateFeed. UI fica desatualizada
+  // Por que invalidar AQUI também (e não só após a recomputação): se
+  // este cliente recebeu o spread ANTES do post (race comum em feeds que
+  // sincronizam de relays diferentes), a recomputação não tem linha de
+  // post pra atualizar (e pede o post por id, `orphans.ts`). UI ficaria desatualizada
   // até o post chegar (eventualmente). Invalidar aqui garante que
   // quando o getMyAction do useEffect roda, encontra o spread persistido
   // e limpa o pending optimistic. Manifesto §6 (Verdade por Eventos).
   if (deferSideEffects) return // dev-seed: bulk recalc + invalidate no fim
   invalidateFeed()
-  scheduleScoreRecalc(postId)
+  scheduleRankingRecompute()
   // Track B.2 — "favorito = mirror automático" (RFC §5.3, manifesto §16).
   // Quando o user atual emite SPREAD em um post, cliente pina o blob
   // local. Best-effort, fire-and-forget — falha não derruba o spread.
@@ -592,15 +669,22 @@ async function maybeAutoPinBlobs(spreaderPub: string, postId: string): Promise<v
 async function persistBury(event: SignedEvent, deferSideEffects: boolean): Promise<void> {
   const postId = getTag(event, 'e')!
   await runWrite(
-    `INSERT OR IGNORE INTO buries
+    // LWW — mesma regra de `persistSpread`.
+    `INSERT INTO buries
      (post_id, burier_pub, created_at, event_id, raw_event)
-     VALUES (?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(post_id, burier_pub) DO UPDATE SET
+       created_at = excluded.created_at,
+       event_id   = excluded.event_id,
+       raw_event  = excluded.raw_event
+     WHERE excluded.created_at > buries.created_at
+        OR (excluded.created_at = buries.created_at AND excluded.event_id < buries.event_id)`,
     [postId, event.pubkey, event.created_at, event.id, JSON.stringify(event)],
   )
   await updateUserActivity(event.pubkey, event.created_at)
   if (deferSideEffects) return // dev-seed: bulk recalc + invalidate no fim
   invalidateFeed() // mesmo motivo de persistSpread — race spread-antes-do-post
-  scheduleScoreRecalc(postId)
+  scheduleRankingRecompute()
   // bury NÃO penaliza o autor — diferença filosófica central
 }
 
@@ -691,80 +775,53 @@ async function persistCommentRow(event: SignedEvent, deferSideEffects: boolean):
   } catch (err) {
     console.warn('[events] addCommentToStore failed (non-fatal):', err)
   }
-  // Track C.5: comments alimentam score do post recebedor via
-  // `applyCommentReceived` em `recalculateScore`. Igual spreads/buries,
-  // usa debounce de SCORE_RECALC_DEBOUNCE_MS pra rajadas (post viral
-  // recebendo dezenas de replies em sequência → 1 recálculo no fim).
-  // Self-comments e moderation (score = -999) são filtrados na query
-  // SQL dentro de recalculateScore (Barney HIGH #3).
-  scheduleScoreRecalc(parsed.rootEventId)
+  // Track C.5: comments entram no NUMERADOR do score do post recebedor
+  // (`ranking.ts`, ponderados pelo peso do commenter, cap
+  // COMMENTS_SCORE_CAP) — e portanto na ordem do feed. Self-comments e
+  // comments moderados não contam (Barney HIGH #3).
+  scheduleRankingRecompute()
+}
+
+/**
+ * Upsert LWW de report por (post_id, reporter_pub). Comum a 9081 e 1984
+ * (dedup cross-kind). Guarda o report MAIS RECENTE — reporter pode mudar
+ * o motivo. Empate de created_at: menor `kind` (9081 nativo antes de 1984
+ * só por ordem numérica) — determinístico.
+ *
+ * `weight` é gravado 0: a coluna é legado. Os pontos do report são
+ * derivados do peso ATUAL do reporter dentro de `ranking.ts` a cada
+ * recomputação — antes eram congelados no instante da ingestão, com o
+ * peso que ESTE cliente achava que o reporter tinha naquele momento.
+ */
+async function upsertReport(
+  postId: string,
+  reporterPub: string,
+  reason: ReportReason,
+  createdAt: number,
+  kind: number,
+): Promise<void> {
+  await runWrite(
+    `INSERT INTO reports (post_id, reporter_pub, reason, weight, created_at, kind)
+     VALUES (?, ?, ?, 0, ?, ?)
+     ON CONFLICT(post_id, reporter_pub) DO UPDATE SET
+       reason     = excluded.reason,
+       created_at = excluded.created_at,
+       kind       = excluded.kind
+     WHERE excluded.created_at > reports.created_at
+        OR (excluded.created_at = reports.created_at AND excluded.kind < reports.kind)`,
+    [postId, reporterPub, reason, createdAt, kind],
+  )
 }
 
 async function persistReport(event: SignedEvent, deferSideEffects: boolean): Promise<void> {
   const postId = getTag(event, 'e')!
   const reasonTag = getTag(event, 'reason')
   const reason = isValidReason(reasonTag) ? reasonTag : 'spam'
-
-  // Peso do reporter: anti-sybil. Identidade nova vale menos (manifesto §26).
-  // O peso pode ser 0 se o reporter é desconhecido pra este cliente — nesse
-  // caso `getReportWeight` aplica o tier mais baixo (0.5).
-  const reporterWeightCalc = await calculateUserWeight(event.pubkey, Date.now())
-  const reporterWeight = getReportWeight(reporterWeightCalc.weight)
-
-  try {
-    await runWrite(
-      `INSERT OR IGNORE INTO reports
-       (post_id, reporter_pub, reason, weight, created_at)
-       VALUES (?, ?, ?, ?, ?)`,
-      [postId, event.pubkey, reason, reporterWeight, event.created_at],
-    )
-  } catch (err) {
-    // Fallback resiliente: banco velho cuja migração `reason` ainda
-    // não foi aplicada (acontece em devices que mantiveram a aba
-    // aberta com worker antigo carregado, ou cache agressivo). Insere
-    // sem reason — perde a categorização específica deste report mas
-    // o fluxo de moderação continua. Cliente vai acabar atualizando
-    // schema na próxima boot completa.
-    const msg = err instanceof Error ? err.message : String(err)
-    if (msg.includes('no such column') && msg.includes('reason')) {
-      console.warn(
-        '[events] persistReport sem coluna reason — banco em schema antigo. ' +
-          'Recarregue a página com cache limpo pra aplicar migração.',
-      )
-      await db.run(
-        `INSERT OR IGNORE INTO reports
-         (post_id, reporter_pub, weight, created_at)
-         VALUES (?, ?, ?, ?)`,
-        [postId, event.pubkey, reporterWeight, event.created_at],
-      )
-    } else {
-      throw err
-    }
-  }
-
+  await upsertReport(postId, event.pubkey, reason, event.created_at, DRIFT_KIND.REPORT)
   await updateUserActivity(event.pubkey, event.created_at)
-
-  // dev-seed: a moderação §26 (maybeModerate) e o invalidateFeed são
-  // adiados pro bulk pass (`recalcAllScores`), que aplica recalc DEPOIS
-  // o threshold de moderação na ordem correta (-999 vence o último write).
-  if (deferSideEffects) return
-
-  // Após inserir, verifica threshold. Se atingido, post.score = -999 e
-  // some do feed default. Manifesto §26.
-  try {
-    await maybeModerate(postId, Date.now())
-  } catch (err) {
-    // Mesmo fallback — moderation.ts:aggregateReports lê coluna reason.
-    // Em banco velho, falha. Logamos e seguimos — moderação fica
-    // reativa quando schema atualizar.
-    const msg = err instanceof Error ? err.message : String(err)
-    if (msg.includes('no such column') && msg.includes('reason')) {
-      console.warn('[events] maybeModerate skip — banco em schema antigo.')
-    } else {
-      throw err
-    }
-  }
-  invalidateFeed()
+  if (deferSideEffects) return // dev-seed: bulk recompute no fim
+  // Moderação é derivada na recomputação global (ranking.ts).
+  scheduleRankingRecompute()
 }
 
 const VALID_REASONS: ReadonlySet<ReportReason> = new Set<ReportReason>([
@@ -777,6 +834,69 @@ function isValidReason(v: string | null): v is ReportReason {
   return v !== null && (VALID_REASONS as ReadonlySet<string>).has(v)
 }
 
+/**
+ * Persiste prova OTS como pendente e agenda verificação. NÃO toca
+ * `users.last_active`: qualquer um pode publicar a prova de um evento
+ * alheio — ela não é atividade de ninguém. Quem é ancorado é o AUTOR do
+ * evento carimbado, resolvido na verificação.
+ */
+async function persistOtsAttestation(event: SignedEvent, deferSideEffects: boolean): Promise<void> {
+  const target = getTag(event, 'e')!
+  // Admissão (revisões F3 + A11/A12). Prova publicada pelo PRÓPRIO autor do
+  // evento carimbado é sempre aceita — é o caso normal do Drift e ninguém
+  // mais consegue assinar como ele. As demais (terceiros, possivelmente
+  // lixo) entram só dentro de tetos:
+  //   - ≤ OTS_PROOFS_PER_TARGET provas pendentes/verificadas por evento
+  //     (inválidas não contam — senão 3 lixos bloqueavam a vítima pra sempre).
+  // Pra TODAS (inclusive do próprio autor): ≤ OTS_PENDING_PER_PUBLISHER
+  // pendentes por pubkey publicadora — um autor honesto precisa de 1.
+  // Fila cheia (OTS_PENDING_CAP) despeja de terceiros, começando pelo
+  // publicador com MAIS pendentes, em vez de recusar a nova — senão 5000
+  // lixos barravam toda prova honesta (A12), e despejar por tentativas
+  // punia justamente as honestas atrasadas pelo lixo (A17).
+  const { resolveLocalAuthor } = await import('./ots-anchors')
+  const author = await resolveLocalAuthor(target)
+  const selfProof = author !== null && author === event.pubkey ? 1 : 0
+  await runWrite(
+    `INSERT OR IGNORE INTO ots_proofs
+     (proof_event_id, target_event_id, proof_b64, raw_event, publisher_pub, self_proof, status)
+     SELECT ?, ?, ?, ?, ?, ?, 'pending'
+     WHERE (SELECT COUNT(*) FROM ots_proofs
+              WHERE publisher_pub = ? AND status = 'pending') < ?
+       AND (? = 1 OR (SELECT COUNT(*) FROM ots_proofs
+              WHERE target_event_id = ? AND status IN ('pending', 'verified')) < ?)`,
+    [
+      event.id, target, event.content, JSON.stringify(event), event.pubkey, selfProof,
+      event.pubkey, OTS_PENDING_PER_PUBLISHER, selfProof, target, OTS_PROOFS_PER_TARGET,
+    ],
+  )
+  // Despejo: acima do teto, sai a pendente de terceiro com mais tentativas
+  // (e mais antiga). Provas do próprio autor nunca são despejadas.
+  await runWrite(
+    `DELETE FROM ots_proofs WHERE proof_event_id IN (
+       SELECT p.proof_event_id FROM ots_proofs p
+       WHERE p.status = 'pending' AND p.self_proof = 0
+       ORDER BY (SELECT COUNT(*) FROM ots_proofs q
+                   WHERE q.publisher_pub = p.publisher_pub AND q.status = 'pending') DESC,
+                p.attempts DESC, p.proof_event_id DESC
+       LIMIT MAX(0, (SELECT COUNT(*) FROM ots_proofs WHERE status = 'pending') - ?)
+     )`,
+    [OTS_PENDING_CAP],
+  )
+  // Inválidas já perderam o conteúdo; ainda assim, teto de linhas.
+  await runWrite(
+    `DELETE FROM ots_proofs WHERE proof_event_id IN (
+       SELECT proof_event_id FROM ots_proofs WHERE status = 'invalid'
+       ORDER BY checked_at ASC
+       LIMIT MAX(0, (SELECT COUNT(*) FROM ots_proofs WHERE status = 'invalid') - ?)
+     )`,
+    [OTS_INVALID_CAP],
+  )
+  if (deferSideEffects) return
+  const { scheduleOtsVerification } = await import('./ots-anchors')
+  scheduleOtsVerification()
+}
+
 // ─── NIP-56 kind 1984 — report cross-cliente Nostr ────────────────
 //
 // Manifesto §29 (compat Nostr): Drift agora emite + ingere kind 1984
@@ -784,11 +904,8 @@ function isValidReason(v: string | null): v is ReportReason {
 // bucket Drift (3) via `lib/nip56-mapping.ts` antes do INSERT.
 //
 // Dedup LWW cross-kind: UNIQUE (post_id, reporter_pub) garante 1 row
-// por par; INSERT OR IGNORE preserva o primeiro report. Marshall
-// recomendou trocar pra ON CONFLICT...WHERE excluded.created_at >
-// reports.created_at (LWW real); deixei como INSERT OR IGNORE por
-// agora pra ficar simétrico com persistReport. Trade-off documentado
-// em nota interna
+// por par; `upsertReport` guarda o report mais recente (LWW real, como
+// spreads/buries — auditoria 2026-11-03).
 
 async function persistNip56Report(event: SignedEvent, deferSideEffects: boolean): Promise<void> {
   const { mapNip56ToDrift } = await import('./nip56-mapping')
@@ -800,53 +917,10 @@ async function persistNip56Report(event: SignedEvent, deferSideEffects: boolean)
   const driftReason = mapNip56ToDrift(reportType)
   if (driftReason === null) return // report_type fora do whitelist NIP-56
 
-  // Mesmo cálculo de peso do reporter — anti-sybil §26. NIP-56 emitido
-  // por cliente externo não traz weight; calculamos local.
-  const reporterWeightCalc = await calculateUserWeight(event.pubkey, Date.now())
-  const reporterWeight = getReportWeight(reporterWeightCalc.weight)
-
-  try {
-    await db.run(
-      `INSERT OR IGNORE INTO reports
-       (post_id, reporter_pub, reason, weight, created_at, kind)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [postId, event.pubkey, driftReason, reporterWeight, event.created_at, 1984],
-    )
-  } catch (err) {
-    // Fallback: banco sem coluna `kind` (migration ainda não aplicada).
-    const msg = err instanceof Error ? err.message : String(err)
-    if (msg.includes('no such column') && msg.includes('kind')) {
-      console.warn(
-        '[events] persistNip56Report sem coluna kind — banco em schema antigo. ' +
-          'Recarregue a página com cache limpo pra aplicar migração.',
-      )
-      await db.run(
-        `INSERT OR IGNORE INTO reports
-         (post_id, reporter_pub, reason, weight, created_at)
-         VALUES (?, ?, ?, ?, ?)`,
-        [postId, event.pubkey, driftReason, reporterWeight, event.created_at],
-      )
-    } else {
-      throw err
-    }
-  }
-
+  await upsertReport(postId, event.pubkey, driftReason, event.created_at, 1984)
   await updateUserActivity(event.pubkey, event.created_at)
-
-  // dev-seed: moderação + invalidate adiados pro bulk pass (ver persistReport).
   if (deferSideEffects) return
-
-  try {
-    await maybeModerate(postId, Date.now())
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err)
-    if (msg.includes('no such column') && msg.includes('reason')) {
-      console.warn('[events] maybeModerate skip — banco em schema antigo.')
-    } else {
-      throw err
-    }
-  }
-  invalidateFeed()
+  scheduleRankingRecompute()
 }
 
 // ─── User metadata kind 0 (NIP-01) — opt-in identity ──────────────
@@ -961,428 +1035,232 @@ function serializeLocation(event: SignedEvent): string | null {
   return null
 }
 
-// ─── Recalc de score com debounce por postId ─────────────────────────
+// ─── Recomputação global do ranking ──────────────────────────────────
 //
-// Cenário motivador: 50 spreads chegam pro mesmo post em rajada
-// (cliente reconectando após offline, post viral). Sem debounce, são
-// 50 recálculos sequenciais. Com debounce 100ms, vira 1 recálculo no
-// fim da rajada — ~50× menos round-trips ao worker SQLite.
+// Antes: recálculo POR POST (debounce por postId), com o peso de cada
+// spreader lido no instante daquele recálculo, e moderação como UPDATE
+// avulso disparado por report. Isso tornava o score função da ordem de
+// chegada e do histórico de recálculos, e deixava o recálculo seguinte
+// apagar o `-999` (auditoria 2026-11-03, A2/S4/M1/M2).
+//
+// Agora: qualquer evento de domínio agenda UMA recomputação global
+// (debounce + teto de espera), que carrega o conjunto inteiro, roda o
+// motor puro `ranking.ts:computeRanking` e grava só as linhas que
+// mudaram. Mesmo conjunto de eventos → mesmo resultado, sempre.
 
-const pendingRecalcs = new Map<string, ReturnType<typeof setTimeout>>()
+const RANKING_MAX_WAIT_MS = 5_000
+/** Votos mais velhos que isso não disparam busca de post órfão (= janela de sync). */
+const ORPHAN_WINDOW_SECONDS = 7 * 24 * 60 * 60
+/** Ids/autores pedidos à rede por recomputação. */
+const NETWORK_REQUEST_CAP = 200
+const RANKING_WRITE_CHUNK = 800
 
-function scheduleScoreRecalc(postId: string): void {
-  const existing = pendingRecalcs.get(postId)
-  if (existing) clearTimeout(existing)
-  pendingRecalcs.set(
-    postId,
-    setTimeout(() => {
-      pendingRecalcs.delete(postId)
-      recalculateScore(postId).catch((err) =>
-        console.error('[recalcScore]', postId, err),
-      )
-    }, SCORE_RECALC_DEBOUNCE_MS),
+let rankingTimer: ReturnType<typeof setTimeout> | null = null
+let rankingFirstRequestAt = 0
+let rankingRun: Promise<void> | null = null
+let rankingRerun = false
+let dayRolloverTimer: ReturnType<typeof setTimeout> | null = null
+let dayRolloverEpoch = -1
+
+/**
+ * Agenda recomputação global. Debounce de `SCORE_RECALC_DEBOUNCE_MS`
+ * por evento, mas nunca adia mais que `RANKING_MAX_WAIT_MS` desde o
+ * primeiro pedido — tráfego contínuo não congela o ranking.
+ */
+function scheduleRankingRecompute(): void {
+  const now = Date.now()
+  if (rankingTimer === null) rankingFirstRequestAt = now
+  else clearTimeout(rankingTimer)
+  const wait = Math.max(
+    0,
+    Math.min(SCORE_RECALC_DEBOUNCE_MS, rankingFirstRequestAt + RANKING_MAX_WAIT_MS - now),
   )
+  rankingTimer = setTimeout(() => {
+    rankingTimer = null
+    recalcAllScores().catch((err) => console.error('[ranking]', err))
+  }, wait)
 }
 
 /**
- * Recalc bulk — recalcula o score de TODOS os posts em um único loop
- * sequencial, sem o debounce-per-postId de `scheduleScoreRecalc`. Pensado
- * pro dev-seed (`lib/dev-seed/seed.ts`), que ingere milhares de eventos
- * com `deferSideEffects: true` e precisa materializar scores UMA vez no
- * fim em vez de disparar uma storm de N timers + N recalcs avulsos.
+ * Recomputa pesos, scores e moderação de TUDO a partir do SQLite.
  *
- * Determinismo (manifesto §7): `recalculateScore` é puro em cima do estado
- * SQLite — rodar 1× por post no fim do drain dá EXATAMENTE o mesmo score
- * que o caminho normal (recalc incremental por evento), porque scoring é
- * agregação idempotente das ações persistidas, não acumulação incremental.
+ * Nome mantido por compat (bootstrap, dev-seed). Serializado: chamadas
+ * concorrentes esperam a corrente e disparam no máximo 1 rodada extra.
  *
- * Ordem crítica (manifesto §26): recalc PRIMEIRO, moderação DEPOIS. Posts
- * que cruzam o threshold de reports recebem `score = -999` via
- * `maybeModerate` — esse write precisa ser o ÚLTIMO, senão o recalc
- * sobrescreveria o -999 com um score real. Por isso a moderação roda num
- * segundo passo, após todos os recalcs.
- *
- * Cede o main thread a cada `yieldEvery` posts (default igual ao boot
- * batch) pra não travar o paint durante o bulk. `recalculateScore` chama
- * `invalidateFeed()` internamente, mas ele é debounced (early-return se já
- * há timer) — durante o bulk vira no máximo 1 refresh, e o caller
- * (`seedDatabase`) garante 1 invalidate final consistente após o bulk.
+ * Determinismo (§7): a saída é função de (conjunto de eventos, âncoras
+ * OTS verificadas, dia UTC, prefs locais de moderação). Não depende de
+ * ordem de chegada nem de quando cada post foi recalculado pela última vez.
  */
-export async function recalcAllScores(yieldEvery: number = 50): Promise<void> {
-  // BULK (user 2026-05-29: "após o seed fica um bom tempo parado"). Antes:
-  // `for each post: await recalculateScore(id)` → ~5 roundtrips/post × ~2700
-  // posts ≈ 13k postMessages serializados = trava de minutos PÓS-drain (o
-  // batch-INSERT tornou o drain rápido, mas o recalc per-post virou o floor).
-  //
-  // Agora: carrega spreads/buries/users de UMA vez (3 reads), computa todos
-  // os scores em JS (REUSA as MESMAS fns puras: selectLatestActionByUser +
-  // calculateWeight + calculateScore → determinismo §7 idêntico) e escreve
-  // tudo num único `db.batch` (1 transação). ~13k roundtrips → ~5.
-  //
-  // Comments (Track C.5): a contribuição de comments NÃO é incluída no bulk
-  // (sua matemática vive em applyCommentsContribution, read-heavy). Posts COM
-  // comments caem no path per-post provado (`recalculateScore`) num 2º passo
-  // — raro no geral, ZERO no dev-seed (kinds 9078-9081, sem 1111). Score
-  // idêntico: post sem comment → contribuição 0 → bulk == per-post.
-  const posts = await db.exec<{ id: string; created_at: number; author_pub: string; score: number }>(
-    `SELECT id, created_at, author_pub, score FROM posts`,
-  )
-  if (posts.length === 0) return
-  const spreads = await db.exec<{ post_id: string; spreader_pub: string; created_at: number }>(
-    `SELECT post_id, spreader_pub, created_at FROM spreads`,
-  )
-  const buries = await db.exec<{ post_id: string; burier_pub: string; created_at: number }>(
-    `SELECT post_id, burier_pub, created_at FROM buries`,
-  )
-  const users = await db.exec<{ npub: string; created_at: number; last_active: number | null }>(
-    `SELECT npub, created_at, last_active FROM users`,
-  )
-
-  const nowMs = Date.now()
-  const nowSec = Math.floor(nowMs / 1000)
-
-  // spreads_received(autor) = nº de spreads em posts que ele autorou (mesma
-  // agregação que fetchUserAggsInChunks faz por user, computada de uma vez).
-  const postAuthor = new Map<string, string>()
-  for (const p of posts) postAuthor.set(p.id, p.author_pub)
-  // Exclui auto-spread (paridade com fetchUserAggsInChunks).
-  const spreadsReceived = new Map<string, number>()
-  for (const s of spreads) {
-    const author = postAuthor.get(s.post_id)
-    if (author && s.spreader_pub !== author) {
-      spreadsReceived.set(author, (spreadsReceived.get(author) ?? 0) + 1)
-    }
+export async function recalcAllScores(_yieldEvery?: number): Promise<void> {
+  if (rankingRun) {
+    rankingRerun = true
+    return rankingRun
   }
-
-  // reports_confirmed(autor) = nº de posts seus já moderados (score
-  // -999). Mesma derivação de calculateUserWeight (weight.ts:200).
-  const reportsConfirmed = new Map<string, number>()
-  for (const p of posts) {
-    if (p.score === MODERATED_SCORE) {
-      reportsConfirmed.set(p.author_pub, (reportsConfirmed.get(p.author_pub) ?? 0) + 1)
-    }
-  }
-
-  // weight por user (fórmula pura, 1 `now` capturado → determinismo intra-run).
-  const weightByUser = new Map<string, number>()
-  for (const u of users) {
-    weightByUser.set(
-      u.npub,
-      calculateWeight({
-        createdAt: u.created_at * 1000,
-        spreadsReceived: spreadsReceived.get(u.npub) ?? 0,
-        reportsConfirmed: reportsConfirmed.get(u.npub) ?? 0,
-        lastActive: u.last_active !== null ? u.last_active * 1000 : null,
-        now: nowMs,
-      }),
-    )
-  }
-
-  // ações agrupadas por post.
-  const actionsByPost = new Map<string, ActionRow[]>()
-  const pushAction = (postId: string, row: ActionRow) => {
-    let arr = actionsByPost.get(postId)
-    if (!arr) {
-      arr = []
-      actionsByPost.set(postId, arr)
-    }
-    arr.push(row)
-  }
-  // Ações do próprio autor não contam (paridade com recalculateScore).
-  for (const s of spreads) {
-    if (postAuthor.get(s.post_id) === s.spreader_pub) continue
-    pushAction(s.post_id, { kind: 'spread', user_pub: s.spreader_pub, created_at: s.created_at })
-  }
-  for (const b of buries) {
-    if (postAuthor.get(b.post_id) === b.burier_pub) continue
-    pushAction(b.post_id, { kind: 'bury', user_pub: b.burier_pub, created_at: b.created_at })
-  }
-
-  // score por post (§23 última-ação via selectLatestActionByUser) → UPDATE ops.
-  const ops: Array<{ sql: string; params: unknown[] }> = []
-  for (const post of posts) {
-    const latest = selectLatestActionByUser(actionsByPost.get(post.id) ?? [])
-    let spreadWeight = 0
-    let buryWeight = 0
-    let spreadCount = 0
-    let buryCount = 0
-    for (const [userPub, action] of latest) {
-      const w = weightByUser.get(userPub) ?? 0
-      if (action === 'spread') {
-        spreadWeight += w
-        spreadCount++
-      } else {
-        buryWeight += w
-        buryCount++
-      }
-    }
-    const score = calculateScore({
-      spreadWeight,
-      buryWeight,
-      createdAt: post.created_at,
-      now: nowSec,
-    })
-    // `score_base` = numerador sem o divisor temporal (D1). É o que o
-    // feed usa pra ordenar, aplicando o decay na leitura; `score` segue
-    // materializado pro sentinela -999, VIRAL_PIN e reports_confirmed.
-    ops.push({
-      sql: `UPDATE posts SET score = ?, score_base = ?, spreads = ?, buries = ? WHERE id = ?`,
-      params: [score, scoreNumerator(spreadWeight, buryWeight), spreadCount, buryCount, post.id],
-    })
-  }
-  // Flush em chunks (payload postMessage saudável + yield ao main entre eles).
-  const CHUNK = 800
-  for (let i = 0; i < ops.length; i += CHUNK) {
-    await db.batch(ops.slice(i, i + CHUNK))
-    if (i + CHUNK < ops.length) await yieldToMain()
-  }
-
-  // 2º passo — posts COM comments: contribuição de comments via path per-post
-  // provado. ZERO no dev-seed (sem kind 1111). Roda ANTES da moderação.
-  const commentedPosts = await db.exec<{ post_id: string }>(
-    `SELECT DISTINCT post_id FROM comments`,
-  )
-  let processed = 0
-  for (const { post_id } of commentedPosts) {
-    await recalculateScore(post_id)
-    processed++
-    if (processed % yieldEvery === 0) await yieldToMain()
-  }
-
-  // 3º passo — moderação §26 por post reportado. DEPOIS do recalc pra que o
-  // -999 (threshold cruzado) seja o último write e vença.
-  const reportedRows = await db.exec<{ post_id: string }>(
-    `SELECT DISTINCT post_id FROM reports`,
-  )
-  const moderationNow = Date.now()
-  processed = 0
-  for (const { post_id } of reportedRows) {
+  rankingRun = (async () => {
     try {
-      await maybeModerate(post_id, moderationNow)
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
-      if (msg.includes('no such column') && msg.includes('reason')) {
-        console.warn('[events] recalcAllScores: maybeModerate skip — schema antigo.')
-      } else {
-        throw err
-      }
+      do {
+        rankingRerun = false
+        await recomputeRankingOnce()
+      } while (rankingRerun)
+    } finally {
+      rankingRun = null
     }
-    processed++
-    if (processed % yieldEvery === 0) await yieldToMain()
+  })()
+  return rankingRun
+}
+
+interface StoredPostRow {
+  id: string
+  author_pub: string
+  created_at: number
+  score: number | null
+  score_base: number | null
+  spreads: number | null
+  buries: number | null
+}
+
+async function recomputeRankingOnce(): Promise<void> {
+  const nowMs = Date.now()
+  // Ordem das leituras importa (não há transação entre elas): ações
+  // PRIMEIRO, posts por último. Um post que chega no meio do snapshot
+  // aparece em `posts`; o contrário marcaria como órfão um post que já
+  // temos (REQ espúrio + id bloqueado por 1h — revisão Ted #9).
+  const spreads = await db.exec<RankingAction>(
+    `SELECT post_id, spreader_pub AS user_pub, created_at, event_id FROM spreads`,
+  )
+  const buries = await db.exec<RankingAction>(
+    `SELECT post_id, burier_pub AS user_pub, created_at, event_id FROM buries`,
+  )
+  const comments = await db.exec<{ post_id: string; author_pub: string; score: number | null }>(
+    `SELECT post_id, author_pub, score FROM comments`,
+  )
+  const reports = await db.exec<RankingReport>(
+    `SELECT post_id, reporter_pub, reason, created_at FROM reports`,
+  )
+  const users = await db.exec<{
+    npub: string
+    last_active: number | null
+    weight: number | null
+    engagement: number | null
+  }>(`SELECT npub, last_active, weight, engagement FROM users`)
+  const anchorRows = await db.exec<{ author_pub: string; t: number }>(
+    `SELECT author_pub, MIN(block_time) AS t FROM ots_anchors GROUP BY author_pub`,
+  )
+  const posts = await db.exec<StoredPostRow>(
+    `SELECT id, author_pub, created_at, score, score_base, spreads, buries FROM posts`,
+  )
+
+  const { getPrefs } = await import('./prefs')
+  const prefs = getPrefs()
+
+  const out = computeRanking({
+    nowMs,
+    posts,
+    spreads,
+    buries,
+    comments: comments.map((c) => ({
+      post_id: c.post_id,
+      author_pub: c.author_pub,
+      hidden: (c.score ?? 0) <= MODERATED_SCORE,
+    })),
+    reports,
+    users,
+    anchors: new Map(anchorRows.map((r) => [r.author_pub, r.t])),
+    moderation: {
+      thresholdOverride: prefs.report_threshold_override,
+      reportDecayHalfLifeMs: prefs.report_decay_enabled ? REPORT_DECAY_HALF_LIFE_MS : undefined,
+    },
+  })
+
+  // Só grava o que mudou — recomputação frequente não reescreve a tabela.
+  const ops: Array<{ sql: string; params: unknown[] }> = []
+  const viral: Array<[string, number]> = []
+  for (const row of posts) {
+    const r = out.posts.get(row.id)
+    if (!r) continue
+    // `<=`: linha legada com score < -999 (bury pesado no pipeline antigo)
+    // também está escondida e precisa ser reescrita (revisão Ted #10).
+    const wasHidden = (row.score ?? 0) <= MODERATED_SCORE
+    const changed =
+      wasHidden !== r.moderated ||
+      Math.abs((row.score_base ?? 0) - r.scoreBase) > 1e-9 ||
+      (row.spreads ?? 0) !== r.spreads ||
+      (row.buries ?? 0) !== r.buries
+    if (changed) {
+      ops.push({
+        sql: `UPDATE posts SET score = ?, score_base = ?, spreads = ?, buries = ? WHERE id = ?`,
+        params: [r.score, r.scoreBase, r.spreads, r.buries, row.id],
+      })
+    }
+    if (r.score > VIRAL_PIN_THRESHOLD && (row.score ?? 0) <= VIRAL_PIN_THRESHOLD) {
+      viral.push([row.id, r.score])
+    }
   }
-}
+  for (const u of users) {
+    const w = out.weights.get(u.npub) ?? 0
+    const e = w - (out.antiquity.get(u.npub) ?? 0)
+    if (Math.abs((u.weight ?? 0) - w) > 1e-9 || Math.abs((u.engagement ?? 0) - e) > 1e-9) {
+      ops.push({ sql: `UPDATE users SET weight = ?, engagement = ? WHERE npub = ?`, params: [w, e, u.npub] })
+    }
+  }
+  for (let i = 0; i < ops.length; i += RANKING_WRITE_CHUNK) {
+    await db.batch(ops.slice(i, i + RANKING_WRITE_CHUNK))
+    if (i + RANKING_WRITE_CHUNK < ops.length) await yieldToMain()
+  }
+  if (ops.length > 0) invalidateFeed()
 
-interface PostRow {
-  created_at: number
-  /** Pubkey do autor — usado pra excluir self-comments (Barney HIGH #3). */
-  author_pub: string
-}
+  for (const [postId, score] of viral) void maybeAutoPinViralBlobs(postId, score)
 
-interface CommenterRow {
-  author_pub: string
-}
+  // Votos sobre posts que não temos → pedir o post por id. Só votos da
+  // janela de sync (7 dias): votos antigos de post evictado do cache não
+  // devem trazê-lo de volta (revisão Ted #3 — eviction × busca de órfãos
+  // entravam em ciclo). Comentários não têm created_at aqui; o post de um
+  // comentário recente chega pelo próprio sync global de 1111.
+  const known = new Set(posts.map((p) => p.id))
+  const recentSec = Math.floor(nowMs / 1000) - ORPHAN_WINDOW_SECONDS
+  const missing = new Set<string>()
+  for (const a of spreads) if (a.created_at >= recentSec && !known.has(a.post_id)) missing.add(a.post_id)
+  for (const a of buries) if (a.created_at >= recentSec && !known.has(a.post_id)) missing.add(a.post_id)
+  if (missing.size > 0) requestMissingEvents([...missing].sort().slice(0, NETWORK_REQUEST_CAP), nowMs)
 
-export interface ActionRow {
-  kind: 'spread' | 'bury'
-  user_pub: string
-  created_at: number
+  // Autores de post e reporters sem âncora OTS → pedir as provas que eles
+  // publicaram. Não pede de todo spreader: chave de peso 0 sem post nem
+  // report não muda nada no ranking, e pedir por todas era tempestade de
+  // REQs (revisão F6b). Teto por recomputação.
+  const anchored = new Set(anchorRows.map((r) => r.author_pub))
+  const actors = new Set<string>()
+  for (const p of posts) actors.add(p.author_pub)
+  for (const r of reports) actors.add(r.reporter_pub)
+  const unanchored = [...actors].filter((n) => !anchored.has(n)).sort()
+  if (unanchored.length > 0) requestAnchorsFor(unanchored.slice(0, NETWORK_REQUEST_CAP), nowMs)
+
+  scheduleDayRollover(out.epochMs)
 }
 
 /**
- * Seleciona a ação líquida (cronologicamente mais recente) de cada user
- * a partir do conjunto bruto de spreads+buries. Função pura — sem db,
- * sem `Date.now()`. Exportada principalmente pra tests de regressão da
- * semântica "última ação vale" (consolidado.md §4.6 + manifesto §23).
- *
- * **Regras**:
- *  1. Pra cada `user_pub`, retorna a ação com maior `created_at`.
- *  2. Empate de `created_at`: tie-break por `kind` ASC — `'bury'` < `'spread'`
- *     em lex order, então em empate `'bury'` ganha. Determinístico.
- *  3. Order independence: o resultado NÃO depende da ordem do array de
- *     entrada (mesmo conjunto de ações → mesmo resultado). Tests cobrem.
- *
- * **Por que esta função existe**: sem ela, dois clientes Drift com
- * mesmos eventos publicados podem chegar a scores diferentes se
- * processarem em ordem distinta. Manifesto §7 (determinismo global)
- * exige convergência. Esta função é a peça que garante isso pro
- * sub-problema "user mudou de opinião N vezes".
+ * Pesos mudam na virada do dia UTC (antiguidade, inatividade). Sem evento
+ * novo nada recomputaria — então agenda 1 recomputação logo após a virada.
  */
-export function selectLatestActionByUser(
-  actions: readonly ActionRow[],
-): Map<string, 'spread' | 'bury'> {
-  const latestActionByUser = new Map<string, 'spread' | 'bury'>()
-  const latestTsByUser = new Map<string, number>()
-  for (const row of actions) {
-    const prevTs = latestTsByUser.get(row.user_pub)
-    if (prevTs === undefined || row.created_at > prevTs) {
-      latestTsByUser.set(row.user_pub, row.created_at)
-      latestActionByUser.set(row.user_pub, row.kind)
-    } else if (row.created_at === prevTs) {
-      // Tie: kind ASC (`'bury'` lex < `'spread'`). Mantém o que vem
-      // primeiro alfabeticamente — determinístico cross-cliente.
-      const prev = latestActionByUser.get(row.user_pub)!
-      if (row.kind < prev) {
-        latestActionByUser.set(row.user_pub, row.kind)
-      }
-    }
-  }
-  return latestActionByUser
-}
-
-interface UserAggRow {
-  npub: string
-  user_created_at: number
-  last_active: number | null
-  spreads_received: number
-  reports_confirmed: number
+function scheduleDayRollover(epochMs: number): void {
+  if (dayRolloverEpoch === epochMs && dayRolloverTimer !== null) return
+  if (dayRolloverTimer !== null) clearTimeout(dayRolloverTimer)
+  dayRolloverEpoch = epochMs
+  const delay = Math.max(1_000, epochMs + MS_PER_DAY + 1_000 - Date.now())
+  dayRolloverTimer = setTimeout(() => {
+    dayRolloverTimer = null
+    scheduleRankingRecompute()
+  }, delay)
 }
 
 /**
- * Recalcula score de um post agregando ações líquidas com pesos.
- *
- * **Semântica "última ação vale"** (manifesto §23, `nota interna
- * conversa-29-04-analise.md` §Seção 2): cada (post_id, user_pub)
- * contribui com APENAS sua ação cronologicamente mais recente entre
- * seus spreads e buries. Pessoas mudam de opinião — eventos imutáveis
- * preservam histórico, mas o score líquido só conta a última.
- *
- * **Score weighted by spreader weight** (`nota interna
- * conversa-29-04.md` §Recomendação central, papel: revisão de
- * conformance): cada ação contribui com o `weight` da identidade Drift
- * do user (0..100). Sybil novo tem weight ~0 → spread vale ~0.
- * Determinístico, função pura — preserva §22 (sem reputação subjetiva)
- * e §11 (sem afinidade no feed).
- *
- * Pipeline:
- *   1. Buscar created_at do post.
- *   2. Buscar TODAS as ações (spreads + buries) do post via UNION.
- *   3. Pra cada user, achar ação líquida (MAX created_at; tie-break
- *      por kind ASC determinístico).
- *   4. Batch-fetch dados de peso pra todos users únicos com ação.
- *   5. Aplicar `calculateUserWeight` puro pra cada um.
- *   6. Somar pesos por kind → spreadWeight, buryWeight.
- *   7. UPDATE posts.score = calculateScore(...).
- *   8. UPDATE posts.spreads/buries = COUNT(distinct users com ação
- *      líquida) — preserva semântica UI ("3 espalharam").
+ * Re-export da regra "última ação vale" (vive em `ranking.ts`, pura).
+ * Mantido aqui por compat de import dos testes e de callers antigos.
  */
-async function recalculateScore(postId: string): Promise<void> {
-  // 1. Post info (existência + created_at + author_pub pra Barney HIGH #3)
-  const postRow = await db.get<PostRow>(
-    `SELECT created_at, author_pub FROM posts WHERE id = ?`,
-    [postId],
-  )
-  if (!postRow) return
-
-  // 2. Todas as ações do post (spreads + buries) ordenadas por tempo.
-  // Exclui ações do próprio autor: auto-spread não é sinal social, é
-  // auto-promoção. Mesma defesa que `applyCommentsContribution` já
-  // aplica a self-comments (Barney HIGH #3); faltava no caminho de
-  // spreads/buries, o que viabilizava o loop de realimentação
-  // "auto-espalho → meu weight sobe → meus spreads valem mais".
-  const actions = await db.exec<ActionRow>(
-    `SELECT 'spread' AS kind, spreader_pub AS user_pub, created_at FROM spreads
-       WHERE post_id = ? AND spreader_pub != ?
-     UNION ALL
-     SELECT 'bury' AS kind, burier_pub AS user_pub, created_at FROM buries
-       WHERE post_id = ? AND burier_pub != ?
-     ORDER BY created_at ASC`,
-    [postId, postRow.author_pub, postId, postRow.author_pub],
-  )
-
-  // 3. Pra cada user, fica com ação mais recente. Lógica pura
-  // extraída em `selectLatestActionByUser` pra ser testável
-  // isolada sem mockar SQLite. Manifesto §7 (determinismo).
-  const latestActionByUser = selectLatestActionByUser(actions)
-
-  if (latestActionByUser.size === 0) {
-    // Nenhuma ação — score puro por idade + contribuição de comments
-    // (post pode ter comments mas zero spread/bury ainda — C.5).
-    const baseScore = calculateScoreNow(0, 0, postRow.created_at)
-    const withComments = await applyCommentsContribution(
-      postId,
-      postRow.author_pub,
-      baseScore,
-      Date.now(),
-    )
-    await db.run(
-      `UPDATE posts SET score = ?, score_base = ?, spreads = 0, buries = 0 WHERE id = ?`,
-      [withComments, scoreNumerator(0, 0), postId],
-    )
-    invalidateFeed()
-    return
-  }
-
-  // 4. Batch-fetch dados de peso pra todos users únicos com ação.
-  // Chunking: SQLite WASM 3.51 tem SQLITE_MAX_VARIABLE_NUMBER 32766
-  // mas alguns builds antigos limitam em 999. Posts virais (>5k spreaders)
-  // estourariam parser sem chunk. CHUNK_SIZE conservador (500) cobre todos
-  // os builds + bom balanço entre número de queries e tamanho de cada uma.
-  // Ted follow-up #2 (sessão 29-04, alta prioridade).
-  const userPubs = Array.from(latestActionByUser.keys())
-  const userRows = await fetchUserAggsInChunks(userPubs)
-
-  // 5+6. Aplicar fórmula pura de weight a cada user e somar por kind.
-  // Capturamos `now` UMA vez antes do loop (Marshall peer review):
-  // todos os users do mesmo recalc usam o mesmo timestamp, fortalecendo
-  // determinismo intra-execução. Cross-execution ainda varia naturalmente.
-  const recalcNow = Date.now()
-  const userWeightMap = new Map<string, number>()
-  for (const row of userRows) {
-    const weight = calculateWeight({
-      createdAt: row.user_created_at * 1000, // unix seconds → ms
-      spreadsReceived: row.spreads_received,
-      reportsConfirmed: row.reports_confirmed,
-      lastActive: row.last_active !== null ? row.last_active * 1000 : null,
-      now: recalcNow,
-    })
-    userWeightMap.set(row.npub, weight)
-  }
-
-  let spreadWeight = 0
-  let buryWeight = 0
-  let spreadCount = 0
-  let buryCount = 0
-  for (const [userPub, action] of latestActionByUser) {
-    // User sem entry em `users` (raro — possível em flush race) → weight 0
-    const weight = userWeightMap.get(userPub) ?? 0
-    if (action === 'spread') {
-      spreadWeight += weight
-      spreadCount++
-    } else {
-      buryWeight += weight
-      buryCount++
-    }
-  }
-
-  // 7+8. Persistir. UI conta pessoas (count); score usa pesos somados.
-  // Track C.5: aplicar contribuição de comments ANTES de persistir.
-  // Reaproveita `userWeightMap` pra comenters que também são spreaders/
-  // buriers — evita double-fetch de weight.
-  const baseScore = calculateScoreNow(spreadWeight, buryWeight, postRow.created_at)
-  const score = await applyCommentsContribution(
-    postId,
-    postRow.author_pub,
-    baseScore,
-    recalcNow,
-    userWeightMap,
-  )
-  await db.run(
-    `UPDATE posts SET score = ?, score_base = ?, spreads = ?, buries = ? WHERE id = ?`,
-    [score, scoreNumerator(spreadWeight, buryWeight), spreadCount, buryCount, postId],
-  )
-  invalidateFeed()
-  // Satoshi audit redundância 2026-05-21 — auto-pin IPFS de posts virais.
-  // Hook fire-and-forget: quando score cruza VIRAL_PIN_THRESHOLD E user
-  // habilitou `auto_pin_enabled`, dispara pinBlob(cid) pra cada blob do
-  // post. Idempotente em Helia (pinar 2× não duplica). Lazy import pra
-  // evitar dep cycle events → helia → ... + manter Helia fora do bundle
-  // inicial (helia.ts §lazy-load).
-  void maybeAutoPinViralBlobs(postId, score)
-}
+export { selectLatestActionByUser, type ActionRow } from './ranking'
 
 /**
  * Track B.2 (Satoshi audit 2026-05-21) — auto-pin de blobs em posts
- * virais. Disparado por `recalculateScore` quando score cruza
+ * virais. Disparado por `recalcAllScores` quando o score cruza
  * `VIRAL_PIN_THRESHOLD`. Manifesto §16 (disponibilidade distribuída):
  * user power que opta-in ajuda a rede a hospedar conteúdo viral sem
  * chave mestra central.
@@ -1434,116 +1312,4 @@ async function maybeAutoPinViralBlobs(postId: string, score: number): Promise<vo
   } catch (err) {
     console.warn('[events] maybeAutoPinViralBlobs falhou (degraded):', err)
   }
-}
-
-/**
- * Track C.5 — agrega contribuição de comments ao score base.
- *
- * Issue Barney HIGH #3: SELECT exclui self-comments (`author_pub !=
- * post.author_pub`) e comments moderados (`score > -999`).
- *
- * Issue Ted #3: weight é current (no `now` passado), espelhando o
- * pipeline de spreads. Se commenter já estava no `userWeightMap`
- * (pré-calculado pra spread/bury do mesmo recalc), reusa — evita
- * fetch duplicado.
- *
- * Distinct commenters: dedup por `author_pub`. 100 comments do mesmo
- * user contam 1× weight (manifesto §22 anti-Sybil; design-comments §15).
- */
-async function applyCommentsContribution(
-  postId: string,
-  postAuthorPub: string,
-  baseScore: number,
-  recalcNow: number,
-  prefetchedWeights?: Map<string, number>,
-): Promise<number> {
-  // SELECT DISTINCT author_pub: já dedup. Filtros: !=author (Barney H#3)
-  // e score > -999 (moderação esconde commenter inteiro do agregado).
-  const commenterRows = await db.exec<CommenterRow>(
-    `SELECT DISTINCT author_pub FROM comments
-     WHERE post_id = ? AND author_pub != ? AND score > -999`,
-    [postId, postAuthorPub],
-  )
-  if (commenterRows.length === 0) return baseScore
-
-  // Buscar weights de commenters que ainda não estão no map prefetched.
-  const missing: string[] = []
-  for (const row of commenterRows) {
-    if (!prefetchedWeights || !prefetchedWeights.has(row.author_pub)) {
-      missing.push(row.author_pub)
-    }
-  }
-  const commenterWeights = new Map<string, number>(prefetchedWeights ?? [])
-  if (missing.length > 0) {
-    const userRows = await fetchUserAggsInChunks(missing)
-    for (const row of userRows) {
-      const weight = calculateWeight({
-        createdAt: row.user_created_at * 1000,
-        spreadsReceived: row.spreads_received,
-        reportsConfirmed: row.reports_confirmed,
-        lastActive: row.last_active !== null ? row.last_active * 1000 : null,
-        now: recalcNow,
-      })
-      commenterWeights.set(row.npub, weight)
-    }
-  }
-
-  let weightedTotal = 0
-  for (const row of commenterRows) {
-    weightedTotal += commenterWeights.get(row.author_pub) ?? 0
-  }
-
-  return applyCommentReceived({
-    distinctCommenters: commenterRows.length,
-    weightedTotal,
-    currentScore: baseScore,
-  })
-}
-
-/**
- * Tamanho máximo de chunk em queries com `IN (?, ?, ...)`. SQLite WASM
- * tem limite de bound params (default 32766 nas builds modernas, 999
- * em builds antigas). 500 é conservador — cobre todos os builds e dá
- * bom balanço: poucos round-trips ao worker pra posts médios, sem
- * estourar limite em posts virais (>5k spreaders).
- *
- * Exportado pra teste — permite verificar comportamento de chunking
- * com sample sizes que cruzam o limite.
- */
-export const RECALC_USER_CHUNK_SIZE = 500
-
-/**
- * Busca dados agregados de um conjunto de users em chunks (evita
- * estourar limite de bound params do SQLite). Idempotente — chunks
- * disjuntos (sem dedup necessário porque user_pubs é Set originalmente).
- */
-async function fetchUserAggsInChunks(userPubs: string[]): Promise<UserAggRow[]> {
-  const all: UserAggRow[] = []
-  for (let i = 0; i < userPubs.length; i += RECALC_USER_CHUNK_SIZE) {
-    const chunk = userPubs.slice(i, i + RECALC_USER_CHUNK_SIZE)
-    const placeholders = chunk.map(() => '?').join(',')
-    const rows = await db.exec<UserAggRow>(
-      // `spreads_received` exclui auto-spreads (`s.spreader_pub !=
-      // u.npub`): sem isso, 6 posts auto-espalhados saturam
-      // ENGAGEMENT_MAX e dão weight 60 a uma identidade de idade zero.
-      // `reports_confirmed` precisa estar aqui, senão REPORT_CONFIRMED
-      // (-15) vira código morto no único cálculo que afeta o ranking —
-      // e diverge de `calculateUserWeight` (weight.ts), que o inclui.
-      `SELECT
-         u.npub AS npub,
-         u.created_at AS user_created_at,
-         u.last_active AS last_active,
-         (SELECT COUNT(*) FROM spreads s
-            INNER JOIN posts p ON p.id = s.post_id
-            WHERE p.author_pub = u.npub
-              AND s.spreader_pub != u.npub) AS spreads_received,
-         (SELECT COUNT(*) FROM posts
-            WHERE author_pub = u.npub AND score = -999) AS reports_confirmed
-       FROM users u
-       WHERE u.npub IN (${placeholders})`,
-      chunk,
-    )
-    all.push(...rows)
-  }
-  return all
 }

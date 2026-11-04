@@ -6,12 +6,20 @@
 >
 > Determinismo é princípio do manifesto (§7) — todas as funções aqui
 > são **puras**, sem `Date.now()` implícito (caller passa `now`). Mesmo
-> input → mesma saída → todos os clientes Drift do mundo convergem.
+> conjunto de eventos + mesmo dia UTC → mesma saída, independente da
+> ordem de chegada → clientes com os mesmos eventos convergem.
+> As propriedades (não só os números) são travadas por
+> `tests/algorithm-invariants.test.ts`, que roda o pipeline real contra
+> ataques e embaralha a ordem dos eventos.
 >
 > Fontes canônicas no código (source-of-truth):
-> - `src/lib/scoring.ts` — score canônico de post
-> - `src/lib/weight.ts` — peso de identidade
-> - `src/lib/moderation.ts` — threshold dinâmico
+> - `src/lib/ranking.ts` — motor global: pesos, scores e moderação a
+>   partir do conjunto de eventos (auditoria 2026-11-03)
+> - `src/lib/scoring.ts` — fórmula do score + decay
+> - `src/lib/weight.ts` — fórmula do peso de identidade
+> - `src/lib/moderation.ts` — threshold dinâmico e pontos de report
+> - `src/lib/ots.ts`, `ots-client.ts`, `ots-anchors.ts`, `ots-stamper.ts`
+>   — âncora de antiguidade OpenTimestamps/Bitcoin (NIP-03)
 > - `src/lib/trust/{ppr,edges,constants}.ts` — Trust Lens
 >
 > Quando este doc divergir do código, **o código vence**. Atualizar
@@ -35,34 +43,60 @@
 
 ## 1. Score canônico de post
 
-**Onde:** `src/lib/scoring.ts:calculateScore`
+**Onde:** `src/lib/ranking.ts:computeRanking` (numerador) +
+`src/lib/feed.ts:DECAYED_SCORE` (decay na leitura) +
+`src/lib/scoring.ts` (fórmula pura)
 **Manifesto:** §7 (determinismo), §22 (score não-subjetivo), §24 (sem
 afinidade no feed canônico)
 
 ### Conceito
 
 O score é o número que ordena o feed canônico. **Igual pra todos os
-clientes Drift no mundo** — sem personalização. Combina engajamento
-ponderado (peso dos spreaders/buriers) com decaimento temporal (posts
-ficam relevantes por horas, não minutos).
+clientes Drift que têm o mesmo conjunto de eventos** — sem
+personalização. Combina engajamento ponderado (peso de quem espalhou,
+enterrou e comentou) com decaimento temporal (posts ficam relevantes
+por horas, não minutos).
 
 ### Fórmula
 
 ```
 ageHours      = max(0, (now - createdAt) / 3600)
-netEngagement = spreadWeight − buryWeight × 0.3
-score         = netEngagement / (ageHours + 2)^1.5
+commentWeight = min(Σ weight(commenters distintos), COMMENTS_SCORE_CAP=30)
+score_base    = spreadWeight − buryWeight × 0.3 + commentWeight × 1
+score         = score_base / (ageHours + 2)^1.5
 ```
 
 Onde:
-- `spreadWeight` = SOMA dos `weight` dos spreaders cuja ação líquida é
-  `spread` (não count — peso!)
-- `buryWeight`   = SOMA dos `weight` dos buriers cuja ação líquida é
-  `bury`
+- `spreadWeight` = SOMA dos `weight` de quem tem ação líquida `spread`
+  (não count — peso!). O autor não conta. **Só contam votos (spread,
+  bury, comentário) de quem tem peso ≥ 4 E ≥ 2 semanas de âncora própria**
+  (`VOTE_MIN_WEIGHT`, `VOTE_MIN_ANTIQUITY_WEEKS`): antiguidade custa tempo,
+  não custo por chave, então sem esse mínimo 10k chaves de 1 semana
+  somavam 10k pontos. Os mesmos mínimos valem pra ENDOSSAR (dar
+  engajamento) — senão milhares de chaves de 1 dia concentravam peso 60
+  numa só.
+- `buryWeight`   = SOMA dos `weight` de quem tem ação líquida `bury`
+- `commentWeight` = SOMA dos `weight` dos commenters distintos (autor e
+  comentários moderados fora), com cap 30. Entra no NUMERADOR e
+  portanto na ordem do feed.
 - Multiplicador `0.3` em bury: enterro é julgamento estético, não
   punição. Reduz menos do que espalhar puxa.
 - `+2` em ageHours: evita divisão explosiva nos primeiros minutos
 - Expoente `1.5`: decay suave (vale por horas, não minutos)
+
+`score_base` é materializado em `posts.score_base` e só muda quando o
+conjunto de eventos ou os pesos mudam. O divisor é aplicado **na
+leitura** (`feed.ts`), então o tempo passa sem nenhum job reescrevendo
+a tabela.
+
+### Relógio
+
+- `max(0, idade)` existe na SQL **e** no TS — paridade travada em
+  `tests/score-decay-parity.test.ts`, inclusive com idade negativa.
+- Eventos com `created_at` mais de 15 min no futuro
+  (`MAX_FUTURE_SKEW_SECONDS`) são descartados na entrada
+  (`events.ts:isAcceptableCreatedAt`). Antes, +1h54 dava boost de ~89×
+  e +2h virava `NULL` na SQL.
 
 ### Exemplo passo-a-passo
 
@@ -72,7 +106,7 @@ Onde:
 spreadWeight   = 50
 buryWeight     = 0
 ageHours       = 1
-netEngagement  = 50 − 0 × 0.3 = 50
+score_base     = 50 − 0 × 0.3 = 50
 score          = 50 / (1 + 2)^1.5
                = 50 / 5.196
                = 9.62
@@ -80,101 +114,142 @@ score          = 50 / (1 + 2)^1.5
 
 ### Simulação multi-cenário
 
-| Idade | spreadWeight | buryWeight | netEngagement | score | Comentário |
+| Idade | spreadWeight | buryWeight | score_base | score | Comentário |
 |---:|---:|---:|---:|---:|---|
 | 0h  |  50 |   0 |  50.0 | **17.68** | Recém-saído, 1 spreader peso 50 |
 | 1h  |  50 |   0 |  50.0 |  9.62 | Mesma identidade, 1h depois |
 | 6h  |  50 |   0 |  50.0 |  2.21 | 6h depois |
-| 24h |  50 |   0 |  50.0 |  0.43 | 1 dia depois |
+| 24h |  50 |   0 |  50.0 |  0.38 | 1 dia depois |
 | 0h  |   0 |   0 |   0.0 |  0.00 | Sem engajamento |
 | 0h  | 500 |   0 | 500.0 | **176.78** | 10 spreaders peso 50 |
 | 0h  | 100 | 100 |  70.0 | 24.75 | 1 spread peso 100, 1 bury peso 100 — bury vale 0.3 |
 | 0h  |   0 | 100 | −30.0 | **−10.61** | Só buries → score negativo |
-| 6h  |  10 |   0 |  10.0 |  0.44 | Sybil novo (weight≈10) tem impacto mínimo |
+| 6h  |   0 |   0 |   0.0 |  0.00 | 100 chaves sem âncora espalhando (peso 0 cada) |
 | 6h  | 100 |   0 | 100.0 |  4.42 | Identidade estabelecida (weight=100) |
 
-### Por que SOMA de pesos, não COUNT
+### "Última ação vale" (§23)
 
-**Defesa anti-Sybil** (manifesto §22, mudança 2026-04-29):
-- ANTES: `score = COUNT(spreads) / ...` → 1000 Sybils auto-spreading
-  inflacionavam scores
-- AGORA: `score = SUM(spreader.weight) / ...` → 1000 Sybils com
-  weight≈0 contribuem ≈0
-
-### Edge cases tratados
-
-- `now < createdAt` (clock skew) → `ageHours = 0` (não exploda)
-- spreader spreda DEPOIS dá bury no MESMO post → conta só o bury
-  ("última ação vale", manifesto §23 — mudança de opinião não pune
-  retroativamente). Implementado em `events.ts:recalculateScore`.
-
-### Contribuição de comentários (Track C.5)
-
-```
-delta = min(weightedCommenters, COMMENTS_SCORE_CAP) × COMMENT_RECEIVED
-newScore = currentScore + delta
-```
-
-Self-comments NÃO contam (Barney HIGH #3). Atualiza retroativamente
-quando weight do commenter muda — trade-off aceito pra evitar snapshot
-temporal complexo (manifesto §7 preservado).
+Cada (post, user) contribui só com a ação **mais recente** entre spread
+e bury. `spreads` e `buries` são upsert LWW por `(post_id, user)` —
+guardam o evento de maior `created_at` (empate: menor `event_id`).
+Antes era `INSERT OR IGNORE`, que guardava o PRIMEIRO a chegar:
+spread→bury→spread contava bury, e a ordem de chegada mudava o score.
+`selectLatestActionByUser` (ranking.ts) desempata `created_at` igual por
+kind (`bury` vence) e depois `event_id`.
 
 ---
 
 ## 2. Peso de identidade (weight)
 
-**Onde:** `src/lib/weight.ts:calculateWeight`
-**Manifesto:** §22 (score não-subjetivo), §32 (anti-Sybil sem prova
-de identidade)
+**Onde:** `src/lib/ranking.ts:computeRanking` (motor global) usando as
+funções puras de `src/lib/weight.ts`; materializado em `users.weight`
+**Manifesto:** §22 (score não-subjetivo), §33 (anti-spam pela mecânica social)
 
 ### Conceito
 
-Cada identidade Drift tem um número 0..100 (`weight`) baseado em
-**eventos públicos verificáveis** — não em "reputação subjetiva".
-Funciona como multiplicador nos algoritmos (score, threshold de
-moderação, max-subposts, lens edge influence).
+Cada identidade tem um número 0..100 (`weight`) derivado de **eventos
+públicos verificáveis**. Multiplica tudo: score, pontos de report, max
+de subposts, lens.
+
+Chave Nostr custa zero. Então o peso só pode vir de algo que **não se
+fabrica de graça**:
+
+1. **Tempo provado no Bitcoin** (antiguidade, via OpenTimestamps), ou
+2. **Spread de quem já tem peso** (engajamento ponderado).
 
 ### Fórmula
 
 ```
-weight     = antiquity + engagement
-antiquity  = clamp(0, 40, weeksSinceCreation)
-engagement = clamp(0, 60,
-               spreadsReceived × 10
-             + commentsReceived × 1
-             − reportsConfirmed × 15
-             − inactivityDays × 1
-             )
+epoch      = início do dia UTC de "agora"   (pesos mudam 1×/dia)
+antiquity  = clamp(0, 40, semanas entre a âncora OTS e epoch)   // 0 sem âncora
+endosso(s → a) = min( teto_aresta × weight(s)/100 ,  0.5 × weight(s) × fatia(s → a) )
+                 teto_aresta = 10 se s deu DRIFT em algum post de a, senão 1 se só comentou
+                 fatia(s → a) = peso da aresta (1 ou 0.1) / Σ pesos das arestas de s
+positivo   = clamp(0, 60, Σ_s endosso(s → a))
+engagement = max(0, positivo − 15 × posts próprios moderados − 1 × dias inativo)
+weight     = antiquity + engagement          (≤ 40 + 60 = 100)
 ```
 
-Cap total: **100** (40 antiquity + 60 engagement).
+Pontos-chave:
+- **Uma aresta por par** (s, a), não por post: espalhar 20 posts do mesmo
+  autor endossa uma vez só.
+- **Orçamento conservado:** cada identidade distribui no máximo
+  `0.5 × o próprio peso` entre todos os autores que endossa. Um veterano
+  que endossa 1 pessoa dá até 10 × peso/100 a ela; se endossa 20, cada
+  uma recebe 1/20 do orçamento.
+- **Penalidades depois do teto:** moderação e inatividade descontam do
+  engajamento já saturado, então sempre mordem.
+
+`weight` aparece dos dois lados: é o **menor ponto fixo ≥ antiquity**,
+obtido por iteração de Jacobi a partir de `w₀ = antiquity`. Como cada
+identidade repassa no máximo metade do próprio peso, o operador é uma
+**contração**: o peso total de QUALQUER grupo de identidades fica
+limitado a `antiguidade_total / (1 − 0.5) = 2 ×` o tempo real ancorado
+que o grupo tem. Converge geometricamente; somas em ordem fixa de pubkey
+→ mesmo número em qualquer cliente.
+
+**Por que o orçamento:** a primeira versão deste motor contava 1 aresta
+por post e sem orçamento. A revisão pré-merge (2026-11-04) mostrou que
+uma única âncora de 1 dia num anel de chaves saturava o anel inteiro em
+peso 60, e duas chaves assim "lavavam" um número ilimitado de outras. O
+teste `PROPRIEDADE (contração)` em `tests/algorithm-invariants.test.ts`
+trava a garantia em grafos aleatórios.
+
+### Âncora de antiguidade (OpenTimestamps, NIP-03)
+
+O `created_at` de um evento Nostr é escolhido por quem assina. Antes a
+antiguidade era "semanas desde o primeiro evento que ESTE cliente viu"
+— uma chave criada hoje assinava um post datado de 1 ano atrás e ganhava
+antiguidade 40 na hora, e dois clientes com históricos diferentes
+calculavam pesos diferentes.
+
+Agora:
+- O cliente carimba o evento mais antigo da identidade ativa em
+  calendários OpenTimestamps públicos (`ots-stamper.ts`), que agregam
+  milhares de hashes numa transação Bitcoin. Quando o bloco confirma,
+  publica a prova como **kind 1040** (NIP-03).
+- Cada cliente verifica a prova contra o header do bloco (≥2
+  exploradores concordando; cache em `btc_headers`) e grava
+  `ots_anchors` (`ots-anchors.ts`).
+- `antiquity` conta a partir do **bloco mais antigo** que prova um
+  evento daquela chave. Ninguém carimba no passado; todo cliente vê o
+  mesmo bloco.
+
+Identidade sem âncora tem `antiquity = 0` — mas ainda pode ganhar peso
+pelo engajamento de quem já tem.
 
 ### Exemplo passo-a-passo
 
-**Cenário:** identidade criada há 8 semanas, 4 spreads recebidos,
-0 reports, ativa hoje.
+**Cenário:** âncora há 8 semanas; 4 spreads recebidos de identidades de
+peso 100; 0 reports; ativa hoje.
 
 ```
-antiquity   = min(40, 8) = 8
-engagement  = 4 × 10 + 0 − 0 × 15 − 0 = 40
-              → clamped a min(60, 40) = 40
+antiquity   = 8
+engagement  = 10 × (4 × 100/100) = 40
 weight      = 8 + 40 = 48
 ```
 
+Se os 4 spreads viessem de chaves sem âncora e sem engajamento (peso 0):
+`engagement = 0`, `weight = 8`.
+
 ### Simulação multi-cenário
 
-| Semanas | spreads | reports | dias inativo | antiquity | engagement | weight | tier |
-|---:|---:|---:|---:|---:|---:|---:|---|
-|  0 |   0 | 0 |   0 |  0 |   0 |  **0** | — (fresh) |
-|  1 |   1 | 0 |   0 |  1 |  10 | **11** | — (<20) |
-|  2 |   2 | 0 |   0 |  2 |  20 | **22** | 🌱 new |
-|  8 |   4 | 0 |   0 |  8 |  40 | **48** | ⭐ active |
-| 12 |   6 | 0 |   0 | 12 |  60 | **72** | 🏆 established (engagement cap atingido) |
-| 40 |  10 | 0 |   0 | 40 |  60 | **100** | 🏆 (antiquity cap atingido) |
-| 40 |  10 | 1 |   0 | 40 | 45 | **85** | 🏆 (1 report = −15 pts) |
-| 40 |  10 | 2 |   0 | 40 | 30 | **70** | 🏆 (2 reports = −30 pts) |
-| 40 |  10 | 4 |   0 | 40 |   0 | **40** | ⭐ (4 reports zeram engagement) |
-| 40 |  10 | 0 |  90 | 40 |   0 | **40** | ⭐ (90d inativo zera engagement) |
+| Âncora | spreads recebidos de | reports | dias inativo | antiquity | engagement | weight |
+|---|---|---:|---:|---:|---:|---:|
+| nenhuma | — | 0 | 0 | 0 | 0 | **0** |
+| nenhuma | 100 chaves sem peso | 0 | 0 | 0 | 0 | **0** (Sybil não lava) |
+| nenhuma | 1 veterano (peso 40) | 0 | 0 | 0 | 4 | **4** (confiança flui) |
+| nenhuma | 1 veterano (peso 40) que endossa 20 pessoas | 0 | 0 | 0 | 1 | **1** (orçamento 20 ÷ 20) |
+| 2 sem | 2 de peso 100 | 0 | 0 | 2 | 20 | **22** |
+| 8 sem | 4 de peso 100 | 0 | 0 | 8 | 40 | **48** |
+| 40 sem | 10 de peso 100 | 0 | 0 | 40 | 60 | **100** |
+| 40 sem | 10 de peso 100 | 1 | 0 | 40 | 45 | **85** (60 − 15: penalidade depois do teto) |
+| 40 sem | 6 de peso 40 | 1 | 0 | 40 | 9 | **49** (24 − 15) |
+| 40 sem | 10 de peso 100 | 0 | 90 | 40 | 0 | **40** (60 − 90 → 0) |
+
+(Linhas com "de peso X" assumem que cada spreader endossa só esta
+identidade; quem endossa k identidades dá a cada uma no máximo
+`0.5 × peso / k`.)
 
 ### Tabela de max subposts (anti-spam mecânico)
 
@@ -187,93 +262,130 @@ weight <85 → 7
 weight ≥85 → 8 (MAX)
 ```
 
-**Por quê:** identidade fresca (weight=0) só pode publicar 1 subpost.
-Sybil que cria 1000 identidades → cada uma só publica 1. Pra publicar
-8 subposts numa POST precisa de identidade estabelecida (custa tempo
-real + spreads recebidos — não dá pra fingir).
-
 ### Por que esses pontos especificamente
 
-- `SPREAD = +10` vs `REPORT_CONFIRMED = −15`: 1.5 spreads são neutralizados
-  por 1 report passado no threshold. Reports comunitários têm peso real.
-- `COMMENT = +1`: pequeno para evitar farming via comentários vazios
-- `DAILY_INACTIVE = −1`: 60 dias sem atividade zera o engagement
-  (antiquity preservada — fica visível que é identidade antiga, mas
-  não mais "rei do feed")
+- `SPREAD = +10 × peso/100`: um veterano (100) dá +10; uma chave sem peso
+  dá 0. Antes eram +10 fixos por evento — 6 chaves recém-criadas davam
+  peso 60 a qualquer um.
+- `REPORT_CONFIRMED = −15` por post próprio moderado
+- `COMMENT = +1 × peso/100`: pequeno para evitar farming
+- `DAILY_INACTIVE = −1`: 60 dias sem atividade zera o engajamento
 - `BURY = 0`: bury NÃO penaliza o autor (manifesto §23)
 
 ---
 
 ## 3. Threshold dinâmico de moderação
 
-**Onde:** `src/lib/moderation.ts:getReportThreshold`
+**Onde:** `src/lib/ranking.ts` (decisão, derivada a cada recomputação)
++ `src/lib/moderation.ts` (funções puras)
 **Manifesto:** §26 (moderação comunitária reativa), §17 (sem chave mestra)
 
 ### Conceito
 
-Quantos reports são necessários pra esconder um post (`score = -999`)?
-Depende do tamanho da base ativa — comunidades grandes precisam mais
-reports; comunidades pequenas precisam menos. Evita brigada de
-poucos usuários derrubando posts em rede pequena.
+Quantos pontos de report escondem um post? Depende do tamanho da base
+ativa. A moderação é **derivada**: a cada recomputação, o motor decide
+"moderado ou não" a partir do conjunto de reports e dos pesos atuais.
+Antes ela era um `UPDATE posts SET score = -999` disparado por report,
+que o recálculo de score seguinte apagava (qualquer spread novo, ou o
+próprio recálculo atrasado do post na rajada de boot, ressuscitava o
+post).
 
 ### Fórmula
 
 ```
-threshold      = max(5, floor(0.1% × activeUsers))
+threshold         = max(5, floor(0.1% × activeUsers))
 threshold_illegal = max(3, floor(threshold / 2))
+pontos(report)    = weight ≥ 20 E antiguidade ≥ 8 semanas ? min(2, weight / 50) : 0
 ```
 
-`activeUsers` = identidades com `last_active` nos últimos 30 dias
-(`countActiveUsers`).
+Os mínimos (`REPORT_MIN_WEIGHT`, `REPORT_MIN_ANTIQUITY_WEEKS`) existem
+porque a soma é linear em chaves: sem eles, 1200 chaves ancoradas há 1 dia
+moderavam qualquer post `illegal` numa rede pequena; só com o mínimo de
+peso, "concentradores" endossados por milhares de chaves de 1 dia ainda
+chegavam a peso 60. Cada reporter precisa de 8 semanas reais próprias.
+
+`activeUsers` = **base ativa ponderada**: Σ `min(1, peso/20)` das
+identidades com `last_active` nos 30 dias antes de `epoch`. Chave de peso
+0 não conta — senão 10k chaves descartáveis dobravam o threshold e
+protegiam spam (revisão pré-merge, F5). Auto-report do autor não conta.
+Report é upsert LWW por (post, reporter).
 
 ### Peso do reporter (anti-Sybil)
 
-Cada report contribui com pontos baseados no peso do reporter:
-
-| reporterWeight | report contribui com |
+| reporterWeight (com ≥ 8 semanas de âncora) | report contribui com |
 |---:|---:|
-| < 20 | 0.5 pts |
-| < 50 | 1.0 pts |
-| < 75 | 1.5 pts |
-| ≥ 75 | 2.0 pts |
+| < 20 | 0.0 pts |
+|  20 | 0.4 pts |
+|  25 | 0.5 pts |
+|  50 | 1.0 pts |
+|  75 | 1.5 pts |
+| 100 | 2.0 pts |
+
+Antes havia piso de 0.5 pt pra peso < 20: 10 chaves recém-criadas
+derrubavam qualquer post (6 com `illegal`). Chave sem peso agora vale 0.
 
 ### Exemplo passo-a-passo
 
 **Cenário:** base ativa = 1000 usuários, reason = `spam`.
 
 ```
-threshold = max(5, floor(1000 × 0.001)) = max(5, 1) = 5 pontos
+threshold = max(5, floor(1000 × 0.001)) = 5 pontos
 ```
 
 Pra esconder um post:
-- 10 reports de identidades novas (peso<20, 0.5 cada) = 5.0 pts → atinge!
-- 5 reports de identidades estabelecidas (peso<50, 1.0 cada) = 5.0 pts → atinge!
-- 3 reports de veteranos (peso≥75, 2.0 cada) = 6.0 pts → atinge!
+- 50 chaves sem âncora = 0 pts → não atinge
+- 7 identidades com 40 semanas de âncora (peso 40 → 0.8 cada) = 5.6 → atinge
+- 3 veteranos de peso 100 (2.0 cada) = 6.0 → atinge
 
 ### Simulação multi-cenário
 
 | Base ativa | reason | threshold | Cenário pra atingir |
 |---:|---|---:|---|
-|    100 | spam    | 5 | 10 novos OU 5 ativos OU 3 veteranos |
-|    100 | illegal | 3 | 6 novos OU 3 ativos OU 2 veteranos |
-|  1.000 | spam    | 5 | (idem — base baixa) |
-| 10.000 | spam    | 10 | 20 novos OU 10 ativos OU 5 veteranos |
-| 100.000 | spam   | 100 | 100 ativos coordenados |
-| 100.000 | illegal | 50 | 50 ativos OU 25 veteranos |
-| 1.000.000 | spam | 1000 | 1000 ativos — quase impossível brigada Sybil |
+|    100 | spam    | 5 | 3 veteranos (100) OU 5 de peso 50 |
+|    100 | illegal | 3 | 2 veteranos (100) OU 4 de peso 40 |
+| 10.000 | spam    | 10 | 5 veteranos OU 10 de peso 50 |
+| 100.000 | spam   | 100 | 50 veteranos coordenados |
 
-### Override do power user
+### Interação peso ↔ moderação
 
-`UserPrefs.report_threshold_override` permite customizar (Marshall
-NEEDS-FIX C). Útil pra debug, comunidades fechadas. Default
-undefined = dynamic calc.
+Pontos de report dependem de pesos; pesos dependem da moderação (−15
+por post moderado). Não existe ponto fixo garantido (mais moderação →
+menos peso → menos moderação). O motor decide de forma **conservadora e
+sem ordem**:
+
+1. `C` = candidatos: posts acima do threshold com os pesos sem
+   penalidade nenhuma;
+2. pesos de pior caso: aplica as penalidades de TODOS os candidatos;
+3. modera só os candidatos que continuam acima do threshold com esses
+   pesos de pior caso.
+
+Cada reporter é avaliado no pior caso pra ele, então um spammer com posts
+denunciados denuncia com o peso já reduzido. Como não há ordem, não há
+timestamp pra manipular (retrodatar reports não muda nada). Em ataque
+simétrico — dois lados se denunciando — o resultado é "ninguém
+moderado": o motor erra pra menos moderação, nunca pra moderar o
+honesto. Custo: 3 soluções de peso por recomputação.
+
+Histórico: versões anteriores oscilavam (podiam não moderar nada),
+decidiam tudo sem penalidade (spammer punido seguia derrubando posts) ou
+seguiam a ordem dos timestamps (o atacante escolhia a ordem).
+
+### Overrides locais
+
+`UserPrefs.report_threshold_override` e `report_decay_enabled` (meia-vida
+48h nos pontos, medida contra o report MAIS RECENTE do post — denúncias
+espalhadas no tempo pesam menos, mas a moderação não se desfaz sozinha
+com a passagem dos dias) continuam valendo — soberania local, entram como
+parâmetros do motor.
 
 ### Por que não fundador apaga
 
 §17 (sem chave mestra): mesmo conteúdo claramente ilegal **não é
 apagado** — só `score=-999` (esconde do feed). User pode exportar,
 auditar, cliente alternativo exibe. **invariante #13**: cliente NÃO
-deleta dados moderados do SQLite.
+deleta dados moderados do SQLite. Post não moderado nunca recebe score
+≤ −999 (piso em −998), então brigada de bury não se confunde com
+moderação.
 
 ---
 
@@ -386,7 +498,7 @@ for k in 1..K:
   for step in 1..L:
     if rng() < α: break                 // teleport-back (damping)
     next = sampleNeighborByInfluence(current)
-    if next is null: restart from source   // dead-end → restart
+    if next is null: break                 // dead-end → encerra o walk
     walk.append(next)
   for node in walk[1:]:                  // exclui source
     visits[node] += 1
@@ -418,7 +530,7 @@ for e in edges:
 ```
 
 Probabilidade de pegar edge X ∝ `influence_X / total`. Inputs zerados
-(weights=0, atacante poisoning) retornam `null` → walker restart.
+(weights=0, atacante poisoning) retornam `null` → o walk termina.
 
 ### Exemplo passo-a-passo (mini-grafo)
 
@@ -663,49 +775,47 @@ após primeiro INSERT trava esse vetor. 4 conformance tests
 ### Cenário A — Post canônico recém-publicado
 
 **Setup:**
-- Autor: identidade nova (criada há 1 semana, weight=11)
+- Autor: identidade com âncora OTS de 1 semana (weight ≈ 1)
 - Post: 0h de idade, 1 spreader (peso 50), 0 buries
 - Lens: OFF (strength=0)
 
 **Pipeline:**
-1. `weight(autor) = antiquity(1w)=1 + engagement(0)=0 = 1`
+1. `weight(autor) = antiquity(1 sem)=1 + engagement(0) = 1`
    → autor publica até 1 subpost (cap iniciante)
-2. `score = (50 − 0) / (0+2)^1.5 = 17.68` (canônico)
+2. `score_base = 50`, `score = 50 / (0+2)^1.5 = 17.68` (canônico)
 3. `s_local = 17.68 × 1.0 = 17.68` (lens off, bit-exact)
-
-User vê o post no feed com `DERIVA 17.68`.
 
 ### Cenário B — Post moderado pela comunidade
 
 **Setup:**
 - Post controverso, 24h de idade
 - 20 spreaders (peso médio 30), 10 buries (peso médio 40)
-- 4 reports `spam` de identidades estabelecidas (peso 50, +1.0 pts cada)
-- Base ativa: 1000 users
-- Threshold spam: `max(5, floor(0.001×1000)) = 5 pts`
+- 4 reports `spam` de identidades de peso 50 (1.0 pt cada)
+- Base ativa: 1000 users → threshold spam = 5 pts
 
 **Pipeline:**
-1. `spreadWeight = 20 × 30 = 600`
-2. `buryWeight = 10 × 40 = 400`
-3. `netEngagement = 600 − 400×0.3 = 480`
-4. `score = 480 / (24+2)^1.5 = 480 / 132.6 = 3.62`
-5. **Reports:** 4 × 1.0 = 4.0 pts < threshold 5 → não modera ainda
-6. 6º report (1.0 pts) → total 6.0 ≥ 5 → `score := -999`, post some
-   do feed default.
+1. `score_base = 600 − 400×0.3 = 480`
+2. `score = 480 / (24+2)^1.5 = 3.62`
+3. **Reports:** 4 × 1.0 = 4.0 pts < 5 → não modera
+4. 5º report de peso 50 → 5.0 ≥ 5 → moderado; `score = -999`, some do
+   feed default. Spreads posteriores **não** desfazem (moderação é
+   derivada do conjunto de reports a cada recomputação).
 
 ### Cenário C — Sybil ring tenta gamificar
 
 **Setup:**
-- Atacante cria 100 identidades novas (cada uma weight=0)
-- Auto-spread em post próprio (autor também weight=0)
+- Atacante cria 100 chaves novas e assina posts com `created_at` de 1
+  ano atrás (backdating)
+- Todas se espalham mutuamente e espalham o post-alvo
 
 **Pipeline:**
-1. `spreadWeight = 100 × 0 = 0`
-2. `score = 0 / ... = 0` → post não sobe no feed
-3. **Defesa funcionou:** SOMA de pesos (não count) neutraliza Sybil
-   sem nenhuma chave mestra
-4. Identidades novas precisam de tempo real (1 ponto/semana) +
-   spreads recebidos (não auto-spreads) pra ganhar weight
+1. Nenhuma tem âncora OTS → `antiquity = 0` (o `created_at` forjado não
+   conta)
+2. Engajamento ponderado: `10 × Σ 0/100 = 0` → ponto fixo em 0 pra todas
+3. `spreadWeight = 100 × 0 = 0` → post não sobe; reports delas valem 0
+4. **Custo real pro atacante:** carimbar as chaves e **esperar** — cada
+   semana de antiguidade custa uma semana de verdade, provada no
+   Bitcoin; ou convencer identidades com peso a espalhá-lo
 
 ### Cenário D — User power liga Trust Lens
 
@@ -748,6 +858,10 @@ Post de X ainda aparece boostado, mas menos — refletindo que user
 
 | Invariante | Arquivo | Manifesto |
 |---|---|---|
+| Mesmo conjunto de eventos em qualquer ordem → mesmos scores/pesos/moderação | `tests/algorithm-invariants.test.ts` §2 | §7 |
+| Chave sem âncora OTS não gera peso (backdating, lavagem, anel) | `tests/algorithm-invariants.test.ts` §3 | §22, §33 |
+| Moderação não se desfaz com spread novo nem com rajada de boot | `tests/algorithm-invariants.test.ts` §4 | §26 |
+| Prova OTS só ancora se conferir com header Bitcoin | `tests/algorithm-invariants.test.ts` §6, `tests/ots.test.ts` | §22 |
 | `calculateScore` é determinístico (mesmo input → mesmo output) | `tests/scoring.test.ts` | §7 |
 | `calculateWeight` é função pura (sem `Date.now()`) | `tests/weight.test.ts` | §7, §22 |
 | `getReportThreshold` é função pura | `tests/moderation.test.ts` | §7, §26 |
@@ -759,6 +873,7 @@ Post de X ainda aparece boostado, mas menos — refletindo que user
 
 ---
 
-*Última atualização: 2026-05-20. Source-of-truth está no código —
+*Última atualização: 2026-11-03 (auditoria do algoritmo — motor global,
+âncora OpenTimestamps, moderação derivada). Source-of-truth está no código —
 quando este doc divergir, código vence. Reportar dessincronia via
 issue ou pair-review HIMYM.*

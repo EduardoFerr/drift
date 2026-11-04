@@ -56,7 +56,6 @@ vi.mock('../src/lib/feed', () => ({
 }))
 vi.mock('../src/lib/moderation', () => ({
   getReportWeight: vi.fn(() => 1),
-  maybeModerate: vi.fn(),
 }))
 vi.mock('../src/lib/weight', () => ({
   calculateUserWeight: vi.fn(async () => ({ weight: 0.5 })),
@@ -181,7 +180,7 @@ describe('pipeline — sig válida persiste (happy path)', () => {
     await onNostrEvent(sp)
     expect(
       dbRunMock.mock.calls.filter((c) =>
-        /INSERT OR IGNORE INTO spreads\b/i.test(String(c[0])),
+        /INSERT INTO spreads\b/i.test(String(c[0])),
       ).length,
     ).toBe(1)
   })
@@ -249,7 +248,7 @@ describe('pipeline — race T1 (Barney): persist só após ack verify', () => {
     await Promise.resolve()
     await Promise.resolve()
     const insertsAfterB = dbRunMock.mock.calls.filter((c) =>
-      /INSERT OR IGNORE INTO spreads\b/i.test(String(c[0])),
+      /INSERT INTO spreads\b/i.test(String(c[0])),
     )
     expect(insertsAfterB.length).toBe(1)
     // Confirma que é o evB (o INSERT inclui event_id como column)
@@ -262,7 +261,7 @@ describe('pipeline — race T1 (Barney): persist só após ack verify', () => {
     await pB
     await pC
     const insertsFinal = dbRunMock.mock.calls.filter((c) =>
-      /INSERT OR IGNORE INTO spreads\b/i.test(String(c[0])),
+      /INSERT INTO spreads\b/i.test(String(c[0])),
     )
     expect(insertsFinal.length).toBe(3)
   })
@@ -275,7 +274,7 @@ describe('pipeline — race T1 (Barney): persist só após ack verify', () => {
       await onNostrEvent(e)
     }
     const spreadInserts = dbRunMock.mock.calls.filter((c) =>
-      /INSERT OR IGNORE INTO spreads\b/i.test(String(c[0])),
+      /INSERT INTO spreads\b/i.test(String(c[0])),
     )
     expect(spreadInserts.length).toBe(3) // só true → persiste
   })
