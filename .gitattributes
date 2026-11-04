@@ -1,0 +1,3 @@
+# Fixtures OTS: o teste confere sha256 byte a byte — sem conversão de
+# fim de linha (core.autocrlf no Windows trocava LF por CRLF).
+tests/fixtures/ots/** binary
