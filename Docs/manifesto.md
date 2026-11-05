@@ -771,8 +771,9 @@ quando esconder do feed default.
   é mais sério, mas o fluxo é processar e esconder, não punir
   individualmente fora da fórmula de peso). Exceção local, §24 emendado:
   na aba Contágio de quem denunciou, o autor (e quem trouxe o post, se a
-  denúncia foi feita ali) perde 0,5 de vínculo — só no aparelho dessa
-  pessoa, sem efeito no score, no peso nem na aba de ninguém mais
+  denúncia foi feita ali) perde 0,5 de vínculo — só nos aparelhos dessa
+  identidade (quem trouxe, só no aparelho da denúncia), sem efeito no
+  score, no peso nem na aba de ninguém mais
 - Não removem da rede — Drift não tem capacidade técnica de fazer
   isso (§17)
 - Não censuram retroativamente histórico do reporter

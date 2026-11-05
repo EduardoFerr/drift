@@ -281,7 +281,9 @@ passa de contato em contato.
 - Acima do autor, no card, **↪ chegou por X** mostra quem trouxe o post
   (o contato de maior vínculo). Se mais de uma pessoa trouxe com o mesmo
   vínculo, aparece **X, Y +N**. Post que entrou direto não mostra.
-- Sua **denúncia** tira 0,5 do vínculo com o autor, para sempre. Se você
+- Sua **denúncia** tira 0,5 do vínculo com o autor, para sempre (só muda
+  algo se você segue a pessoa: sem follow, o vínculo já é zero e os posts
+  dela podem chegar pelos seus contatos). Se você
   denunciou na aba Contágio, cada pessoa da etiqueta **↪ chegou por**
   (inclusive as do +N) também perde 0,5. O passo de confirmação da
   denúncia avisa isso antes do envio. Seu SINK não pune ninguém (ver ↓
@@ -366,7 +368,7 @@ coletiva. Você não pode "cancelar" alguém pra todo mundo via bloqueio.
      brigada de poucos)
 
 6. **Na sua aba Contágio:** o autor perde 0,5 de vínculo com você, para
-   sempre. Se você denunciou na aba Contágio, cada pessoa da etiqueta
+   sempre (efeito só se você o segue). Se você denunciou na aba Contágio, cada pessoa da etiqueta
    **↪ chegou por** também perde 0,5 — esse registro fica só no seu
    aparelho. O passo de confirmação avisa antes do envio. Nas abas de quem segue você, sua
    denúncia soma na quarentena do post. Ver

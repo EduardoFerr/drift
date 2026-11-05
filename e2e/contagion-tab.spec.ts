@@ -381,7 +381,9 @@ test.describe('aba Contágio', () => {
       await goToCard(page, elsewhere)
       await expect(page.getByTestId('contagion-via')).toHaveCount(0)
       const noteGlobal = await reportCurrentCard(page)
-      expect(noteGlobal, 'o aviso fala do autor').toContain('o que vem do autor passa a chegar menos')
+      // Bob não segue o Frank: sem follow o vínculo já é zero — o aviso não
+      // promete efeito no autor (os posts dele seguem chegando pelos contatos)
+      expect(noteGlobal, 'autor não seguido: sem promessa sobre ele').not.toContain('o que vem do autor')
       expect(noteGlobal, 'sem pílula, o aviso não cita ninguém mais').not.toContain('o mesmo vale para')
       const authorElsewhere = await authorOf(page, elsewhere)
       await expect.poll(async () => (await badRows(page, elsewhere)).map((r) => r.s), { timeout: 10_000 }).toEqual([authorElsewhere])
@@ -397,7 +399,7 @@ test.describe('aba Contágio', () => {
       await expect(page.getByTestId('contagion-via').first()).toBeVisible()
 
       const noteTab = await reportCurrentCard(page)
-      expect(noteTab, 'o aviso cita quem trouxe antes do envio').toContain('o mesmo vale para')
+      expect(noteTab, 'o aviso cita quem trouxe antes do envio').toContain('que trouxe este post')
       await expect.poll(async () => (await badRows(page, target)).length, { timeout: 10_000 }).toBe(2)
       const rows = await badRows(page, target)
       expect(rows.every((r) => r.v === me), 'o registro é do leitor').toBe(true)
@@ -459,6 +461,26 @@ test.describe('aba Contágio', () => {
       await expect.poll(async () => (await badRows(page, alvo.id)).map((r) => r.s).sort(), { timeout: 10_000 })
         .toEqual([alice!.pub, frank!.pub, heidi!.pub].sort())
       expect((await badRows(page, alvo.id)).every((r) => r.v === me)).toBe(true)
+    } finally {
+      await bob.context.close()
+    }
+  })
+
+  test('10. aviso da denúncia: autor que você segue → fala do autor; post direto não cita ninguém mais', async ({ browser }) => {
+    const bob = await setupUser(browser, 'bob')
+    try {
+      const page = bob.page
+      const alice = (await follows(page, await viewer(page)))[0]!
+      await openTab(page, 'contágio')
+      // post direto da Alice (seguida): sem pílula, aviso só sobre o autor
+      let direto: string | null = null
+      for (const id of await tabIds(page)) if ((await authorOf(page, id)) === alice && (await arrivedVia(page, id)) === null) { direto = id; break }
+      expect(direto, 'a aba do Bob tem post direto da Alice').not.toBeNull()
+      await goToCard(page, direto!)
+      await expect(page.getByTestId('contagion-via')).toHaveCount(0)
+      const note = await reportCurrentCard(page)
+      expect(note).toContain('o que vem do autor passa a chegar menos')
+      expect(note).not.toContain('que trouxe este post')
     } finally {
       await bob.context.close()
     }

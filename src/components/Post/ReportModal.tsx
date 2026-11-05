@@ -23,6 +23,7 @@ import { FullPageCard } from '../UI/FullPageCard'
 import { DriftButton } from '../UI/DriftButton'
 import { SectionHeader } from '../UI/SectionHeader'
 import { PeopleNames } from './ContagionViaChip'
+import { useFollowsStore } from '../../lib/follows'
 
 export interface ReportModalProps {
   post: Post
@@ -83,6 +84,7 @@ function toneClasses(tone: ReasonOption['tone'], active: boolean) {
 export function ReportModal({ post, vias = [], pending, onSubmit, onClose }: ReportModalProps) {
   const [selected, setSelected] = useState<ReportReason | null>(null)
   const [confirmStep, setConfirmStep] = useState(false)
+  const followsAuthor = useFollowsStore((s) => s.following.has(post.authorPub))
 
   async function handleSubmit() {
     if (!selected || pending) return
@@ -149,6 +151,7 @@ export function ReportModal({ post, vias = [], pending, onSubmit, onClose }: Rep
           <ConfirmStep
             reason={selected}
             vias={vias}
+            followsAuthor={followsAuthor}
             pending={pending}
             onBack={() => setConfirmStep(false)}
             onSubmit={handleSubmit}
@@ -163,12 +166,14 @@ export function ReportModal({ post, vias = [], pending, onSubmit, onClose }: Rep
 function ConfirmStep({
   reason,
   vias,
+  followsAuthor,
   pending,
   onBack,
   onSubmit,
 }: {
   reason: ReportReason
   vias: readonly string[]
+  followsAuthor: boolean
   pending: boolean
   onBack: () => void
   onSubmit: () => void
@@ -215,13 +220,16 @@ function ConfirmStep({
           data-testid="report-contagion-note"
           className="px-1 font-mono text-[10px] leading-relaxed text-drift-warning"
         >
-          na sua aba contágio, o que vem do autor passa a chegar menos, sem volta.
+          {/* Só promete o efeito no autor se o leitor o segue: sem follow o
+              vínculo já é zero e os posts dele seguem chegando pelos contatos. */}
+          {followsAuthor && <>na sua aba contágio, o que vem do autor passa a chegar menos, sem volta.{' '}</>}
           {vias.length > 0 && (
             <>
-              {' '}o mesmo vale para <PeopleNames pubs={vias} />, que {vias.length > 1 ? 'trouxeram' : 'trouxe'} este
-              post (registro só no seu aparelho).
+              {followsAuthor ? 'o mesmo vale para ' : 'na sua aba contágio, o que vem de '}
+              <PeopleNames pubs={vias} />, que {vias.length > 1 ? 'trouxeram' : 'trouxe'} este post
+              {!followsAuthor && ', passa a chegar menos, sem volta'} (registro só no seu aparelho).{' '}
             </>
-          )}{' '}
+          )}
           denúncia é para spam, golpe ou abuso — para o que só não te agrada, use sink.
         </p>
 

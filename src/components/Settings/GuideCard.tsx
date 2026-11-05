@@ -288,7 +288,7 @@ function AcoesTopics() {
             accordionId="guia-acao-report"
             label="denunciar (report)"
             description="Reporta o post como violação grave — spam, ilegal, abuso. Publica um evento kind 9081 com o motivo."
-            impact="Cada denúncia vale peso ÷ 50 pontos, a partir de peso 20 e 8 semanas de âncora (antes disso vale 0). Quando a soma passa do threshold (5 pontos, ou mais em redes grandes; metade pra ilegal), o post recebe -999 e some do feed. Reports são PÚBLICOS na rede Nostr — sua npub fica visível como quem denunciou. Na sua aba contágio, o que vem do autor — e, se você denunciou ali, de quem trouxe o post (↪) — passa a chegar menos, sem volta."
+            impact="Cada denúncia vale peso ÷ 50 pontos, a partir de peso 20 e 8 semanas de âncora (antes disso vale 0). Quando a soma passa do threshold (5 pontos, ou mais em redes grandes; metade pra ilegal), o post recebe -999 e some do feed. Reports são PÚBLICOS na rede Nostr — sua npub fica visível como quem denunciou. Na sua aba contágio, o que vem do autor (se você o segue) — e, se você denunciou ali, de quem trouxe o post (↪) — passa a chegar menos, sem volta."
             defaultExplained="Não tem default. UI sempre mostra warning sobre privacidade do reporter ANTES de enviar."
             reversible={false}
             warning="Seu npub fica visível como reporter. Reports são eventos públicos Nostr — outras pessoas (e o autor do post) podem ver que você denunciou."

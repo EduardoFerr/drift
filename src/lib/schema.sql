@@ -229,10 +229,11 @@ CREATE TABLE IF NOT EXISTS muted (
 );
 
 -- ── Aba Contágio: quem trouxe o que o leitor denunciou (manifesto §24 emendado)
--- Denúncia feita na aba Contágio: uma linha por contato que trouxe o post
--- (cada identidade do aparelho tem as suas — `viewer_pub`). Cada post
--- distinto tira 0,5 do vínculo (src/lib/contagion.ts). A parte do AUTOR
--- não fica aqui: sai das denúncias públicas do leitor (`reports`).
+-- Denúncia feita no aparelho: uma linha para o autor (em qualquer aba) e
+-- uma por contato que a pílula "↪ chegou por" mostrava (só na aba
+-- Contágio). Cada identidade do aparelho tem as suas (`viewer_pub`); cada
+-- post distinto tira 0,5 do vínculo (src/lib/contagion.ts). Denúncias do
+-- leitor vindas de outro aparelho entram pela tabela `reports`.
 -- Estado local do user, como blocked/muted: não é publicado e não entra
 -- em DOMAIN_TABLES (rebuild preserva).
 CREATE TABLE IF NOT EXISTS contagion_bad_experiences (

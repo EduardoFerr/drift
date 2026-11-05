@@ -56,6 +56,13 @@ em `Docs/simulacao-contagio/` e `Docs/spec-revisao-contagio.md`.
   (difamação com vínculo forte); defesas: só mídia verificada na aba,
   lista local "quem perdeu vínculo por denúncia sua" com "perdoar" —
   bloqueio: nenhum, trabalho a fazer.
+- [ ] **Publish nos relays sempre conta "ok"** — `transport/wss.ts:60-61`
+  faz `Promise.allSettled` sobre `pool.publish([url], event)`, que no
+  nostr-tools 2.23.3 devolve um ARRAY de promises: cada item resolve na
+  hora, `ok` = nº de relays, `recordRelayOk` roda mesmo com falha e as
+  rejeições ficam sem tratamento (idem `rebroadcast.ts:79`; mocks escondem).
+  Achado colateral do Ted na revisão da aba Contágio — bloqueio: nenhum,
+  tarefa à parte (branch própria, testes que falham hoje).
 - [ ] **Alinhar a simulação ao app** — "quem trouxe" = todos os empatados,
   SINK de contato 96 h, feed = tudo o que passa (até 50) na ordem canônica
   (Ted, revisão em par) — bloqueio: nenhum.
