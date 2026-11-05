@@ -142,11 +142,12 @@ describe('A expressão de decay do feed.ts não divergiu', () => {
     )
   })
 
-  it('as 3 queries do feed usam a ordenação canônica com tie-break', () => {
+  it('as 4 queries do feed usam a ordenação canônica com tie-break', () => {
     const feed = readFileSync(join(ROOT, 'src/lib/feed.ts'), 'utf8')
     expect(feed).toMatch(/ORDER BY score_now DESC, p\.created_at DESC, p\.id ASC/)
     const usos = feed.match(/\$\{FEED_ORDER\}/g) ?? []
-    expect(usos.length, 'Global, Seguindo e Em alta devem usar a mesma ordenação').toBe(3)
+    // Contágio (§24 emendado) muda o CONJUNTO, nunca a ordem.
+    expect(usos.length, 'Global, Seguindo, Em alta e Contágio devem usar a mesma ordenação').toBe(4)
   })
 
   it('a UI exibe o MESMO valor que ordena o feed', () => {

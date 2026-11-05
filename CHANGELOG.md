@@ -4,6 +4,34 @@ All notable changes to the Drift client. Uses [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+Contágio local, Fase 1 (2026-11-05). **Emenda ao manifesto §24** — de
+"Sem Algoritmo Personalizado de Feed" para "Algoritmo Público, Entradas
+Suas": regras públicas e determinísticas, entradas do próprio usuário.
+
+### Added
+- **Aba "contágio"** — o que chegou pelas pessoas que você segue: DRIFTs
+  de contatos somando 0,8 (follow 0,5; 0,8 se você já driftou algo da
+  pessoa), teto de 0,5 para quem você só segue, vacina (SINK) e quarentena
+  (denúncias) dos contatos, posts recentes de quem você segue. A ordem é a
+  canônica. `src/lib/contagion.ts` (núcleo puro), `src/lib/contagion-data.ts`
+  (SQLite), `Docs/algoritmos.md` §9.
+- **Experiências ruins locais** — seu SINK ou denúncia tira 0,5 do vínculo
+  com o autor e com quem trouxe o post (tabela local `contagion_strikes`,
+  nunca publicada; desfazer o SINK apaga a daquele post).
+- **Índices** `spreads(spreader_pub, created_at)`, `buries(burier_pub,
+  created_at)`, `reports(reporter_pub, created_at)`.
+- **Simulação reproduzível no repositório** — `Docs/simulacao-contagio/`
+  (2.250 pessoas, 6 cidades, fazendas adaptadas) e
+  `Docs/spec-revisao-contagio.md` (spec para revisão externa).
+- **Testes** — `tests/contagion.test.ts` (propriedades: fazenda de até
+  2.000 contas só seguidas nunca passa; ordem de chegada não muda nada;
+  monotonia; pipeline real) e `e2e/contagion-tab.spec.ts` (oráculo SQL
+  independente no app real).
+
+### Changed
+- Manifesto §24 emendado (motivo e simulação no próprio artigo).
+- Testes que travavam "3 abas usam `FEED_ORDER`" agora travam 4.
+
 Auditoria do algoritmo (2026-11-03, `Docs/auditoria-algoritmo-2026-11.md`):
 14 defeitos com prova executável, todos corrigidos. **Mudança de
 semântica do peso** — ver "Changed".

@@ -130,6 +130,11 @@ Quem fizer auditoria histórica vê que você mudou de opinião.
 4. **O autor NÃO é penalizado.** Bury reduz o score do post, mas não
    afeta o `weight` do autor (manifesto §23). Você pode "afundar"
    alguém 1000 vezes sem prejudicar a reputação dele.
+5. **Só pra você, na aba Contágio:** o SINK conta como experiência ruim
+   com o autor e com quem trouxe o post até você. Cada uma tira 0,5 da
+   força desse vínculo **no seu aparelho** (nada é publicado). Com duas,
+   aquela pessoa para de trazer posts pra sua aba Contágio. Ver
+   [A aba Contágio](#a-aba-contágio).
 
 **Quem vê que VOCÊ afundou:**
 
@@ -137,7 +142,8 @@ Quem fizer auditoria histórica vê que você mudou de opinião.
 
 **Pode desfazer?**
 
-✅ Sim — swipe ↑ no mesmo post. Última ação vale.
+✅ Sim — swipe ↑ no mesmo post. Última ação vale. Desfazer também
+apaga a experiência ruim daquele post na aba Contágio.
 
 ---
 
@@ -230,6 +236,7 @@ event), mas:
 **Pra que serve:**
 
 - Aba "Seguindo" do feed filtra posts dos seus follows
+- Aba "Contágio" traz o que essas pessoas driftaram (ver abaixo)
 - Trust Lens (se ligada) usa seus follows pra calcular o grafo de
   influência local
 - Outros clientes Nostr (Damus, Snort, Coracle) entendem essa lista —
@@ -240,6 +247,38 @@ event), mas:
 ✅ Botão "deixar de seguir" publica novo kind 3 sem aquela pessoa. A
 versão anterior (com a pessoa) **continua existindo nos relays** mas é
 ignorada (replaceable LWW).
+
+---
+
+## A aba Contágio
+
+As abas **global**, **seguindo** e **em alta** são iguais pra todo mundo.
+A aba **contágio** mostra o que chegou até você **pelas pessoas que você
+segue**, como um vírus que passa de contato em contato.
+
+**Como um post chega aqui:**
+
+- Posts recentes (até 3 dias) de quem você segue entram direto.
+- Um post de outra pessoa entra quando gente que você segue deu DRIFT
+  nele nas últimas 48 h e a força desses vínculos soma **0,8**:
+  - quem você só segue vale **0,5**;
+  - quem você segue **e** de quem você já driftou algum post vale
+    **0,8** — sozinha já traz o post;
+  - quem você só segue soma no máximo 0,5 por post, por mais pessoas que
+    sejam. Contas falsas que você seguiu de volta nunca trazem nada
+    sozinhas.
+- O SINK das pessoas que você segue **tira** força (vacina); denúncias
+  delas somando 1,0 **escondem** o post (quarentena).
+- Seu SINK ou sua denúncia tira 0,5 do vínculo com o autor e com quem
+  trouxe o post (ver ↓ SINK).
+
+**O que continua igual:** a ordem dentro da aba é a mesma do feed global
+(score público). As regras estão em `Docs/algoritmos.md` §9 e qualquer
+pessoa pode recalcular sua aba a partir dos eventos e das suas escolhas.
+Nada disso sai do seu aparelho.
+
+**Se a aba estiver vazia:** siga pessoas e drifte o que gostar — é isso
+que dá força aos seus vínculos.
 
 ---
 
@@ -411,7 +450,7 @@ Power user pode trocar:
 | Drift escaneia automaticamente o que você publica | §25 — operador do scanner herdaria chave mestra |
 | Existe "moderador supremo" que apaga posts | §17 — sem chave mestra disfarçada |
 | Seu `nsec1…` é enviado pra algum servidor | §3 — identidade no dispositivo, sempre |
-| Feed é personalizado por você sem você ligar Lente | §24 — feed canônico cross-device |
+| Feed é personalizado sem você escolher | §24 — global, seguindo e em alta são iguais pra todos; a aba Contágio só usa as suas escolhas, com regras públicas |
 | Posts são apagados quando reports passam threshold | §17 — só score = -999 esconde; cliente alternativo exibe |
 | Bury penaliza o autor | §23 — bury é julgamento estético, não punição |
 | Existe "boost pago" pra subir no feed | §22 — score determinístico, sem reputação subjetiva nem ad |

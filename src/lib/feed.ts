@@ -18,6 +18,8 @@ import { create } from 'zustand'
 import { db } from './db'
 import { hiddenReason } from './moderation-local'
 import { useFollowsStore } from './follows'
+import { getCurrentNpub } from './identity'
+import { computeContagionFor } from './contagion-data'
 import { normalizeLayout } from '../types/drift'
 import { parseImetaTag as parseImetaTagSync, type BlobMeta } from './nip94'
 import { FEED_INITIAL_LIMIT, FEED_QUEUE_CAP } from '../config/constants'
@@ -194,6 +196,34 @@ export async function getTrendingFeed(limit = 50, now = Date.now()): Promise<Pos
 }
 
 /**
+ * Aba Contágio (manifesto §24 emendado; Docs/algoritmos.md §9): o CONJUNTO
+ * é o que chegou ao leitor pelas pessoas que ele segue — DRIFTs de
+ * contatos somando 0,8, com teto para vínculos fracos, vacina e quarentena
+ * dos contatos (src/lib/contagion.ts). A ORDEM continua a canônica: mesmas
+ * entradas, mesmo feed, recalculável por qualquer um.
+ *
+ * Sem follows não há contágio: retorna vazio e a UI convida a seguir.
+ */
+export async function getContagionFeed(limit = 50, now = Date.now()): Promise<Post[]> {
+  const follows = useFollowsStore.getState().following
+  if (follows.size === 0) return []
+  const viewer = await getCurrentNpub()
+  if (!viewer) return []
+  const verdicts = await computeContagionFor(viewer, follows, nowSeconds(now))
+  const ids = [...verdicts.values()].filter((v) => v.pass).map((v) => v.postId).sort()
+  if (ids.length === 0) return []
+  const placeholders = ids.map(() => '?').join(',')
+  const rows = await db.exec<PostRow>(
+    `${POST_SELECT}
+     WHERE p.score > -999 AND p.id IN (${placeholders})
+     ${FEED_ORDER}
+     LIMIT ?`,
+    [nowSeconds(now), ...ids, limit],
+  )
+  return rows.map(rowToPost)
+}
+
+/**
  * V9.20 — busca um Post pelo id no SQLite local. Usado pelo handler
  * de deep-link (`?p=<nevent>`) em App.tsx pra abrir PostViewer modal
  * com o post linkado depois do onNostrEvent ter materializado o row.
@@ -221,6 +251,8 @@ async function getFeedByTab(tab: FeedTab, limit: number): Promise<Post[]> {
       return getFollowingFeed(limit)
     case 'trending':
       return getTrendingFeed(limit)
+    case 'contagio':
+      return getContagionFeed(limit)
   }
 }
 
@@ -281,7 +313,7 @@ export const useFeedStore = create<FeedStore>(() => ({
   limit: FEED_INITIAL_LIMIT,
   tab: 'global',
   snapshotTs: null,
-  unseenByTab: { global: 0, following: 0, trending: 0 },
+  unseenByTab: { global: 0, following: 0, trending: 0, contagio: 0 },
 }))
 
 /**
@@ -302,6 +334,7 @@ export function bumpUnseenCount(): void {
       global: s.unseenByTab.global + 1,
       following: s.unseenByTab.following + 1,
       trending: s.unseenByTab.trending + 1,
+      contagio: s.unseenByTab.contagio + 1,
     },
   }))
 }

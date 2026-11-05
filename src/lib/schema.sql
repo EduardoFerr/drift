@@ -97,6 +97,9 @@ CREATE TABLE IF NOT EXISTS spreads (
 );
 CREATE INDEX IF NOT EXISTS idx_spreads_post    ON spreads(post_id);
 CREATE INDEX IF NOT EXISTS idx_spreads_created ON spreads(created_at);
+-- Aba Contágio: "o que esta pessoa impulsionou" (vínculo conquistado e
+-- DRIFTs recentes dos contatos).
+CREATE INDEX IF NOT EXISTS idx_spreads_spreader ON spreads(spreader_pub, created_at);
 
 -- ── Buries ───────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS buries (
@@ -109,6 +112,7 @@ CREATE TABLE IF NOT EXISTS buries (
   UNIQUE(post_id, burier_pub)
 );
 CREATE INDEX IF NOT EXISTS idx_buries_post ON buries(post_id);
+CREATE INDEX IF NOT EXISTS idx_buries_burier ON buries(burier_pub, created_at);
 
 -- ── Reports ──────────────────────────────────────────────────────
 -- Reports (kind 9081 Drift native + kind 1984 NIP-56 dual stack).
@@ -141,6 +145,7 @@ CREATE TABLE IF NOT EXISTS reports (
 );
 CREATE INDEX IF NOT EXISTS idx_reports_post   ON reports(post_id);
 CREATE INDEX IF NOT EXISTS idx_reports_reason ON reports(reason);
+CREATE INDEX IF NOT EXISTS idx_reports_reporter ON reports(reporter_pub, created_at);
 
 -- ── Comments (Track C — kind 1111 NIP-22) ───────────────────────
 -- Threads de comentários reusando NIP-22 (manifesto §29 compat). Drift
@@ -221,6 +226,19 @@ CREATE TABLE IF NOT EXISTS muted (
   npub      TEXT PRIMARY KEY,
   muted_at  INTEGER NOT NULL
 );
+
+-- ── Aba Contágio: experiências ruins do leitor (manifesto §24 emendado)
+-- SINK ou denúncia do leitor contra um post: uma linha para o autor e uma
+-- para o contato que trouxe o post. Cada linha tira 0,5 do vínculo (ver
+-- src/lib/contagion.ts). Estado local do user, como blocked/muted: não é
+-- publicado e não entra em DOMAIN_TABLES (rebuild preserva).
+CREATE TABLE IF NOT EXISTS contagion_strikes (
+  subject_pub TEXT NOT NULL,
+  post_id     TEXT NOT NULL,
+  created_at  INTEGER NOT NULL,
+  PRIMARY KEY (subject_pub, post_id)
+);
+CREATE INDEX IF NOT EXISTS idx_contagion_strikes_post ON contagion_strikes(post_id);
 
 -- ── Usuários (perfis agregados) ──────────────────────────────────
 CREATE TABLE IF NOT EXISTS users (

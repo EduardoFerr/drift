@@ -609,24 +609,39 @@ escolhe a ação líquida e `computeRanking` soma os pesos por kind.
 espalharam"); `posts.score_base` usa soma de pesos. Bury não penaliza o
 autor (§23 preservado). Ver arquitetura §8.
 
-### 24. Sem Algoritmo Personalizado de Feed
+### 24. Algoritmo Público, Entradas Suas
 
-Ranking é determinístico e público. Sem feed "para você", sem bolha,
-sem afinidade automática.
+> **Emendado em 2026-11-05.** Até então este artigo se chamava "Sem
+> Algoritmo Personalizado de Feed" e exigia a mesma ordem global para
+> todos. A emenda e o motivo estão abaixo; o texto original segue no
+> histórico do repositório.
+
+Ranking é determinístico e público. Nenhuma regra é secreta, nenhum
+sinal é escondido do usuário, nada sai do dispositivo. O que pode
+variar entre pessoas são as **entradas** — e elas são do próprio
+usuário.
 
 **Regras:**
+- Toda regra de seleção e ordenação é pública, determinística e
+  documentada em `Docs/algoritmos.md`: com os mesmos eventos e as mesmas
+  escolhas do usuário, qualquer pessoa recalcula o mesmo feed
 - Ordem do feed é função pura: `score = (Σ weight(spreader) −
   Σ weight(burier) × 0.3 + min(Σ weight(comentaristas), 30)) /
   (idade + 2)^1.5`, depois `created_at` desc, depois `id` asc (ver §23
-  "Score weighted" para detalhes)
-- Qualquer cliente Drift mostra a mesma ordem global
-- Não há scoring personalizado por usuário
-- Bloquear / silenciar / seguir são camada de filtragem **local** na
-  visualização, não de ranking
+  "Score weighted" para detalhes) — **em todas as abas**
+- As abas Global, Seguindo e Em alta mostram a mesma ordem para todos
+- A aba **Contágio** escolhe o **conjunto** de posts a partir das
+  entradas do próprio usuário (quem ele segue, o que ele já impulsionou,
+  o que ele enterrou ou denunciou), pelas regras de
+  `Docs/algoritmos.md` §9; a ordem dentro dela continua a de cima
+- Proibido: previsão de engajamento, tempo de tela, modelos treinados,
+  otimização escondida, sinal que o usuário não vê ou não controla
+- Bloquear / silenciar / seguir continuam filtros **locais** na
+  visualização
 - O usuário pode escolher categorias para filtrar; a ordenação
   dentro da categoria continua determinística
 
-**Por que essa regra dura existe:**
+**Por que a regra original existia:**
 Afinidade no feed é o que cria bolha. Se o app começa a
 "personalizar" o que você vê com base em quem você seguiu ou no que
 você espalhou, estamos construindo o mesmo algoritmo central que o
@@ -634,8 +649,27 @@ Drift se propõe a substituir — só que rodando localmente em vez de
 num servidor da Meta. O resultado social é idêntico: bolhas,
 manipulação, captura.
 
-**Implementação:** `scoring.ts` é função pura sem inputs do user
-individual. `feed.ts` query é genérica e idêntica entre users.
+**Por que foi emendada:**
+1. **Uma ordem igual para todos é um alvo único.** Simulações com 2.250
+   pessoas (`Docs/simulacao-contagio/`, `Docs/spec-revisao-contagio.md`)
+   mostraram uma fazenda paciente de 2.000 contas no feed de 100% das
+   pessoas no modelo global, mesmo com antiguidade ancorada no Bitcoin;
+   no contágio local, abaixo de 0,3%. A captura que o artigo temia
+   acontecia justamente por causa da regra.
+2. **É um resultado conhecido:** nenhuma reputação simétrica (igual para
+   todos) resiste a contas falsas; as assimétricas, calculadas a partir
+   de quem olha, podem resistir (Cheng & Friedman, 2005).
+3. **O medo da bolha continua levado a sério:** a aba é opcional e as
+   regras são abertas; as entradas são escolhas explícitas do usuário,
+   não inferências; e a simulação mediu a mesma abertura entre cidades
+   (~55% do feed vindo de fora). Bolha *ideológica* não foi medida —
+   registrada em `Docs/known-limitations.md` §5l.
+
+**Implementação:** `scoring.ts` é função pura sem inputs do usuário
+individual. As queries Global, Seguindo e Em alta de `feed.ts` são
+genéricas e idênticas entre usuários. `contagion.ts` é função pura cujas
+entradas são as do próprio leitor; a aba usa a mesma `FEED_ORDER`
+(travado por `tests/score-decay-parity.test.ts`).
 
 ### 25. Sem Scan Automático Obrigatório de Conteúdo (Sem Chave Mestra Disfarçada)
 

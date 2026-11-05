@@ -19,7 +19,7 @@ import { type ReactNode } from 'react'
 import { m } from 'framer-motion'
 import { markFeedSeen, refreshFeed, setFeedTab, useFeedStore } from '../../lib/feed'
 
-type FeedTab = 'global' | 'following' | 'trending'
+type FeedTab = 'global' | 'following' | 'trending' | 'contagio'
 
 export interface FeedTabsProps {
   /**
@@ -57,6 +57,8 @@ export function FeedTabs({ onActiveTabTap }: FeedTabsProps = {}) {
     { id: 'global', label: 'global' },
     { id: 'following', label: 'seguindo' },
     { id: 'trending', label: 'em alta' },
+    // Manifesto §24 emendado: o que chegou pelas pessoas que você segue.
+    { id: 'contagio', label: 'contágio' },
   ]
   const activeIndex = Math.max(
     0,
@@ -91,10 +93,11 @@ export function FeedTabs({ onActiveTabTap }: FeedTabsProps = {}) {
         ))}
         {/* Indicator único hoisted no container — anima `x` em % via
             `animate` prop (feature `animation` está em `domAnimation`).
-            Largura = 1/3 do container das tabs (flex-1 × 3). */}
+            Largura = 1/N do container das tabs (flex-1 × N). */}
         <m.span
           aria-hidden="true"
-          className="pointer-events-none absolute -bottom-px left-0 h-[2px] w-1/3 bg-drift-accent2"
+          className="pointer-events-none absolute -bottom-px left-0 h-[2px] bg-drift-accent2"
+          style={{ width: `${100 / tabs.length}%` }}
           animate={{ x: `${activeIndex * 100}%` }}
           transition={{
             type: 'spring',

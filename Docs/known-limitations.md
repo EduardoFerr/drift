@@ -287,6 +287,35 @@ audits só por feio. Defer documentado > silence.
 - **Reopener:** paginação de histórico por `until` (TODO em `sync.ts`)
   ou relays de arquivo dedicados.
 
+### 5l. Aba Contágio — o que a Fase 1 ainda não cobre
+
+- **Status:** ABERTO (fases 2–3 planejadas; `BACKLOG.md` "Contágio").
+- **O que é:** a Fase 1 (`Docs/algoritmos.md` §9) usa só o que o app já
+  tem: follows do leitor, o que ele impulsionou e o que ele enterrou ou
+  denunciou. Ficam de fora, com efeito medido na simulação
+  (`Docs/spec-revisao-contagio.md`):
+  - **Isca:** contas falsas que postam conteúdo bom conquistam o vínculo
+    de 0,8 com quem as impulsiona e depois trazem spam. Na Fase 1, 1,4%
+    das pessoas veem ataque (pico 7%); o lockstep da Fase 2 leva a 0,2%.
+  - **Alcance:** o post mais viral chega a ~38% pela aba (82–92% com
+    encontros físicos e o mapa da área, Fases 2–3).
+  - **Engenharia social em escala:** gente real enganada cria vínculo
+    forte de verdade com o atacante; nenhuma regra de grafo separa isso
+    de influência real. Contido pelo SINK que baixa o vínculo.
+  - **Bolha ideológica:** a simulação mediu abertura entre cidades (igual
+    à do feed global), não diversidade de opinião — o simulador não tem
+    opiniões.
+  - **Janela de sync:** o vínculo conquistado usa os DRIFTs do leitor que
+    estão no SQLite local; um dispositivo novo só "lembra" o que o sync de
+    7 dias trouxe (`sync.ts`), então começa com vínculos de 0,5.
+  - **Eclipse:** quem usa 1–2 relays controlados pelo atacante perde a
+    vacina e a quarentena dos contatos (o atacante só omite). O ataque
+    fica contido, mas o alcance honesto cai ~25 pontos. A defesa é de
+    produto: piso de diversidade de relays (≥ 6 relays de ≥ 3 operadores).
+- **Reopener:** Fase 2 (lockstep, aval, período de experiência; contágio
+  como padrão) e Fase 3 (mapa da área e encontros físicos), cada uma
+  simulada antes de entrar.
+
 ## Anti-spam
 
 ### 6. Content-hash dedup — pesquisado, NO-GO atual

@@ -13,6 +13,7 @@ import { rebuildIdentityHistory, restartSync, useSyncStore } from './lib/sync'
 import { parseDeepLinkSearch, cleanDeepLinkParams } from './lib/deep-link'
 import { createPost, spreadPost, buryPost } from './lib/protocol'
 import { getMyAction, markFeedSeen, refreshFeed, useFeedStore } from './lib/feed'
+import { forgetBadExperience, recordBadExperience } from './lib/contagion-data'
 import {
   advanceCursor,
   exitAtEnd,
@@ -850,6 +851,7 @@ function App() {
     global: { postId: null, atEnd: false },
     following: { postId: null, atEnd: false },
     trending: { postId: null, atEnd: false },
+    contagio: { postId: null, atEnd: false },
   })
   // Último idx válido por tab — usado pra snap quando o post atual
   // some do feed (ex: moderação atinge threshold, score = -999 esconde).
@@ -861,6 +863,7 @@ function App() {
     global: 0,
     following: 0,
     trending: 0,
+    contagio: 0,
   })
 
   const cursor = cursorByTab[feedTab]
@@ -1071,6 +1074,9 @@ function App() {
     // ação idêntica repetida. Pra reverter, user clica ↓ (ação oposta).
     if (myActions[post.id] === 'spread') return
     setPending((p) => ({ ...p, [post.id]: 'spread' }))
+    // Desfez um SINK: a experiência ruim daquele post deixa de pesar no
+    // vínculo da aba Contágio (corrigir engano, não esquecer com o tempo).
+    if (myActions[post.id] === 'bury') void forgetBadExperience(post.id)
 
     // Timeout de safety: se o evento não voltar pelo subscribe em 15s
     // (alguns relays não echoam pro publisher; rede ruim; etc.), limpa
@@ -1161,6 +1167,9 @@ function App() {
       next.add(post.id)
       return next
     })
+    // Aba Contágio: SINK é experiência ruim com o autor e com quem trouxe
+    // o post (−0,5 no vínculo). Local, nunca publicado (manifesto §28).
+    void recordBadExperience(post.id, post.authorPub)
 
     const safetyTimeout = setTimeout(() => {
       setPending((p) => {
@@ -1828,10 +1837,12 @@ function FeedSnapshotAgeBadge() {
   )
 }
 
-function HomeEmpty({ tab }: { tab: 'global' | 'following' | 'trending' }) {
+function HomeEmpty({ tab }: { tab: FeedTab }) {
   const msg =
     tab === 'following'
       ? 'Você não segue ninguém ainda. Toque ➕ pra criar seu primeiro post — depois siga autores ao abrir os posts deles.'
+      : tab === 'contagio'
+      ? 'Nada chegou pela sua rede ainda. Aqui aparece o que as pessoas que você segue driftaram — siga autores e drifte o que gostar pra rede ganhar força.'
       : tab === 'trending'
       ? 'Nada em alta nas últimas 24h. Driftar um post recente vai puxar ele pro trending.'
       : 'Nenhum post no feed ainda. Toque ➕ pra publicar o primeiro — ele vai dar a volta pelos relays e voltar.'
@@ -1863,14 +1874,14 @@ function EndOfFeed({
   onBack,
   onJumpToTop,
 }: {
-  tab: 'global' | 'following' | 'trending'
+  tab: FeedTab
   /** Voltar 1 post (o último que o user viu). */
   onBack: () => void
   /** Jump explícito pra idx=0 (instant, sem network). */
   onJumpToTop: () => void
 }) {
   const tabLabel =
-    tab === 'following' ? 'seguindo' : tab === 'trending' ? 'em alta' : 'global'
+    tab === 'following' ? 'seguindo' : tab === 'trending' ? 'em alta' : tab === 'contagio' ? 'contágio' : 'global'
   const [refreshing, setRefreshing] = useState(false)
   const [statusMsg, setStatusMsg] = useState<string | null>(null)
 

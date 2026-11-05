@@ -17,6 +17,32 @@ Formato:
 - Item aberto: `- [ ] <decisão> — contexto: <origem> — bloqueio: <quem/quê>`
 - Item fechado: `- [x] <decisão> — fechado YYYY-MM-DD em <commit-hash> — <1 linha resolução>`
 
+## Contágio local (2026-11-05)
+
+Fase 1 shipada (aba "contágio"; manifesto §24 emendado). Simulação e spec
+em `Docs/simulacao-contagio/` e `Docs/spec-revisao-contagio.md`.
+
+- [ ] **Fase 2: lockstep + aval + período de experiência; contágio como
+  padrão** — contexto: simulação v7 (isca 1,4% → 0,2%; aval fecha
+  enganados no mapa). Exige ingerir kind 3 dos contatos (hoje o app só
+  guarda a lista do próprio usuário — `sync.ts` não assina kind 3) e
+  histórico de 30 dias de DRIFTs de terceiros — bloqueio: nenhum, trabalho
+  a fazer, simular a versão exata antes.
+- [ ] **Fase 3: mapa da área + encontros físicos** — contexto: alcance
+  honesto 38% → 82–92% na simulação. Exige ler a posição atual para o
+  feed (hoje nunca lida) e um evento de encontro co-assinado (não existe).
+  Privacidade: geo-indistinguishability e k-anonimato espacial (relatório
+  Marshall) — bloqueio: desenho.
+- [ ] **Piso de diversidade de relays (anti-eclipse)** — contexto:
+  eclipse de 30% dos clientes derruba o alcance honesto ~25 pontos
+  (Heilman et al. 2015; Nostr: maioria usa 1–2 relays) — bloqueio:
+  desenho (≥ 6 relays de ≥ 3 operadores, 2 fixos + 4 rotativos).
+- [ ] **"Por que vi isto"** na aba Contágio — mostrar quem trouxe e a
+  soma (o núcleo já devolve `contributors`) — bloqueio: desenho (revela o
+  limiar a atacante; Marshall).
+- [ ] **Grafo social realista na simulação** (amigos de amigos agrupados)
+  para testar avais independentes e teto por grupo — bloqueio: nenhum.
+
 ## Auditoria do algoritmo (2026-11-03)
 
 - [ ] **PoW opcional anti-spam de volume** — contexto: user perguntou se o próprio

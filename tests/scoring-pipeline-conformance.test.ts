@@ -120,9 +120,10 @@ describe('Pipeline — invariantes que só existem no texto da SQL', () => {
     expect(ordenacao, 'feed.ts deve definir FEED_ORDER').toBeTruthy()
     expect(ordenacao![1], 'ORDER BY sem tie-break por id').toMatch(/p\.created_at DESC, p\.id ASC/)
 
-    // E as 3 queries precisam usá-la — nenhuma pode ter ordenação própria.
+    // E as 4 queries precisam usá-la — nenhuma pode ter ordenação própria
+    // (a aba Contágio, §24 emendado, muda só o conjunto).
     const usos = feed.match(/\$\{FEED_ORDER\}/g) ?? []
-    expect(usos.length, 'Global, Seguindo e Em alta devem usar FEED_ORDER').toBe(3)
+    expect(usos.length, 'Global, Seguindo, Em alta e Contágio devem usar FEED_ORDER').toBe(4)
   })
 
   // D2/D3 eram verificados procurando strings na SQL de events.ts. O

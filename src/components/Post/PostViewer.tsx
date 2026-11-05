@@ -49,6 +49,7 @@ import { applyContentFilters } from '../../lib/feed'
 import { usePrefsStore } from '../../lib/prefs'
 import { toggleSlim, useViewModeStore } from '../../lib/view-mode'
 import { reportPost } from '../../lib/protocol'
+import { recordBadExperience } from '../../lib/contagion-data'
 import { pinPost, unpinPost } from '../../lib/cache'
 import { block, mute } from '../../lib/moderation-local'
 import { follow, unfollow, useFollowsStore } from '../../lib/follows'
@@ -296,6 +297,9 @@ export function PostViewer({
     setReporting(true)
     try {
       await reportPost({ postId: post.id, authorPub: post.authorPub, reason })
+      // Aba Contágio: denúncia é experiência ruim com o autor e com quem
+      // trouxe o post (mesma linha do SINK — não conta duas vezes).
+      void recordBadExperience(post.id, post.authorPub)
       setShowReport(false)
     } catch (err) {
       console.error('report failed', err)

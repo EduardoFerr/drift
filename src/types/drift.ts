@@ -267,7 +267,7 @@ export interface CommentRecord {
 
 // ─── Feed ────────────────────────────────────────────────────────────
 
-export type FeedTab = 'global' | 'following' | 'trending'
+export type FeedTab = 'global' | 'following' | 'trending' | 'contagio'
 
 // ─── Mapa ────────────────────────────────────────────────────────────
 
