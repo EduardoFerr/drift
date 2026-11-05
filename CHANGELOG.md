@@ -19,6 +19,14 @@ Suas": regras públicas e determinísticas, entradas do próprio usuário.
 - **"↪ chegou por X"** — etiqueta no texto do card da aba Contágio, acima
   do autor, com os contatos de maior vínculo que trouxeram o post ("Ana,
   Bia +1" no empate). Post direto não mostra.
+- **"Não trazer mais por X"** — tocar na etiqueta abre a folha "chegou
+  por", com um botão por pessoa: os DRIFTs dela param de trazer post; os
+  posts dela, o SINK e a denúncia continuam valendo. Não pune, não é
+  publicado (tabela local `contagion_no_bring`) e se desfaz em
+  Configurações → listas locais → não trazem. Na simulação, com denúncia
+  em 10% dos spams vistos, segura a isca em 4,8% se usado em 20% das vezes
+  (sem o gesto, 12,4%), sem custo de alcance honesto
+  (`Docs/spec-revisao-contagio.md` §4.8).
 - **Experiência ruim = denúncia** — sua denúncia tira 0,5 do vínculo com o
   autor e, se feita na aba, com cada contato que a etiqueta mostrava
   (tabela local `contagion_bad_experiences`, nunca publicada). O passo de
@@ -45,6 +53,9 @@ Suas": regras públicas e determinísticas, entradas do próprio usuário.
 - Denúncia e a ingestão de denúncias atualizam o feed na hora (a aba
   Contágio não espera o próximo evento).
 - Abas cabem em 320 px (tracking e padding menores abaixo de 375 px).
+- O motor da aba Contágio (`contagion.ts` + `contagion-data.ts`) carrega
+  sob demanda, fora do chunk de entrada: só baixa ao abrir a aba ou
+  denunciar.
 - Testes que travavam "3 abas usam `FEED_ORDER`" agora travam 4.
 
 Auditoria do algoritmo (2026-11-03, `Docs/auditoria-algoritmo-2026-11.md`):

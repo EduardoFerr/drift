@@ -68,11 +68,41 @@ em `Docs/simulacao-contagio/` e `Docs/spec-revisao-contagio.md`.
   (Ted, revisão em par) — bloqueio: nenhum.
 - [ ] **`getMyAction` numa consulta só** — hoje 2 por post a cada mudança
   de posts, em todas as abas (Ted) — bloqueio: nenhum.
-- [ ] **Deixar de seguir quem trouxe, em 1 toque, a partir da pílula ↪** —
-  contexto: a simulação das versões v1–v7 contava com o leitor cortando o
-  vínculo que trouxe spam em 40% das vezes; o app não tem esse gesto, e a
-  bateria final da Fase 1 roda sem ele (limite conservador) — bloqueio:
-  desenho (a pílula hoje não é botão; manifesto §24: nada escondido).
+- [x] **Deixar de seguir quem trouxe, em 1 toque, a partir da pílula ↪** —
+  fechado 2026-11-05 em [05ea98b] — virou "não trazer mais por X": a
+  pílula é botão e abre a folha "chegou por"; corta só os DRIFTs de X (os
+  posts de X, o SINK e a denúncia continuam), local, desfazível em listas
+  locais → não trazem. Bateria `gesto_*` (spec §4.8): com 10% de denúncia,
+  isca 12,4% → 4,8% (uso 20%) → 2,6% (uso 40%), sem custo de alcance; não
+  pega spam direto de quem a pessoa segue.
+- [ ] **Medir uso real do gesto "não trazer mais" e da denúncia** —
+  contexto: a defesa contra a isca na Fase 1 depende das duas taxas, que a
+  simulação supõe (spec §4.7–§4.8) — bloqueio: decidir como medir sem
+  telemetria (manifesto: nada sai do aparelho); talvez só pesquisa
+  voluntária.
+- [ ] **Chunk de entrada acima do ratchet (dívida de `main`)** — contexto:
+  `tests/bundle-chunks-conformance.test.ts` trava o entry em 210 KB
+  (baseline 190 KB em 2026-05-15); `main` (09b98f2) já está em 239,7 KB e
+  a Fase 1 da aba Contágio soma +4,8 KB (o motor foi para chunk sob
+  demanda). O CI não pega porque roda `npm run test` antes do `build`
+  (sem `dist/`, o teste pula) — bloqueio: nenhum; tarefa à parte: achar o
+  que entrou no entry desde maio, cortar (lazy) ou subir o ratchet com
+  justificativa, e rodar o ratchet depois do build no CI.
+- [ ] **Boot trava no 1º acesso com OPFS em disco (pré-existente em `main`;
+  bloqueia o deploy da aba Contágio)** — contexto: em 05/11/2026 o user viu
+  `SQLITE_IOERR: disk I/O error` na etapa 2/5 no preview. Reproduzido em
+  perfil persistente (Chromium/Windows): o schema leva 5–8 s (cada CREATE
+  numa transação própria, com journal criado, sincronizado e apagado no
+  OPFS) e banco novo cai em `schema_v=0 < 6` → reconstrução de domínio
+  (apaga e recria tudo, +8–10 s) → passa de `INIT_TIMEOUT_MS` (15 s).
+  Recarregar mata o worker no meio, o `schema_v` não é gravado e o laço se
+  repete; o timeout não encerra o worker (dois workers no mesmo OPFS →
+  provável origem do IOERR). Igual com o schema de `main`; a branch soma
+  ~0,4 s. Correção proposta: schema e reconstrução numa transação só; pular
+  a reconstrução em banco vazio; prazo que renova enquanto o worker dá sinal
+  de vida e `terminate()` no estouro; IOERR/BUSY no schema com nova
+  tentativa antes de falhar; E2E com perfil persistente (o efêmero deixa o
+  OPFS em memória e esconde o problema) — bloqueio: nenhum.
 
 ## Auditoria do algoritmo (2026-11-03)
 

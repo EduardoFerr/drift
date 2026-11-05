@@ -638,8 +638,12 @@ usuário.
   todos; a aba Seguindo filtra pelos follows de quem lê, na mesma ordem
 - A aba **Contágio** escolhe o **conjunto** de posts a partir das
   entradas do próprio usuário (quem ele segue, o que ele já impulsionou,
-  o que ele denunciou), pelas regras de `Docs/algoritmos.md` §9; a ordem
-  dentro dela continua a de cima
+  o que ele denunciou, de quem ele não quer mais receber recomendações),
+  pelas regras de `Docs/algoritmos.md` §9; a ordem dentro dela continua a
+  de cima
+- "Não trazer mais por X" é escolha explícita do usuário, feita a partir
+  da pílula "↪ chegou por": tira só os DRIFTs de X da conta dele, não pune
+  ninguém, não é publicado e se desfaz a qualquer momento
 - Na aba Contágio, enterrar continua sendo gosto (§23): o SINK do
   usuário não pune ninguém. Só a denúncia dele baixa o vínculo com o
   autor e, se feita com "↪ chegou por" à vista, com quem trouxe o post

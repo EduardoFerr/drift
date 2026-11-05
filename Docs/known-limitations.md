@@ -295,18 +295,22 @@ audits só por feio. Defer documentado > silence.
   Ficam de fora, com efeito medido na simulação
   (`Docs/spec-revisao-contagio.md`, rodadas `fase1__*`):
   - **Isca:** contas falsas que postam conteúdo bom conquistam o vínculo
-    de 0,8 com quem as impulsiona e depois trazem spam. Na Fase 1, 2,9%
-    das pessoas veem ataque, com picos de 11% e mais de 5% em metade dos
-    dias simulados; o lockstep da Fase 2 leva a 0,2%. A simulação anterior
-    (1,4%) supunha que o leitor corta o vínculo que trouxe spam em 40% das
-    vezes; o app não tem esse gesto (BACKLOG "Deixar de seguir quem
-    trouxe"; com ele, 1,8%). Punir também no SINK baixaria a isca para
-    1,4%, mas com 10% de SINK por gosto derruba o alcance honesto de 29%
-    para 5% e deixa 30% dos feeds quase vazios (spec §4.6). **Os 2,9%
-    supõem denúncia em 35% dos spams vistos**: com 10%, a isca vai a 12,4%;
-    com 5%, a 22,3% (revisão em par, Satoshi). O gesto privado de cortar
-    quem trouxe é a alavanca de maior retorno e é condição para a aba virar
-    padrão.
+    de 0,8 com quem as impulsiona e depois trazem spam. Na Fase 1, sem
+    ninguém usar o gesto "não trazer mais", 2,9% das pessoas veem ataque,
+    com picos de 11% e mais de 5% em metade dos dias simulados; o lockstep
+    da Fase 2 leva a 0,2%. Punir também no SINK baixaria a isca para 1,4%,
+    mas com 10% de SINK por gosto derruba o alcance honesto de 29% para 5%
+    e deixa 30% dos feeds quase vazios (spec §4.6). **Os 2,9% supõem
+    denúncia em 35% dos spams vistos**: com 10%, a isca vai a 12,4%; com
+    5%, a 22,3% (revisão em par, Satoshi). O gesto privado "não trazer
+    mais por X" (pílula ↪, desde 05/11/2026) é a alavanca de maior
+    retorno: usado em 20% das vezes, segura 10% de denúncia em 4,8% (40%:
+    2,6%), sem custo de alcance honesto (spec §4.8). Quanto as pessoas vão
+    de fato usá-lo é o que medir antes de a aba virar padrão.
+  - **Spam direto de quem você segue:** o gesto não ajuda quando o spam
+    vem de alguém que a pessoa segue (os "enganados" seguem o fazendeiro):
+    com denúncia em 10%, 2,5% veem ataque com ou sem gesto. Ali, só
+    denunciar ou deixar de seguir.
   - **Funil do Global:** a fazenda domina o feed global; quem segue e dá
     DRIFT numa isca lá cria, por escolha própria, o vínculo de 0,8 que traz
     spam na aba. Aproximação: 0,5%–2% de DRIFT em isca por dia ativo → isca

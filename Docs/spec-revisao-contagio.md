@@ -3,7 +3,8 @@
 > **Status (2026-11-05):** Fase 1 implementada (aba "contágio",
 > `src/lib/contagion.ts`, `Docs/algoritmos.md` §9; manifesto §24
 > emendado) e revisada em par: teto também na vacina e na quarentena,
-> só a denúncia pune (§4.6), sem corte automático de vínculo (§4.5).
+> só a denúncia pune (§4.6), sem corte automático de vínculo (§4.5), com
+> o gesto privado "não trazer mais por X" (§4.8).
 > Fases 2–3 planejadas (`BACKLOG.md` "Contágio local").
 > Simulação reproduzível em [`simulacao-contagio/`](simulacao-contagio/).
 > Este documento existe para que alguém de fora possa refazer as contas,
@@ -50,7 +51,7 @@ décimos inteiros (a soma não depende da ordem).
 | v6 | v5 + **aval** (mapa: "conhecido" exige 3 contatos que encontraram ou impulsionaram a pessoa) + **lockstep** (DRIFT de conta com histórico de 30 dias ≥ 40% igual ao de outra vale menos, zero a partir de 80% ou de 15 impulsos idênticos) + **SINK baixa o vínculo** (−0,5 por experiência ruim, permanente) + **período de experiência** (conta com < 5 DRIFTs vale metade) | v5 |
 | v7 | v6 + **teto para vínculos fracos**: contatos com vínculo ≤ 0,5 somam no máximo 0,5 por post | v5 |
 | Fase 1 v0 | v7 **sem** mapa, sem encontro físico, sem lockstep, aval e experiência | conquistado 0,8 · follow 0,5 |
-| **Fase 1 (app)** | Fase 1 v0 + teto também na vacina e na quarentena + só a **denúncia** pune (§4.6) + post direto sem "quem trouxe" + **sem** corte de vínculo (o app não tem o gesto) | idem |
+| **Fase 1 (app)** | Fase 1 v0 + teto também na vacina e na quarentena + só a **denúncia** pune (§4.6) + post direto sem "quem trouxe" + gesto **"não trazer mais por X"** no lugar do corte de vínculo (corta só os DRIFTs de X; as rodadas `fase1__*` supõem que ninguém o usa, §4.8 varia) | idem |
 
 A Fase 1 é o que o app já consegue calcular com os dados que tem: os
 follows do próprio leitor, o que ele impulsionou e o que ele denunciou.
@@ -70,8 +71,10 @@ Detalhes e exemplo em `Docs/algoritmos.md` §9.
   (ver §5).
 - **Comportamento:** abre o app em 30–90% dos dias, posta em ~10% deles,
   dá DRIFT em 1–2 itens do feed (80% de chance se for honesto). Diante de
-  spam: SINK 50%, denúncia 35%, corta o vínculo que trouxe 40% (o corte
-  não existe no app: as rodadas `fase1__*` usam 0%).
+  spam: SINK 50%, denúncia 35%, corta o vínculo que trouxe 40% (v1–v7).
+  No app, o corte é o gesto "não trazer mais por X", que só tira os
+  DRIFTs da pessoa: as rodadas `fase1__*` supõem 0%; a §4.8 varia o uso
+  (0/20/40%) e a taxa de denúncia (35/10%).
 - **Atacantes (todos ao mesmo tempo):** fazenda de 2.000 contas que dá
   DRIFT diário no spam do dono e, no contágio, declara uma cidade
   aleatória por dia; brigada de 3 concentradores + 300 contas denunciando
@@ -167,12 +170,12 @@ Duas surpresas:
 | alcance sem mobilidade (com ataques) | 69% | 55% | ~39% | 38% |
 | feed vindo de outra cidade, sem ataque | 57% | 58% | 54% | 54% |
 
-A isca dobra da Fase 1 v0 para o app porque o app não tem o corte do
-vínculo que trouxe spam: com corte em 40% das vezes (rodada
-`fase1_corte40__isca`), ela fica em 1,8% · pico 9%. Um gesto de "deixar
-de seguir quem trouxe" a partir da pílula ↪ está no BACKLOG. Mesmo assim,
-a isca passa de 5% das pessoas em metade dos dias simulados: é o ataque
-que a Fase 1 aceita até o lockstep da Fase 2.
+A isca dobra da Fase 1 v0 para o app porque a coluna do app supõe que
+ninguém corta quem trouxe spam: com corte em 40% das vezes (rodada
+`fase1_corte40__isca`), ela fica em 1,8% · pico 9%. O app ganhou esse
+gesto como "não trazer mais por X" (§4.8). Sem ele, a isca passa de 5% das
+pessoas em metade dos dias simulados: é o ataque que a Fase 1 aceita até
+o lockstep da Fase 2.
 
 Para comparar a abertura: no feed da urna global, 72% vem de outra cidade;
 no v2, 61%. O contágio é mais local, como foi desenhado ("ver o próximo
@@ -221,7 +224,8 @@ neutras quando desligadas; `isca` reproduz 2,9% · pico 10,6%):
 | denúncia em 10% | 12,4% (13,0% na seed 23) |
 | denúncia em 5% | 22,3% |
 | 10% de denúncia + SINK punindo | 1,5–1,6% (mas derruba o alcance honesto, §4.6) |
-| 10% de denúncia + corte de quem trouxe em 20% / 40% | 4,5% / 2,9% |
+| 10% de denúncia + corte total de quem trouxe em 20% / 40% (tira a pessoa de tudo) | 4,5% / 2,9% |
+| 10% de denúncia + gesto do app "não trazer mais" em 20% / 40% (§4.8) | 4,8% / 2,6% |
 | seguir e dar DRIFT numa isca do Global em 0,5% / 1% / 2% dos dias ativos | 7,7% / 12,7% / 20,4% |
 | contas de isca postando spam direto | 6,5% |
 | punição do autor expirando em 30 / 7 dias (enganados + isca) | 6,1% / 9,1% (base 0,1%) |
@@ -230,6 +234,34 @@ neutras quando desligadas; `isca` reproduz 2,9% · pico 10,6%):
 O que segura: a seed e o teto de itens do feed. O que mais derruba: a
 taxa de denúncia e o funil do Global. A punição do autor que expirava com
 a limpeza do cache foi corrigida antes do merge.
+
+### 4.8 O gesto "não trazer mais por X" (05/11/2026)
+
+A sensibilidade (§4.7) mostrou que a defesa contra a isca depende de as
+pessoas denunciarem. O app ganhou um gesto privado na pílula ↪: "não
+trazer mais por X" faz os DRIFTs de X pararem de trazer post. Os posts
+diretos de X, o SINK (vacina) e a denúncia (quarentena) de X continuam
+valendo; não pune ninguém e se desfaz em listas locais. Na simulação
+(`cutMode: 'bring'`), cada vez que alguém vê spam trazido por um contato,
+usa o gesto contra ele com chance c; a denúncia acontece com chance r.
+Rodadas `gesto_r{35,10}_c{0,20,40}__*`, média das últimas 6 semanas, %
+das pessoas que veem ataque (pico entre parênteses):
+
+| Cenário | r35 · c0 | r35 · c20 | r35 · c40 | r10 · c0 | r10 · c20 | r10 · c40 |
+|---|---|---|---|---|---|---|
+| isca | 2,9 (11) | 1,8 (9) | 1,6 (8) | 12,4 (19) | **4,8** (12) | 2,6 (11) |
+| isca + 10% de SINK de gosto | 2,3 (10) | 1,5 (8) | 1,4 (8) | 11,7 (18) | 3,8 (12) | 2,5 (9) |
+| enganados + isca | 0,1 (9) | 0,1 (9) | 0,1 (9) | 2,5 (10) | 2,5 (10) | 2,5 (10) |
+| sem ataque: alcance do post mais viral | 38% | 38% | 38% | 38% | 38% | 38% |
+
+Leitura: com denúncia baixa (10%), o gesto usado em 1 de cada 5 spams
+trazidos derruba a isca de 12,4% para 4,8%; em 2 de cada 5, para 2,6% —
+perto do que a Fase 1 dá com denúncia alta. Sem ataque nada muda (o gesto
+só é usado contra spam). Ele **não** pega o caso "enganados": ali o spam
+chega direto, porque a pessoa segue o fazendeiro, e só a denúncia (que
+zera o vínculo com o autor) ou deixar de seguir resolvem. Os dias de surto
+(> 5% das pessoas) caem de 152 para 126 (c20) e 64 (c40) com denúncia em
+10%. Ordem embaralhada: 0 diferenças em 840 feeds em todas as rodadas.
 
 ## 5. O que esta simulação não prova
 
@@ -241,7 +273,7 @@ a limpeza do cache foi corrigida antes do merge.
 - **Cliente real ≠ simulação:** janela de sync de 7 dias, latência, relays com conteúdos diferentes.
 - **v7 sem as outras peças não foi testado.** Talvez o teto sozinho baste para parte delas.
 - **SINK de gosto uniforme.** Cada pessoa enterra 10% de tudo ao acaso; gosto real se concentra (um assunto, um autor) e pode zerar menos vínculos, ou mais.
-- **Taxas de reação fixas.** SINK 50% e denúncia 35% diante de spam são suposições; a defesa contra a isca na Fase 1 depende da denúncia (§4.7).
+- **Taxas de reação fixas.** SINK 50% e denúncia 35% diante de spam são suposições; a defesa contra a isca na Fase 1 depende da denúncia (§4.7) e de quanto as pessoas usam o gesto "não trazer mais" (§4.8) — nenhuma das duas taxas foi medida em gente de verdade.
 - **Simulação × app.** Na simulação, "quem trouxe" é um contato só (no app, todos os empatados), o SINK de contato vale 2 dias (no app, 96 h) e o feed medido são os 8 primeiros por pontuação de contágio (no app, tudo o que passa, até 50, na ordem canônica). A simulação não aplica a moderação global (−999), que no app vale também na aba.
 - **Contágio isolado do Global.** As rodadas não colocam o feed global e a aba Contágio no mesmo mundo; o funil (§4.7) foi aproximado.
 
@@ -265,10 +297,12 @@ node Docs/simulacao-contagio/bateria.cjs 0 4 &       # rode os workers 0..3 em p
 node Docs/simulacao-contagio/bateria.cjs resumo      # tabela das rodadas prontas
 node Docs/simulacao-contagio/bateria.cjs 0 1 '^fase1'   # só as rodadas da Fase 1 (app, v0 e variações)
 node Docs/simulacao-contagio/bateria.cjs 0 1 '^decisao_' # a decisão de 05/11 com corte de vínculo
+node Docs/simulacao-contagio/bateria.cjs 0 1 '^gesto_'   # o gesto "não trazer mais" (§4.8)
 ```
 
 Determinística: mesma seed, mesmo resultado. As tabelas acima saem das
-rodadas `v2..v7`, `fase1_v0`, `fase1*`, `decisao_*` e `global` da bateria.
+rodadas `v2..v7`, `fase1_v0`, `fase1*`, `decisao_*`, `gesto_*` e `global`
+da bateria.
 
 ## 8. Perguntas para quem revisar
 
@@ -280,6 +314,7 @@ rodadas `v2..v7`, `fase1_v0`, `fase1*`, `decisao_*` e `global` da bateria.
 3. A emenda ao §24 preserva o espírito anti-bolha? Que métrica de
    diversidade deveríamos medir antes da Fase 2?
 4. O que muda com um grafo social realista (agrupado)?
-5. Que defesa barata, sem lockstep, fecha a isca na Fase 1? (O gesto de
-   "deixar de seguir quem trouxe" baixa de 2,9% para 1,8% se usado em 40%
-   das vezes.)
+5. Que defesa barata, sem lockstep, fecha a isca na Fase 1? O gesto "não
+   trazer mais por X" (§4.8) segura 10% de denúncia em 4,8% se usado em
+   20% das vezes — mas quanto gente de verdade vai usá-lo? E o que pega o
+   spam direto de quem a pessoa segue sem depender só da denúncia?

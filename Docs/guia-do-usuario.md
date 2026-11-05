@@ -281,6 +281,14 @@ passa de contato em contato.
 - Acima do autor, no card, **↪ chegou por X** mostra quem trouxe o post
   (o contato de maior vínculo). Se mais de uma pessoa trouxe com o mesmo
   vínculo, aparece **X, Y +N**. Post que entrou direto não mostra.
+- **Não trazer mais por X:** toque em **↪ chegou por** para ver quem
+  trouxe o post e, se quiser, parar de receber o que essa pessoa drifta.
+  Só as recomendações dela param: os posts que ela escreve continuam
+  chegando, e o SINK e a denúncia dela continuam valendo. Não é punição,
+  ninguém fica sabendo e fica só no seu aparelho. A aba se atualiza quando
+  você fecha a folha. Desfaça em configurações → listas locais → **não
+  trazem**. Serve para o contato que vive driftando coisa que você não
+  quer, sem precisar denunciar post nem deixar de seguir.
 - Sua **denúncia** tira 0,5 do vínculo com o autor, para sempre (só muda
   algo se você segue a pessoa: sem follow, o vínculo já é zero e os posts
   dela podem chegar pelos seus contatos). Se você
@@ -293,8 +301,8 @@ passa de contato em contato.
 (score público). As regras estão em `Docs/algoritmos.md` §9 e qualquer
 pessoa pode recalcular sua aba a partir dos eventos e das suas escolhas.
 Seus follows, DRIFTs e denúncias são públicos como sempre; os **vínculos
-calculados e o registro de quem trouxe o que você denunciou ficam só no
-seu aparelho** — nada disso é publicado.
+calculados, o registro de quem trouxe o que você denunciou e a lista
+"não trazem" ficam só no seu aparelho** — nada disso é publicado.
 
 **Se a aba estiver vazia:** siga pessoas e drifte o que gostar — quem
 você já driftou traz posts sozinho. Num aparelho novo a aba começa mais
@@ -311,6 +319,9 @@ devolveram.
   não vê mais. **Local-only** — manifesto §24.
 - **Bloquear (block):** mais agressivo — esconde posts E interações
   (replies, drifts, etc.) dessa pessoa do **seu** feed.
+- **Não trazer mais (só na aba Contágio):** mais leve — os posts dessa
+  pessoa continuam; só o que ela drifta para de chegar pela aba. Ver
+  [A aba Contágio](#a-aba-contágio).
 
 **O que acontece:**
 
@@ -322,7 +333,8 @@ devolveram.
 
 **Pode desfazer?**
 
-✅ Sim — desmute/desbloquear na lista (Settings → Listas locais).
+✅ Sim — desmute/desbloquear/voltar a trazer na lista (Settings → Listas
+locais).
 
 **Importante (manifesto §24):**
 

@@ -463,7 +463,7 @@ function AlgosTopics() {
             accordionId="guia-algo-contagio"
             label="aba contágio — o que chegou pelas pessoas que você segue"
             description="Recomendação boca a boca: um post de outra pessoa chega quando quem você segue dá DRIFT nele e a confiança somada chega a 0,8. Quem você só segue vale 0,5; quem você já driftou (um post escrito pela pessoa) vale 0,8 e traz sozinho. Posts de até 3 dias de quem você segue entram direto."
-            impact="Quem você só segue soma no máximo 0,5 por post, por mais contas que sejam — é a trava contra fazendas de contas falsas. SINK de contatos desconta; denúncias de contatos somando 1,0 escondem o post. O card mostra ↪ chegou por X. Sua denúncia tira 0,5 do autor e, se feita aqui, de quem trouxe; seu SINK não tira de ninguém."
+            impact="Quem você só segue soma no máximo 0,5 por post, por mais contas que sejam — é a trava contra fazendas de contas falsas. SINK de contatos desconta; denúncias de contatos somando 1,0 escondem o post. O card mostra ↪ chegou por X — toque para não trazer mais pela pessoa (os posts dela continuam). Sua denúncia tira 0,5 do autor e, se feita aqui, de quem trouxe; seu SINK não tira de ninguém."
             defaultExplained="Aba opcional. A ordem dentro dela é a mesma do feed global — o que muda é só quem entra, calculado no seu aparelho com as suas escolhas, nunca publicado."
             reversible
             reference="manifesto §24 (emendado) + Docs/algoritmos.md §9"
@@ -474,7 +474,9 @@ function AlgosTopics() {
               chegou pela própria rede — uma fazenda de 2.000 contas que você
               seguiu de volta vale o mesmo que uma conta só. O que ainda
               passa: contas falsas que postam coisa boa para ganhar seu DRIFT
-              e depois trazem spam. Se isso acontecer, denuncie o spam.
+              e depois trazem spam. Se isso acontecer, denuncie o spam — ou,
+              se foi um contato que trouxe, toque em ↪ chegou por e escolha
+              não trazer mais por ele (desfaz em listas locais → não trazem).
             </P>
           </SettingExplainer>
 

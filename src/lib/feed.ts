@@ -19,7 +19,6 @@ import { db } from './db'
 import { hiddenReason } from './moderation-local'
 import { useFollowsStore } from './follows'
 import { getCurrentNpub } from './identity'
-import { computeContagionFor } from './contagion-data'
 import { normalizeLayout } from '../types/drift'
 import { parseImetaTag as parseImetaTagSync, type BlobMeta } from './nip94'
 import { FEED_INITIAL_LIMIT, FEED_QUEUE_CAP } from '../config/constants'
@@ -209,6 +208,8 @@ export async function getContagionFeed(limit = 50, now = Date.now()): Promise<Po
   if (follows.size === 0) return []
   const viewer = await getCurrentNpub()
   if (!viewer) return []
+  // Sob demanda: a aba é opcional, quem nunca a abre não baixa o motor.
+  const { computeContagionFor } = await import('./contagion-data')
   const verdicts = await computeContagionFor(viewer, follows, nowSeconds(now))
   const ids = [...verdicts.values()].filter((v) => v.pass).map((v) => v.postId).sort()
   if (ids.length === 0) return []

@@ -49,7 +49,6 @@ import { applyContentFilters, invalidateFeed } from '../../lib/feed'
 import { usePrefsStore } from '../../lib/prefs'
 import { toggleSlim, useViewModeStore } from '../../lib/view-mode'
 import { reportPost } from '../../lib/protocol'
-import { recordReport } from '../../lib/contagion-data'
 import { ContagionViaContext } from './ContagionViaChip'
 import { pinPost, unpinPost } from '../../lib/cache'
 import { block, mute } from '../../lib/moderation-local'
@@ -309,7 +308,9 @@ export function PostViewer({
       // Aba Contágio: a denúncia é experiência ruim com o autor e com quem a
       // pílula "↪ chegou por" mostrava quando a denúncia foi aberta
       // (`reportVias`, o mesmo nome que o modal exibiu). Registro local;
-      // a aba se atualiza já, sem esperar o eco do relay.
+      // a aba se atualiza já, sem esperar o eco do relay. Sob demanda (fora
+      // do chunk de entrada).
+      const { recordReport } = await import('../../lib/contagion-data')
       await recordReport(post.id, post.authorPub, reportVias)
       invalidateFeed()
       setShowReport(false)
