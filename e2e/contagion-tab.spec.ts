@@ -486,6 +486,48 @@ test.describe('aba Contágio', () => {
     }
   })
 
+  test('11. "não trazer mais por X" pela etiqueta: some o que a Alice trouxe, ficam os posts dela, sem punição; desfazer em listas locais devolve', async ({ browser }) => {
+    // percorre card → folha → configurações → listas: mais lento que os outros
+    test.setTimeout(120_000)
+    const bob = await setupUser(browser, 'bob')
+    try {
+      const page = bob.page
+      const me = await viewer(page)
+      const alice = (await follows(page, me))[0]!
+      const target = await aliceBringsOne(page)
+      await openTab(page, 'contágio')
+      await goToCard(page, target)
+      await page.getByTestId('contagion-via').first().getByRole('button').click()
+      const sheet = page.getByRole('dialog', { name: 'chegou por' })
+      await expect(sheet).toBeVisible()
+      await sheet.getByRole('button', { name: /^não trazer mais por/ }).click()
+      // a confirmação aparece na folha; a aba só se atualiza ao fechar
+      await expect(sheet.getByRole('status')).toHaveText(/não traz mais/)
+      expect(await tabIds(page), 'nada muda com a folha aberta').toContain(target)
+      await sheet.getByRole('button', { name: 'fechar' }).click({ timeout: 10_000 })
+      await expect(sheet).toHaveCount(0)
+      // o que a Alice trouxe sai; os posts dela ficam
+      await expect.poll(() => tabIds(page), { timeout: 10_000 }).not.toContain(target)
+      const restantes = await tabIds(page)
+      expect(restantes.length, 'os posts da Alice continuam').toBeGreaterThan(0)
+      for (const id of restantes) expect(await authorOf(page, id), 'só posts diretos da Alice').toBe(alice)
+      expect(await strikesOf(page, alice), 'não é punição: o vínculo não muda').toBe(0)
+
+      // desfazer: config → conteúdo → listas → não trazem → voltar a trazer
+      await page.getByRole('button', { name: 'abrir config' }).click({ timeout: 10_000 })
+      await page.locator('[id^="settings-group-"]', { hasText: 'conteúdo' }).click({ timeout: 10_000 })
+      await page.getByRole('button', { name: /^listas/ }).click({ timeout: 10_000 })
+      await page.getByRole('button', { name: /^não trazem/ }).click({ timeout: 10_000 })
+      const lista = page.getByTestId('nobring-list')
+      await expect(lista).toBeVisible()
+      await lista.getByRole('button', { name: 'voltar a trazer' }).click({ timeout: 10_000 })
+      await expect(lista).toHaveCount(0)
+      await expect.poll(() => tabIds(page), { timeout: 10_000 }).toContain(target)
+    } finally {
+      await bob.context.close()
+    }
+  })
+
   test('7. a pílula "chegou por" aparece quando o post veio por alguém e some quando entrou direto', async ({ browser }) => {
     const bob = await setupUser(browser, 'bob')
     try {

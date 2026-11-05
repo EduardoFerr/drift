@@ -236,6 +236,17 @@ CREATE TABLE IF NOT EXISTS muted (
 -- leitor vindas de outro aparelho entram pela tabela `reports`.
 -- Estado local do user, como blocked/muted: não é publicado e não entra
 -- em DOMAIN_TABLES (rebuild preserva).
+-- Gesto "não trazer mais por X" (aba Contágio): os DRIFTs de X deixam de
+-- trazer post para este leitor; os posts diretos, o SINK e a denúncia de X
+-- continuam. Local, desfazível em Configurações → listas locais; não
+-- publicado e fora de DOMAIN_TABLES.
+CREATE TABLE IF NOT EXISTS contagion_no_bring (
+  viewer_pub  TEXT NOT NULL,
+  subject_pub TEXT NOT NULL,
+  created_at  INTEGER NOT NULL,            -- unix seconds
+  PRIMARY KEY (viewer_pub, subject_pub)
+);
+
 CREATE TABLE IF NOT EXISTS contagion_bad_experiences (
   viewer_pub  TEXT NOT NULL,
   subject_pub TEXT NOT NULL,

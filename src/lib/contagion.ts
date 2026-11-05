@@ -21,6 +21,11 @@
  * põem o post em quarentena para o leitor. Posts recentes de quem o leitor
  * segue entram direto, enquanto o vínculo com o autor for positivo.
  *
+ * Gesto do leitor "não trazer mais por X" (local, desfazível): os DRIFTs de
+ * X deixam de trazer post; os posts diretos de X, o SINK e a denúncia de X
+ * continuam valendo. Com denúncia em 10% dos spams vistos, usado em 20% das
+ * vezes, segura a isca (Docs/spec-revisao-contagio.md §4.8).
+ *
  * Tudo em décimos inteiros: a soma não depende da ordem de chegada
  * (Docs/algoritmos.md §9; simulação em Docs/simulacao-contagio/).
  */
@@ -79,6 +84,12 @@ export interface ContagionInput {
   reports: readonly ContagionReport[]
   /** Posts conhecidos localmente: alvos das ações e posts recentes de seguidos. */
   posts: readonly ContagionPost[]
+  /**
+   * Gesto local "não trazer mais por X": os DRIFTs destes contatos não
+   * trazem post. O resto continua — os posts diretos deles, o SINK
+   * (vacina) e a denúncia (quarentena). Desfazível; nunca publicado.
+   */
+  noBring?: ReadonlySet<string>
 }
 
 export interface ContagionVerdict {
@@ -129,7 +140,7 @@ function latestActions(actions: readonly ContagionAction[]): Map<string, Contagi
 }
 
 export function computeContagion(input: ContagionInput): Map<string, ContagionVerdict> {
-  const { viewer, nowSec, follows, earned, strikes } = input
+  const { viewer, nowSec, follows, earned, strikes, noBring } = input
   const tie = (pub: string) => tieOf(pub, follows, earned, strikes)
   const posts = new Map<string, ContagionPost>()
   for (const p of input.posts) posts.set(p.id, p)
@@ -158,8 +169,10 @@ export function computeContagion(input: ContagionInput): Map<string, ContagionVe
     if (posts.get(a.postId)?.author === a.actor) continue
     const t = tie(a.actor)
     if (t <= 0) continue
+    if (a.kind === 'bury') { add(get(a.postId).vac, t); continue }
+    // "não trazer mais por X": o DRIFT de X não traz (o resto de X vale)
+    if (noBring?.has(a.actor)) continue
     const s = get(a.postId)
-    if (a.kind === 'bury') { add(s.vac, t); continue }
     add(s.up, t)
     s.contributors.push({ pub: a.actor, tie: t })
   }

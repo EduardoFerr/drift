@@ -13,7 +13,10 @@
  *            não tem "quem trouxe"), strikeOn (o que vira experiência ruim: 'both' = SINK ou
  *            denúncia; 'report' = só denúncia, como no app; 'viaSink' = denúncia, e SINK só
  *            contra quem trouxe), cutProb (chance de cortar o vínculo que trouxe spam;
- *            padrão 0,4 — o app não tem esse gesto, use 0), breaker (disjuntor por idade),
+ *            padrão 0,4), cutMode ('all' = o corte tira a pessoa de tudo, como deixar de
+ *            seguir; 'bring' = gesto do app "não trazer mais por X": só deixa de trazer,
+ *            mantém posts diretos, vacina e quarentena), reportProb (chance de denunciar
+ *            o spam visto; padrão 0,35), breaker (disjuntor por idade),
  *            labelers, ambient (itens do mapa), noEncounters
  *   ataque:  atk{spammer,farm,brigade}, followBack, deceivedPct, farmContent (isca),
  *            farmerBait, farmCamo (camuflagem), farmRot (revezamento), farmJoin (paciente),
@@ -177,8 +180,9 @@ function runModel(E, cfg, model, onFrame) {
 
   // ── Modelo de contágio: feed de v ─────────────────────────────
   const THETA = cfg.theta, THETA_Q = 1.0
+  const BRING = cfg.cutMode === 'bring' // gesto "não trazer mais por X"
   function tie(v, u, day) {
-    if (cut[v].has(u)) return 0
+    if (!BRING && cut[v].has(u)) return 0
     let s = 0
     if (fol[v].has(u) && cfg.earnOwn && (drd[v].get(u)?.size || 0) >= cfg.earnOwn) s = 0.8
     else if (fol[v].has(u)) s = fol[u].has(v) && (!cfg.mutualNeedsMeet || (!cfg.noEncounters && enc[v].has(u)) || (cfg.mutualEarn && (drd[v].get(u)?.size || 0) >= 2 && (drd[u].get(v)?.size || 0) >= 2)) ? 0.8 : 0.5
@@ -263,7 +267,7 @@ function runModel(E, cfg, model, onFrame) {
       for (const a of recentAct[u]) {
         if (day - a.day > 2) continue
         if (a.up) {
-          if (s <= 0 || dropped(v, vE, u, a.p)) continue
+          if (s <= 0 || dropped(v, vE, u, a.p) || (BRING && cut[v].has(u))) continue
           if (cfg.weakCap && s0 <= 5) weakS.set(a.p, (weakS.get(a.p) || 0) + s) // vínculo fraco: só follow
           else score.set(a.p, (score.get(a.p) || 0) + s)
           src.set(a.p, (src.get(a.p) || 0) + 1)
@@ -272,7 +276,7 @@ function runModel(E, cfg, model, onFrame) {
         } else if (!vE && !uE) { const m = weakNeg ? vacW : vac; m.set(a.p, (m.get(a.p) || 0) + s) }
       }
       if (!vE && !uE) for (const r of reportsBy[u]) if (day - r.day <= 14) { const m = weakNeg ? quarW : quar; m.set(r.p, (m.get(r.p) || 0) + s) }
-      if (fol[v].has(u) && !cut[v].has(u)) for (const pi of postsBy[u]) {
+      if (fol[v].has(u) && (BRING || !cut[v].has(u))) for (const pi of postsBy[u]) {
         if (day - posts[pi].day <= 3 && !dropped(v, vE, u, pi)) { direct.add(pi); if (!cfg.implVia && !via.has(pi)) via.set(pi, [u, 10]) }
       }
     }
@@ -421,7 +425,7 @@ function runModel(E, cfg, model, onFrame) {
         else if (p.spam || p.atk) {
           const sunk = rnd() < 0.5
           if (sunk) actOn(u, p, day, false, loc[i])
-          const rep = rnd() < 0.35
+          const rep = rnd() < (cfg.reportProb ?? 0.35)
           if (rep) report(u, p, day, 'spam')
           if (model === 'contagio' && it.via >= 0 && rnd() < (cfg.cutProb ?? 0.4)) cut[i].add(it.via) // rastreamento de contato (sorteio sempre feito: mesma sequência com qualquer cutProb)
           // v6: experiência ruim baixa o vínculo com o autor e com quem trouxe (crédito à la Ostra)

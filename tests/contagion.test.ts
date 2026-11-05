@@ -55,7 +55,7 @@ vi.mock('../src/lib/identity', async (orig) => ({
 }))
 
 import { CONTAGION, computeContagion, tieOf, type ContagionAction, type ContagionInput, type ContagionVerdict } from '../src/lib/contagion'
-import { loadContagionInput, recordReport } from '../src/lib/contagion-data'
+import { forgetIdentityContagion, listNoBring, loadContagionInput, recordReport, setNoBring } from '../src/lib/contagion-data'
 import { onNostrEvent, recalcAllScores } from '../src/lib/events'
 import { getContagionFeed, getGlobalFeed, getMyAction, refreshFeed, setFeedTab, useFeedStore } from '../src/lib/feed'
 import { useFollowsStore } from '../src/lib/follows'
@@ -349,6 +349,40 @@ describe('Contágio — propriedades do núcleo', () => {
     expect(v.pass).toBe(false)
   })
 
+  it('"não trazer mais por X": o DRIFT de X não traz; o post direto, o SINK e a denúncia de X continuam', () => {
+    const follows = new Set(['ana', 'bia', 'cris'])
+    const earned = new Map([['ana', 1], ['bia', 1], ['cris', 1]])
+    const posts = [
+      { id: 'trazido', author: 'x', createdAt: NOW - 3 * HOUR },
+      { id: 'daAna', author: 'ana', createdAt: NOW - 2 * HOUR },
+      { id: 'vacinado', author: 'y', createdAt: NOW - 3 * HOUR },
+      { id: 'denunciado', author: 'z', createdAt: NOW - 3 * HOUR },
+    ]
+    const actions = [spreadBy('ana', 'trazido'), spreadBy('bia', 'vacinado'), buryBy('ana', 'vacinado'), spreadBy('bia', 'denunciado')]
+    const reports = [{ postId: 'denunciado', reporter: 'ana', createdAt: NOW - HOUR }, { postId: 'denunciado', reporter: 'cris', createdAt: NOW - HOUR }]
+    const v = computeContagion(base({ follows, earned, posts, actions, reports, noBring: new Set(['ana']) }))
+    expect(v.get('trazido')?.pass ?? false, 'o DRIFT da Ana não traz').toBe(false)
+    expect(v.get('daAna')!.pass, 'post direto da Ana continua').toBe(true)
+    expect(v.get('vacinado')!.vaccine, 'SINK da Ana continua vacinando').toBe(CONTAGION.TIE_EARNED)
+    expect(v.get('vacinado')!.pass).toBe(false)
+    expect(v.get('denunciado')!.quarantine, 'denúncia da Ana continua contando').toBe(16)
+    expect(v.get('denunciado')!.pass).toBe(false)
+  })
+
+  it('"não trazer mais por X" nunca acrescenta post nem muda quem trouxe para outro que não trouxe', () => {
+    for (let seed = 1; seed <= 20; seed++) {
+      const inp = scenario(seed)
+      const before = computeContagion(inp)
+      for (const who of inp.follows) {
+        const after = computeContagion({ ...inp, noBring: new Set([who]) })
+        for (const [id, verdict] of after) {
+          if (verdict.pass) expect(before.get(id)?.pass, `post ${id} entrou depois de cortar ${who}`).toBe(true)
+          expect(verdict.viaAll, `${who} cortado não aparece como quem trouxe`).not.toContain(who)
+        }
+      }
+    }
+  })
+
   it('empate exato DRIFT × SINK do mesmo contato: o SINK vence em qualquer ordem de chegada', () => {
     const posts = [{ id: 'p', author: 'x', createdAt: NOW - 3 * HOUR }]
     const base0 = { follows: new Set(['ana']), earned: new Map([['ana', 1]]), posts }
@@ -613,6 +647,40 @@ describe('Contágio — pipeline real', () => {
     expect(await tab()).toContain(x.id)
     H.conn!.prepare(`INSERT INTO blocked (npub, blocked_at) VALUES (?, ?)`).run(pk('ana'), NOW)
     expect(await tab(), 'bloqueada continua trazendo').not.toContain(x.id)
+  })
+
+  it('"não trazer mais por X" pelo caminho real: some o que X trouxe, ficam os posts de X; desfazer devolve; cada identidade tem a sua lista', async () => {
+    const antigo = post('ana', NOW - 10 * DAY)
+    const daAna = post('ana', NOW - 2 * HOUR)
+    const x = post('autorX', NOW - 5 * HOUR)
+    await ingest(antigo, daAna, x, spread('eu', antigo, NOW - 9 * DAY), spread('ana', x))
+    follow('ana')
+    expect(await tab()).toEqual(expect.arrayContaining([x.id, daAna.id]))
+    await setNoBring(pk('ana'), true)
+    expect((await listNoBring()).map((e) => e.npub)).toEqual([pk('ana')])
+    let ids = await tab()
+    expect(ids, 'o que a Ana trouxe sai').not.toContain(x.id)
+    expect(ids, 'o post da Ana fica').toContain(daAna.id)
+    expect(await strikesOf('ana'), 'não é punição: o vínculo não muda').toBe(0)
+    // outra identidade do aparelho não herda
+    H.viewer = pk('outra')
+    expect(await listNoBring()).toEqual([])
+    H.viewer = pk('eu')
+    await setNoBring(pk('ana'), false)
+    ids = await tab()
+    expect(ids, 'desfazer devolve').toContain(x.id)
+    expect(await listNoBring()).toEqual([])
+  })
+
+  it('remover a identidade apaga o que ela registrou na aba (denúncias locais e "não trazer")', async () => {
+    const p = post('w', NOW - 6 * HOUR)
+    await ingest(p)
+    await recordReport(p.id, p.pubkey, [pk('ana')])
+    await setNoBring(pk('ana'), true)
+    await forgetIdentityContagion(pk('eu'))
+    expect(viaCount('eu', 'ana')).toBe(0)
+    expect(viaCount('eu', 'w')).toBe(0)
+    expect(await listNoBring()).toEqual([])
   })
 
   it('bloqueado também não vacina nem põe em quarentena', async () => {

@@ -2330,7 +2330,7 @@ function SettingsRoot({ onClose }: { onClose: () => void }) {
         {
           target: 'listas',
           label: 'listas',
-          hint: 'pinned, blocked, muted',
+          hint: 'fixados, bloqueados, silenciados, não trazem',
           icon: ListIcon,
         },
         {

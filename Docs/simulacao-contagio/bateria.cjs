@@ -60,6 +60,10 @@ for (const opt of ['both', 'report', 'viaSink']) for (const s of ['isca', 'engan
 for (const opt of ['both', 'viaSink']) for (const s of ['isca', 'enganados_isca', 'difamacao', 'gosto10', 'gosto10_isca'])
   RUNS.push([`fase1_${opt}__${s}`, 'fase1', { ...SCEN[s], strikeOn: opt }])
 for (const s of ['isca', 'enganados_isca', 'gosto10_isca']) RUNS.push([`fase1_corte40__${s}`, 'fase1', { ...SCEN[s], cutProb: 0.4 }])
+// Gesto do app "não trazer mais por X" (cutMode 'bring': só deixa de trazer, mantém
+// os posts diretos), usado em 0/20/40% dos spams vistos, com denúncia em 35% e 10%.
+for (const r of [35, 10]) for (const c of [0, 20, 40]) for (const s of ['isca', 'enganados_isca', 'gosto10_isca', 'sem_ataque'])
+  RUNS.push([`gesto_r${r}_c${c}__${s}`, 'fase1', { ...SCEN[s], cutMode: 'bring', cutProb: c / 100, reportProb: r / 100 }])
 for (const m of ['v3', 'v4']) for (const s of ['base', 'sem_ataque', 'sem_mobilidade', 'followback_3', 'enganados_10']) RUNS.push([`${m}__${s}`, m, SCEN[s]])
 for (const s of ['seed_11', 'seed_23', 'seed_42', 'seed_99']) RUNS.push([`v2__${s}`, 'v2', SCEN[s]])
 RUNS.push(['v6__erro_honesto', 'v6', SCEN.erro_honesto], ['v6_recupera__enganados_isca', 'v6', { ...SCEN.enganados_isca, sinkDecay: 30 }])

@@ -50,6 +50,7 @@ import { usePrefsStore } from '../../lib/prefs'
 import { toggleSlim, useViewModeStore } from '../../lib/view-mode'
 import { reportPost } from '../../lib/protocol'
 import { recordReport } from '../../lib/contagion-data'
+import { ContagionViaContext } from './ContagionViaChip'
 import { pinPost, unpinPost } from '../../lib/cache'
 import { block, mute } from '../../lib/moderation-local'
 import { follow, unfollow, useFollowsStore } from '../../lib/follows'
@@ -67,6 +68,9 @@ import { useCommentCountsStore } from '../../lib/comment-counts'
 
 // Round CWV-2 — lazy: ReportModal (raríssimo, gesture explícito) e
 // SpreadMap (1.1 MB MapLibre + Deck.gl ArcLayer, só ao abrir map toggle).
+const ContagionViaSheet = lazy(() =>
+  import('./ContagionViaSheet').then((m) => ({ default: m.ContagionViaSheet })),
+)
 const ReportModal = lazy(() =>
   import('./ReportModal').then((m) => ({ default: m.ReportModal })),
 )
@@ -164,6 +168,8 @@ export function PostViewer({
   // Aba Contágio: quem a pílula "↪ chegou por" mostrava quando a denúncia
   // foi aberta — o modal cita e a denúncia pune exatamente estes.
   const [reportVias, setReportVias] = useState<readonly string[]>([])
+  // Aba Contágio: folha "chegou por" (gesto "não trazer mais por X")
+  const [viaSheet, setViaSheet] = useState<readonly string[] | null>(null)
   // V_2026-05-17 (user pedido): long-press 5s mudou semantics.
   //   - Antes: abria ModerationModal (block/mute/report)
   //   - Agora: alterna modo padrão ⇄ modo slim (chrome hidden, card
@@ -803,12 +809,14 @@ export function PostViewer({
                 !revealed ? 'pointer-events-none blur-xl' : ''
               }`}
             >
-              <SubpostCarousel
-                subposts={post.subposts}
-                index={subpostIdx}
-                post={post}
-                onSelect={setSubpostIdx}
-              />
+              <ContagionViaContext.Provider value={setViaSheet}>
+                <SubpostCarousel
+                  subposts={post.subposts}
+                  index={subpostIdx}
+                  post={post}
+                  onSelect={setSubpostIdx}
+                />
+              </ContagionViaContext.Provider>
             </div>
 
             {!revealed && (
@@ -845,6 +853,14 @@ export function PostViewer({
             context="embedded"
             onClose={() => setShowMapExplainer(false)}
           />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {viaSheet && (
+          <LazyBoundary fallback={<DriftSkeleton variant="card" />}>
+            <ContagionViaSheet vias={viaSheet} onClose={() => setViaSheet(null)} />
+          </LazyBoundary>
         )}
       </AnimatePresence>
 

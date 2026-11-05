@@ -83,6 +83,10 @@ export async function loadContagionInput(viewer: string, follows: ReadonlySet<st
   )
   const earned = new Map(earnedRows.map((r) => [r.author, Number(r.n)]))
   const strikes = new Map(strikeRows.map((r) => [r.pub, Number(r.n)]))
+  // Gesto "não trazer mais por X" do leitor: os DRIFTs de X não trazem.
+  const noBring = new Set(
+    (await db.exec<{ pub: string }>(`SELECT subject_pub AS pub FROM contagion_no_bring WHERE viewer_pub = ?`, [viewer])).map((r) => r.pub),
+  )
   // Só quem ainda tem vínculo pesa: zerados nem entram na SQL (custo).
   const contacts = [...effectiveFollows].filter((p) => tieOf(p, effectiveFollows, earned, strikes) > 0).sort()
 
@@ -137,7 +141,37 @@ export async function loadContagionInput(viewer: string, follows: ReadonlySet<st
     actions,
     reports,
     posts: [...direct, ...targets],
+    noBring,
   }
+}
+
+/**
+ * Gesto "não trazer mais por X" (pílula ↪ da aba Contágio): liga ou
+ * desliga para a identidade atual. Local e desfazível — "perdoar" aqui não
+ * é a oscilação que o TrustGuard descreve, porque só o leitor dispara.
+ */
+export async function setNoBring(subjectPub: string, on: boolean, nowMs = Date.now()): Promise<void> {
+  const viewer = await getCurrentNpub()
+  if (!viewer || subjectPub === viewer) return
+  if (on) {
+    await db.run(
+      `INSERT OR IGNORE INTO contagion_no_bring (viewer_pub, subject_pub, created_at) VALUES (?, ?, ?)`,
+      [viewer, subjectPub, Math.floor(nowMs / 1000)],
+    )
+  } else {
+    await db.run(`DELETE FROM contagion_no_bring WHERE viewer_pub = ? AND subject_pub = ?`, [viewer, subjectPub])
+  }
+}
+
+/** Quem a identidade atual pediu para não trazer mais (mais recente primeiro). */
+export async function listNoBring(): Promise<{ npub: string; at: number }[]> {
+  const viewer = await getCurrentNpub()
+  if (!viewer) return []
+  const rows = await db.exec<{ pub: string; t: number }>(
+    `SELECT subject_pub AS pub, created_at AS t FROM contagion_no_bring WHERE viewer_pub = ? ORDER BY created_at DESC, subject_pub`,
+    [viewer],
+  )
+  return rows.map((r) => ({ npub: r.pub, at: Number(r.t) * 1000 }))
 }
 
 /** Calcula a aba: veredicto de cada post candidato (função pura sobre o SQLite). */
@@ -169,4 +203,5 @@ export async function recordReport(postId: string, authorPub: string, vias: read
 /** Remover uma identidade apaga também o que ela registrou aqui (§4, §28). */
 export async function forgetIdentityContagion(viewer: string): Promise<void> {
   await db.run(`DELETE FROM contagion_bad_experiences WHERE viewer_pub = ?`, [viewer])
+  await db.run(`DELETE FROM contagion_no_bring WHERE viewer_pub = ?`, [viewer])
 }

@@ -6,6 +6,8 @@
  *   - Blocked: npubs cujo conteúdo NÃO aparece no feed
  *   - Muted: npubs cujos POSTS estão silenciados (mas spreads/buries
  *     deles ainda contam pro score visualizado)
+ *   - Não trazem (aba Contágio): npubs cujos DRIFTs não trazem mais posts
+ *     (gesto "não trazer mais por X" da etiqueta ↪); os posts deles seguem
  *
  * Manifesto §24: filtro local, não muda ranking. §10: cliente NÃO
  * deleta dados moderados — só esconde. Pinned é diferente: protege
@@ -23,6 +25,9 @@ import {
   type ModLocalEntry,
 } from '../../lib/moderation-local'
 import * as nip19 from 'nostr-tools/nip19'
+import { listNoBring, setNoBring } from '../../lib/contagion-data'
+import { invalidateFeed } from '../../lib/feed'
+import { PersonName } from '../Post/ContagionViaChip'
 
 export interface LocalListsSettingsProps {
   onClose: () => void
@@ -35,20 +40,22 @@ interface PinnedEntry {
 }
 
 export function LocalListsSettings({ onClose }: LocalListsSettingsProps) {
-  const [tab, setTab] = useState<'pinned' | 'blocked' | 'muted'>('pinned')
+  const [tab, setTab] = useState<'pinned' | 'blocked' | 'muted' | 'nobring'>('pinned')
   const [pinned, setPinned] = useState<PinnedEntry[]>([])
   const [blocked, setBlocked] = useState<ModLocalEntry[]>([])
   const [muted, setMuted] = useState<ModLocalEntry[]>([])
+  const [noBring, setNoBringList] = useState<{ npub: string; at: number }[]>([])
 
   useEffect(() => {
     void reload()
   }, [])
 
   async function reload() {
-    const [p, b, m] = await Promise.all([listPinned(), listBlocked(), listMuted()])
+    const [p, b, m, n] = await Promise.all([listPinned(), listBlocked(), listMuted(), listNoBring()])
     setPinned(p)
     setBlocked(b)
     setMuted(m)
+    setNoBringList(n)
   }
 
   return (
@@ -64,6 +71,9 @@ export function LocalListsSettings({ onClose }: LocalListsSettingsProps) {
           </TabBtn>
           <TabBtn active={tab === 'muted'} onClick={() => setTab('muted')} count={muted.length}>
             silenciados
+          </TabBtn>
+          <TabBtn active={tab === 'nobring'} onClick={() => setTab('nobring')} count={noBring.length}>
+            não trazem
           </TabBtn>
         </div>
 
@@ -93,6 +103,16 @@ export function LocalListsSettings({ onClose }: LocalListsSettingsProps) {
               kind="muted"
               onAction={async (npub) => {
                 await unmute(npub)
+                await reload()
+              }}
+            />
+          )}
+          {tab === 'nobring' && (
+            <NoBringList
+              list={noBring}
+              onUndo={async (npub) => {
+                await setNoBring(npub, false)
+                invalidateFeed()
                 await reload()
               }}
             />
@@ -224,6 +244,46 @@ function ModList({
           </div>
         )
       })}
+    </div>
+  )
+}
+
+/** Aba Contágio: quem não traz mais (gesto local da etiqueta ↪). */
+function NoBringList({
+  list,
+  onUndo,
+}: {
+  list: { npub: string; at: number }[]
+  onUndo: (npub: string) => Promise<void>
+}) {
+  if (list.length === 0) {
+    return (
+      <p className="py-8 text-center font-mono text-[11px] leading-relaxed text-drift-muted/40">
+        ninguém aqui.
+        <br />
+        na aba contágio, toque em ↪ chegou por… pra parar de receber o que uma pessoa traz — os posts dela continuam.
+      </p>
+    )
+  }
+  return (
+    <div className="max-h-96 space-y-2 overflow-y-auto" data-testid="nobring-list">
+      {list.map((e) => (
+        <div
+          key={e.npub}
+          className="flex items-center gap-2 rounded-xl border border-drift-border/30 bg-drift-surface/30 px-3 py-2.5 font-mono text-[11px]"
+        >
+          <span className="flex-1 truncate text-drift-text/80">
+            <PersonName pub={e.npub} />
+          </span>
+          <span className="text-drift-muted/40">{timeAgo(e.at)}</span>
+          <button
+            onClick={() => void onUndo(e.npub)}
+            className="rounded-lg border border-drift-border/30 bg-drift-surface/30 px-2 py-0.5 text-[10px] uppercase tracking-meta text-drift-muted/70 transition-colors hover:border-drift-accent2/30 hover:text-drift-accent2"
+          >
+            voltar a trazer
+          </button>
+        </div>
+      ))}
     </div>
   )
 }

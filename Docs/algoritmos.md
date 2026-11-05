@@ -868,8 +868,9 @@ segue**, como um vírus que passa de contato em contato: um post entra
 quando contatos deram DRIFT nele e a soma da força desses vínculos
 chega a 0,8. As regras são públicas e determinísticas; só as
 **entradas** são do leitor (quem ele segue, o que ele já impulsionou, o
-que ele denunciou, quem ele bloqueou). A **ordem** dentro da aba continua
-a canônica (§1). Manifesto §24, emendado em 2026-11-05.
+que ele denunciou, quem ele bloqueou, de quem ele não quer mais receber
+recomendações). A **ordem** dentro da aba continua a canônica (§1).
+Manifesto §24, emendado em 2026-11-05.
 
 Por que existe: numa ordem global igual para todos, uma fazenda de
 contas paciente compra o topo de todo mundo de uma vez. A simulação
@@ -895,7 +896,8 @@ ruins(u) = posts distintos que o leitor DENUNCIOU e que eram de u, ou que
 Para cada post p (nunca os do próprio leitor), usando a AÇÃO MAIS RECENTE
 de cada contato em p (no empate exato, o SINK) e ignorando a ação do
 próprio autor em p:
-  traz(p)       = Σ⁺(contatos com DRIFT em p nas últimas 48 h)
+  traz(p)       = Σ⁺(contatos com DRIFT em p nas últimas 48 h,
+                     menos os marcados "não trazer mais")
   vacina(p)     = Σ⁺(contatos com SINK em p nas últimas 96 h)
   quarentena(p) = Σ⁺(contatos que denunciaram p nos últimos 14 dias)
   direto(p)     = autor seguido com tie > 0 e post com até 72 h
@@ -922,6 +924,15 @@ aparelho também contam contra o autor, pela tabela `reports` (com o alvo
 da tag `p` quando o post não está no cache); o cache não apaga posts que
 o leitor denunciou.
 
+**Gesto "não trazer mais por X".** Tocar na pílula "↪ chegou por" abre a
+folha "chegou por", com um botão por pessoa. O gesto corta só as
+recomendações de X: os DRIFTs dele param de trazer post. Os posts que X
+escreve continuam entrando direto, e o SINK (vacina) e a denúncia
+(quarentena) de X continuam valendo. Não pune ninguém, não é publicado
+(tabela local `contagion_no_bring`) e se desfaz em Configurações → listas
+locais → não trazem. É o jeito de dizer "esse contato me traz lixo" sem
+denunciar post honesto e sem deixar de seguir em público.
+
 ### Exemplo
 
 Bia segue Ana (já impulsionou um post dela → 0,8), Caio e Duda (só segue
@@ -936,6 +947,7 @@ Bia segue Ana (já impulsionou um post dela → 0,8), Caio e Duda (só segue
 | W | Post de Caio de ontem; Ana deu SINK | direto: 10 − 8 = 2 > 0 | sim, sem pílula |
 | V | Ana deu DRIFT; Bia já denunciou 2 posts que vieram pela Ana | tie(Ana) = 8 − 10 → 0 | não |
 | S | Ana deu DRIFT; Bia já deu SINK em 5 posts da Ana | tie(Ana) = 8 (SINK não pune) | sim |
+| N | Ana deu DRIFT; Bia marcou "não trazer mais por Ana" | traz 0 | não (posts da própria Ana continuam entrando) |
 
 ### Simulação (2.250 pessoas, 6 cidades, 24 semanas, fazenda de 2.000 contas)
 
@@ -948,18 +960,33 @@ Bia segue Ana (já impulsionou um post dela → 0,8), Caio e Duda (só segue
 | enganados (10%) + isca do fazendeiro | 0,1% (pico 9%) | 1,8% |
 | contas da fazenda postando isca (conteúdo bom) | **2,9%** (pico 11%) | 0,2% |
 
-Rodadas `fase1__*` da bateria: a configuração do app, sem o corte do
-vínculo que trouxe spam (o app não tem esse gesto; com corte em 40% das
-vezes, a isca cai para 1,8%). Ordem de chegada embaralhada: 0 diferenças
-em 840 feeds por rodada. Custo da Fase 1: o post mais viral alcança ~38%
+Rodadas `fase1__*` da bateria: a configuração do app sem ninguém usar o
+gesto "não trazer mais" (limite conservador). Ordem de chegada
+embaralhada: 0 diferenças em 840 feeds por rodada. Custo da Fase 1: o post mais viral alcança ~38%
 das pessoas pela aba (29% com 10% de SINK por gosto; 27% sob eclipse); o
 modelo completo, com encontros físicos e o mapa da área, chega a 82–92%.
 A isca é o que mais passa: acima de 5% das pessoas em metade dos dias da
 simulação, até o lockstep da Fase 2. **Ela depende de quanto as pessoas
 denunciam**: a simulação supõe denúncia em 35% dos spams vistos; com 10%,
-a isca vai a 12,4%; com 5%, a 22,3% (revisão em par, 05/11/2026). Um
-gesto privado de cortar quem trouxe, usado em 20% das vezes, segura 10%
-de denúncia em 4,5%. A aba é opcional e as outras continuam lá.
+a isca vai a 12,4%; com 5%, a 22,3% (revisão em par, 05/11/2026). A
+aba é opcional e as outras continuam lá.
+
+**O gesto "não trazer mais por X" na simulação** (rodadas `gesto_r*_c*`:
+r = % dos spams vistos que a pessoa denuncia; c = % das vezes que ela
+usa o gesto contra quem trouxe o spam). Média das últimas 6 semanas, %
+das pessoas que veem ataque:
+
+| Ataque | denúncia 35% · sem gesto / 20% / 40% | denúncia 10% · sem gesto / 20% / 40% |
+|---|---|---|
+| isca (contas da fazenda postando conteúdo bom) | 2,9 / 1,8 / 1,6 | 12,4 / **4,8** / 2,6 |
+| isca + 10% enterrando por gosto | 2,3 / 1,5 / 1,4 | 11,7 / 3,8 / 2,5 |
+| enganados (10%) + isca | 0,1 / 0,1 / 0,1 | 2,5 / 2,5 / 2,5 |
+| sem ataque (alcance do post mais viral) | 37,8 / 37,8 / 37,8 | 37,8 / 37,8 / 37,8 |
+
+O gesto segura a isca mesmo quando quase ninguém denuncia, e não custa
+alcance honesto (sem ataque, nada muda). Ele **não ajuda** quando o spam
+vem direto de alguém que a pessoa segue (os enganados seguem o
+fazendeiro): ali, só denunciar ou deixar de seguir.
 
 Onde a simulação difere do app: na simulação, "quem trouxe" é um contato
 só (no app, todos os empatados), o SINK de contato vale 2 dias (no app,
@@ -997,7 +1024,13 @@ Global esconde na aba Contágio também.
 - Ação do próprio autor no próprio post não conta (como no ranking
   canônico): republicar o DRIFT não mantém um post velho na aba.
 - Bloquear tira a pessoa da conta (não traz, não vacina, não denuncia);
-  silenciar só esconde os posts dela.
+  silenciar só esconde os posts dela; "não trazer mais" só tira os DRIFTs
+  dela (os posts dela, o SINK e a denúncia continuam valendo).
+- "Não trazer mais" nunca põe post na aba e nunca vira "quem trouxe";
+  não mexe no vínculo (não é experiência ruim) e vale por identidade:
+  trocar de identidade no aparelho não leva a lista junto.
+- A aba só se atualiza quando a folha "chegou por" fecha (atualizar antes
+  tiraria o post, e a folha junto, antes da confirmação aparecer).
 - SINK de contato vale 96 h, enquanto o post ainda pode entrar; senão o
   atacante republicaria o DRIFT depois que a vacina expirasse.
 - A moderação comunitária global (§3) continua valendo: post com
@@ -1032,6 +1065,7 @@ Global esconde na aba Contágio também.
 | As 4 abas usam a mesma ordenação canônica (`FEED_ORDER`) | `tests/score-decay-parity.test.ts`, `tests/scoring-pipeline-conformance.test.ts` | §8, §24 |
 | Experiências ruins do leitor só mexem na aba dele; o global não muda | `tests/contagion.test.ts` | §24 |
 | Contas só seguidas não escondem nada sozinhas (teto também na vacina e na quarentena) | `tests/contagion.test.ts` | §24, §26 |
+| "Não trazer mais por X" nunca põe post na aba nem cria "quem trouxe"; o SINK e a denúncia de X continuam valendo | `tests/contagion.test.ts` | §24 |
 | SINK do leitor não pune ninguém na aba Contágio | `tests/contagion.test.ts`, `e2e/contagion-tab.spec.ts` | §23 |
 | Denúncia fora da aba nunca pune quem trouxe | `e2e/contagion-tab.spec.ts` | §24 |
 
