@@ -6,7 +6,8 @@
  * de denúncia diz isso antes do envio. O SINK não pune ninguém (§23).
  *
  * Tocar na etiqueta abre "não trazer mais por X" (ContagionViaSheet): o
- * gesto local que corta só as recomendações daquela pessoa.
+ * gesto local que corta as recomendações daquela pessoa e dá ao SINK e à
+ * denúncia dela o peso de quem o leitor só segue.
  *
  * Fica no bloco de texto do card, acima do autor (não sobre a imagem nem
  * sobre a linha de números). Não aparece para post que entrou direto.
@@ -33,10 +34,13 @@ export function PersonName({ pub }: { pub: string }) {
 export function PersonNameKey({ pub }: { pub: string }) {
   const meta = useUserMetadata(pub)
   const name = meta?.displayName?.trim() || meta?.name?.trim()
-  if (!name) return <>{`anon…${pub.slice(-6)}`}</>
+  if (!name) return <span className="min-w-0 truncate">{`anon…${pub.slice(-6)}`}</span>
+  // dentro de um pai `flex min-w-0`: o nome corta com reticências, o fim
+  // da chave nunca some (é ele que distingue a pessoa de quem a imita)
   return (
     <>
-      {name} <span className="text-drift-muted">…{pub.slice(-6)}</span>
+      <span className="min-w-0 truncate">{name}</span>
+      <span className="shrink-0 text-drift-muted">&nbsp;…{pub.slice(-6)}</span>
     </>
   )
 }

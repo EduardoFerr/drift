@@ -174,7 +174,7 @@ export function initDb(opts: { onProgress?: (message: string) => void } = {}): P
     // empurrar para "limpar local" (apaga a identidade se não foi exportada).
     // O detalhe técnico vai para o console.
     const KEEP =
-      'Feche as outras abas do Drift e toque em “↻ forçar atualização”, abaixo. Seus dados continuam aqui — não use “limpar local”.'
+      'Feche as outras abas do Drift e toque em “↻ forçar atualização”, abaixo. Seus dados continuam aqui. Só use “limpar local” se isso não resolver — ele apaga a sua identidade se você não a exportou.'
     let opened = false
     const arm = () => {
       clearTimeout(idle)

@@ -274,7 +274,8 @@ function NoBringList({
           key={e.npub}
           className="flex items-center gap-2 rounded-xl border border-drift-border/30 bg-drift-surface/30 px-3 py-2.5 font-mono text-[11px]"
         >
-          <span className="flex-1 truncate text-drift-text/80">
+          {/* flex: o nome corta, o fim da chave fica sempre à vista */}
+          <span className="flex min-w-0 flex-1 text-drift-text/80">
             <PersonNameKey pub={e.npub} />
           </span>
           <span className="text-drift-muted/40">{timeAgo(e.at)}</span>

@@ -2809,7 +2809,7 @@ function BootView({ state }: { state: BootState }) {
           detail={
             state.storage === null
               ? state.step === 'db'
-                ? state.dbProgress ?? 'inicializando worker…'
+                ? state.dbProgress ?? 'abrindo os dados deste aparelho…'
                 : 'aguardando'
               : state.storage === 'opfs'
               ? 'storage: OPFS (persistente)'
