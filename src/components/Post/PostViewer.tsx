@@ -304,13 +304,14 @@ export function PostViewer({
     if (reporting) return
     setReporting(true)
     try {
-      await reportPost({ postId: post.id, authorPub: post.authorPub, reason })
       // Aba Contágio: a denúncia é experiência ruim com o autor e com quem a
       // pílula "↪ chegou por" mostrava quando a denúncia foi aberta
       // (`reportVias`, o mesmo nome que o modal exibiu). Registro local;
-      // a aba se atualiza já, sem esperar o eco do relay. Sob demanda (fora
-      // do chunk de entrada).
+      // a aba se atualiza já, sem esperar o eco do relay. O módulo (fora do
+      // chunk de entrada) carrega ANTES de publicar: se a carga falhar, a
+      // denúncia não sai pela metade, sem o registro que o modal prometeu.
       const { recordReport } = await import('../../lib/contagion-data')
+      await reportPost({ postId: post.id, authorPub: post.authorPub, reason })
       await recordReport(post.id, post.authorPub, reportVias)
       invalidateFeed()
       setShowReport(false)

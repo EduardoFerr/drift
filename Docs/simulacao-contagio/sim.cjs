@@ -15,14 +15,23 @@
  *            contra quem trouxe), cutProb (chance de cortar o vínculo que trouxe spam;
  *            padrão 0,4), cutMode ('all' = o corte tira a pessoa de tudo, como deixar de
  *            seguir; 'bring' = gesto do app "não trazer mais por X": só deixa de trazer,
- *            mantém posts diretos, vacina e quarentena), reportProb (chance de denunciar
- *            o spam visto; padrão 0,35), breaker (disjuntor por idade),
- *            labelers, ambient (itens do mapa), noEncounters
+ *            mantém posts diretos), cutNeg (no modo 'bring', o SINK e a denúncia de quem
+ *            foi cortado: ausente = vínculo inteiro; 'weak' = entram no balde dos fracos,
+ *            com teto, como no app desde a revisão de 05/11/2026; 'none' = não contam),
+ *            reportProb (chance de denunciar o spam visto; padrão 0,35), breaker
+ *            (disjuntor por idade), labelers, ambient (itens do mapa), noEncounters
  *   ataque:  atk{spammer,farm,brigade}, followBack, deceivedPct, farmContent (isca),
  *            farmerBait, farmCamo (camuflagem), farmRot (revezamento), farmJoin (paciente),
- *            badmouth{sink,report} (difamação: a fazenda enterra e denuncia post honesto)
+ *            badmouth{sink,report} (difamação: a fazenda enterra e denuncia post honesto),
+ *            farmSpamDirect + farmSpamFrom (contas da fazenda postando spam direto, a
+ *            partir do dia), baitDiscovery (funil do Global: chance diária de seguir e
+ *            impulsionar uma isca recente)
  *   mundo:   mobility, remote, vis + visMode + visScale (visão parcial), eclipse + censor,
- *            honestError (erro honesto), tasteSink (SINK de gosto em post honesto) */
+ *            honestError (erro honesto), tasteSink (SINK de gosto em post honesto)
+ *   métricas novas: honHid (fração de leitores com algum post honesto que entraria e foi
+ *            escondido por vacina ou quarentena), honHidN (quantos, por leitor).
+ *   Flags e métrica de cutNeg/farmSpamDirect/baitDiscovery/honHid: revisão adversarial
+ *   (Barney+Satoshi) de 05/11/2026. */
 'use strict'
 
 const CITIES = [
@@ -262,7 +271,9 @@ function runModel(E, cfg, model, onFrame) {
     for (const [u, s0] of cs) {
       const s = cfg.lockstep && !vE ? Math.floor(s0 * lwEff(u, day, VIS ? v % VK : 0) / 10) : s0 // eclipsado: sem dados de co-impulsionadores nem rótulos
       const uE = ECL(u)
-      const weakNeg = cfg.negCap && s0 <= 5
+      const cutN = BRING && cut[v].has(u)
+      if (cutN && cfg.cutNeg === 'none') { if (fol[v].has(u)) for (const pi of postsBy[u]) { if (day - posts[pi].day <= 3 && !dropped(v, vE, u, pi)) { direct.add(pi) } } continue }
+      const weakNeg = cfg.negCap && (s0 <= 5 || (cutN && cfg.cutNeg === 'weak'))
       if (cfg.badmouth && s > 0 && U[u].kind === 'fazenda' && U[u].id !== 'fazendeiro') { if (weakNeg) bmW += s; else bmS += s }
       for (const a of recentAct[u]) {
         if (day - a.day > 2) continue
@@ -296,11 +307,12 @@ function runModel(E, cfg, model, onFrame) {
       const p = posts[pi]
       if (p.a === v || day - p.day > 4) continue
       const qv = negOf(quar, quarW, pi, p, BM.report), vv = negOf(vac, vacW, pi, p, BM.sink)
-      if (qv >= THETA_Q * 10) { if (opt.stat && target(p)) opt.stat.quarHidden++; continue }
       const sc = (direct.has(pi) ? 10 : 0) + tot(pi) - vv
       const thr = cfg.breaker && (young.get(pi) || 0) * 2 > tot(pi) ? cfg.breaker.theta * 10 : THETA * 10
-      if (!direct.has(pi) && (tot(pi) < thr || (src.get(pi) || 0) < (cfg.minSrc || 1))) continue
-      if (sc <= 0) continue
+      const wouldEnter = direct.has(pi) || (tot(pi) >= thr && (src.get(pi) || 0) >= (cfg.minSrc || 1))
+      if (qv >= THETA_Q * 10) { if (opt.stat && target(p) && wouldEnter) opt.stat.quarHidden++; continue }
+      if (!wouldEnter) continue
+      if (sc <= 0) { if (opt.stat && target(p)) opt.stat.vacHidden++; continue }
       cand.push({ pi, s: sc / (day - p.day + 0.5), via: via.get(pi)?.[0] ?? -1, ch: direct.has(pi) ? 'dir' : 'cont' })
     }
     cand.sort((a, b) => b.s - a.s || a.pi - b.pi)
@@ -403,6 +415,7 @@ function runModel(E, cfg, model, onFrame) {
       if (rnd() < 0.15) { const n = pick(byCity[loc[i]]); if (joined(U[n], day) && loc[n] === loc[i]) meet(i, n, day) }
       if (tripCity[i] >= 0 && rnd() < 0.6) { const n = pick(byCity[loc[i]]); if (joined(U[n], day)) meet(i, n, day) }
     }
+    const baitRecent = cfg.baitDiscovery ? posts.filter((p) => p.bait && day - p.day <= 2).map((p) => p.i) : null
     // pessoas reais
     for (let i = 0; i < NH; i++) {
       const u = U[i]
@@ -414,6 +427,10 @@ function runModel(E, cfg, model, onFrame) {
         // no modelo global, além do top 8 a pessoa "passeia" pelo mapa da cidade onde está
         const log = cityLog[loc[i]]
         for (let k = 0; k < 2 && log.length; k++) { const e = log[Math.max(0, log.length - 1 - Math.floor(rnd() * Math.min(300, log.length)))]; if (e.day >= day - 2) feed.push({ pi: e.p, via: -1 }) }
+      }
+      if (cfg.baitDiscovery && baitRecent.length && rnd() < cfg.baitDiscovery) {
+        const b = posts[baitRecent[Math.floor(rnd() * baitRecent.length)]]
+        if (b.a !== i) { follow(i, b.a); if (!lastAct.has(i + '|' + b.i) && rnd() < 0.8) actOn(u, b, day, true, loc[i]) }
       }
       if (!feed.length) continue
       const k = 1 + (rnd() < u.act ? 1 : 0)
@@ -452,6 +469,7 @@ function runModel(E, cfg, model, onFrame) {
       for (const f of farm) if (!cfg.farmRot || rnd() < cfg.farmRot) actOn(f, sp, day, true, loc[f.idx])
       // fazenda adaptada ao v5: contas postam isca (conteúdo bom) para ganhar DRIFT de quem as segue
       if (cfg.farmContent) for (const f of farm) if (rnd() < cfg.farmContent) newPost(f, day, loc[f.idx], false, true)
+      if (cfg.farmSpamDirect && day >= (cfg.farmSpamFrom ?? 0)) for (const f of farm) if (rnd() < cfg.farmSpamDirect) newPost(f, day, loc[f.idx], true)
       // fazendeiro adaptado ao aval: posta isca para os enganados darem DRIFT nele; a fazenda impulsiona tudo
       if (cfg.farmerBait && rnd() < cfg.farmerBait) { const b = newPost(farmer, day, loc[farmer.idx], false, true); for (const f of farm) actOn(f, b, day, true, loc[f.idx]) }
       // camuflagem contra o lockstep: cada conta dá DRIFT em posts honestos aleatórios para diversificar o histórico
@@ -485,7 +503,7 @@ function runModel(E, cfg, model, onFrame) {
     // ── Medição (todas as pessoas reais que já entraram) ──────────
     const chan = { dir: 0, cont: 0, ambK: 0, ambU: 0, top: 0 }
     let n = 0, withAtk = 0, atkShare = 0, poro = 0, empty = 0, hiddenVictimViewers = 0
-    let honSum = 0, honEmpty = 0, farmC2 = 0
+    let honSum = 0, honEmpty = 0, farmC2 = 0, honHid = 0, honHidN = 0
     let zeroed = 0, edges = 0
     if (cfg.sinkLearn) for (let v = 0; v < NH; v++) { if (!joined(U[v], day)) continue; for (const u of fol[v]) { if (u >= NH) continue; edges++; if (negK(v, u, day) > 0 && tie(v, u, day) === 0) zeroed++ } }
     const tStart = Date.now()
@@ -503,7 +521,10 @@ function runModel(E, cfg, model, onFrame) {
       let f = 1
       if (loc[i] !== u.home) f |= 8
       n++
-      const res = model === 'contagio' ? feedContagion(i, day) : { feed: gTop, hidden: null }
+      const st = { quarHidden: 0, vacHidden: 0 }
+      const res = model === 'contagio' ? feedContagion(i, day, { stat: st }) : { feed: gTop, hidden: null }
+      if (st.quarHidden + st.vacHidden > 0) honHid++
+      honHidN += st.quarHidden + st.vacHidden
       const feed = res.feed
       frameFeeds.push([i, feed])
       if (feed.length < 3) empty++
@@ -547,7 +568,7 @@ function runModel(E, cfg, model, onFrame) {
     }
     const fr = {
       day: day + 1, n, ms: Date.now() - tStart,
-      m: { honLen: honSum / n, honEmpty: honEmpty / n, farmC2: farmC2 / n, zeroed: edges ? zeroed / edges : 0,
+      m: { honHid: honHid / n, honHidN: honHidN / n, honLen: honSum / n, honEmpty: honEmpty / n, farmC2: farmC2 / n, zeroed: edges ? zeroed / edges : 0,
         withAtk: withAtk / n, atkShare: atkShare / n, poro: poro / n, empty: empty / n,
         reach: bestN / n, reachCities: best >= 0 ? reachCities.get(best).size : 0,
         victims: victims.length, victimsHidden, hiddenViewers: hiddenVictimViewers, det,

@@ -240,10 +240,12 @@ export async function removeIdentity(npub: string): Promise<void> {
   if (active === npub) {
     throw new Error('Não pode remover a identidade ativa — troque a ativa primeiro')
   }
-  await db.run(`DELETE FROM identities WHERE npub = ?`, [npub])
   // Aba Contágio: o registro local de quem trouxe o que ela denunciou não
   // pode ficar ligando identidades num aparelho compartilhado (§4, §28).
+  // O módulo carrega ANTES de apagar: se a carga falhar (deploy novo), nada
+  // é apagado pela metade.
   const { forgetIdentityContagion } = await import('./contagion-data')
+  await db.run(`DELETE FROM identities WHERE npub = ?`, [npub])
   await forgetIdentityContagion(npub)
   await refresh()
 }

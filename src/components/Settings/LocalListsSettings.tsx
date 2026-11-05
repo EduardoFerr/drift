@@ -27,7 +27,7 @@ import {
 import * as nip19 from 'nostr-tools/nip19'
 import { listNoBring, setNoBring } from '../../lib/contagion-data'
 import { invalidateFeed } from '../../lib/feed'
-import { PersonName } from '../Post/ContagionViaChip'
+import { PersonNameKey } from '../Post/ContagionViaChip'
 
 export interface LocalListsSettingsProps {
   onClose: () => void
@@ -62,7 +62,9 @@ export function LocalListsSettings({ onClose }: LocalListsSettingsProps) {
     <FullPageCard onClose={onClose} title="listas locais" ariaLabel="settings · listas locais">
       <div className="space-y-3 px-4 py-5">
 
-        <div className="flex gap-2 rounded-2xl border border-drift-border/40 bg-drift-surface/50 p-1.5">
+        {/* 2 × 2: as 4 abas em fila não cabem abaixo de ~440 px, e "não
+            trazem" (o único desfazer do gesto da aba Contágio) sumia */}
+        <div className="grid grid-cols-2 gap-1.5 rounded-2xl border border-drift-border/40 bg-drift-surface/50 p-1.5">
           <TabBtn active={tab === 'pinned'} onClick={() => setTab('pinned')} count={pinned.length}>
             fixados
           </TabBtn>
@@ -273,7 +275,7 @@ function NoBringList({
           className="flex items-center gap-2 rounded-xl border border-drift-border/30 bg-drift-surface/30 px-3 py-2.5 font-mono text-[11px]"
         >
           <span className="flex-1 truncate text-drift-text/80">
-            <PersonName pub={e.npub} />
+            <PersonNameKey pub={e.npub} />
           </span>
           <span className="text-drift-muted/40">{timeAgo(e.at)}</span>
           <button

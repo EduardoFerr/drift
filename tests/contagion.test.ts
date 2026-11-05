@@ -57,7 +57,7 @@ vi.mock('../src/lib/identity', async (orig) => ({
 import { CONTAGION, computeContagion, tieOf, type ContagionAction, type ContagionInput, type ContagionVerdict } from '../src/lib/contagion'
 import { forgetIdentityContagion, listNoBring, loadContagionInput, recordReport, setNoBring } from '../src/lib/contagion-data'
 import { onNostrEvent, recalcAllScores } from '../src/lib/events'
-import { getContagionFeed, getGlobalFeed, getMyAction, refreshFeed, setFeedTab, useFeedStore } from '../src/lib/feed'
+import { getContagionFeed, getGlobalFeed, getMyAction, holdFeed, refreshFeed, setFeedTab, useFeedStore } from '../src/lib/feed'
 import { useFollowsStore } from '../src/lib/follows'
 import { __resetOrphansForTest } from '../src/lib/orphans'
 
@@ -349,39 +349,70 @@ describe('Contágio — propriedades do núcleo', () => {
     expect(v.pass).toBe(false)
   })
 
-  it('"não trazer mais por X": o DRIFT de X não traz; o post direto, o SINK e a denúncia de X continuam', () => {
-    const follows = new Set(['ana', 'bia', 'cris'])
-    const earned = new Map([['ana', 1], ['bia', 1], ['cris', 1]])
+  it('"não trazer mais por X": o DRIFT de X não traz, o post direto continua, e o SINK e a denúncia de X contam como de quem só é seguido', () => {
+    const follows = new Set(['ana', 'bia', 'cris', 'duda'])
+    const earned = new Map([['ana', 1], ['bia', 1], ['cris', 1]]) // duda: só seguida (0,5)
     const posts = [
       { id: 'trazido', author: 'x', createdAt: NOW - 3 * HOUR },
       { id: 'daAna', author: 'ana', createdAt: NOW - 2 * HOUR },
       { id: 'vacinado', author: 'y', createdAt: NOW - 3 * HOUR },
-      { id: 'denunciado', author: 'z', createdAt: NOW - 3 * HOUR },
+      { id: 'soAnaEDuda', author: 'z', createdAt: NOW - 3 * HOUR },
+      { id: 'comCris', author: 'w', createdAt: NOW - 3 * HOUR },
     ]
-    const actions = [spreadBy('ana', 'trazido'), spreadBy('bia', 'vacinado'), buryBy('ana', 'vacinado'), spreadBy('bia', 'denunciado')]
-    const reports = [{ postId: 'denunciado', reporter: 'ana', createdAt: NOW - HOUR }, { postId: 'denunciado', reporter: 'cris', createdAt: NOW - HOUR }]
+    const actions = [
+      spreadBy('ana', 'trazido'),
+      spreadBy('bia', 'vacinado'), buryBy('ana', 'vacinado'),
+      spreadBy('bia', 'soAnaEDuda'), spreadBy('bia', 'comCris'),
+    ]
+    const rep = (postId: string, reporter: string) => ({ postId, reporter, createdAt: NOW - HOUR })
+    const reports = [rep('soAnaEDuda', 'ana'), rep('soAnaEDuda', 'duda'), rep('comCris', 'ana'), rep('comCris', 'cris')]
     const v = computeContagion(base({ follows, earned, posts, actions, reports, noBring: new Set(['ana']) }))
     expect(v.get('trazido')?.pass ?? false, 'o DRIFT da Ana não traz').toBe(false)
     expect(v.get('daAna')!.pass, 'post direto da Ana continua').toBe(true)
-    expect(v.get('vacinado')!.vaccine, 'SINK da Ana continua vacinando').toBe(CONTAGION.TIE_EARNED)
-    expect(v.get('vacinado')!.pass).toBe(false)
-    expect(v.get('denunciado')!.quarantine, 'denúncia da Ana continua contando').toBe(16)
-    expect(v.get('denunciado')!.pass).toBe(false)
+    // SINK da Ana cortada: teto dos fracos (5), não os 8 do vínculo
+    expect(v.get('vacinado')!.vaccine).toBe(CONTAGION.WEAK_CAP)
+    expect(v.get('vacinado')!.pass, 'a Ana cortada sozinha não esconde o que a Bia traz').toBe(true)
+    // denúncias: Ana cortada + Duda só seguida = balde fraco, teto 5 → não esconde
+    expect(v.get('soAnaEDuda')!.quarantine).toBe(CONTAGION.WEAK_CAP)
+    expect(v.get('soAnaEDuda')!.pass).toBe(true)
+    // com um vínculo forte de verdade (Cris), esconde — como com qualquer só seguido
+    expect(v.get('comCris')!.quarantine).toBe(CONTAGION.TIE_EARNED + CONTAGION.WEAK_CAP)
+    expect(v.get('comCris')!.pass).toBe(false)
   })
 
-  it('"não trazer mais por X" nunca acrescenta post nem muda quem trouxe para outro que não trouxe', () => {
+  it('"não trazer mais por X": o cortado nunca traz nem vira quem trouxe, sozinho nunca esconde nada, e cortar só mexe nos posts em que ele agiu', () => {
     for (let seed = 1; seed <= 20; seed++) {
       const inp = scenario(seed)
       const before = computeContagion(inp)
       for (const who of inp.follows) {
         const after = computeContagion({ ...inp, noBring: new Set([who]) })
+        const touched = new Set([
+          ...inp.actions.filter((a) => a.actor === who).map((a) => a.postId),
+          ...inp.reports.filter((r) => r.reporter === who).map((r) => r.postId),
+          ...inp.posts.filter((p) => p.author === who).map((p) => p.id),
+        ])
         for (const [id, verdict] of after) {
-          if (verdict.pass) expect(before.get(id)?.pass, `post ${id} entrou depois de cortar ${who}`).toBe(true)
           expect(verdict.viaAll, `${who} cortado não aparece como quem trouxe`).not.toContain(who)
+          expect(verdict.contributors.map((c) => c.pub), `${who} cortado não traz`).not.toContain(who)
+          if (!touched.has(id)) expect(verdict.pass, `post ${id} mudou sem ${who} ter agido nele`).toBe(before.get(id)?.pass ?? false)
         }
       }
     }
-  })
+    // isca cortada (vínculo conquistado 0,8) que enterra e denuncia sozinha:
+    // não esconde nada — nem post direto, nem post trazido por outro forte
+    const posts = [{ id: 'direto', author: 'amiga', createdAt: NOW - 2 * HOUR }, { id: 'trazido', author: 'z', createdAt: NOW - 3 * HOUR }]
+    const inp = base({
+      follows: new Set(['isca', 'amiga', 'bia']),
+      earned: new Map([['isca', 1], ['bia', 1]]),
+      posts,
+      actions: [buryBy('isca', 'direto'), spreadBy('bia', 'trazido'), buryBy('isca', 'trazido')],
+      reports: [{ postId: 'direto', reporter: 'isca', createdAt: NOW - HOUR }, { postId: 'trazido', reporter: 'isca', createdAt: NOW - HOUR }],
+    })
+    expect(computeContagion(inp).get('trazido')!.pass, 'sem o corte, a isca esconde').toBe(false)
+    const cortada = computeContagion({ ...inp, noBring: new Set(['isca']) })
+    expect(cortada.get('direto')!.pass, 'post direto de amiga continua').toBe(true)
+    expect(cortada.get('trazido')!.pass, 'o que a Bia traz continua').toBe(true)
+  }, 30_000) // 20 cenários × cada contato cortado: passa dos 5 s padrão em máquina carregada
 
   it('empate exato DRIFT × SINK do mesmo contato: o SINK vence em qualquer ordem de chegada', () => {
     const posts = [{ id: 'p', author: 'x', createdAt: NOW - 3 * HOUR }]
@@ -739,6 +770,49 @@ describe('Contágio — pipeline real', () => {
     expect(useFeedStore.getState().loaded).toBe(true)
     expect(vistos.filter((v) => v.tab === 'contagio' && v.n > 0), 'aba Contágio exibiu posts do global').toEqual([])
     useFeedStore.setState({ tab: 'global' } as never)
+  })
+
+  it('se a primeira carga da aba falhar, a lista fica vazia com erro — nunca os posts da aba anterior', async () => {
+    // revisão Ted+Marshall: o motor da aba vem num arquivo à parte; se ele
+    // falha (deploy novo), a store ficava com os posts do global e a aba
+    // Contágio os mostrava como "o que chegou pelas pessoas que você segue"
+    await ingest(...Array.from({ length: 3 }, (_, i) => post(`f${i}`, NOW - (i + 2) * HOUR)))
+    useFeedStore.setState({ tab: 'global', loaded: false, posts: [], failed: false } as never)
+    await refreshFeed()
+    expect(useFeedStore.getState().posts.length, 'global carregado').toBeGreaterThan(0)
+    const prev = useFollowsStore.getState().following
+    useFollowsStore.setState({ following: null } as never) // a carga da aba Contágio lança
+    try {
+      await setFeedTab('contagio')
+      expect(useFeedStore.getState()).toMatchObject({ tab: 'contagio', loaded: true, failed: true, posts: [] })
+    } finally {
+      useFollowsStore.setState({ following: prev } as never)
+    }
+    // trocar de aba limpa o erro; um refresh bom da mesma aba também
+    await setFeedTab('global')
+    expect(useFeedStore.getState()).toMatchObject({ tab: 'global', loaded: true, failed: false })
+    expect(useFeedStore.getState().posts.length).toBeGreaterThan(0)
+  })
+
+  it('com uma folha aberta (holdFeed) a lista não se mexe; ao soltar, atualiza uma vez', async () => {
+    // revisão de UX: evento do relay recalculava a aba com a folha "chegou
+    // por" aberta, e a folha sumia junto com o card do post
+    await ingest(...Array.from({ length: 3 }, (_, i) => post(`h${i}`, NOW - (i + 2) * HOUR)))
+    useFeedStore.setState({ tab: 'global', loaded: true, posts: [] } as never)
+    const release = holdFeed()
+    await refreshFeed()
+    expect(useFeedStore.getState().posts, 'segurada, a lista não muda').toEqual([])
+    release()
+    for (let i = 0; i < 100 && useFeedStore.getState().posts.length === 0; i++) await new Promise((r) => setTimeout(r, 10))
+    expect(useFeedStore.getState().posts.length, 'ao soltar, o refresh pedido roda').toBeGreaterThan(0)
+    // soltar duas vezes não desconta outra folha aberta
+    release()
+    const other = holdFeed()
+    useFeedStore.setState({ posts: [] } as never)
+    await refreshFeed()
+    expect(useFeedStore.getState().posts, 'a outra folha continua segurando').toEqual([])
+    other()
+    for (let i = 0; i < 100 && useFeedStore.getState().posts.length === 0; i++) await new Promise((r) => setTimeout(r, 10))
   })
 
   it('o leitor que enterrou depois de impulsionar perde o vínculo conquistado', async () => {

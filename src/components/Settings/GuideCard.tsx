@@ -476,7 +476,8 @@ function AlgosTopics() {
               passa: contas falsas que postam coisa boa para ganhar seu DRIFT
               e depois trazem spam. Se isso acontecer, denuncie o spam — ou,
               se foi um contato que trouxe, toque em ↪ chegou por e escolha
-              não trazer mais por ele (desfaz em listas locais → não trazem).
+              não trazer mais por ele (desfaz na hora, na própria folha, ou em
+              config → conteúdo → listas → não trazem).
             </P>
           </SettingExplainer>
 

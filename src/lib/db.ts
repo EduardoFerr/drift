@@ -8,8 +8,9 @@
  * SQLite. db.worker.ts não é importado em nenhum outro lugar.
  *
  * Robustez:
- *  - Prazo do init: 30 s sem sinal de vida do worker (cada log renova) e
- *    120 s no total; no estouro o worker é encerrado
+ *  - Prazo do init: até o banco abrir, 30 s sem sinal de vida do worker
+ *    (cada log renova); depois, só o teto total de 10 min; no estouro o
+ *    worker é encerrado
  *  - worker.onerror / onmessageerror rejeitam promises pendentes
  *    (caso contrário um worker que falha silenciosamente trava o boot)
  */
@@ -24,10 +25,15 @@
 // segundos fazendo progresso. Um prazo fixo de 15 s matava o boot no meio,
 // o próximo refazia tudo e estourava de novo (laço), e o worker antigo
 // seguia escrevendo no OPFS — dois workers no mesmo banco disputam o
-// journal (SQLITE_IOERR). Agora: o prazo renova a cada sinal de vida do
-// worker, tem teto total e, no estouro, o worker é encerrado.
+// journal (SQLITE_IOERR). Agora:
+//  - até o banco abrir (WASM + OPFS), 30 s sem sinal de vida = travado;
+//  - depois de aberto, o trabalho é SQL (ex.: índice novo num banco grande,
+//    num celular lento): matar por silêncio só faria o próximo boot refazer
+//    tudo, então vale só o teto total — e cada índice fica salvo ao ficar
+//    pronto, então nem o teto volta à estaca zero;
+//  - no estouro, o worker é encerrado.
 const INIT_IDLE_TIMEOUT_MS = 30_000
-const INIT_MAX_MS = 120_000
+const INIT_MAX_MS = 600_000
 
 interface Pending {
   resolve: (v: unknown) => void
@@ -52,6 +58,8 @@ let nextId = 0
 let initPromise: Promise<InitResult> | null = null
 /** Renova o prazo do init a cada log do worker (só enquanto o init corre). */
 let onInitProgress: (() => void) | null = null
+/** O worker abriu o banco: desliga o prazo de silêncio (fica o teto total). */
+let onInitOpened: (() => void) | null = null
 const pending = new Map<number, Pending>()
 
 function rejectAllPending(reason: Error): void {
@@ -68,7 +76,7 @@ function call<T>(type: string, payload: Record<string, unknown> = {}): Promise<T
   })
 }
 
-export function initDb(): Promise<InitResult> {
+export function initDb(opts: { onProgress?: (message: string) => void } = {}): Promise<InitResult> {
   if (initPromise) return initPromise
 
   console.log('[db] criando worker SQLite…')
@@ -90,11 +98,19 @@ export function initDb(): Promise<InitResult> {
       result?: unknown
       error?: string
       log?: string
+      stage?: 'opened'
+      progress?: string
     }
 
+    // etapa/progresso do init (sem id): renovam o prazo e informam a tela
+    if (data.stage === 'opened') {
+      onInitOpened?.()
+      return
+    }
     // log do worker — útil pra debug
-    if (data.log) {
-      console.log('[db.worker]', data.log)
+    if (data.log || data.progress) {
+      if (data.log) console.log('[db.worker]', data.log)
+      if (data.progress) opts.onProgress?.(data.progress)
       onInitProgress?.()
       return
     }
@@ -139,6 +155,7 @@ export function initDb(): Promise<InitResult> {
   let cap: ReturnType<typeof setTimeout> | undefined
   const stopTimers = () => {
     onInitProgress = null
+    onInitOpened = null
     clearTimeout(idle)
     clearTimeout(cap)
   }
@@ -153,25 +170,32 @@ export function initDb(): Promise<InitResult> {
       rejectAllPending(err)
       reject(err)
     }
+    // O texto aparece na tela de erro do boot: linguagem simples, e nunca
+    // empurrar para "limpar local" (apaga a identidade se não foi exportada).
+    // O detalhe técnico vai para o console.
+    const KEEP =
+      'Feche as outras abas do Drift e toque em “↻ forçar atualização”, abaixo. Seus dados continuam aqui — não use “limpar local”.'
+    let opened = false
     const arm = () => {
       clearTimeout(idle)
-      idle = setTimeout(
-        () =>
-          fail(
-            `Init do SQLite worker ficou ${INIT_IDLE_TIMEOUT_MS / 1000}s sem dar sinal de vida. Feche outras abas do Drift e recarregue; veja o console — provável erro carregando o WASM ou abrindo OPFS.`,
-          ),
-        INIT_IDLE_TIMEOUT_MS,
-      )
+      if (opened) return // banco aberto: só o teto total
+      idle = setTimeout(() => {
+        console.error(`[db] init do worker SQLite sem sinal de vida por ${INIT_IDLE_TIMEOUT_MS} ms (WASM ou OPFS?)`)
+        fail(
+          `O Drift ficou ${INIT_IDLE_TIMEOUT_MS / 1000} segundos sem conseguir abrir os dados guardados neste aparelho. ${KEEP}`,
+        )
+      }, INIT_IDLE_TIMEOUT_MS)
     }
     onInitProgress = arm
+    onInitOpened = () => {
+      opened = true
+      clearTimeout(idle)
+    }
     arm()
-    cap = setTimeout(
-      () =>
-        fail(
-          `Init do SQLite worker excedeu ${INIT_MAX_MS / 1000}s. Feche outras abas do Drift e recarregue; veja o console.`,
-        ),
-      INIT_MAX_MS,
-    )
+    cap = setTimeout(() => {
+      console.error(`[db] init do worker SQLite passou de ${INIT_MAX_MS} ms`)
+      fail(`O Drift levou mais de ${INIT_MAX_MS / 60_000} minutos para abrir os dados deste aparelho. ${KEEP}`)
+    }, INIT_MAX_MS)
   })
 
   initPromise = Promise.race([initCall, timeout]).then(

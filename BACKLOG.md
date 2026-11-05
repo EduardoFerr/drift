@@ -75,6 +75,19 @@ em `Docs/simulacao-contagio/` e `Docs/spec-revisao-contagio.md`.
   locais → não trazem. Bateria `gesto_*` (spec §4.8): com 10% de denúncia,
   isca 12,4% → 4,8% (uso 20%) → 2,6% (uso 40%), sem custo de alcance; não
   pega spam direto de quem a pessoa segue.
+- [ ] **Folhas (`SlideUpOverlay`) sem Esc nem gestão de foco** — contexto:
+  revisão de UX de 05/11/2026 (pré-existente): não fecham com Esc, não
+  põem o foco no diálogo ao abrir, não o prendem dentro e não o devolvem
+  a quem abriu; afeta todas as folhas (a "chegou por" herda). O
+  `FullPageCard` já trata Esc — bloqueio: o componente está sendo
+  redesenhado no branch da Lily (material "velatura"); fazer depois do
+  merge dela, para não conflitar.
+- [ ] **Tela de erro do boot empurra para o botão destrutivo** — contexto:
+  o user quase usou "limpar local + recarregar" no erro de 05/11/2026; é
+  o botão principal da tela, apaga a identidade não exportada e o diálogo
+  pede para exportar, o que é impossível com o app sem abrir. Os textos já
+  avisam (fix de cc0a505 em diante) — bloqueio: desenho (inverter os
+  botões? oferecer exportar a identidade direto do IndexedDB antes?).
 - [ ] **Medir uso real do gesto "não trazer mais" e da denúncia** —
   contexto: a defesa contra a isca na Fase 1 depende das duas taxas, que a
   simulação supõe (spec §4.7–§4.8) — bloqueio: decidir como medir sem

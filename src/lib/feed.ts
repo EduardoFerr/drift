@@ -305,6 +305,13 @@ interface FeedStore {
    */
   snapshotTs: number | null
   /**
+   * A primeira carga da aba atual falhou (ex.: o arquivo do motor da aba
+   * Contágio sumiu do servidor depois de um deploy). A lista fica vazia e a
+   * UI oferece recarregar — nunca os posts da aba anterior sob o rótulo
+   * desta.
+   */
+  failed: boolean
+  /**
    * Contador de POSTs novos recebidos via subscribe desde a última vez
    * que o user "marcou como visto" (refresh manual ou tab change).
    * Por tab — cada um conta separadamente. UI mostra badge "+N novos"
@@ -323,6 +330,7 @@ export const useFeedStore = create<FeedStore>(() => ({
   limit: FEED_INITIAL_LIMIT,
   tab: 'global',
   snapshotTs: null,
+  failed: false,
   unseenByTab: { global: 0, following: 0, trending: 0, contagio: 0 },
 }))
 
@@ -376,6 +384,7 @@ export async function setFeedTab(tab: FeedTab): Promise<void> {
   useFeedStore.setState((s) => ({
     tab,
     loaded: false,
+    failed: false,
     unseenByTab: { ...s.unseenByTab, [tab]: 0 },
   }))
   await refreshFeed()
@@ -384,6 +393,29 @@ export async function setFeedTab(tab: FeedTab): Promise<void> {
 let refreshTimer: ReturnType<typeof setTimeout> | null = null
 let refreshInFlight = false
 let refreshPending = false
+let feedHolds = 0
+let refreshHeld = false
+
+/**
+ * Segura a atualização do feed enquanto uma folha que mora num card está
+ * aberta (ex.: "chegou por", aba Contágio): um evento do relay recalcularia
+ * a aba e tiraria o card — e a folha junto — da tela no meio da ação. Os
+ * refreshes pedidos nesse meio-tempo viram um só, ao soltar. Devolve a
+ * função que solta (idempotente).
+ */
+export function holdFeed(): () => void {
+  feedHolds++
+  let released = false
+  return () => {
+    if (released) return
+    released = true
+    feedHolds--
+    if (feedHolds === 0 && refreshHeld) {
+      refreshHeld = false
+      invalidateFeed()
+    }
+  }
+}
 
 /**
  * Sinaliza que o feed precisa ser recarregado do SQLite. Debounced —
@@ -407,6 +439,11 @@ export function invalidateFeed(): void {
  * `location.reload()` ou clearLocal.
  */
 export async function refreshFeed(): Promise<void> {
+  // Folha aberta sobre um card (holdFeed): roda quando ela fechar.
+  if (feedHolds > 0) {
+    refreshHeld = true
+    return
+  }
   // Coalesce: se já tem refresh rolando, marca pendente e sai. Quando
   // o atual terminar, dispara mais um.
   if (refreshInFlight) {
@@ -414,8 +451,8 @@ export async function refreshFeed(): Promise<void> {
     return
   }
   refreshInFlight = true
+  const { limit, tab } = useFeedStore.getState()
   try {
-    const { limit, tab } = useFeedStore.getState()
     const rawPosts = await getFeedByTab(tab, limit)
     // A aba pode ter mudado enquanto a query rodava (a do Contágio é a mais
     // lenta): descarta o resultado velho e refaz para a aba atual, em vez de
@@ -434,10 +471,17 @@ export async function refreshFeed(): Promise<void> {
     useFeedStore.setState({
       posts,
       loaded: true,
+      failed: false,
       snapshotTs: Date.now(), // Lily Item 3 — UI badge "atualizado há X"
     })
   } catch (err) {
     console.error('[feed] refresh failed:', err)
+    // Primeira carga desta aba (logo depois da troca): os posts na store são
+    // da aba anterior. Não deixa a lista errada sob o rótulo desta; a UI
+    // mostra o erro com "recarregar". Num refresh da mesma aba, os posts
+    // que estão lá são dela: ficam.
+    const now = useFeedStore.getState()
+    if (now.tab === tab && !now.loaded) useFeedStore.setState({ posts: [], loaded: true, failed: true })
   } finally {
     refreshInFlight = false
     if (refreshPending) {

@@ -24,6 +24,23 @@ export function PersonName({ pub }: { pub: string }) {
   return <>{meta?.displayName?.trim() || meta?.name?.trim() || `anon…${pub.slice(-6)}`}</>
 }
 
+/**
+ * Nome + fim da chave ("Ana …a1b2c3"), onde a escolha importa (folha
+ * "chegou por", lista "não trazem"): uma conta que copia o nome de um amigo
+ * não se passa por ele. Mesma convenção do `anon…<6>` do AuthorChip; sem
+ * nome, o fim da chave já é o nome.
+ */
+export function PersonNameKey({ pub }: { pub: string }) {
+  const meta = useUserMetadata(pub)
+  const name = meta?.displayName?.trim() || meta?.name?.trim()
+  if (!name) return <>{`anon…${pub.slice(-6)}`}</>
+  return (
+    <>
+      {name} <span className="text-drift-muted">…{pub.slice(-6)}</span>
+    </>
+  )
+}
+
 /** "Ana", "Ana e Bia", "Ana, Bia e Caio". */
 export function PeopleNames({ pubs }: { pubs: readonly string[] }) {
   return (
@@ -79,7 +96,11 @@ export function ContagionViaChip({ vias }: { vias: readonly string[] }) {
             e.stopPropagation()
             open(vias)
           }}
-          className={`${PILL} min-h-[28px] cursor-pointer transition-colors hover:border-drift-accent2 hover:text-drift-text focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2`}
+          data-no-longpress="true"
+          // pointer-events-auto: em post com imagem o texto do card vive
+          // numa camada pointer-events-none (o toque vai para a imagem),
+          // como o "ver mais" (SubpostLayout)
+          className={`${PILL} pointer-events-auto min-h-[28px] cursor-pointer transition-colors hover:border-drift-accent2 hover:text-drift-text focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2`}
         >
           {body}
           <span aria-hidden="true" className="opacity-60">›</span>

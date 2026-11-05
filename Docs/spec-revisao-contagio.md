@@ -239,13 +239,15 @@ a limpeza do cache foi corrigida antes do merge.
 
 A sensibilidade (§4.7) mostrou que a defesa contra a isca depende de as
 pessoas denunciarem. O app ganhou um gesto privado na pílula ↪: "não
-trazer mais por X" faz os DRIFTs de X pararem de trazer post. Os posts
-diretos de X, o SINK (vacina) e a denúncia (quarentena) de X continuam
-valendo; não pune ninguém e se desfaz em listas locais. Na simulação
-(`cutMode: 'bring'`), cada vez que alguém vê spam trazido por um contato,
-usa o gesto contra ele com chance c; a denúncia acontece com chance r.
-Rodadas `gesto_r{35,10}_c{0,20,40}__*`, média das últimas 6 semanas, %
-das pessoas que veem ataque (pico entre parênteses):
+trazer mais por X" faz os DRIFTs de X pararem de trazer post, e o SINK
+(vacina) e a denúncia (quarentena) de X passam a pesar como os de quem o
+leitor só segue (balde fraco, teto 0,5). Os posts diretos de X continuam;
+não pune ninguém e se desfaz na própria folha ou em config → conteúdo →
+listas → não trazem. Na simulação (`cutMode: 'bring'`, `cutNeg: 'weak'`),
+cada vez que alguém vê spam trazido por um contato, usa o gesto contra ele
+com chance c; a denúncia acontece com chance r. Rodadas
+`gesto_r{35,10}_c{0,20,40}__*`, média das últimas 6 semanas, % das pessoas
+que veem ataque (pico entre parênteses):
 
 | Cenário | r35 · c0 | r35 · c20 | r35 · c40 | r10 · c0 | r10 · c20 | r10 · c40 |
 |---|---|---|---|---|---|---|
@@ -262,6 +264,29 @@ chega direto, porque a pessoa segue o fazendeiro, e só a denúncia (que
 zera o vínculo com o autor) ou deixar de seguir resolvem. Os dias de surto
 (> 5% das pessoas) caem de 152 para 126 (c20) e 64 (c40) com denúncia em
 10%. Ordem embaralhada: 0 diferenças em 840 feeds em todas as rodadas.
+"Sem custo de alcance" vale porque a simulação só usa o gesto contra spam:
+quem corta um contato por gosto deixa de receber o que ele traria.
+
+**Por que o cortado pesa como fraco (revisão Barney+Satoshi, 05/11/2026).**
+Na primeira versão do gesto, o SINK e a denúncia de X continuavam com o
+vínculo inteiro. A conta de isca cortada — e por isso nunca mais
+denunciada: o leitor deixa de ver o spam dela — ficava com 0,8 para sempre
+e podia esconder post honesto (sozinha, a vacina 8 anula o que chegou por
+um vínculo forte; com qualquer conta só seguida, a quarentena passa de 10).
+Cenário `isca_difamacao` (as contas de isca enterram e denunciam post
+honesto) e a métrica nova `honHid` (% dos leitores com algum post honesto
+que entraria e foi escondido):
+
+| Regra | r35 · c0 | r35 · c20 | r35 · c40 | r10 · c0 | r10 · c20 | r10 · c40 |
+|---|---|---|---|---|---|---|
+| primeira versão (vínculo inteiro), `gesto_forte_*` | 0,5 | 12,3 | 18,3 | 2,7 | **26,9** | 31,1 |
+| app (balde fraco), `gesto_*` | 0,5 | 0,4 | 0,2 | 2,7 | **0,4** | 0,2 |
+
+Na primeira versão, até 7,6% das abas ficavam quase vazias e o alcance do
+post mais viral caía de 30% para 18%; com o balde fraco, nenhuma aba
+esvazia e a isca pura não muda (4,8% com r10 · c20). Ignorar de vez o SINK
+e a denúncia do cortado dá o mesmo (0,5%), mas tira do leitor a vacina de
+um contato que ele só não quer mais que recomende.
 
 ## 5. O que esta simulação não prova
 

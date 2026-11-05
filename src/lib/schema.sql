@@ -235,7 +235,7 @@ CREATE TABLE IF NOT EXISTS muted (
 --
 -- Gesto "não trazer mais por X": os DRIFTs de X deixam de trazer post para
 -- este leitor; os posts diretos, o SINK e a denúncia de X continuam.
--- Desfazível em Configurações → listas locais → não trazem.
+-- Desfazível na própria folha ou em config → conteúdo → listas → não trazem.
 CREATE TABLE IF NOT EXISTS contagion_no_bring (
   viewer_pub  TEXT NOT NULL,
   subject_pub TEXT NOT NULL,

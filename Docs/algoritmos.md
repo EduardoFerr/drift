@@ -900,6 +900,8 @@ próprio autor em p:
                      menos os marcados "não trazer mais")
   vacina(p)     = Σ⁺(contatos com SINK em p nas últimas 96 h)
   quarentena(p) = Σ⁺(contatos que denunciaram p nos últimos 14 dias)
+                  ← na vacina e na quarentena, os marcados "não trazer mais"
+                    entram na parte dos fracos (teto 5), seja qual for o vínculo
   direto(p)     = autor seguido com tie > 0 e post com até 72 h
 
 p entra ⇔ quarentena(p) < 10
@@ -925,13 +927,22 @@ da tag `p` quando o post não está no cache); o cache não apaga posts que
 o leitor denunciou.
 
 **Gesto "não trazer mais por X".** Tocar na pílula "↪ chegou por" abre a
-folha "chegou por", com um botão por pessoa. O gesto corta só as
-recomendações de X: os DRIFTs dele param de trazer post. Os posts que X
-escreve continuam entrando direto, e o SINK (vacina) e a denúncia
-(quarentena) de X continuam valendo. Não pune ninguém, não é publicado
-(tabela local `contagion_no_bring`) e se desfaz em Configurações → listas
-locais → não trazem. É o jeito de dizer "esse contato me traz lixo" sem
-denunciar post honesto e sem deixar de seguir em público.
+folha "chegou por", com um botão por pessoa. O gesto corta as
+recomendações de X: os DRIFTs dele param de trazer post, e o SINK (vacina)
+e a denúncia (quarentena) dele passam a pesar como os de quem o leitor só
+segue — sozinho, X não esconde nada. Os posts que X escreve continuam
+entrando direto. Não pune ninguém (o vínculo não muda), não é publicado
+(tabela local `contagion_no_bring`) e se desfaz na própria folha
+("desfazer") ou em config → conteúdo → listas → não trazem. É o jeito de
+dizer "esse contato me traz lixo" sem denunciar post honesto e sem deixar
+de seguir em público.
+
+Por que o SINK e a denúncia de X também caem: na primeira versão eles
+continuavam com o vínculo inteiro. Uma conta de isca cortada — e por isso
+nunca mais denunciada, porque o leitor deixa de ver o spam dela — ficava
+com 0,8 para sempre e podia esconder post honesto: sozinha, a vacina dela
+anula o que chegou por um vínculo forte; com qualquer conta só seguida, a
+quarentena passa de 10 (revisão em par de 05/11/2026; tabela abaixo).
 
 ### Exemplo
 
@@ -948,6 +959,7 @@ Bia segue Ana (já impulsionou um post dela → 0,8), Caio e Duda (só segue
 | V | Ana deu DRIFT; Bia já denunciou 2 posts que vieram pela Ana | tie(Ana) = 8 − 10 → 0 | não |
 | S | Ana deu DRIFT; Bia já deu SINK em 5 posts da Ana | tie(Ana) = 8 (SINK não pune) | sim |
 | N | Ana deu DRIFT; Bia marcou "não trazer mais por Ana" | traz 0 | não (posts da própria Ana continuam entrando) |
+| M | Post de Caio de ontem; Ana, marcada "não trazer mais", deu SINK e denunciou | vacina e quarentena min(8, 5) = 5: 10 − 5 = 5 > 0 e 5 < 10 | sim (marcada, a Ana sozinha não esconde) |
 
 ### Simulação (2.250 pessoas, 6 cidades, 24 semanas, fazenda de 2.000 contas)
 
@@ -982,11 +994,17 @@ das pessoas que veem ataque:
 | isca + 10% enterrando por gosto | 2,3 / 1,5 / 1,4 | 11,7 / 3,8 / 2,5 |
 | enganados (10%) + isca | 0,1 / 0,1 / 0,1 | 2,5 / 2,5 / 2,5 |
 | sem ataque (alcance do post mais viral) | 37,8 / 37,8 / 37,8 | 37,8 / 37,8 / 37,8 |
+| isca que difama — leitores com post honesto escondido, **regra do app** (cortado pesa como fraco) | 0,5 / 0,4 / 0,2 | 2,7 / **0,4** / 0,2 |
+| isca que difama — idem, **primeira versão** (cortado seguia com o vínculo inteiro) | 0,5 / 12,3 / 18,3 | 2,7 / **26,9** / 31,1 |
 
-O gesto segura a isca mesmo quando quase ninguém denuncia, e não custa
-alcance honesto (sem ataque, nada muda). Ele **não ajuda** quando o spam
-vem direto de alguém que a pessoa segue (os enganados seguem o
-fazendeiro): ali, só denunciar ou deixar de seguir.
+O gesto segura a isca mesmo quando quase ninguém denuncia. Sem ataque,
+nada muda — mas a simulação só usa o gesto contra spam: quem corta um
+contato por gosto deixa de receber o que ele traria, como ao deixar de
+seguir. Ele **não ajuda** quando o spam vem direto de alguém que a pessoa
+segue (os enganados seguem o fazendeiro): ali, só denunciar ou deixar de
+seguir. A última linha é o porquê da regra: com o vínculo inteiro, a isca
+cortada escondia post honesto de até 31% dos leitores e deixava 7,6% das
+abas quase vazias (rodadas `gesto_forte_*`).
 
 Onde a simulação difere do app: na simulação, "quem trouxe" é um contato
 só (no app, todos os empatados), o SINK de contato vale 2 dias (no app,
@@ -1024,13 +1042,20 @@ Global esconde na aba Contágio também.
 - Ação do próprio autor no próprio post não conta (como no ranking
   canônico): republicar o DRIFT não mantém um post velho na aba.
 - Bloquear tira a pessoa da conta (não traz, não vacina, não denuncia);
-  silenciar só esconde os posts dela; "não trazer mais" só tira os DRIFTs
-  dela (os posts dela, o SINK e a denúncia continuam valendo).
-- "Não trazer mais" nunca põe post na aba e nunca vira "quem trouxe";
-  não mexe no vínculo (não é experiência ruim) e vale por identidade:
-  trocar de identidade no aparelho não leva a lista junto.
-- A aba só se atualiza quando a folha "chegou por" fecha (atualizar antes
-  tiraria o post, e a folha junto, antes da confirmação aparecer).
+  silenciar só esconde os posts dela; "não trazer mais" tira os DRIFTs
+  dela e põe o SINK e a denúncia dela no balde dos fracos (os posts dela
+  continuam entrando direto).
+- O marcado "não trazer mais" nunca traz post nem vira "quem trouxe" e,
+  sozinho, não esconde nada; marcar só muda posts em que ele agiu — e pode
+  devolver à aba um post que só ele tinha vacinado. Não mexe no vínculo
+  (não é experiência ruim) e vale por identidade: trocar de identidade no
+  aparelho não leva a lista junto.
+- A folha "chegou por" e a lista "não trazem" mostram o nome com o fim da
+  chave (…a1b2c3): uma conta que copia o nome de um amigo não se passa por
+  ele.
+- A aba só se atualiza quando a folha "chegou por" fecha, mesmo que chegue
+  evento do relay com ela aberta (`holdFeed` em `feed.ts`): atualizar antes
+  tiraria o post, e a folha junto, no meio da ação.
 - SINK de contato vale 96 h, enquanto o post ainda pode entrar; senão o
   atacante republicaria o DRIFT depois que a vacina expirasse.
 - A moderação comunitária global (§3) continua valendo: post com
@@ -1065,7 +1090,7 @@ Global esconde na aba Contágio também.
 | As 4 abas usam a mesma ordenação canônica (`FEED_ORDER`) | `tests/score-decay-parity.test.ts`, `tests/scoring-pipeline-conformance.test.ts` | §8, §24 |
 | Experiências ruins do leitor só mexem na aba dele; o global não muda | `tests/contagion.test.ts` | §24 |
 | Contas só seguidas não escondem nada sozinhas (teto também na vacina e na quarentena) | `tests/contagion.test.ts` | §24, §26 |
-| "Não trazer mais por X" nunca põe post na aba nem cria "quem trouxe"; o SINK e a denúncia de X continuam valendo | `tests/contagion.test.ts` | §24 |
+| "Não trazer mais por X": X nunca traz nem vira "quem trouxe"; sozinho, não esconde nada; marcar só muda posts em que X agiu | `tests/contagion.test.ts` | §24 |
 | SINK do leitor não pune ninguém na aba Contágio | `tests/contagion.test.ts`, `e2e/contagion-tab.spec.ts` | §23 |
 | Denúncia fora da aba nunca pune quem trouxe | `e2e/contagion-tab.spec.ts` | §24 |
 

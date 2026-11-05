@@ -112,6 +112,13 @@ export interface BootState {
    */
   seedProgress: { done: number; total: number } | null
   /**
+   * Trabalho longo do SQLite no boot, em linguagem simples (ex.: "organizando
+   * os dados deste aparelho (1 de 3)…" ao criar índice novo num banco grande
+   * depois de uma atualização). BootView mostra na etapa do SQLite para a
+   * tela não parecer travada. `null` fora disso.
+   */
+  dbProgress: string | null
+  /**
    * Falhas non-fatal que aconteceram durante o boot mas não impediram
    * `step === 'ready'`. UI usa pra mostrar indicador "modo degradado"
    * sem bloquear o app. Sprint 6 do roadmap pós-auditoria.
@@ -138,6 +145,7 @@ const INITIAL: BootState = {
   relays: null,
   devSeedActive: false,
   seedProgress: null,
+  dbProgress: null,
   degradedReasons: [],
 }
 
@@ -250,8 +258,10 @@ async function doBootstrap(): Promise<void> {
     }
 
     setBoot((p) => ({ ...p, step: 'db' }))
-    const { hasOpfs, storage } = await initDb()
-    setBoot((p) => ({ ...p, hasOpfs, storage }))
+    const { hasOpfs, storage } = await initDb({
+      onProgress: (dbProgress) => setBoot((p) => ({ ...p, dbProgress })),
+    })
+    setBoot((p) => ({ ...p, hasOpfs, storage, dbProgress: null }))
 
     // ─── Dev-seed (Sprint N+5 E2E) ─────────────────────────────────
     //
@@ -548,6 +558,16 @@ async function doBootstrap(): Promise<void> {
     // agregada COUNT(*) GROUP BY post_id é barata mas não bloqueia boot.
     void loadCommentCounts().catch((err) => {
       console.warn('[bootstrap] loadCommentCounts falhou (degraded):', err)
+    })
+
+    // Motor da aba Contágio: fora do chunk de entrada, mas carregado logo
+    // depois do boot, em segundo plano. Assim o arquivo vem da MESMA versão
+    // do app: num deploy novo, o hash antigo some do servidor e um import()
+    // tardio falharia (feed, denúncia, remover identidade).
+    scheduleIdle(() => {
+      void import('./contagion-data').catch((err) => {
+        console.warn('[bootstrap] pré-carga do motor da aba Contágio falhou:', err)
+      })
     })
 
     // ─── Post-paint: trabalho não-crítico ─────────────────────────

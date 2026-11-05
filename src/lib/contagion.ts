@@ -22,9 +22,12 @@
  * segue entram direto, enquanto o vínculo com o autor for positivo.
  *
  * Gesto do leitor "não trazer mais por X" (local, desfazível): os DRIFTs de
- * X deixam de trazer post; os posts diretos de X, o SINK e a denúncia de X
- * continuam valendo. Com denúncia em 10% dos spams vistos, usado em 20% das
- * vezes, segura a isca (Docs/spec-revisao-contagio.md §4.8).
+ * X deixam de trazer post e o SINK e a denúncia de X passam a contar como os
+ * de quem o leitor só segue (balde fraco, com teto); os posts diretos de X
+ * continuam. Com o vínculo inteiro, uma conta de isca cortada — e por isso
+ * nunca denunciada — seguiria escondendo post honesto (revisão de
+ * 05/11/2026). Com denúncia em 10% dos spams vistos, usado em 20% das vezes,
+ * segura a isca (Docs/spec-revisao-contagio.md §4.8).
  *
  * Tudo em décimos inteiros: a soma não depende da ordem de chegada
  * (Docs/algoritmos.md §9; simulação em Docs/simulacao-contagio/).
@@ -86,8 +89,9 @@ export interface ContagionInput {
   posts: readonly ContagionPost[]
   /**
    * Gesto local "não trazer mais por X": os DRIFTs destes contatos não
-   * trazem post. O resto continua — os posts diretos deles, o SINK
-   * (vacina) e a denúncia (quarentena). Desfazível; nunca publicado.
+   * trazem post, e o SINK (vacina) e a denúncia (quarentena) deles contam
+   * como vínculo fraco (teto 0,5 somado aos outros fracos). Os posts diretos
+   * deles continuam. Desfazível; nunca publicado.
    */
   noBring?: ReadonlySet<string>
 }
@@ -156,7 +160,13 @@ export function computeContagion(input: ContagionInput): Map<string, ContagionVe
     if (!a) acc.set(id, (a = { up: { strong: 0, weak: 0 }, vac: { strong: 0, weak: 0 }, quar: { strong: 0, weak: 0 }, contributors: [] }))
     return a
   }
-  const add = (sum: Sum, t: number) => { if (t > CONTAGION.TIE_FOLLOW) sum.strong += t; else sum.weak += t }
+  // `weak`: conta no balde fraco mesmo com vínculo forte (contato cortado
+  // pelo gesto "não trazer mais").
+  const add = (sum: Sum, t: number, weak = false) => {
+    if (!weak && t > CONTAGION.TIE_FOLLOW) sum.strong += t
+    else sum.weak += t
+  }
+  const cut = (pub: string) => noBring?.has(pub) ?? false
   const total = (sum: Sum) => sum.strong + Math.min(sum.weak, CONTAGION.WEAK_CAP)
 
   for (const a of latestActions(input.actions).values()) {
@@ -169,9 +179,10 @@ export function computeContagion(input: ContagionInput): Map<string, ContagionVe
     if (posts.get(a.postId)?.author === a.actor) continue
     const t = tie(a.actor)
     if (t <= 0) continue
-    if (a.kind === 'bury') { add(get(a.postId).vac, t); continue }
-    // "não trazer mais por X": o DRIFT de X não traz (o resto de X vale)
-    if (noBring?.has(a.actor)) continue
+    // "não trazer mais por X": o SINK de X vacina como o de quem só é seguido…
+    if (a.kind === 'bury') { add(get(a.postId).vac, t, cut(a.actor)); continue }
+    // …e o DRIFT de X não traz
+    if (cut(a.actor)) continue
     const s = get(a.postId)
     add(s.up, t)
     s.contributors.push({ pub: a.actor, tie: t })
@@ -180,7 +191,7 @@ export function computeContagion(input: ContagionInput): Map<string, ContagionVe
   for (const r of input.reports) {
     if (r.reporter === viewer || nowSec - r.createdAt > CONTAGION.REPORT_WINDOW_S) continue
     const t = tie(r.reporter)
-    if (t > 0) add(get(r.postId).quar, t)
+    if (t > 0) add(get(r.postId).quar, t, cut(r.reporter))
   }
 
   // Posts recentes de quem o leitor segue entram direto (se o vínculo

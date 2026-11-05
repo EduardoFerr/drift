@@ -34,13 +34,17 @@ let freshSeq = 0
  * relay. O seed sozinho não garante DRIFT recente da Alice: sem isto a
  * pílula e a denúncia na aba ficavam sem cobertura.
  */
-async function aliceBringsOne(page: Page): Promise<string> {
+async function aliceBringsOne(page: Page, image?: 'landscape' | 'portrait'): Promise<string> {
   const alice = NAMED_BY_NAME.alice!
   const frank = NAMED_BY_NAME.frank!
   const now = Math.floor(Date.now() / 1000)
   const text = `e2e contágio ${now}-${++freshSeq}`
+  // com imagem: o texto do card vive numa camada pointer-events-none
+  const subpost = image
+    ? { id: `e2e-${freshSeq}`, type: 'text+image', text, imageUrl: '/dev-seed-media/seed-1.jpg', order: 0, layout: image }
+    : { id: `e2e-${freshSeq}`, type: 'text', text, imageUrl: null, order: 0, layout: 'text' }
   const post = finalizeEvent(
-    { kind: 9078, created_at: now - 120, tags: [['drift-version', '1'], ['client', 'drift-official']], content: JSON.stringify({ subposts: [{ id: `e2e-${freshSeq}`, type: 'text', text, imageUrl: null, order: 0, layout: 'text' }] }) },
+    { kind: 9078, created_at: now - 120, tags: [['drift-version', '1'], ['client', 'drift-official']], content: JSON.stringify({ subposts: [subpost] }) },
     frank.sk,
   )
   const drift = finalizeEvent({ kind: 9079, created_at: now - 60, tags: [['e', post.id], ['p', post.pubkey]], content: '' }, alice.sk)
@@ -486,7 +490,7 @@ test.describe('aba Contágio', () => {
     }
   })
 
-  test('11. "não trazer mais por X" pela etiqueta: some o que a Alice trouxe, ficam os posts dela, sem punição; desfazer em listas locais devolve', async ({ browser }) => {
+  test('11. "não trazer mais por X" pela etiqueta: some o que a Alice trouxe, ficam os posts dela, sem punição; desfazer na folha e em config → listas devolve', async ({ browser }) => {
     // percorre card → folha → configurações → listas: mais lento que os outros
     test.setTimeout(120_000)
     const bob = await setupUser(browser, 'bob')
@@ -500,9 +504,25 @@ test.describe('aba Contágio', () => {
       await page.getByTestId('contagion-via').first().getByRole('button').click()
       const sheet = page.getByRole('dialog', { name: 'chegou por' })
       await expect(sheet).toBeVisible()
-      await sheet.getByRole('button', { name: /^não trazer mais por/ }).click()
-      // a confirmação aparece na folha; a aba só se atualiza ao fechar
+      const cut = sheet.getByRole('button', { name: /^não trazer mais por/ })
+      const undo = sheet.getByRole('button', { name: 'desfazer' })
+      // nome com o fim da chave: quem copia o nome da Alice não se passa por ela
+      await expect(sheet.getByRole('listitem').first()).toContainText(`…${alice.slice(-6)}`)
+      await cut.click()
+      // a confirmação é anunciada e o foco vai para o "desfazer" da linha
+      // (o botão tocado some; sem isso o foco cairia fora do diálogo)
       await expect(sheet.getByRole('status')).toHaveText(/não traz mais/)
+      await expect(undo).toBeFocused()
+      // desfazer na hora devolve o botão, com o foco, e anuncia
+      await undo.click()
+      await expect(sheet.getByRole('status')).toHaveText(/volta a trazer/)
+      await expect(cut).toBeFocused()
+      await cut.click()
+      await expect(undo).toBeFocused()
+      // com a folha aberta a aba não se mexe — nem com evento novo do relay
+      await aliceBringsOne(page)
+      await page.waitForTimeout(800)
+      await expect(sheet).toBeVisible()
       expect(await tabIds(page), 'nada muda com a folha aberta').toContain(target)
       await sheet.getByRole('button', { name: 'fechar' }).click({ timeout: 10_000 })
       await expect(sheet).toHaveCount(0)
@@ -523,6 +543,66 @@ test.describe('aba Contágio', () => {
       await lista.getByRole('button', { name: 'voltar a trazer' }).click({ timeout: 10_000 })
       await expect(lista).toHaveCount(0)
       await expect.poll(() => tabIds(page), { timeout: 10_000 }).toContain(target)
+    } finally {
+      await bob.context.close()
+    }
+  })
+
+  test('12. em post com imagem (paisagem e retrato), tocar na etiqueta abre a folha — o toque não vai para a imagem', async ({ browser }) => {
+    // o texto do card com imagem vive numa camada pointer-events-none; o
+    // clique do Playwright exige que a etiqueta receba o toque de verdade
+    test.setTimeout(120_000)
+    const bob = await setupUser(browser, 'bob')
+    try {
+      const page = bob.page
+      const paisagem = await aliceBringsOne(page, 'landscape')
+      const retrato = await aliceBringsOne(page, 'portrait')
+      await openTab(page, 'contágio')
+      for (const target of [paisagem, retrato]) {
+        await goToCard(page, target)
+        await page.getByTestId('contagion-via').first().getByRole('button').click({ timeout: 10_000 })
+        const sheet = page.getByRole('dialog', { name: 'chegou por' })
+        await expect(sheet).toBeVisible()
+        await sheet.getByRole('button', { name: 'fechar' }).click({ timeout: 10_000 })
+        await expect(sheet).toHaveCount(0)
+      }
+    } finally {
+      await bob.context.close()
+    }
+  })
+
+  test('13. a 320 px: o botão da folha "chegou por" e as 4 abas das listas locais cabem inteiros na tela', async ({ browser }) => {
+    // revisão de UX: em fila, as 4 abas só cabiam a partir de ~440 px e
+    // "não trazem" (o único desfazer fora da folha) ficava fora da tela
+    test.setTimeout(120_000)
+    const bob = await setupUser(browser, 'bob')
+    try {
+      const page = bob.page
+      await page.setViewportSize({ width: 320, height: 720 })
+      const inside = async (loc: ReturnType<Page['getByRole']>, what: string) => {
+        const b = await loc.boundingBox()
+        expect(b, `${what} visível`).not.toBeNull()
+        expect(b!.x >= 0 && b!.x + b!.width <= 320, `${what} inteiro dentro dos 320 px`).toBe(true)
+      }
+      const target = await aliceBringsOne(page)
+      await openTab(page, 'contágio')
+      await goToCard(page, target)
+      await page.getByTestId('contagion-via').first().getByRole('button').click({ timeout: 10_000 })
+      const sheet = page.getByRole('dialog', { name: 'chegou por' })
+      await expect(sheet).toBeVisible()
+      await inside(sheet.getByRole('button', { name: /^não trazer mais por/ }), 'botão "não trazer mais"')
+      await page.waitForTimeout(700) // a captura depois da animação de entrada
+      await page.screenshot({ path: test.info().outputPath('folha-chegou-por-320.png') })
+      await sheet.getByRole('button', { name: 'fechar' }).click({ timeout: 10_000 })
+      await expect(sheet).toHaveCount(0)
+      await page.getByRole('button', { name: 'abrir config' }).click({ timeout: 10_000 })
+      await page.locator('[id^="settings-group-"]', { hasText: 'conteúdo' }).click({ timeout: 10_000 })
+      await page.getByRole('button', { name: /^listas/ }).click({ timeout: 10_000 })
+      for (const [name, what] of [[/^fixados/, 'fixados'], [/^bloqueados/, 'bloqueados'], [/^silenciados/, 'silenciados'], [/^não trazem/, 'não trazem']] as const) {
+        await inside(page.getByRole('button', { name }), `aba "${what}"`)
+      }
+      await page.waitForTimeout(700)
+      await page.screenshot({ path: test.info().outputPath('listas-locais-320.png') })
     } finally {
       await bob.context.close()
     }

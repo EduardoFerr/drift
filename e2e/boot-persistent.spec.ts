@@ -106,6 +106,8 @@ test.describe('boot com OPFS em disco', () => {
     }
   })
 
+  // smoke: com o schema em ~0,1 s, a recarga quase sempre cai depois dele;
+  // o caso de matar no meio de trabalho pesado é o teste 5
   test('3. recarregar no meio do boot não trava o próximo', async ({}, info) => {
     const { ctx, page } = await persistent(info.outputPath('perfil'))
     try {
@@ -114,6 +116,44 @@ test.describe('boot com OPFS em disco', () => {
       await opened
       await page.reload() // mata o worker com o schema em andamento
       expect(await bootResult(page)).toBe('ok')
+    } finally {
+      await ctx.close()
+    }
+  })
+
+  test('5. banco grande: índice novo um por um, com progresso; recarregar no meio não volta à estaca zero', async ({}, info) => {
+    // revisão Barney+Satoshi: com o schema todo numa transação e o worker
+    // morto no prazo, celular lento com banco grande entraria em laço
+    const { ctx, page, logs } = await persistent(info.outputPath('perfil'))
+    try {
+      await page.goto(URL)
+      expect(await bootResult(page)).toBe('ok')
+      await page.evaluate(async () => {
+        const db = (window as unknown as { __driftDb: { run: (s: string) => Promise<void> } }).__driftDb
+        await db.run(`WITH RECURSIVE c(x) AS (SELECT 1 UNION ALL SELECT x+1 FROM c WHERE x < 150000)
+          INSERT OR IGNORE INTO spreads(post_id, spreader_pub, created_at, event_id, raw_event)
+          SELECT printf('p%06d', x % 20000), printf('%064x', x), 1790000000 + x, printf('s%010d', x),
+                 printf('{"id":"s%010d","pad":"%s"}', x, hex(randomblob(120))) FROM c`)
+        for (const ix of ['idx_spreads_spreader', 'idx_buries_burier', 'idx_reports_reporter']) await db.run(`DROP INDEX IF EXISTS ${ix}`)
+      })
+      // atualização: o boot cria os índices que faltam, um por um, com log
+      const creating = page.waitForEvent('console', {
+        predicate: (m) => m.text().includes('criando índice idx_spreads_spreader'),
+        timeout: 60_000,
+      })
+      await page.reload()
+      await creating
+      await page.reload() // mata o worker no meio do trabalho pesado
+      expect(await bootResult(page)).toBe('ok')
+      const ixs = await exec<{ name: string }>(
+        page,
+        `SELECT name FROM sqlite_master WHERE type = 'index'
+           AND name IN ('idx_spreads_spreader','idx_buries_burier','idx_reports_reporter') ORDER BY name`,
+      )
+      expect(ixs.map((i) => i.name)).toEqual(['idx_buries_burier', 'idx_reports_reporter', 'idx_spreads_spreader'])
+      const [{ n }] = await exec<{ n: number }>(page, 'SELECT COUNT(*) AS n FROM spreads')
+      expect(n, 'nada se perdeu com a recarga no meio').toBeGreaterThanOrEqual(150_000)
+      expect(logs.some((l) => /IOERR|disk I\/O|sem dar sinal|levou mais de/.test(l)), 'sem erro de E/S nem prazo').toBe(false)
     } finally {
       await ctx.close()
     }

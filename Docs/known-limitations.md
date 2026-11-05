@@ -305,8 +305,13 @@ audits só por feio. Defer documentado > silence.
     5%, a 22,3% (revisão em par, Satoshi). O gesto privado "não trazer
     mais por X" (pílula ↪, desde 05/11/2026) é a alavanca de maior
     retorno: usado em 20% das vezes, segura 10% de denúncia em 4,8% (40%:
-    2,6%), sem custo de alcance honesto (spec §4.8). Quanto as pessoas vão
-    de fato usá-lo é o que medir antes de a aba virar padrão.
+    2,6%) (spec §4.8). "Sem custo de alcance" vale na simulação, onde o
+    gesto só é usado contra spam: quem corta por gosto perde o que aquele
+    contato traria. Quanto as pessoas vão de fato usá-lo é o que medir
+    antes de a aba virar padrão. O cortado continua seguido, mas o SINK e
+    a denúncia dele pesam como de vínculo fraco: na primeira versão
+    (vínculo inteiro), a isca cortada escondia post honesto de 27–31% dos
+    leitores (revisão Barney+Satoshi; com o peso fraco, 0,2–0,4%).
   - **Spam direto de quem você segue:** o gesto não ajuda quando o spam
     vem de alguém que a pessoa segue (os "enganados" seguem o fazendeiro):
     com denúncia em 10%, 2,5% veem ataque com ou sem gesto. Ali, só
@@ -318,8 +323,17 @@ audits só por feio. Defer documentado > silence.
     alcance).
   - **Fazenda postando spam pelas próprias contas:** conta de isca que já
     vale 0,8 posta spam direto (o caminho direto só exige vínculo > 0) —
-    6,5% na simulação; as rodadas publicadas supõem que a fazenda só
-    impulsiona o spam do dono.
+    6,5% na simulação com denúncia em 35%; com denúncia em 10%, 17,4%, e
+    12,6% com o gesto usado em 20% das vezes (o gesto não corta post
+    direto; só a denúncia zera o vínculo com o autor). Funil do Global (1%
+    dos dias) + gesto em 20%: 18,3%. As rodadas publicadas supõem que a
+    fazenda só impulsiona o spam do dono (números da revisão Barney+Satoshi
+    de 05/11/2026, com o simulador do repositório + `farmSpamDirect`/
+    `baitDiscovery`).
+  - **Culpa trocada induzindo o corte:** trocar mídia, nome ou avatar
+    depois do DRIFT de um contato honesto pode levar o leitor a marcar esse
+    contato com "não trazer mais". Menos grave que a denúncia: é
+    desfazível e aparece na lista "não trazem".
   - **Culpa trocada:** o atacante posta algo bom, um contato honesto dá
     DRIFT, e depois troca mídia sem hash, nome ou avatar por abuso; quem
     denunciar na aba pune o contato honesto (1–3% dos vínculos honestos em

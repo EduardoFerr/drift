@@ -282,13 +282,17 @@ passa de contato em contato.
   (o contato de maior vínculo). Se mais de uma pessoa trouxe com o mesmo
   vínculo, aparece **X, Y +N**. Post que entrou direto não mostra.
 - **Não trazer mais por X:** toque em **↪ chegou por** para ver quem
-  trouxe o post e, se quiser, parar de receber o que essa pessoa drifta.
-  Só as recomendações dela param: os posts que ela escreve continuam
-  chegando, e o SINK e a denúncia dela continuam valendo. Não é punição,
-  ninguém fica sabendo e fica só no seu aparelho. A aba se atualiza quando
-  você fecha a folha. Desfaça em configurações → listas locais → **não
-  trazem**. Serve para o contato que vive driftando coisa que você não
-  quer, sem precisar denunciar post nem deixar de seguir.
+  trouxe o post e escolha **não trazer mais por** aquela pessoa, para
+  parar de receber o que ela drifta. Os posts que ela escreve continuam
+  chegando; o que ela afunda ou denuncia passa a pesar como o de alguém
+  que você só segue — sozinha, ela não esconde nada da sua aba. Não é
+  punição, ninguém fica sabendo e fica só no seu aparelho. Na folha e na
+  lista, o nome vem com o fim da chave (…a1b2c3), para você saber que é a
+  pessoa certa. Enquanto a folha está aberta a aba não muda; ela se atualiza
+  quando você fecha. Desfaça na hora, com **desfazer** na própria folha,
+  ou depois em config → conteúdo → listas → **não trazem**. Serve para o
+  contato que vive driftando coisa que você não quer, sem precisar
+  denunciar post nem deixar de seguir.
 - Sua **denúncia** tira 0,5 do vínculo com o autor, para sempre (só muda
   algo se você segue a pessoa: sem follow, o vínculo já é zero e os posts
   dela podem chegar pelos seus contatos). Se você
@@ -320,7 +324,8 @@ devolveram.
 - **Bloquear (block):** mais agressivo — esconde posts E interações
   (replies, drifts, etc.) dessa pessoa do **seu** feed.
 - **Não trazer mais (só na aba Contágio):** mais leve — os posts dessa
-  pessoa continuam; só o que ela drifta para de chegar pela aba. Ver
+  pessoa continuam; o que ela drifta para de chegar pela aba, e o que ela
+  afunda ou denuncia pesa como o de quem você só segue. Ver
   [A aba Contágio](#a-aba-contágio).
 
 **O que acontece:**
@@ -333,8 +338,8 @@ devolveram.
 
 **Pode desfazer?**
 
-✅ Sim — desmute/desbloquear/voltar a trazer na lista (Settings → Listas
-locais).
+✅ Sim — desmute/desbloquear/voltar a trazer na lista (config → conteúdo
+→ listas).
 
 **Importante (manifesto §24):**
 

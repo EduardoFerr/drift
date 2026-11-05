@@ -25,8 +25,9 @@ const MODEL = {
   // "quem trouxe" também em post direto e corte do vínculo que trouxe spam em 40% das vezes
   fase1_v0: { unknownSlot: false, mutualNeedsMeet: true, earnOwn: 1, weakCap: 0.5, ambient: 0, noEncounters: true, sinkLearn: true },
   // o que está no app (aba Contágio): sem mapa nem encontro físico; teto também na vacina e na
-  // quarentena; só a denúncia pune (autor + quem trouxe); post direto sem "quem trouxe"; sem corte
-  // automático do vínculo que trouxe spam (o app não tem esse gesto: limite conservador)
+  // quarentena; só a denúncia pune (autor + quem trouxe); post direto sem "quem trouxe". O gesto
+  // "não trazer mais por X" (cutMode 'bring', cutNeg 'weak') fica nas rodadas gesto_*; as fase1__*
+  // supõem que ninguém o usa (limite conservador)
   fase1: { unknownSlot: false, mutualNeedsMeet: true, earnOwn: 1, weakCap: 0.5, ambient: 0, noEncounters: true, sinkLearn: true, negCap: true, implVia: true, strikeOn: 'report', cutProb: 0 },
 }
 const NO_ATK = { atk: { spammer: false, farm: false, brigade: false } }
@@ -44,6 +45,8 @@ const SCEN = {
   // SINK de gosto: cada pessoa enterra 5% / 10% dos posts honestos que vê
   gosto5: { ...NO_ATK, tasteSink: 0.05 }, gosto10: { ...NO_ATK, tasteSink: 0.1 },
   gosto10_isca: { followBack: 0.03, farmContent: 0.1, tasteSink: 0.1 },
+  // isca que difama: as contas de isca, depois de conquistar 0,8, enterram e denunciam post honesto
+  isca_difamacao: { followBack: 0.03, farmContent: 0.1, badmouth: { sink: true, report: true } },
   seed_11: { seed: 11 }, seed_23: { seed: 23 }, seed_42: { seed: 42 }, seed_99: { seed: 99 },
 }
 const MAIN = ['base', 'sem_ataque', 'sem_mobilidade', 'followback_10', 'isca', 'enganados_isca', 'camuflagem', 'revezamento', 'paciente', 'visao30', 'eclipse30']
@@ -60,10 +63,15 @@ for (const opt of ['both', 'report', 'viaSink']) for (const s of ['isca', 'engan
 for (const opt of ['both', 'viaSink']) for (const s of ['isca', 'enganados_isca', 'difamacao', 'gosto10', 'gosto10_isca'])
   RUNS.push([`fase1_${opt}__${s}`, 'fase1', { ...SCEN[s], strikeOn: opt }])
 for (const s of ['isca', 'enganados_isca', 'gosto10_isca']) RUNS.push([`fase1_corte40__${s}`, 'fase1', { ...SCEN[s], cutProb: 0.4 }])
-// Gesto do app "não trazer mais por X" (cutMode 'bring': só deixa de trazer, mantém
-// os posts diretos), usado em 0/20/40% dos spams vistos, com denúncia em 35% e 10%.
-for (const r of [35, 10]) for (const c of [0, 20, 40]) for (const s of ['isca', 'enganados_isca', 'gosto10_isca', 'sem_ataque'])
-  RUNS.push([`gesto_r${r}_c${c}__${s}`, 'fase1', { ...SCEN[s], cutMode: 'bring', cutProb: c / 100, reportProb: r / 100 }])
+// Gesto do app "não trazer mais por X" (cutMode 'bring': só deixa de trazer, mantém os posts
+// diretos; cutNeg 'weak': o SINK e a denúncia de quem foi cortado contam como vínculo fraco),
+// usado em 0/20/40% dos spams vistos, com denúncia em 35% e 10%.
+for (const r of [35, 10]) for (const c of [0, 20, 40]) for (const s of ['isca', 'enganados_isca', 'gosto10_isca', 'isca_difamacao', 'sem_ataque'])
+  RUNS.push([`gesto_r${r}_c${c}__${s}`, 'fase1', { ...SCEN[s], cutMode: 'bring', cutNeg: 'weak', cutProb: c / 100, reportProb: r / 100 }])
+// A primeira versão do gesto (05/11/2026), em que o cortado seguia enterrando e denunciando com o
+// vínculo inteiro: a isca cortada (e nunca denunciada) escondia post honesto (revisão Barney+Satoshi).
+for (const r of [35, 10]) for (const c of [0, 20, 40])
+  RUNS.push([`gesto_forte_r${r}_c${c}__isca_difamacao`, 'fase1', { ...SCEN.isca_difamacao, cutMode: 'bring', cutProb: c / 100, reportProb: r / 100 }])
 for (const m of ['v3', 'v4']) for (const s of ['base', 'sem_ataque', 'sem_mobilidade', 'followback_3', 'enganados_10']) RUNS.push([`${m}__${s}`, m, SCEN[s]])
 for (const s of ['seed_11', 'seed_23', 'seed_42', 'seed_99']) RUNS.push([`v2__${s}`, 'v2', SCEN[s]])
 RUNS.push(['v6__erro_honesto', 'v6', SCEN.erro_honesto], ['v6_recupera__enganados_isca', 'v6', { ...SCEN.enganados_isca, sinkDecay: 30 }])
@@ -73,13 +81,15 @@ const BASE = { seed: 7, weeks: 24, stepDays: 2, farmStart: 14, farmSize: 2000, t
 
 if (process.argv[2] === 'resumo') {
   const p = (x) => (x * 100).toFixed(1).padStart(6)
-  console.log('rodada'.padEnd(34), ' ataque  pico  surto  alcance  poro  vazio zerados det')
+  // escondidos = leitores com post honesto que entraria e foi escondido (vacina ou quarentena)
+  console.log('rodada'.padEnd(40), ' ataque  pico  surto  alcance  poro  vazio zerados escond det')
   for (const f of fs.readdirSync(out).filter((x) => x.endsWith('.json')).sort()) {
     const r = JSON.parse(fs.readFileSync(path.join(out, f))), F = r.frames, L = F.slice(-21)
     const a = (k) => L.reduce((s, x) => s + (x.m[k] || 0), 0) / L.length
     const D = F.filter((x) => x.m.det >= 0)
-    console.log(r.name.padEnd(34), p(a('withAtk')), p(Math.max(...F.map((x) => x.m.withAtk))), String(F.filter((x) => x.m.withAtk > 0.05).length * 2 + 'd').padStart(6),
-      p(a('reach')), p(a('poro')), p(a('empty')), p(a('zeroed')), `${D.reduce((s, x) => s + x.m.det, 0)}/${D.length * 40}`)
+    const hid = F.some((x) => x.m.honHid !== undefined) ? p(a('honHid')) : '     —'
+    console.log(r.name.padEnd(40), p(a('withAtk')), p(Math.max(...F.map((x) => x.m.withAtk))), String(F.filter((x) => x.m.withAtk > 0.05).length * 2 + 'd').padStart(6),
+      p(a('reach')), p(a('poro')), p(a('empty')), p(a('zeroed')), hid, `${D.reduce((s, x) => s + x.m.det, 0)}/${D.length * 40}`)
   }
   process.exit(0)
 }
