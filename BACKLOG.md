@@ -88,8 +88,13 @@ em `Docs/simulacao-contagio/` e `Docs/spec-revisao-contagio.md`.
   (sem `dist/`, o teste pula) — bloqueio: nenhum; tarefa à parte: achar o
   que entrou no entry desde maio, cortar (lazy) ou subir o ratchet com
   justificativa, e rodar o ratchet depois do build no CI.
-- [ ] **Boot trava no 1º acesso com OPFS em disco (pré-existente em `main`;
-  bloqueia o deploy da aba Contágio)** — contexto: em 05/11/2026 o user viu
+- [x] **Boot trava no 1º acesso com OPFS em disco (pré-existente em `main`;
+  bloqueia o deploy da aba Contágio)** — fechado 2026-11-05 no commit
+  "fix(boot)" logo após [49c1243] — schema e reconstrução em uma transação
+  (5,8 s → 0,1 s), sem rebuild em banco vazio, nova tentativa em IOERR/BUSY,
+  prazo do init que renova com sinal de vida e encerra o worker;
+  `e2e/boot-persistent.spec.ts` (4 testes; o 1º falha no código antigo).
+  Contexto original: em 05/11/2026 o user viu
   `SQLITE_IOERR: disk I/O error` na etapa 2/5 no preview. Reproduzido em
   perfil persistente (Chromium/Windows): o schema leva 5–8 s (cada CREATE
   numa transação própria, com journal criado, sincronizado e apagado no

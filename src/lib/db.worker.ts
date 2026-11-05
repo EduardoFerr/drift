@@ -79,6 +79,53 @@ function log(message: string) {
   reply({ log: message })
 }
 
+/**
+ * Várias instruções numa transação só. No OPFS em disco cada transação
+ * cria, sincroniza e apaga `drift.db-journal` (~100 ms no Windows, medido
+ * em 2026-11-05); o schema tem dezenas de instruções e a reconstrução de
+ * domínio, o dobro. Em transações avulsas o primeiro boot passava de 15 s,
+ * estourava o prazo do init e o próximo boot refazia tudo (laço).
+ */
+function inTransaction(run: () => void): void {
+  if (!db) throw new Error('DB not initialized — inTransaction')
+  db.exec('BEGIN')
+  try {
+    run()
+    db.exec('COMMIT')
+  } catch (err) {
+    try {
+      db.exec('ROLLBACK')
+    } catch {
+      /* transação já abortada */
+    }
+    throw err
+  }
+}
+
+/** Erro de E/S ou de trava que pode passar sozinho: o worker de uma página
+ *  recém-fechada ainda está soltando os arquivos do OPFS. */
+function isTransientIo(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err)
+  return /SQLITE_(IOERR|BUSY)|disk I\/O error|database is locked/i.test(msg)
+}
+
+/** Aplica o schema numa transação, com até 4 tentativas para erro
+ *  passageiro de E/S (cada tentativa dá sinal de vida ao main thread). */
+async function applySchema(schema: string): Promise<void> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      inTransaction(() => db!.exec(schema))
+      return
+    } catch (err) {
+      if (attempt >= 4 || !isTransientIo(err)) throw err
+      log(
+        `schema: erro passageiro (${err instanceof Error ? err.message : err}) — nova tentativa ${attempt + 1}/4`,
+      )
+      await new Promise((r) => setTimeout(r, 500 * attempt))
+    }
+  }
+}
+
 async function init(schema: string): Promise<{ hasOpfs: boolean; storage: StorageMode }> {
   log('chamando sqlite3InitModule…')
   // O .d.ts em @sqlite.org/sqlite-wasm 3.51.x declara init() sem args,
@@ -151,7 +198,7 @@ async function init(schema: string): Promise<{ hasOpfs: boolean; storage: Storag
   db.exec('PRAGMA busy_timeout = 5000')
 
   try {
-    db.exec(schema)
+    await applySchema(schema)
   } catch (err) {
     // User feedback 2026-05-17: pós-update do app, db.exec(schema) falha
     // com NoModificationAllowedError em /drift.db-journal porque o worker
@@ -193,7 +240,7 @@ async function init(schema: string): Promise<{ hasOpfs: boolean; storage: Storag
       try {
         db = new sqlite3.oo1.OpfsDb('/drift.db')
         db.exec('PRAGMA busy_timeout = 5000')
-        db.exec(schema)
+        inTransaction(() => db!.exec(schema))
         log('self-heal funcionou — schema aplicado após cleanup')
       } catch (retryErr) {
         if (retryErr instanceof Error && retryErr.name === 'NoModificationAllowedError') {
@@ -202,6 +249,10 @@ async function init(schema: string): Promise<{ hasOpfs: boolean; storage: Storag
         }
         throw retryErr
       }
+    } else if (storageMode === 'opfs' && /SQLITE_BUSY|database is locked/i.test(String(err))) {
+      // Trava que não passou em 4 tentativas: outra aba segura o banco.
+      log('schema: banco travado após 4 tentativas — provável outra aba aberta')
+      throw new Error('MULTI_TAB_CONFLICT')
     } else {
       throw err
     }
@@ -256,18 +307,39 @@ const DOMAIN_TABLES = [
 function rebuildDomainSchema(schema: string) {
   if (!db) throw new Error('DB not initialized — rebuildDomainSchema')
   log('reconstruindo schema de domínio (preserva identity + user_prefs)…')
-  for (const t of DOMAIN_TABLES) {
-    try {
-      db.exec(`DROP TABLE IF EXISTS ${t}`)
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
-      log(`drop ${t} falhou (continuando): ${msg}`)
+  // Uma transação só: rápido no OPFS em disco e atômico — se recriar
+  // falhar, nada fica pela metade (as tabelas voltam como estavam).
+  inTransaction(() => {
+    for (const t of DOMAIN_TABLES) {
+      try {
+        db!.exec(`DROP TABLE IF EXISTS ${t}`)
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        log(`drop ${t} falhou (continuando): ${msg}`)
+      }
     }
-  }
-  // schema.sql usa CREATE TABLE IF NOT EXISTS — recria os DOMAIN_TABLES
-  // dropados, mantém identity + user_prefs intactos (não foram dropados).
-  db.exec(schema)
+    // schema.sql usa CREATE TABLE IF NOT EXISTS — recria os DOMAIN_TABLES
+    // dropados, mantém identity + user_prefs intactos (não foram dropados).
+    db!.exec(schema)
+  })
   log('schema de domínio reconstruído com sucesso')
+}
+
+/** Banco sem nenhum post nem voto: nada a converter num rebuild de domínio
+ *  (o caso de todo primeiro acesso). Na dúvida (tabela ausente), diz não. */
+function domainIsEmpty(): boolean {
+  if (!db) return false
+  try {
+    const rows = db.exec({
+      sql: `SELECT (EXISTS(SELECT 1 FROM posts) OR EXISTS(SELECT 1 FROM spreads)
+              OR EXISTS(SELECT 1 FROM buries) OR EXISTS(SELECT 1 FROM reports)) AS has`,
+      returnValue: 'resultRows',
+      rowMode: 'object',
+    }) as Array<{ has: number }>
+    return rows[0]?.has === 0
+  } catch {
+    return false
+  }
 }
 
 function tableHasColumn(table: string, column: string): boolean {
@@ -517,8 +589,14 @@ function applyMigrations(schema: string) {
     const current = rows.length > 0 ? parseInt(rows[0]!.value, 10) || 0 : 0
 
     if (current < 6) {
-      log(`schema_v=${current} < 6 — rebuild de domínio (posts.id UUID → event.id hex)`)
-      rebuildDomainSchema(schema)
+      if (domainIsEmpty()) {
+        // Primeiro acesso: o schema acabou de ser criado, não há post com id
+        // UUID para converter. Reconstruir aqui só dobrava o tempo do boot.
+        log(`schema_v=${current} < 6 num banco sem posts nem votos — nada a converter`)
+      } else {
+        log(`schema_v=${current} < 6 — rebuild de domínio (posts.id UUID → event.id hex)`)
+        rebuildDomainSchema(schema)
+      }
     }
 
     // schema_v=7 (Fase 6.2): peers_known para Peer Registry WebRTC.

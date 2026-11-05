@@ -8,7 +8,8 @@
  * SQLite. db.worker.ts não é importado em nenhum outro lugar.
  *
  * Robustez:
- *  - Timeout de 15s no init (caso WASM demore demais ou trave)
+ *  - Prazo do init: 30 s sem sinal de vida do worker (cada log renova) e
+ *    120 s no total; no estouro o worker é encerrado
  *  - worker.onerror / onmessageerror rejeitam promises pendentes
  *    (caso contrário um worker que falha silenciosamente trava o boot)
  */
@@ -18,7 +19,15 @@
 // inchando o entry chunk em ~13 KB raw / ~4 KB gz sem benefício
 // (schema é usado uma única vez no init e nunca mais — desperdício de
 // parse + heap). Lighthouse `unused-javascript` audit identificou.
-const INIT_TIMEOUT_MS = 15_000
+//
+// Prazo do init (2026-11-05): no OPFS em disco o primeiro boot leva vários
+// segundos fazendo progresso. Um prazo fixo de 15 s matava o boot no meio,
+// o próximo refazia tudo e estourava de novo (laço), e o worker antigo
+// seguia escrevendo no OPFS — dois workers no mesmo banco disputam o
+// journal (SQLITE_IOERR). Agora: o prazo renova a cada sinal de vida do
+// worker, tem teto total e, no estouro, o worker é encerrado.
+const INIT_IDLE_TIMEOUT_MS = 30_000
+const INIT_MAX_MS = 120_000
 
 interface Pending {
   resolve: (v: unknown) => void
@@ -41,6 +50,8 @@ export interface InitResult {
 let worker: Worker | null = null
 let nextId = 0
 let initPromise: Promise<InitResult> | null = null
+/** Renova o prazo do init a cada log do worker (só enquanto o init corre). */
+let onInitProgress: (() => void) | null = null
 const pending = new Map<number, Pending>()
 
 function rejectAllPending(reason: Error): void {
@@ -84,6 +95,7 @@ export function initDb(): Promise<InitResult> {
     // log do worker — útil pra debug
     if (data.log) {
       console.log('[db.worker]', data.log)
+      onInitProgress?.()
       return
     }
 
@@ -123,21 +135,57 @@ export function initDb(): Promise<InitResult> {
   // Operações subsequentes não usam timeout — assumem que o canal está saudável.
   // V10.11 — payload `schema` removido; worker importa direto.
   const initCall = call<InitResult>('init')
+  let idle: ReturnType<typeof setTimeout> | undefined
+  let cap: ReturnType<typeof setTimeout> | undefined
+  const stopTimers = () => {
+    onInitProgress = null
+    clearTimeout(idle)
+    clearTimeout(cap)
+  }
   const timeout = new Promise<never>((_, reject) => {
-    setTimeout(() => {
-      reject(
-        new Error(
-          `Init do SQLite worker excedeu ${INIT_TIMEOUT_MS}ms. Verifique o console — provável erro carregando o WASM ou abrindo OPFS.`,
-        ),
+    const fail = (message: string) => {
+      stopTimers()
+      // Encerra o worker: senão ele segue escrevendo no OPFS e a próxima
+      // tentativa (ou a recarga) disputa o journal com ele.
+      worker?.terminate()
+      worker = null
+      const err = new Error(message)
+      rejectAllPending(err)
+      reject(err)
+    }
+    const arm = () => {
+      clearTimeout(idle)
+      idle = setTimeout(
+        () =>
+          fail(
+            `Init do SQLite worker ficou ${INIT_IDLE_TIMEOUT_MS / 1000}s sem dar sinal de vida. Feche outras abas do Drift e recarregue; veja o console — provável erro carregando o WASM ou abrindo OPFS.`,
+          ),
+        INIT_IDLE_TIMEOUT_MS,
       )
-    }, INIT_TIMEOUT_MS)
+    }
+    onInitProgress = arm
+    arm()
+    cap = setTimeout(
+      () =>
+        fail(
+          `Init do SQLite worker excedeu ${INIT_MAX_MS / 1000}s. Feche outras abas do Drift e recarregue; veja o console.`,
+        ),
+      INIT_MAX_MS,
+    )
   })
 
-  initPromise = Promise.race([initCall, timeout]).catch((err) => {
-    // libera initPromise para retentativa após erro
-    initPromise = null
-    throw err
-  })
+  initPromise = Promise.race([initCall, timeout]).then(
+    (result) => {
+      stopTimers()
+      return result
+    },
+    (err) => {
+      stopTimers()
+      // libera initPromise para retentativa após erro
+      initPromise = null
+      throw err
+    },
+  )
 
   return initPromise
 }

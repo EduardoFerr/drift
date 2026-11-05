@@ -228,18 +228,14 @@ CREATE TABLE IF NOT EXISTS muted (
   muted_at  INTEGER NOT NULL
 );
 
--- ── Aba Contágio: quem trouxe o que o leitor denunciou (manifesto §24 emendado)
--- Denúncia feita no aparelho: uma linha para o autor (em qualquer aba) e
--- uma por contato que a pílula "↪ chegou por" mostrava (só na aba
--- Contágio). Cada identidade do aparelho tem as suas (`viewer_pub`); cada
--- post distinto tira 0,5 do vínculo (src/lib/contagion.ts). Denúncias do
--- leitor vindas de outro aparelho entram pela tabela `reports`.
+-- ── Aba Contágio (manifesto §24 emendado) ────────────────────────
 -- Estado local do user, como blocked/muted: não é publicado e não entra
--- em DOMAIN_TABLES (rebuild preserva).
--- Gesto "não trazer mais por X" (aba Contágio): os DRIFTs de X deixam de
--- trazer post para este leitor; os posts diretos, o SINK e a denúncia de X
--- continuam. Local, desfazível em Configurações → listas locais; não
--- publicado e fora de DOMAIN_TABLES.
+-- em DOMAIN_TABLES (rebuild preserva). Cada identidade do aparelho tem o
+-- seu (`viewer_pub`).
+--
+-- Gesto "não trazer mais por X": os DRIFTs de X deixam de trazer post para
+-- este leitor; os posts diretos, o SINK e a denúncia de X continuam.
+-- Desfazível em Configurações → listas locais → não trazem.
 CREATE TABLE IF NOT EXISTS contagion_no_bring (
   viewer_pub  TEXT NOT NULL,
   subject_pub TEXT NOT NULL,
@@ -247,6 +243,11 @@ CREATE TABLE IF NOT EXISTS contagion_no_bring (
   PRIMARY KEY (viewer_pub, subject_pub)
 );
 
+-- Quem trouxe o que o leitor denunciou: denúncia feita no aparelho grava
+-- uma linha para o autor (em qualquer aba) e uma por contato que a pílula
+-- "↪ chegou por" mostrava (só na aba Contágio). Cada post distinto tira
+-- 0,5 do vínculo (src/lib/contagion.ts). Denúncias do leitor vindas de
+-- outro aparelho entram pela tabela `reports`.
 CREATE TABLE IF NOT EXISTS contagion_bad_experiences (
   viewer_pub  TEXT NOT NULL,
   subject_pub TEXT NOT NULL,

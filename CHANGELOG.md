@@ -58,6 +58,22 @@ Suas": regras públicas e determinísticas, entradas do próprio usuário.
   denunciar.
 - Testes que travavam "3 abas usam `FEED_ORDER`" agora travam 4.
 
+### Fixed
+- **Boot travava no primeiro acesso com o banco em disco** (erro na etapa
+  2/5: "Init do SQLite worker excedeu 15000ms" ou `SQLITE_IOERR: disk I/O
+  error`). No OPFS em disco cada transação cria, sincroniza e apaga o
+  journal (~100 ms no Windows); o schema rodava em dezenas de transações
+  avulsas (5–8 s) e o banco novo ainda era reconstruído à toa (+8–10 s).
+  O prazo fixo de 15 s matava o worker no meio, o próximo boot refazia
+  tudo (laço) e o worker antigo seguia escrevendo no OPFS. Agora: schema e
+  reconstrução numa transação só (schema em ~0,1 s), sem reconstrução em
+  banco sem posts, nova tentativa em erro passageiro de E/S, trava que não
+  passa vira o aviso "Drift já está aberto em outra aba", e o prazo do
+  init renova a cada sinal de vida do worker (30 s parado, 120 s no total),
+  encerrando o worker no estouro. Já acontecia em `main`; os outros specs
+  E2E não pegavam porque usam contexto efêmero (OPFS em memória) —
+  `e2e/boot-persistent.spec.ts` usa perfil persistente.
+
 Auditoria do algoritmo (2026-11-03, `Docs/auditoria-algoritmo-2026-11.md`):
 14 defeitos com prova executável, todos corrigidos. **Mudança de
 semântica do peso** — ver "Changed".
