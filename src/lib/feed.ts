@@ -212,13 +212,14 @@ export async function getContagionFeed(limit = 50, now = Date.now()): Promise<Po
   const verdicts = await computeContagionFor(viewer, follows, nowSeconds(now))
   const ids = [...verdicts.values()].filter((v) => v.pass).map((v) => v.postId).sort()
   if (ids.length === 0) return []
-  const placeholders = ids.map(() => '?').join(',')
+  // Um parâmetro só (json_each): sem teto de parâmetros do SQLite, por
+  // maior que seja o conjunto.
   const rows = await db.exec<PostRow>(
     `${POST_SELECT}
-     WHERE p.score > -999 AND p.id IN (${placeholders})
+     WHERE p.score > -999 AND p.id IN (SELECT value FROM json_each(?))
      ${FEED_ORDER}
      LIMIT ?`,
-    [nowSeconds(now), ...ids, limit],
+    [nowSeconds(now), JSON.stringify(ids), limit],
   )
   return rows.map(rowToPost)
 }
@@ -256,22 +257,24 @@ async function getFeedByTab(tab: FeedTab, limit: number): Promise<Post[]> {
   }
 }
 
-/** Indica se o usuário corrente já espalhou ou enterrou o post. Usado
- *  para esconder os botões depois de uma ação. */
+/** A ação LÍQUIDA do usuário corrente no post (a mais recente; no empate
+ *  exato, o SINK — igual ao ranking canônico). Usado para destacar o botão
+ *  e decidir se um DRIFT desfaz um SINK. Antes devolvia 'spread' se
+ *  existisse qualquer spread, e DRIFT→SINK→DRIFT virava no-op. */
 export async function getMyAction(
   postId: string,
   npub: string,
 ): Promise<'spread' | 'bury' | null> {
-  const sp = await db.get<{ n: number }>(
-    `SELECT 1 AS n FROM spreads WHERE post_id = ? AND spreader_pub = ? LIMIT 1`,
+  const sp = await db.get<{ t: number }>(
+    `SELECT created_at AS t FROM spreads WHERE post_id = ? AND spreader_pub = ? LIMIT 1`,
     [postId, npub],
   )
+  const bu = await db.get<{ t: number }>(
+    `SELECT created_at AS t FROM buries WHERE post_id = ? AND burier_pub = ? LIMIT 1`,
+    [postId, npub],
+  )
+  if (bu && (!sp || bu.t >= sp.t)) return 'bury'
   if (sp) return 'spread'
-  const bu = await db.get<{ n: number }>(
-    `SELECT 1 AS n FROM buries WHERE post_id = ? AND burier_pub = ? LIMIT 1`,
-    [postId, npub],
-  )
-  if (bu) return 'bury'
   return null
 }
 
@@ -407,6 +410,13 @@ export async function refreshFeed(): Promise<void> {
   try {
     const { limit, tab } = useFeedStore.getState()
     const rawPosts = await getFeedByTab(tab, limit)
+    // A aba pode ter mudado enquanto a query rodava (a do Contágio é a mais
+    // lenta): descarta o resultado velho e refaz para a aba atual, em vez de
+    // gravar posts de uma aba sob o rótulo de outra com `loaded = true`.
+    if (useFeedStore.getState().tab !== tab) {
+      refreshPending = true
+      return
+    }
     // Lily Tinder-audit 2026-05-21 (Item 2): cap defensivo Zustand vs OOM
     // mobile low-end. SQLite já tem MAX_POSTS_CACHE (cache.ts) — este é
     // defesa em camada no array da store. Posts vêm ordenados por score

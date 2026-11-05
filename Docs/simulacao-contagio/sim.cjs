@@ -9,11 +9,17 @@
  *   modelo:  unknownSlot, knownMin, mutualNeedsMeet, mutualEarn, earnOwn, minSrc,
  *            vouch (aval), lockstep + lockAbs (sobreposição), sinkLearn + sinkDecay,
  *            probation (período de experiência), weakCap (teto p/ vínculos fracos),
- *            breaker (disjuntor por idade), labelers, ambient (itens do mapa), noEncounters
+ *            negCap (o teto vale também na vacina e na quarentena), implVia (post direto
+ *            não tem "quem trouxe"), strikeOn (o que vira experiência ruim: 'both' = SINK ou
+ *            denúncia; 'report' = só denúncia, como no app; 'viaSink' = denúncia, e SINK só
+ *            contra quem trouxe), cutProb (chance de cortar o vínculo que trouxe spam;
+ *            padrão 0,4 — o app não tem esse gesto, use 0), breaker (disjuntor por idade),
+ *            labelers, ambient (itens do mapa), noEncounters
  *   ataque:  atk{spammer,farm,brigade}, followBack, deceivedPct, farmContent (isca),
- *            farmerBait, farmCamo (camuflagem), farmRot (revezamento), farmJoin (paciente)
+ *            farmerBait, farmCamo (camuflagem), farmRot (revezamento), farmJoin (paciente),
+ *            badmouth{sink,report} (difamação: a fazenda enterra e denuncia post honesto)
  *   mundo:   mobility, remote, vis + visMode + visScale (visão parcial), eclipse + censor,
- *            honestError (erro honesto) */
+ *            honestError (erro honesto), tasteSink (SINK de gosto em post honesto) */
 'use strict'
 
 const CITIES = [
@@ -245,11 +251,15 @@ function runModel(E, cfg, model, onFrame) {
     const vE = ECL(v)
     const C = contacts(v, day)
     const weakS = new Map(), young = new Map(), src = new Map(), score = new Map(), vac = new Map(), quar = new Map(), via = new Map(), direct = new Set()
+    const vacW = new Map(), quarW = new Map() // negativos de vínculos fracos (só com cfg.negCap)
+    let bmS = 0, bmW = 0 // força das contas da fazenda que o leitor segue (bad-mouthing)
     let cs = [...C]
     if (opt.shuffle) cs = cs.sort(() => opt.r() - 0.5)
     for (const [u, s0] of cs) {
       const s = cfg.lockstep && !vE ? Math.floor(s0 * lwEff(u, day, VIS ? v % VK : 0) / 10) : s0 // eclipsado: sem dados de co-impulsionadores nem rótulos
       const uE = ECL(u)
+      const weakNeg = cfg.negCap && s0 <= 5
+      if (cfg.badmouth && s > 0 && U[u].kind === 'fazenda' && U[u].id !== 'fazendeiro') { if (weakNeg) bmW += s; else bmS += s }
       for (const a of recentAct[u]) {
         if (day - a.day > 2) continue
         if (a.up) {
@@ -259,22 +269,31 @@ function runModel(E, cfg, model, onFrame) {
           src.set(a.p, (src.get(a.p) || 0) + 1)
           if (cfg.breaker && day - U[u].join < cfg.breaker.age) young.set(a.p, (young.get(a.p) || 0) + s)
           if (!via.has(a.p) || via.get(a.p)[1] < s || (via.get(a.p)[1] === s && u < via.get(a.p)[0])) via.set(a.p, [u, s])
-        } else if (!vE && !uE) vac.set(a.p, (vac.get(a.p) || 0) + s)
+        } else if (!vE && !uE) { const m = weakNeg ? vacW : vac; m.set(a.p, (m.get(a.p) || 0) + s) }
       }
-      if (!vE && !uE) for (const r of reportsBy[u]) if (day - r.day <= 14) quar.set(r.p, (quar.get(r.p) || 0) + s)
+      if (!vE && !uE) for (const r of reportsBy[u]) if (day - r.day <= 14) { const m = weakNeg ? quarW : quar; m.set(r.p, (m.get(r.p) || 0) + s) }
       if (fol[v].has(u) && !cut[v].has(u)) for (const pi of postsBy[u]) {
-        if (day - posts[pi].day <= 3 && !dropped(v, vE, u, pi)) { direct.add(pi); if (!via.has(pi)) via.set(pi, [u, 10]) }
+        if (day - posts[pi].day <= 3 && !dropped(v, vE, u, pi)) { direct.add(pi); if (!cfg.implVia && !via.has(pi)) via.set(pi, [u, 10]) }
       }
     }
     const cand = []
     const WCAP = cfg.weakCap ? Math.round(cfg.weakCap * 10) : 0
     const tot = (pi) => (score.get(pi) || 0) + Math.min(weakS.get(pi) || 0, WCAP)
     const keys = new Set([...score.keys(), ...weakS.keys(), ...direct])
+    // a fazenda dá SINK e denuncia todo post honesto que chega a quem a segue
+    const target = (p) => !p.spam && !p.atk && !p.bait
+    const negOf = (strongM, weakM, pi, p, on) => {
+      const hit = on && target(p)
+      const w = (weakM.get(pi) || 0) + (hit ? bmW : 0)
+      return (strongM.get(pi) || 0) + (hit ? bmS : 0) + (cfg.negCap ? Math.min(w, WCAP) : w)
+    }
+    const BM = cfg.badmouth || {}
     for (const pi of keys) {
       const p = posts[pi]
       if (p.a === v || day - p.day > 4) continue
-      if ((quar.get(pi) || 0) >= THETA_Q * 10) continue
-      const sc = (direct.has(pi) ? 10 : 0) + tot(pi) - (vac.get(pi) || 0)
+      const qv = negOf(quar, quarW, pi, p, BM.report), vv = negOf(vac, vacW, pi, p, BM.sink)
+      if (qv >= THETA_Q * 10) { if (opt.stat && target(p)) opt.stat.quarHidden++; continue }
+      const sc = (direct.has(pi) ? 10 : 0) + tot(pi) - vv
       const thr = cfg.breaker && (young.get(pi) || 0) * 2 > tot(pi) ? cfg.breaker.theta * 10 : THETA * 10
       if (!direct.has(pi) && (tot(pi) < thr || (src.get(pi) || 0) < (cfg.minSrc || 1))) continue
       if (sc <= 0) continue
@@ -404,9 +423,20 @@ function runModel(E, cfg, model, onFrame) {
           if (sunk) actOn(u, p, day, false, loc[i])
           const rep = rnd() < 0.35
           if (rep) report(u, p, day, 'spam')
-          if (model === 'contagio' && it.via >= 0 && rnd() < 0.4) cut[i].add(it.via) // rastreamento de contato
+          if (model === 'contagio' && it.via >= 0 && rnd() < (cfg.cutProb ?? 0.4)) cut[i].add(it.via) // rastreamento de contato (sorteio sempre feito: mesma sequência com qualquer cutProb)
           // v6: experiência ruim baixa o vínculo com o autor e com quem trouxe (crédito à la Ostra)
-          if (cfg.sinkLearn && (sunk || rep)) { negAdd(i, p.a, day); if (it.via >= 0 && it.via !== p.a) negAdd(i, it.via, day) }
+          const mode = cfg.strikeOn || 'both'
+          const viaOk = it.via >= 0 && it.via !== p.a && it.ch === 'cont'
+          if (cfg.sinkLearn && mode === 'both' && (sunk || rep)) { negAdd(i, p.a, day); if (it.via >= 0 && it.via !== p.a) negAdd(i, it.via, day) }
+          if (cfg.sinkLearn && mode !== 'both' && rep) { negAdd(i, p.a, day); if (viaOk) negAdd(i, it.via, day) }
+          if (cfg.sinkLearn && mode === 'viaSink' && sunk && !rep && viaOk) negAdd(i, it.via, day)
+        } else if (cfg.tasteSink && rnd() < cfg.tasteSink) {
+          // SINK de gosto em post honesto ("não quero ver isso aqui"); quem pune depende de strikeOn
+          actOn(u, p, day, false, loc[i])
+          const tmode = cfg.strikeOn || 'both'
+          if (cfg.sinkLearn && tmode === 'viaSink' && it.ch === 'cont' && it.via >= 0 && it.via !== p.a) negAdd(i, it.via, day)
+          else if (cfg.sinkLearn && tmode === 'both' && !cfg.tasteNoStrike) { negAdd(i, p.a, day); if (it.via >= 0 && it.via !== p.a) negAdd(i, it.via, day) }
+          else if (cfg.sinkLearn && cfg.tasteStrikeViaOnly && it.ch === 'cont' && it.via >= 0 && it.via !== p.a) negAdd(i, it.via, day)
         } else if (rnd() < 0.8) actOn(u, p, day, true, loc[i])
       }
     }
@@ -451,6 +481,9 @@ function runModel(E, cfg, model, onFrame) {
     // ── Medição (todas as pessoas reais que já entraram) ──────────
     const chan = { dir: 0, cont: 0, ambK: 0, ambU: 0, top: 0 }
     let n = 0, withAtk = 0, atkShare = 0, poro = 0, empty = 0, hiddenVictimViewers = 0
+    let honSum = 0, honEmpty = 0, farmC2 = 0
+    let zeroed = 0, edges = 0
+    if (cfg.sinkLearn) for (let v = 0; v < NH; v++) { if (!joined(U[v], day)) continue; for (const u of fol[v]) { if (u >= NH) continue; edges++; if (negK(v, u, day) > 0 && tie(v, u, day) === 0) zeroed++ } }
     const tStart = Date.now()
     let lockFP = 0, lockHon = 0, lockTP = 0, lockFarm = 0
     if (cfg.lockstep && lwDay === day) for (const [key, w] of lwCache) { const u = key % N; if (u < NH) { lockHon++; if (w < 10) lockFP++ } else if (U[u].kind === 'fazenda') { lockFarm++; if (w < 10) lockTP++ } }
@@ -470,15 +503,18 @@ function runModel(E, cfg, model, onFrame) {
       const feed = res.feed
       frameFeeds.push([i, feed])
       if (feed.length < 3) empty++
-      let a = 0, other = 0
+      let a = 0, other = 0, hon = 0
+      { let fc = 0; for (const [cu] of contacts(i, day)) if (U[cu].kind === 'fazenda' && U[cu].id !== 'fazendeiro') fc++; if (fc >= 2) farmC2++ }
       for (const it of feed) {
         const p = posts[it.pi]
+        if (!p.spam && !p.atk) hon++
         if (p.spam || p.atk) { a++; chan[it.ch || 'top']++ }
         const home = U[p.a].home
         if (home >= 0 && home !== u.home) other++
         let set = reach.get(it.pi); if (!set) reach.set(it.pi, (set = new Set())); set.add(i)
         let cs = reachCities.get(it.pi); if (!cs) reachCities.set(it.pi, (cs = new Set())); cs.add(u.home)
       }
+      honSum += hon; if (hon === 0) honEmpty++
       if (a) { withAtk++; f |= 2 }
       if (ECLK) { if (eclArr[i]) { eclN++; if (a) eclAtk++ } else { nonN++; if (a) nonAtk++ } }
       atkShare += feed.length ? a / feed.length : 0
@@ -507,7 +543,8 @@ function runModel(E, cfg, model, onFrame) {
     }
     const fr = {
       day: day + 1, n, ms: Date.now() - tStart,
-      m: { withAtk: withAtk / n, atkShare: atkShare / n, poro: poro / n, empty: empty / n,
+      m: { honLen: honSum / n, honEmpty: honEmpty / n, farmC2: farmC2 / n, zeroed: edges ? zeroed / edges : 0,
+        withAtk: withAtk / n, atkShare: atkShare / n, poro: poro / n, empty: empty / n,
         reach: bestN / n, reachCities: best >= 0 ? reachCities.get(best).size : 0,
         victims: victims.length, victimsHidden, hiddenViewers: hiddenVictimViewers, det,
         cut: cut.reduce((s, x) => s + x.size, 0), deceived: deceived.length, followBacks, lockFP, lockHon, lockTP, lockFarm, mutedHonest, labeledHonest, atkEcl: eclN ? eclAtk / eclN : 0, atkNon: nonN ? nonAtk / nonN : 0, chan },

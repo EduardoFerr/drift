@@ -11,13 +11,20 @@ Suas": regras públicas e determinísticas, entradas do próprio usuário.
 ### Added
 - **Aba "contágio"** — o que chegou pelas pessoas que você segue: DRIFTs
   de contatos somando 0,8 (follow 0,5; 0,8 se você já driftou algo da
-  pessoa), teto de 0,5 para quem você só segue, vacina (SINK) e quarentena
-  (denúncias) dos contatos, posts recentes de quem você segue. A ordem é a
-  canônica. `src/lib/contagion.ts` (núcleo puro), `src/lib/contagion-data.ts`
-  (SQLite), `Docs/algoritmos.md` §9.
-- **Experiências ruins locais** — seu SINK ou denúncia tira 0,5 do vínculo
-  com o autor e com quem trouxe o post (tabela local `contagion_strikes`,
-  nunca publicada; desfazer o SINK apaga a daquele post).
+  pessoa), vacina (SINK) e quarentena (denúncias) dos contatos, posts
+  recentes de quem você segue. Teto de 0,5 para quem você só segue no
+  DRIFT, na vacina e na quarentena (contas só seguidas não trazem nem
+  escondem nada sozinhas). A ordem é a canônica. `src/lib/contagion.ts`
+  (núcleo puro), `src/lib/contagion-data.ts` (SQLite), `Docs/algoritmos.md` §9.
+- **"↪ chegou por X"** — pílula no card da aba Contágio com o contato de
+  maior vínculo que trouxe o post (`ContagionViaChip`). Post direto não
+  mostra.
+- **Experiência ruim = denúncia** — sua denúncia tira 0,5 do vínculo com o
+  autor (derivado das suas denúncias públicas) e, se feita na aba com a
+  pílula à vista, com quem trouxe o post (tabela local
+  `contagion_bad_experiences`, nunca publicada). O SINK continua sendo gosto
+  e não pune ninguém (§23): na simulação, punir no SINK derrubava o alcance
+  honesto de 29% para 5% com 10% de SINK por gosto.
 - **Índices** `spreads(spreader_pub, created_at)`, `buries(burier_pub,
   created_at)`, `reports(reporter_pub, created_at)`.
 - **Simulação reproduzível no repositório** — `Docs/simulacao-contagio/`

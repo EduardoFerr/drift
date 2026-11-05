@@ -1,5 +1,5 @@
 /**
- * FeedTabs — seletor de aba do feed (Global / Seguindo / Em alta).
+ * FeedTabs — seletor de aba do feed (Global / Seguindo / Em alta / Contágio).
  *
  * V_pre0 extraiu de App.tsx; V3.2 (reskin) adicionou indicator slide
  * elastic + paleta v0.7. V_2026-05-17 (HIMYM consenso 4/4) remove o
@@ -53,12 +53,12 @@ export function FeedTabs({ onActiveTabTap }: FeedTabsProps = {}) {
     }
   }
 
-  const tabs: { id: FeedTab; label: string }[] = [
+  const tabs: { id: FeedTab; label: string; hint?: string }[] = [
     { id: 'global', label: 'global' },
     { id: 'following', label: 'seguindo' },
     { id: 'trending', label: 'em alta' },
     // Manifesto §24 emendado: o que chegou pelas pessoas que você segue.
-    { id: 'contagio', label: 'contágio' },
+    { id: 'contagio', label: 'contágio', hint: 'o que chegou pelas pessoas que você segue' },
   ]
   const activeIndex = Math.max(
     0,
@@ -75,7 +75,7 @@ export function FeedTabs({ onActiveTabTap }: FeedTabsProps = {}) {
             // B1 fix (2026-05-22, Marshall): dot só em tab INATIVA com
             // unseen > 0. Tab ativa não mostra dot — ambíguo
             // ("precisa atenção?" vs. "estou aqui mesmo"). Combinado
-            // com bumpUnseenCount que incrementa todas as 3 tabs por
+            // com bumpUnseenCount que incrementa todas as tabs por
             // simplicidade, sem este guard as 3 tabs sempre piscavam
             // dot juntas após qualquer evento.
             unseen={tab === t.id ? 0 : unseenByTab[t.id]}
@@ -85,7 +85,7 @@ export function FeedTabs({ onActiveTabTap }: FeedTabsProps = {}) {
                 ? 'tocar de novo: atualizar + voltar ao topo'
                 : unseenByTab[t.id] > 0
                 ? `${unseenByTab[t.id]} ${unseenByTab[t.id] === 1 ? 'novo' : 'novos'}`
-                : undefined
+                : t.hint
             }
           >
             {t.label}
@@ -147,7 +147,8 @@ function FeedTabBtn({
           : 'text-drift-muted hover:text-drift-text'
       }`}
     >
-      <span className="relative inline-block">
+      {/* nowrap: com 4 abas, "em alta" quebrava em telas de ~320 px */}
+      <span className="relative inline-block whitespace-nowrap">
         {children}
         {/* Dot indicator pra unseen — visível em qualquer tab que tenha
             novo (ativa ou não). Posicionado top-right do label sem

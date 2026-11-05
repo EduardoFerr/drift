@@ -13,7 +13,8 @@ import { rebuildIdentityHistory, restartSync, useSyncStore } from './lib/sync'
 import { parseDeepLinkSearch, cleanDeepLinkParams } from './lib/deep-link'
 import { createPost, spreadPost, buryPost } from './lib/protocol'
 import { getMyAction, markFeedSeen, refreshFeed, useFeedStore } from './lib/feed'
-import { forgetBadExperience, recordBadExperience } from './lib/contagion-data'
+import { getArrivedVia } from './lib/contagion-data'
+import { useFollowsStore } from './lib/follows'
 import {
   advanceCursor,
   exitAtEnd,
@@ -1074,9 +1075,6 @@ function App() {
     // ação idêntica repetida. Pra reverter, user clica ↓ (ação oposta).
     if (myActions[post.id] === 'spread') return
     setPending((p) => ({ ...p, [post.id]: 'spread' }))
-    // Desfez um SINK: a experiência ruim daquele post deixa de pesar no
-    // vínculo da aba Contágio (corrigir engano, não esquecer com o tempo).
-    if (myActions[post.id] === 'bury') void forgetBadExperience(post.id)
 
     // Timeout de safety: se o evento não voltar pelo subscribe em 15s
     // (alguns relays não echoam pro publisher; rede ruim; etc.), limpa
@@ -1167,9 +1165,6 @@ function App() {
       next.add(post.id)
       return next
     })
-    // Aba Contágio: SINK é experiência ruim com o autor e com quem trouxe
-    // o post (−0,5 no vínculo). Local, nunca publicado (manifesto §28).
-    void recordBadExperience(post.id, post.authorPub)
 
     const safetyTimeout = setTimeout(() => {
       setPending((p) => {
@@ -1403,6 +1398,7 @@ function App() {
                   post={currentPost}
                   isMine={currentPost.authorPub === boot.identity?.npub}
                   pendingAction={pending[currentPost.id] ?? null}
+                  arrivedVia={feedTab === 'contagio' ? getArrivedVia(currentPost.id) : null}
                   queue={{
                     index: currentIdx,
                     total: posts.length,
@@ -1838,11 +1834,14 @@ function FeedSnapshotAgeBadge() {
 }
 
 function HomeEmpty({ tab }: { tab: FeedTab }) {
+  const followsSomeone = useFollowsStore((s) => s.following.size > 0)
   const msg =
     tab === 'following'
       ? 'Você não segue ninguém ainda. Toque ➕ pra criar seu primeiro post — depois siga autores ao abrir os posts deles.'
       : tab === 'contagio'
-      ? 'Nada chegou pela sua rede ainda. Aqui aparece o que as pessoas que você segue driftaram — siga autores e drifte o que gostar pra rede ganhar força.'
+      ? followsSomeone
+        ? 'Nada novo chegou pelas pessoas que você segue. Drifte posts delas pra fortalecer o vínculo — quem você já driftou traz posts sozinho.'
+        : 'Você ainda não segue ninguém. Aqui aparece o que as pessoas que você segue driftaram — siga autores ao abrir os posts deles.'
       : tab === 'trending'
       ? 'Nada em alta nas últimas 24h. Driftar um post recente vai puxar ele pro trending.'
       : 'Nenhum post no feed ainda. Toque ➕ pra publicar o primeiro — ele vai dar a volta pelos relays e voltar.'

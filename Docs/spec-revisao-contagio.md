@@ -2,14 +2,17 @@
 
 > **Status (2026-11-05):** Fase 1 implementada (aba "contágio",
 > `src/lib/contagion.ts`, `Docs/algoritmos.md` §9; manifesto §24
-> emendado). Fases 2–3 planejadas (`BACKLOG.md` "Contágio local").
+> emendado) e revisada em par: teto também na vacina e na quarentena,
+> só a denúncia pune (§4.6), sem corte automático de vínculo (§4.5).
+> Fases 2–3 planejadas (`BACKLOG.md` "Contágio local").
 > Simulação reproduzível em [`simulacao-contagio/`](simulacao-contagio/).
 > Este documento existe para que alguém de fora possa refazer as contas,
 > discordar delas e apontar o que a simulação não cobre.
 
 ## 1. O problema
 
-O Drift ordenava o feed por uma **urna global**: a soma ponderada dos
+O Drift ordenava o feed por uma **urna global** — uma votação única, em
+que todos os DRIFTs da rede somam no mesmo placar: a soma ponderada dos
 DRIFTs de todo mundo, igual para todos os clientes (manifesto §24
 original), com peso por antiguidade ancorada no Bitcoin (OpenTimestamps).
 A primeira simulação mostrou que isso não resiste a quem tem paciência:
@@ -46,11 +49,12 @@ décimos inteiros (a soma não depende da ordem).
 | v5 | vínculo vale 0,8 se **você** já impulsionou algo que a pessoa escreveu | encontro 1,0 · conquistado 0,8 · follow 0,5 |
 | v6 | v5 + **aval** (mapa: "conhecido" exige 3 contatos que encontraram ou impulsionaram a pessoa) + **lockstep** (DRIFT de conta com histórico de 30 dias ≥ 40% igual ao de outra vale menos, zero a partir de 80% ou de 15 impulsos idênticos) + **SINK baixa o vínculo** (−0,5 por experiência ruim, permanente) + **período de experiência** (conta com < 5 DRIFTs vale metade) | v5 |
 | v7 | v6 + **teto para vínculos fracos**: contatos com vínculo ≤ 0,5 somam no máximo 0,5 por post | v5 |
-| **Fase 1 (app)** | v7 **sem** mapa, sem encontro físico, sem lockstep, aval e experiência | conquistado 0,8 · follow 0,5 |
+| Fase 1 v0 | v7 **sem** mapa, sem encontro físico, sem lockstep, aval e experiência | conquistado 0,8 · follow 0,5 |
+| **Fase 1 (app)** | Fase 1 v0 + teto também na vacina e na quarentena + só a **denúncia** pune (§4.6) + post direto sem "quem trouxe" + **sem** corte de vínculo (o app não tem o gesto) | idem |
 
 A Fase 1 é o que o app já consegue calcular com os dados que tem: os
-follows do próprio leitor, o que ele impulsionou e o que ele enterrou ou
-denunciou. Detalhes e exemplo em `Docs/algoritmos.md` §9.
+follows do próprio leitor, o que ele impulsionou e o que ele denunciou.
+Detalhes e exemplo em `Docs/algoritmos.md` §9.
 
 ## 3. O mundo simulado
 
@@ -66,7 +70,8 @@ denunciou. Detalhes e exemplo em `Docs/algoritmos.md` §9.
   (ver §5).
 - **Comportamento:** abre o app em 30–90% dos dias, posta em ~10% deles,
   dá DRIFT em 1–2 itens do feed (80% de chance se for honesto). Diante de
-  spam: SINK 50%, denúncia 35%, corta o vínculo que trouxe 40%.
+  spam: SINK 50%, denúncia 35%, corta o vínculo que trouxe 40% (o corte
+  não existe no app: as rodadas `fase1__*` usam 0%).
 - **Atacantes (todos ao mesmo tempo):** fazenda de 2.000 contas que dá
   DRIFT diário no spam do dono e, no contágio, declara uma cidade
   aleatória por dia; brigada de 3 concentradores + 300 contas denunciando
@@ -81,7 +86,9 @@ denunciou. Detalhes e exemplo em `Docs/algoritmos.md` §9.
   - *revezamento*: cada spam é impulsionado por 1/3 da fazenda;
   - *paciente*: contas criadas no dia 0, camufladas, atacando no dia 28;
   - *visão 30%*: cada cliente vê 30% dos DRIFTs de terceiros (pior caso, por evento);
-  - *eclipse*: 30% dos clientes só usam relays do atacante, que esconde SINKs e denúncias e descarta metade do que é honesto.
+  - *eclipse*: 30% dos clientes só usam relays do atacante, que esconde SINKs e denúncias e descarta metade do que é honesto;
+  - *difamação*: a fazenda (seguida de volta por 10%) enterra e denuncia todo post honesto que vê;
+  - *SINK de gosto*: cada pessoa enterra 5% ou 10% dos posts honestos que vê (não é ataque: mede o custo de punir no SINK).
 - **Métricas (média das últimas 6 semanas):**
   - % de pessoas com ataque no feed;
   - pico em qualquer momento;
@@ -146,16 +153,30 @@ Duas surpresas:
 
 ### 4.5 v7 (teto para vínculos fracos) e a Fase 1
 
-| Cenário | v6 | **v7** | **Fase 1 (app)** |
-|---|---|---|---|
-| revezamento | 3,5% · pico 21% | 0,2% · 2% | 0,0% · 2% |
-| paciente | 0,3% · pico 51% | 0,2% · 2% | 0,0% · 2% |
-| visão 30% | 10,5% · pico 29% | 0,2% · 2% | 0,0% · 1% |
-| eclipse 30% | 0,7% · pico 21% | 0,2% · 2% | 0,0% · 1% |
-| isca | 0,2% | 0,2% | **1,4% · pico 7%** |
-| enganados + isca | 2,1% · pico 9% | 1,8% · pico 9% | 0,0% · pico 8% |
-| alcance honesto sem ataque | 88% | 92% | ~38% |
-| alcance sem mobilidade (com ataques) | 69% | 55% | ~39% |
+| Cenário | v6 | **v7** | Fase 1 v0 | **Fase 1 (app)** |
+|---|---|---|---|---|
+| revezamento | 3,5% · pico 21% | 0,2% · 2% | 0,0% · 2% | 0,0% · 2% |
+| paciente | 0,3% · pico 51% | 0,2% · 2% | 0,0% · 2% | 0,0% · 2% |
+| visão 30% | 10,5% · pico 29% | 0,2% · 2% | 0,0% · 1% | 0,0% · 2% |
+| eclipse 30% | 0,7% · pico 21% | 0,2% · 2% | 0,0% · 1% | 0,0% · 2% (alcance 27%) |
+| difamação | — | — | — | 0,0% · 2% |
+| isca | 0,2% | 0,2% | 1,4% · pico 7% | **2,9% · pico 11%** |
+| enganados + isca | 2,1% · pico 9% | 1,8% · pico 9% | 0,0% · pico 8% | 0,1% · pico 9% |
+| alcance honesto sem ataque | 88% | 92% | ~38% | 38% |
+| alcance com 10% de SINK de gosto | — | — | 5% | 29% |
+| alcance sem mobilidade (com ataques) | 69% | 55% | ~39% | 38% |
+| feed vindo de outra cidade, sem ataque | 57% | 58% | 54% | 54% |
+
+A isca dobra da Fase 1 v0 para o app porque o app não tem o corte do
+vínculo que trouxe spam: com corte em 40% das vezes (rodada
+`fase1_corte40__isca`), ela fica em 1,8% · pico 9%. Um gesto de "deixar
+de seguir quem trouxe" a partir da pílula ↪ está no BACKLOG. Mesmo assim,
+a isca passa de 5% das pessoas em metade dos dias simulados: é o ataque
+que a Fase 1 aceita até o lockstep da Fase 2.
+
+Para comparar a abertura: no feed da urna global, 72% vem de outra cidade;
+no v2, 61%. O contágio é mais local, como foi desenhado ("ver o próximo
+primeiro"), sem fechar a pessoa na própria cidade.
 
 O alcance do post mais viral é uma métrica de um post só e varia ±8 pontos
 entre seeds; a diferença v6 × v7 sem mobilidade está nesse ruído. O pico
@@ -164,6 +185,29 @@ usa os vínculos de quem lê, então revezamento, visão parcial e eclipse não
 o afetam. A Fase 1 perde alcance (sem encontros e sem mapa da área) e deixa
 a isca passar (sem lockstep); ambos voltam nas Fases 2–3. Ordem
 embaralhada: 0 diferenças em 840 feeds em todas as rodadas.
+
+### 4.6 O que vira experiência ruim (decisão de 05/11/2026)
+
+A primeira versão punia (−0,5 no vínculo com o autor e com quem trouxe)
+tanto o SINK quanto a denúncia do leitor. A revisão em par apontou o
+custo: SINK no Drift é gosto (manifesto §23), e gente comum enterra post
+honesto. Três opções, na configuração do app (sem corte de vínculo):
+
+| Cenário | SINK e denúncia punem | **só a denúncia pune** | denúncia + SINK só contra quem trouxe |
+|---|---|---|---|
+| isca | 1,4% · pico 7% | **2,9% · pico 11%** | 1,3% · pico 8% |
+| enganados + isca | 0,0% · pico 7% | 0,1% · pico 9% | 0,1% · pico 9% |
+| difamação | 0,0% | 0,0% | 0,0% |
+| 10% de SINK de gosto, sem ataque: alcance | **5%** (30% dos feeds quase vazios; 25% dos vínculos honestos zerados) | **29%** (nenhum vínculo zerado) | 8% (9% dos feeds quase vazios) |
+| 10% de SINK de gosto + isca: ataque · alcance | 0,5% · 5% | 2,3% · 30% | 0,8% · 7% |
+
+Punir no SINK compra pouca defesa contra a isca e desmonta a rede
+honesta: um SINK de gosto num post trazido por alguém já derruba o vínculo
+conquistado (0,8 → 0,3) e a pessoa para de trazer posts. Decisão: **só a
+denúncia pune**, que é intenção explícita ("isto é spam/abuso"). A rodada
+da manhã, com o corte de vínculo em 40%, apontou o mesmo (isca 1,4% ×
+1,5%; alcance com SINK de gosto 5% × 29%). Rodadas `fase1_both__*`,
+`fase1_viaSink__*`, `fase1__*` e `decisao_*` da bateria.
 
 ## 5. O que esta simulação não prova
 
@@ -174,6 +218,8 @@ embaralhada: 0 diferenças em 840 feeds em todas as rodadas.
 - **Uma seed** nas rodadas finais (as anteriores variaram ±8 pontos de alcance).
 - **Cliente real ≠ simulação:** janela de sync de 7 dias, latência, relays com conteúdos diferentes.
 - **v7 sem as outras peças não foi testado.** Talvez o teto sozinho baste para parte delas.
+- **SINK de gosto uniforme.** Cada pessoa enterra 10% de tudo ao acaso; gosto real se concentra (um assunto, um autor) e pode zerar menos vínculos, ou mais.
+- **Taxas de reação fixas.** SINK 50% e denúncia 35% diante de spam são suposições; a defesa contra a isca na Fase 1 depende da denúncia.
 
 ## 6. Literatura usada
 
@@ -193,18 +239,23 @@ simulação e em `Docs/algoritmos.md` §9.
 node Docs/simulacao-contagio/build-engine.mjs        # empacota src/lib/ranking.ts (motor real)
 node Docs/simulacao-contagio/bateria.cjs 0 4 &       # rode os workers 0..3 em paralelo
 node Docs/simulacao-contagio/bateria.cjs resumo      # tabela das rodadas prontas
-node Docs/simulacao-contagio/bateria.cjs 0 1 fase1   # só as rodadas da Fase 1
+node Docs/simulacao-contagio/bateria.cjs 0 1 '^fase1'   # só as rodadas da Fase 1 (app, v0 e variações)
+node Docs/simulacao-contagio/bateria.cjs 0 1 '^decisao_' # a decisão de 05/11 com corte de vínculo
 ```
 
 Determinística: mesma seed, mesmo resultado. As tabelas acima saem das
-rodadas `v2..v7`, `fase1` e `global` da bateria.
+rodadas `v2..v7`, `fase1_v0`, `fase1*`, `decisao_*` e `global` da bateria.
 
 ## 8. Perguntas para quem revisar
 
 1. O teto de 0,5 para vínculos fracos tem um ataque que a simulação não
    pegou? (Ex.: comprar vínculos conquistados em escala com isca de LLM.)
-2. A punição permanente do SINK é aceitável socialmente? A simulação não
-   mostrou fragmentação com 5% de erro honesto, mas o grafo é sintético.
+2. A punição permanente da denúncia (autor e quem trouxe) é aceitável
+   socialmente? O SINK deixou de punir (§4.6); denúncia por engano não
+   tem volta, como a própria denúncia (evento imutável).
 3. A emenda ao §24 preserva o espírito anti-bolha? Que métrica de
    diversidade deveríamos medir antes da Fase 2?
 4. O que muda com um grafo social realista (agrupado)?
+5. Que defesa barata, sem lockstep, fecha a isca na Fase 1? (O gesto de
+   "deixar de seguir quem trouxe" baixa de 2,9% para 1,8% se usado em 40%
+   das vezes.)

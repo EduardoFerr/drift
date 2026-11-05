@@ -227,18 +227,20 @@ CREATE TABLE IF NOT EXISTS muted (
   muted_at  INTEGER NOT NULL
 );
 
--- ── Aba Contágio: experiências ruins do leitor (manifesto §24 emendado)
--- SINK ou denúncia do leitor contra um post: uma linha para o autor e uma
--- para o contato que trouxe o post. Cada linha tira 0,5 do vínculo (ver
--- src/lib/contagion.ts). Estado local do user, como blocked/muted: não é
--- publicado e não entra em DOMAIN_TABLES (rebuild preserva).
-CREATE TABLE IF NOT EXISTS contagion_strikes (
+-- ── Aba Contágio: quem trouxe o que o leitor denunciou (manifesto §24 emendado)
+-- Denúncia feita na aba Contágio: uma linha por contato que trouxe o post
+-- (cada identidade do aparelho tem as suas — `viewer_pub`). Cada post
+-- distinto tira 0,5 do vínculo (src/lib/contagion.ts). A parte do AUTOR
+-- não fica aqui: sai das denúncias públicas do leitor (`reports`).
+-- Estado local do user, como blocked/muted: não é publicado e não entra
+-- em DOMAIN_TABLES (rebuild preserva).
+CREATE TABLE IF NOT EXISTS contagion_bad_experiences (
+  viewer_pub  TEXT NOT NULL,
   subject_pub TEXT NOT NULL,
   post_id     TEXT NOT NULL,
   created_at  INTEGER NOT NULL,
-  PRIMARY KEY (subject_pub, post_id)
+  PRIMARY KEY (viewer_pub, subject_pub, post_id)
 );
-CREATE INDEX IF NOT EXISTS idx_contagion_strikes_post ON contagion_strikes(post_id);
 
 -- ── Usuários (perfis agregados) ──────────────────────────────────
 CREATE TABLE IF NOT EXISTS users (

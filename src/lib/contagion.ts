@@ -4,17 +4,18 @@
  * as do próprio leitor.
  *
  * Um post chega ao leitor quando pessoas que ele segue deram DRIFT nele
- * nas últimas 48 h e a soma da força desses vínculos passa de 0,8. A força
+ * nas últimas 48 h e a soma da força desses vínculos chega a 0,8. A força
  * de cada vínculo sai só de dados locais do leitor:
  *
  *   - follow ........................................ 0,5
  *   - follow + o leitor já impulsionou algo da pessoa  0,8  (vínculo conquistado)
- *   - cada SINK/denúncia do leitor contra conteúdo que veio pela pessoa: −0,5,
- *     permanente (recuperar é explorável por quem oscila — TrustGuard, WWW 2005)
+ *   - cada post da pessoa (ou trazido por ela) que o leitor DENUNCIOU: −0,5,
+ *     permanente (recuperar é explorável por quem oscila — TrustGuard, WWW
+ *     2005). O SINK do leitor não pune ninguém: é gosto (§23).
  *
- * Teto para vínculos fracos (≤ 0,5): somados, valem no máximo 0,5 por post.
- * Contas que o leitor só segue nunca passam o limiar sozinhas, por mais
- * que sejam (fazenda que ganha follow de volta, revezando ou camuflada).
+ * Teto para vínculos fracos (≤ 0,5): somados, valem no máximo 0,5 por post
+ * — no DRIFT, na vacina e na quarentena. Contas que o leitor só segue nunca
+ * trazem nem escondem nada sozinhas, por mais que sejam.
  *
  * SINK dos contatos vacina (subtrai); denúncias dos contatos somando 1,0
  * põem o post em quarentena para o leitor. Posts recentes de quem o leitor
@@ -40,6 +41,8 @@ export const CONTAGION = {
   SPREAD_WINDOW_S: 48 * 3600,
   DIRECT_WINDOW_S: 72 * 3600,
   REPORT_WINDOW_S: 14 * 86400,
+  /** Post com mais de 4 dias não entra pelo contágio (igual à simulação). */
+  POST_MAX_AGE_S: 96 * 3600,
 } as const
 
 export interface ContagionAction {
@@ -91,8 +94,11 @@ export interface ContagionVerdict {
   direct: boolean
   /** Quem impulsionou, maior vínculo primeiro (desempate pela chave). */
   contributors: { pub: string; tie: number }[]
-  /** Contato de maior vínculo que trouxe o post; null se veio só direto. */
+  /** Contato de maior vínculo que trouxe o post; null se entrou direto. */
   via: string | null
+  /** Todos os empatados no maior vínculo: dividem a experiência ruim, para
+   *  que ninguém escape da culpa escolhendo a própria chave. */
+  viaAll: string[]
 }
 
 /** Força do vínculo do leitor com `pub`, em décimos. 0 = sem vínculo. */
@@ -127,29 +133,40 @@ export function computeContagion(input: ContagionInput): Map<string, ContagionVe
   const posts = new Map<string, ContagionPost>()
   for (const p of input.posts) posts.set(p.id, p)
 
-  interface Acc { strong: number; weakRaw: number; vaccine: number; quarantine: number; contributors: { pub: string; tie: number }[] }
+  // Teto simétrico: vínculos fracos (≤ 0,5) somam no máximo WEAK_CAP também
+  // na vacina e na quarentena — duas contas só seguidas não escondem nada
+  // sozinhas (difamação), do mesmo jeito que não trazem nada sozinhas.
+  interface Sum { strong: number; weak: number }
+  interface Acc { up: Sum; vac: Sum; quar: Sum; contributors: { pub: string; tie: number }[] }
   const acc = new Map<string, Acc>()
   const get = (id: string): Acc => {
     let a = acc.get(id)
-    if (!a) acc.set(id, (a = { strong: 0, weakRaw: 0, vaccine: 0, quarantine: 0, contributors: [] }))
+    if (!a) acc.set(id, (a = { up: { strong: 0, weak: 0 }, vac: { strong: 0, weak: 0 }, quar: { strong: 0, weak: 0 }, contributors: [] }))
     return a
   }
+  const add = (sum: Sum, t: number) => { if (t > CONTAGION.TIE_FOLLOW) sum.strong += t; else sum.weak += t }
+  const total = (sum: Sum) => sum.strong + Math.min(sum.weak, CONTAGION.WEAK_CAP)
 
   for (const a of latestActions(input.actions).values()) {
-    if (a.actor === viewer || nowSec - a.createdAt > CONTAGION.SPREAD_WINDOW_S) continue
+    // DRIFT vale 48 h; o SINK de um contato vale enquanto o post puder entrar
+    // (4 dias), senão o atacante só republica o DRIFT depois que a vacina expira.
+    const window = a.kind === 'bury' ? CONTAGION.POST_MAX_AGE_S : CONTAGION.SPREAD_WINDOW_S
+    if (a.actor === viewer || nowSec - a.createdAt > window) continue
+    // Ação do próprio autor no próprio post não conta (como no ranking
+    // canônico): republicar o DRIFT não mantém um post velho na aba.
+    if (posts.get(a.postId)?.author === a.actor) continue
     const t = tie(a.actor)
     if (t <= 0) continue
     const s = get(a.postId)
-    if (a.kind === 'bury') { s.vaccine += t; continue }
-    if (t > CONTAGION.TIE_FOLLOW) s.strong += t
-    else s.weakRaw += t
+    if (a.kind === 'bury') { add(s.vac, t); continue }
+    add(s.up, t)
     s.contributors.push({ pub: a.actor, tie: t })
   }
 
   for (const r of input.reports) {
     if (r.reporter === viewer || nowSec - r.createdAt > CONTAGION.REPORT_WINDOW_S) continue
     const t = tie(r.reporter)
-    if (t > 0) get(r.postId).quarantine += t
+    if (t > 0) add(get(r.postId).quar, t)
   }
 
   // Posts recentes de quem o leitor segue entram direto (se o vínculo
@@ -163,22 +180,29 @@ export function computeContagion(input: ContagionInput): Map<string, ContagionVe
     const post = posts.get(postId)
     if (!post || post.author === viewer) continue
     const direct = nowSec - post.createdAt <= CONTAGION.DIRECT_WINDOW_S && tie(post.author) > 0
-    const weak = Math.min(s.weakRaw, CONTAGION.WEAK_CAP)
-    const score = s.strong + weak
+    const weak = Math.min(s.up.weak, CONTAGION.WEAK_CAP)
+    const score = s.up.strong + weak
+    const vaccine = total(s.vac)
+    const quarantine = total(s.quar)
     const contributors = s.contributors.sort((x, y) => y.tie - x.tie || (x.pub < y.pub ? -1 : x.pub > y.pub ? 1 : 0))
-    const net = (direct ? CONTAGION.DIRECT_WEIGHT : 0) + score - s.vaccine
-    const pass = s.quarantine < CONTAGION.QUARANTINE && net > 0 && (direct || score >= CONTAGION.THRESHOLD)
+    const net = (direct ? CONTAGION.DIRECT_WEIGHT : 0) + score - vaccine
+    const fresh = nowSec - post.createdAt <= CONTAGION.POST_MAX_AGE_S
+    const pass = quarantine < CONTAGION.QUARANTINE && net > 0 && (direct || (fresh && score >= CONTAGION.THRESHOLD))
+    // Post direto veio pelo follow no autor, não por quem impulsionou: não
+    // há "quem trouxe" (nem pílula, nem culpa de terceiros).
+    const top = direct ? [] : contributors.filter((c) => c.tie === contributors[0]?.tie)
     out.set(postId, {
       postId,
       pass,
       score,
-      strong: s.strong,
+      strong: s.up.strong,
       weak,
-      vaccine: s.vaccine,
-      quarantine: s.quarantine,
+      vaccine,
+      quarantine,
       direct,
       contributors,
-      via: contributors[0]?.pub ?? null,
+      via: top[0]?.pub ?? null,
+      viaAll: top.map((c) => c.pub),
     })
   }
   return out

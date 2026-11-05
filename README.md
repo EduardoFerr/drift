@@ -6,7 +6,7 @@
 **Drift é um protocolo + cliente de referência. MIT. Sem dono.**
 Use, modifique, redistribua, hospede, force. O protocolo é o contrato; o cliente é uma de muitas implementações possíveis. Esta distribuição não é canônica — qualquer fork verificável é igualmente legítimo. Se este repositório desaparecer, o protocolo persiste em qualquer cliente Nostr que respeite os kinds 9078–9081.
 
-Rede social descentralizada construída sobre [Nostr](https://github.com/nostr-protocol/nostr). Eventos imutáveis na rede; estado materializado localmente em SQLite WASM; UI React reativa via stores Zustand. Sem servidor proprietário, sem chave mestra, sem algoritmo de feed personalizado.
+Rede social descentralizada construída sobre [Nostr](https://github.com/nostr-protocol/nostr). Eventos imutáveis na rede; estado materializado localmente em SQLite WASM; UI React reativa via stores Zustand. Sem servidor proprietário, sem chave mestra, sem algoritmo secreto de feed — regras públicas, e a aba Contágio usa só as escolhas de quem lê (manifesto §24).
 
 A interação core são **swipes**: ↑ **DRIFT** (drifta) · ↓ **SINK** (afunda) · ← → navega subposts. PostViewer funciona como fila estilo Tinder — drift/sink avança automaticamente pro próximo post. Métrica de engajamento: **DERIVA** (score determinístico, não personalizado).
 
@@ -165,7 +165,7 @@ Fase 6 entrega a **capacidade técnica** (§15 — múltiplos transportes); Fase
 
 > Drift não impede mentira; impede consenso estável da mentira.
 
-Nada de feed personalizado, nada de reputação subjetiva, nada de função `deletePost`/`banUser`. Conteúdo ilegal é tratado por reports comunitários (§26) + auto-classificação voluntária (§27) + denúncia ao operador legal competente (NCMEC, SaferNet, etc.). Cliente oficial **não** escaneia conteúdo automaticamente — qualquer scanner externo embutido é chave mestra disfarçada (§25).
+Nada de algoritmo secreto de feed, nada de reputação subjetiva, nada de função `deletePost`/`banUser`. Conteúdo ilegal é tratado por reports comunitários (§26) + auto-classificação voluntária (§27) + denúncia ao operador legal competente (NCMEC, SaferNet, etc.). Cliente oficial **não** escaneia conteúdo automaticamente — qualquer scanner externo embutido é chave mestra disfarçada (§25).
 
 ## Licença
 

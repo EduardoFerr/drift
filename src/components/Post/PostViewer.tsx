@@ -49,7 +49,8 @@ import { applyContentFilters } from '../../lib/feed'
 import { usePrefsStore } from '../../lib/prefs'
 import { toggleSlim, useViewModeStore } from '../../lib/view-mode'
 import { reportPost } from '../../lib/protocol'
-import { recordBadExperience } from '../../lib/contagion-data'
+import { recordReportedVia } from '../../lib/contagion-data'
+import { ContagionViaChip } from './ContagionViaChip'
 import { pinPost, unpinPost } from '../../lib/cache'
 import { block, mute } from '../../lib/moderation-local'
 import { follow, unfollow, useFollowsStore } from '../../lib/follows'
@@ -114,6 +115,9 @@ export interface PostViewerProps {
    * sem isso, user via texto sem caminho de saída.
    */
   onOpenLocationSettings?: () => void
+  /** Aba Contágio: contato que trouxe o post ("↪ chegou por X"); null fora
+   *  da aba ou quando o post entrou direto. */
+  arrivedVia?: string | null
   onSpread: () => void
   onBury: () => void
   onClose: () => void
@@ -125,6 +129,7 @@ export function PostViewer({
   pendingAction,
   custom,
   queue,
+  arrivedVia = null,
   onOpenLocationSettings,
   onSpread,
   onBury,
@@ -297,9 +302,10 @@ export function PostViewer({
     setReporting(true)
     try {
       await reportPost({ postId: post.id, authorPub: post.authorPub, reason })
-      // Aba Contágio: denúncia é experiência ruim com o autor e com quem
-      // trouxe o post (mesma linha do SINK — não conta duas vezes).
-      void recordBadExperience(post.id, post.authorPub)
+      // Aba Contágio: denúncia é experiência ruim com o autor (sai da própria
+      // denúncia publicada) e, se feita na aba com o "chegou por" à vista,
+      // com quem trouxe o post (registro local).
+      if (arrivedVia) void recordReportedVia(post.id)
       setShowReport(false)
     } catch (err) {
       console.error('report failed', err)
@@ -741,6 +747,7 @@ export function PostViewer({
             {/* Trust Lens inspector chip — bottom-right do card.
                 Aparece só quando lens strength > 0 E post foi tocado. */}
             <LensInspector postId={post.id} authorPub={post.authorPub} />
+            {arrivedVia && <ContagionViaChip viaPub={arrivedVia} />}
         </>
         {queue && queue.next && (
           <>

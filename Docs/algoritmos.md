@@ -861,14 +861,15 @@ Post de X ainda aparece boostado, mas menos — refletindo que user
 
 ### Conceito
 
-As abas Global, Seguindo e Em alta mostram a mesma ordem para todo mundo.
-A aba **Contágio** mostra o que chegou ao leitor **pelas pessoas que ele
+Todas as abas usam a mesma ordem (§1). Global e Em alta mostram os mesmos
+posts para todo mundo; Seguindo filtra pelos follows de quem lê. A aba
+**Contágio** mostra o que chegou ao leitor **pelas pessoas que ele
 segue**, como um vírus que passa de contato em contato: um post entra
 quando contatos deram DRIFT nele e a soma da força desses vínculos
-passa de 0,8. As regras são públicas e determinísticas; só as
+chega a 0,8. As regras são públicas e determinísticas; só as
 **entradas** são do leitor (quem ele segue, o que ele já impulsionou, o
-que ele enterrou ou denunciou). A **ordem** dentro da aba continua a
-canônica (§1). Manifesto §24, emendado em 2026-11-05.
+que ele denunciou, quem ele bloqueou). A **ordem** dentro da aba continua
+a canônica (§1). Manifesto §24, emendado em 2026-11-05.
 
 Por que existe: numa ordem global igual para todos, uma fazenda de
 contas paciente compra o topo de todo mundo de uma vez. A simulação
@@ -881,31 +882,42 @@ assimétricas, calculadas a partir de quem olha, podem resistir.
 ### Fórmula (décimos inteiros — a soma não depende da ordem)
 
 ```
-tie(u) = 0                                   se o leitor não segue u
+tie(u) = 0                                   se o leitor não segue u ou o bloqueou
        = max(0, base(u) − 5 × ruins(u))      senão
 base(u) = 8   se o leitor já impulsionou algo que u escreveu (ação líquida)
         = 5   se só segue
-ruins(u) = posts distintos que o leitor enterrou/denunciou e que eram de u
-           ou chegaram por u (permanente)
+ruins(u) = posts distintos que o leitor DENUNCIOU e que eram de u, ou que
+           chegaram por u e foram denunciados na aba (permanente)
+
+Σ⁺(S) = Σ tie(u) dos u em S com tie(u) > 5  +  min(Σ tie(u) dos com tie(u) ≤ 5, 5)
+        ← teto: os vínculos fracos (≤ 0,5) somam no máximo 0,5
 
 Para cada post p (nunca os do próprio leitor), usando a AÇÃO MAIS RECENTE
-de cada contato em p (no empate exato, o SINK):
-  forte(p)      = Σ tie(u)  contatos com DRIFT em p nas últimas 48 h e tie(u) > 5
-  fraco(p)      = min(Σ tie(u) dos com tie(u) ≤ 5, 5)      ← teto: 0,5
-  vacina(p)     = Σ tie(u)  contatos com SINK em p nas últimas 48 h
-  quarentena(p) = Σ tie(u)  contatos que denunciaram p nos últimos 14 dias
+de cada contato em p (no empate exato, o SINK) e ignorando a ação do
+próprio autor em p:
+  traz(p)       = Σ⁺(contatos com DRIFT em p nas últimas 48 h)
+  vacina(p)     = Σ⁺(contatos com SINK em p nas últimas 96 h)
+  quarentena(p) = Σ⁺(contatos que denunciaram p nos últimos 14 dias)
   direto(p)     = autor seguido com tie > 0 e post com até 72 h
 
 p entra ⇔ quarentena(p) < 10
-        ∧ 10·direto(p) + forte(p) + fraco(p) − vacina(p) > 0
-        ∧ (direto(p) ∨ forte(p) + fraco(p) ≥ 8)
+        ∧ 10·direto(p) + traz(p) − vacina(p) > 0
+        ∧ (direto(p) ∨ (idade(p) ≤ 4 dias ∧ traz(p) ≥ 8))
 ```
 
 O **teto para vínculos fracos** é a peça central: contas que o leitor só
 segue somam no máximo 0,5 por post, então nunca passam o limiar sozinhas,
 por mais que sejam, revezem, camuflem o histórico ou se escondam atrás de
-relays. Ele só usa os vínculos do próprio leitor: não depende de dado
-global.
+relays. Ele vale do mesmo jeito na vacina e na quarentena: contas só
+seguidas também não escondem nada sozinhas (difamação). Só usa os
+vínculos do próprio leitor: não depende de dado global.
+
+**Experiência ruim é a denúncia.** O SINK do leitor é gosto (manifesto
+§23): vacina o post para quem o segue e tira o post da tela dele, mas
+não pune ninguém. A parte do autor sai das denúncias públicas do próprio
+leitor (tabela `reports`), recalculável a partir dos eventos; a de quem
+trouxe nasce só de denúncia feita na aba, com "↪ chegou por X" à vista,
+e fica local (`contagion_bad_experiences`).
 
 ### Exemplo
 
@@ -914,40 +926,64 @@ Bia segue Ana (já impulsionou um post dela → 0,8), Caio e Duda (só segue
 
 | Post | O que aconteceu | Conta | Entra? |
 |---|---|---|---|
-| X | Ana deu DRIFT há 3 h | forte 8 | sim |
-| Y | Caio e Duda deram DRIFT | fraco min(10, 5) = 5 | não |
-| Z | Ana deu DRIFT; Caio e Duda denunciaram | quarentena 5 + 5 = 10 | não |
-| W | Post de Caio de ontem; Ana deu SINK | direto: 10 − 8 = 2 > 0 | sim |
-| V | Ana deu DRIFT; Bia já enterrou 2 posts que vieram pela Ana | tie(Ana) = 8 − 10 → 0 | não |
+| X | Ana deu DRIFT há 3 h | traz 8 | sim, "↪ chegou por Ana" |
+| Y | Caio e Duda deram DRIFT | traz min(5 + 5, 5) = 5 | não |
+| Z | Ana deu DRIFT; Caio e Duda denunciaram | quarentena min(5 + 5, 5) = 5 < 10 | sim (fracos não escondem) |
+| Q | Post de Duda de ontem; Ana e Caio denunciaram | quarentena 8 + 5 = 13 | não |
+| W | Post de Caio de ontem; Ana deu SINK | direto: 10 − 8 = 2 > 0 | sim, sem pílula |
+| V | Ana deu DRIFT; Bia já denunciou 2 posts que vieram pela Ana | tie(Ana) = 8 − 10 → 0 | não |
+| S | Ana deu DRIFT; Bia já deu SINK em 5 posts da Ana | tie(Ana) = 8 (SINK não pune) | sim |
 
 ### Simulação (2.250 pessoas, 6 cidades, 24 semanas, fazenda de 2.000 contas)
 
-| Ataque | % que vê ataque, Fase 1 | Modelo completo (Fases 2–3) |
+| Ataque | % que vê ataque, Fase 1 (app) | Modelo completo (v7, Fases 2–3) |
 |---|---|---|
 | fazenda com follow-back 10% | 0,0% | 0,3% |
 | fazenda camuflada / revezando / paciente | 0,0% | 0,2% |
 | eclipse (30% dos clientes em relays do atacante) | 0,0% | 0,2% |
-| enganados (10%) + isca do fazendeiro | 0,0% (pico 8%) | 1,8% |
-| contas da fazenda postando isca (conteúdo bom) | **1,4%** (pico 7%) | 0,2% |
+| difamação (a fazenda enterra e denuncia post honesto) | 0,0% | — |
+| enganados (10%) + isca do fazendeiro | 0,1% (pico 9%) | 1,8% |
+| contas da fazenda postando isca (conteúdo bom) | **2,9%** (pico 11%) | 0,2% |
 
-Ordem de chegada embaralhada: 0 diferenças em 840 feeds por rodada. Custo
-da Fase 1: o post mais viral alcança ~38% das pessoas pela aba (o modelo
-completo, com encontros físicos e o mapa da área, chega a 82–92%). A aba
-é opcional e as outras continuam lá.
+Rodadas `fase1__*` da bateria: a configuração do app, sem o corte do
+vínculo que trouxe spam (o app não tem esse gesto; com corte em 40% das
+vezes, a isca cai para 1,8%). Ordem de chegada embaralhada: 0 diferenças
+em 840 feeds por rodada. Custo da Fase 1: o post mais viral alcança ~38%
+das pessoas pela aba (29% com 10% de SINK por gosto; 27% sob eclipse); o
+modelo completo, com encontros físicos e o mapa da área, chega a 82–92%.
+A isca é o que mais passa: acima de 5% das pessoas em metade dos dias da
+simulação, até o lockstep da Fase 2. A aba é opcional e as outras
+continuam lá.
 
 ### Edge cases
 
 - Sem follows → aba vazia, com convite a seguir (não há fallback global).
-- Desfazer um SINK (impulsionar o post de novo) apaga a experiência ruim
-  **daquele** post: corrigir engano, não esquecer com o tempo — o atacante
-  não tem como provocar isso no lugar do leitor.
-- Enterrar e denunciar o mesmo post contam uma vez (uma linha por pessoa e
-  post em `contagion_strikes`).
+- Por que o SINK não pune: na simulação, com cada pessoa enterrando 10%
+  dos posts honestos por gosto, punir no SINK zerava 25% dos vínculos
+  honestos e derrubava o alcance de 29% para 5%. O preço é a isca passar
+  mais (2,9% × 1,4% das pessoas). Detalhes em
+  `Docs/spec-revisao-contagio.md` §4.6.
+- Denunciar o mesmo post de novo conta uma vez (uma experiência ruim por
+  pessoa e post).
+- "Quem trouxe" = os contatos de maior vínculo que deram DRIFT. Empatados
+  dividem a experiência ruim (ninguém escapa escolhendo a própria chave);
+  a pílula mostra o primeiro pela chave.
+- Post direto não tem "quem trouxe": veio pelo follow no autor (nem
+  pílula, nem culpa de terceiros).
 - Experiências ruins são permanentes: na simulação, deixá-las expirar em
   30 dias fez "enganados + isca" voltar de 2,1% para 20,1% (TrustGuard,
-  WWW 2005, descreve o ataque de quem oscila).
-- "Quem trouxe" é inferido na hora a partir dos vínculos do leitor e fica
-  em memória: nada de proveniência é publicado (`cascade.ts`, §28).
+  WWW 2005, descreve o ataque de quem oscila). A denúncia também é evento
+  imutável (§6).
+- "Quem trouxe" é inferido na hora a partir dos vínculos do leitor: nada
+  de proveniência é publicado (`cascade.ts`, §28). O registro de quem
+  trouxe o que o leitor denunciou fica em cada aparelho; a parte do autor
+  é igual em todo aparelho da mesma identidade.
+- Ação do próprio autor no próprio post não conta (como no ranking
+  canônico): republicar o DRIFT não mantém um post velho na aba.
+- Bloquear tira a pessoa da conta (não traz, não vacina, não denuncia);
+  silenciar só esconde os posts dela.
+- SINK de contato vale 96 h, enquanto o post ainda pode entrar; senão o
+  atacante republicaria o DRIFT depois que a vacina expirasse.
 - A moderação comunitária global (§3) continua valendo: post com
   `score = −999` não aparece em aba nenhuma.
 
@@ -979,11 +1015,15 @@ completo, com encontros físicos e o mapa da área, chega a 82–92%). A aba
 | Impulsionar nunca tira um post da aba Contágio (monotonia) | `tests/contagion.test.ts` | §7 |
 | As 4 abas usam a mesma ordenação canônica (`FEED_ORDER`) | `tests/score-decay-parity.test.ts`, `tests/scoring-pipeline-conformance.test.ts` | §8, §24 |
 | Experiências ruins do leitor só mexem na aba dele; o global não muda | `tests/contagion.test.ts` | §24 |
+| Contas só seguidas não escondem nada sozinhas (teto também na vacina e na quarentena) | `tests/contagion.test.ts` | §24, §26 |
+| SINK do leitor não pune ninguém na aba Contágio | `tests/contagion.test.ts`, `e2e/contagion-tab.spec.ts` | §23 |
+| Denúncia fora da aba nunca pune quem trouxe | `e2e/contagion-tab.spec.ts` | §24 |
 
 ---
 
 *Última atualização: 2026-11-05 (§9 — contágio local, aba Contágio,
-Fase 1; manifesto §24 emendado). Anterior: 2026-11-03 (auditoria do
+Fase 1; manifesto §24 emendado; revisão em par: teto simétrico, só a
+denúncia pune, "↪ chegou por"). Anterior: 2026-11-03 (auditoria do
 algoritmo — motor global, âncora OpenTimestamps, moderação derivada). Source-of-truth está no código —
 quando este doc divergir, código vence. Reportar dessincronia via
 issue ou pair-review HIMYM.*

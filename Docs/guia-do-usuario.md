@@ -10,8 +10,8 @@
 
 ## 30 segundos pra entender o Drift
 
-Drift é uma rede social sem servidor central, sem feed personalizado, e
-sem alguém que pode te apagar. Os posts vivem em **relays Nostr**
+Drift é uma rede social sem servidor central, sem algoritmo secreto de
+feed, e sem alguém que pode te apagar. Os posts vivem em **relays Nostr**
 (servidores comuns que retransmitem eventos) e seu cliente baixa o que
 te interessa.
 
@@ -20,8 +20,9 @@ te interessa.
 - 🔑 Sua identidade é uma **chave criptográfica** (`nsec1…`) gerada no
   seu dispositivo. Sem email, sem telefone, sem cadastro.
 - 📊 O score que ordena o feed é uma **fórmula pública**. Todos os
-  clientes Drift no mundo veem o feed **na mesma ordem** (a menos que
-  você ligue a "Lente" — explicado abaixo).
+  clientes Drift no mundo veem o feed global **na mesma ordem** (a menos
+  que você ligue a "Lente" — explicado abaixo). A aba **contágio** escolhe
+  posts pelas suas próprias escolhas, com regras igualmente públicas.
 - 🚫 Não existe "moderador supremo". Conteúdo problemático é escondido
   pela **comunidade via denúncias** — nem o criador do Drift consegue
   apagar um post.
@@ -130,11 +131,10 @@ Quem fizer auditoria histórica vê que você mudou de opinião.
 4. **O autor NÃO é penalizado.** Bury reduz o score do post, mas não
    afeta o `weight` do autor (manifesto §23). Você pode "afundar"
    alguém 1000 vezes sem prejudicar a reputação dele.
-5. **Só pra você, na aba Contágio:** o SINK conta como experiência ruim
-   com o autor e com quem trouxe o post até você. Cada uma tira 0,5 da
-   força desse vínculo **no seu aparelho** (nada é publicado). Com duas,
-   aquela pessoa para de trazer posts pra sua aba Contágio. Ver
-   [A aba Contágio](#a-aba-contágio).
+5. **Na aba Contágio o SINK também é só gosto.** Ele tira força do post
+   na aba de quem segue você (vacina), mas **não pune ninguém**: nem o
+   autor, nem quem trouxe o post até você. Quem baixa vínculo é a
+   denúncia. Ver [A aba Contágio](#a-aba-contágio).
 
 **Quem vê que VOCÊ afundou:**
 
@@ -142,8 +142,7 @@ Quem fizer auditoria histórica vê que você mudou de opinião.
 
 **Pode desfazer?**
 
-✅ Sim — swipe ↑ no mesmo post. Última ação vale. Desfazer também
-apaga a experiência ruim daquele post na aba Contágio.
+✅ Sim — swipe ↑ no mesmo post. Última ação vale.
 
 ---
 
@@ -252,9 +251,11 @@ ignorada (replaceable LWW).
 
 ## A aba Contágio
 
-As abas **global**, **seguindo** e **em alta** são iguais pra todo mundo.
-A aba **contágio** mostra o que chegou até você **pelas pessoas que você
-segue**, como um vírus que passa de contato em contato.
+Todas as abas usam a **mesma ordem** (score público). **Global** e **em
+alta** são iguais pra todo mundo; **seguindo** e **contágio** mudam o
+conjunto de posts conforme quem você segue. A aba **contágio** mostra o
+que chegou até você **pelas pessoas que você segue**, como um vírus que
+passa de contato em contato.
 
 **Como um post chega aqui:**
 
@@ -267,18 +268,29 @@ segue**, como um vírus que passa de contato em contato.
   - quem você só segue soma no máximo 0,5 por post, por mais pessoas que
     sejam. Contas falsas que você seguiu de volta nunca trazem nada
     sozinhas.
-- O SINK das pessoas que você segue **tira** força (vacina); denúncias
-  delas somando 1,0 **escondem** o post (quarentena).
-- Seu SINK ou sua denúncia tira 0,5 do vínculo com o autor e com quem
-  trouxe o post (ver ↓ SINK).
+- O SINK das pessoas que você segue (nas últimas 96 h) **tira** força
+  (vacina); denúncias delas nos últimos 14 dias somando 1,0 **escondem**
+  o post (quarentena). O teto vale aqui também: quem você só segue soma
+  no máximo 0,5, então duas contas só seguidas não escondem nada
+  sozinhas.
+- No canto inferior esquerdo do card, **↪ chegou por X** mostra quem
+  trouxe o post (o contato de maior vínculo). Post que entrou direto não
+  mostra.
+- Sua **denúncia** tira 0,5 do vínculo com o autor, para sempre. Se você
+  denunciou na aba Contágio, com o **↪ chegou por X** na tela, X também
+  perde 0,5. Seu SINK não pune ninguém (ver ↓ SINK).
 
 **O que continua igual:** a ordem dentro da aba é a mesma do feed global
 (score público). As regras estão em `Docs/algoritmos.md` §9 e qualquer
 pessoa pode recalcular sua aba a partir dos eventos e das suas escolhas.
-Nada disso sai do seu aparelho.
+Seus follows, DRIFTs e denúncias são públicos como sempre; os **vínculos
+calculados e o registro de quem trouxe o que você denunciou ficam só no
+seu aparelho** — nada disso é publicado.
 
-**Se a aba estiver vazia:** siga pessoas e drifte o que gostar — é isso
-que dá força aos seus vínculos.
+**Se a aba estiver vazia:** siga pessoas e drifte o que gostar — quem
+você já driftou traz posts sozinho. Num aparelho novo a aba começa mais
+vazia: ele só conhece os DRIFTs seus dos últimos 7 dias que os relays
+devolveram.
 
 ---
 
@@ -346,6 +358,13 @@ coletiva. Você não pode "cancelar" alguém pra todo mundo via bloqueio.
    - Base ativa 1.000 users → threshold 5 pts pra `spam`, 3 pts pra `illegal`
    - Base ativa 100.000 users → threshold 100 pts (defesa contra
      brigada de poucos)
+
+6. **Na sua aba Contágio:** o autor perde 0,5 de vínculo com você, para
+   sempre (sai da própria denúncia publicada). Se você denunciou na aba
+   Contágio, com **↪ chegou por X** na tela, X também perde 0,5 — esse
+   registro fica só no seu aparelho. Nas abas de quem segue você, sua
+   denúncia soma na quarentena do post. Ver
+   [A aba Contágio](#a-aba-contágio).
 
 **O que NÃO acontece:**
 
@@ -450,7 +469,7 @@ Power user pode trocar:
 | Drift escaneia automaticamente o que você publica | §25 — operador do scanner herdaria chave mestra |
 | Existe "moderador supremo" que apaga posts | §17 — sem chave mestra disfarçada |
 | Seu `nsec1…` é enviado pra algum servidor | §3 — identidade no dispositivo, sempre |
-| Feed é personalizado sem você escolher | §24 — global, seguindo e em alta são iguais pra todos; a aba Contágio só usa as suas escolhas, com regras públicas |
+| Feed é personalizado sem você escolher | §24 — mesma ordem em todas as abas; global e em alta são iguais pra todos; seguindo e contágio só usam as suas escolhas, com regras públicas |
 | Posts são apagados quando reports passam threshold | §17 — só score = -999 esconde; cliente alternativo exibe |
 | Bury penaliza o autor | §23 — bury é julgamento estético, não punição |
 | Existe "boost pago" pra subir no feed | §22 — score determinístico, sem reputação subjetiva nem ad |

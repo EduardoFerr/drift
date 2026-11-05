@@ -68,7 +68,7 @@ Não são aspirações. Cada item será entregue na fase indicada.
 - **Disponibilidade distribuída** — re-broadcast, IPFS pin, "espalhar = seedear" (Fase 5 ✓ + Fase 7 IPFS/WebRTC seed)
 - **Sem chave mestra** — não existe `deletePost()` global, build reproduzível (✓ MVP + Fase 6 capacidade + Fase 7 F-Droid garantia)
 - **Bury não pune** — autores não perdem engajamento (✓)
-- **Score determinístico** — sem afinidade, sem feed personalizado (✓)
+- **Score determinístico** — sem afinidade escondida, regras públicas; a aba Contágio usa só as escolhas do leitor (§24 emendado) (✓)
 - **Compatibilidade preservada** — Nostr, entre versões Drift, entre clientes (✓)
 
 ### 0.3 O Ponto de Não Retorno
@@ -98,7 +98,7 @@ Drift é uma rede social descentralizada onde o conteúdo se espalha exclusivame
 - Identidade portável, dispositivo descartável
 - Código aberto, build reproduzível
 - Sem notificações fora do app — filosofia zen
-- Sem afinidade no feed — sem bolha algorítmica
+- Sem afinidade escondida no feed — sem bolha algorítmica (a aba Contágio usa só as escolhas explícitas do leitor, com regras públicas — §24 emendado)
 
 ---
 
@@ -611,8 +611,10 @@ async function getGlobalFeed(limit = 50): Promise<Post[]> {
 **continua no banco e na rede Nostr.** Cliente NÃO deleta.
 
 Ranking é função pura sem inputs personalizados — qualquer cliente
-Drift mostra a mesma ordem global. Sem afinidade. Sem "para você".
-Ver manifesto §24.
+Drift mostra a mesma ordem global. Sem afinidade escondida. Sem "para
+você". Ver manifesto §24 (emendado em 2026-11-05: a aba Contágio escolhe
+o conjunto de posts pelas entradas do próprio leitor, com regras públicas
+em `Docs/algoritmos.md` §9; a ordem continua esta).
 
 Filtragem por bloqueio/silenciamento (Fase 5) é camada de
 visualização, aplicada APÓS a query, sem mudar score.
@@ -964,7 +966,7 @@ e não entrega.
 - **Bootstrap fora do React** — `lib/bootstrap.ts` singleton
 - **Identidade portável** — toda ação destrutiva oferece export antes
 - **Cliente NÃO deleta** dados moderados (score=-999 esconde, não apaga)
-- **Sem afinidade no feed** — score determinístico, sem personalização
+- **Sem afinidade escondida no feed** — score determinístico e público; a aba Contágio (§24 emendado) usa só as escolhas explícitas do leitor
 - **Sem chave mestra** — não escrever `deletePost()` ou `banUser()` global
 - **MIT no primeiro commit** — antes de qualquer código público
 - **Build reproduzível** Fase 6 — lockfiles + CI verificável

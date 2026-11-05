@@ -23,7 +23,7 @@ Fase 1 shipada (aba "contágio"; manifesto §24 emendado). Simulação e spec
 em `Docs/simulacao-contagio/` e `Docs/spec-revisao-contagio.md`.
 
 - [ ] **Fase 2: lockstep + aval + período de experiência; contágio como
-  padrão** — contexto: simulação v7 (isca 1,4% → 0,2%; aval fecha
+  padrão** — contexto: simulação v7 (isca 2,9% na Fase 1 → 0,2%; aval fecha
   enganados no mapa). Exige ingerir kind 3 dos contatos (hoje o app só
   guarda a lista do próprio usuário — `sync.ts` não assina kind 3) e
   histórico de 30 dias de DRIFTs de terceiros — bloqueio: nenhum, trabalho
@@ -42,6 +42,18 @@ em `Docs/simulacao-contagio/` e `Docs/spec-revisao-contagio.md`.
   limiar a atacante; Marshall).
 - [ ] **Grafo social realista na simulação** (amigos de amigos agrupados)
   para testar avais independentes e teto por grupo — bloqueio: nenhum.
+- [ ] **Assinatura própria para as ações dos contatos** — contexto:
+  revisão pré-merge da Fase 1 (Satoshi #5). O sync pede os eventos
+  recentes da rede com limite por assinatura; uma fazenda publicando em
+  volume pode empurrar para fora da janela os DRIFTs/SINKs/denúncias de
+  quem você segue, e a aba Contágio fica com menos entradas. Correção:
+  assinatura de kinds 9079/9080/9081 com `authors` = seus follows —
+  bloqueio: nenhum, trabalho a fazer (Fase 2).
+- [ ] **Deixar de seguir quem trouxe, em 1 toque, a partir da pílula ↪** —
+  contexto: a simulação das versões v1–v7 contava com o leitor cortando o
+  vínculo que trouxe spam em 40% das vezes; o app não tem esse gesto, e a
+  bateria final da Fase 1 roda sem ele (limite conservador) — bloqueio:
+  desenho (a pílula hoje não é botão; manifesto §24: nada escondido).
 
 ## Auditoria do algoritmo (2026-11-03)
 

@@ -291,17 +291,36 @@ audits só por feio. Defer documentado > silence.
 
 - **Status:** ABERTO (fases 2–3 planejadas; `BACKLOG.md` "Contágio").
 - **O que é:** a Fase 1 (`Docs/algoritmos.md` §9) usa só o que o app já
-  tem: follows do leitor, o que ele impulsionou e o que ele enterrou ou
-  denunciou. Ficam de fora, com efeito medido na simulação
-  (`Docs/spec-revisao-contagio.md`):
+  tem: follows do leitor, o que ele impulsionou e o que ele denunciou.
+  Ficam de fora, com efeito medido na simulação
+  (`Docs/spec-revisao-contagio.md`, rodadas `fase1__*`):
   - **Isca:** contas falsas que postam conteúdo bom conquistam o vínculo
-    de 0,8 com quem as impulsiona e depois trazem spam. Na Fase 1, 1,4%
-    das pessoas veem ataque (pico 7%); o lockstep da Fase 2 leva a 0,2%.
-  - **Alcance:** o post mais viral chega a ~38% pela aba (82–92% com
-    encontros físicos e o mapa da área, Fases 2–3).
+    de 0,8 com quem as impulsiona e depois trazem spam. Na Fase 1, 2,9%
+    das pessoas veem ataque, com picos de 11% e mais de 5% em metade dos
+    dias simulados; o lockstep da Fase 2 leva a 0,2%. A simulação anterior
+    (1,4%) supunha que o leitor corta o vínculo que trouxe spam em 40% das
+    vezes; o app não tem esse gesto (BACKLOG "Deixar de seguir quem
+    trouxe"; com ele, 1,8%). Punir também no SINK baixaria a isca para
+    1,4%, mas com 10% de SINK por gosto derruba o alcance honesto de 29%
+    para 5% e deixa 30% dos feeds quase vazios (spec §4.6).
+  - **Alcance:** o post mais viral chega a ~38% pela aba (29% com 10% de
+    SINK por gosto; 82–92% com encontros físicos e o mapa da área, Fases
+    2–3).
   - **Engenharia social em escala:** gente real enganada cria vínculo
     forte de verdade com o atacante; nenhuma regra de grafo separa isso
-    de influência real. Contido pelo SINK que baixa o vínculo.
+    de influência real. Contido pela denúncia, que baixa o vínculo com o
+    autor e com quem trouxe (0,1% veem ataque, pico 9%).
+  - **Quem trouxe fica em cada aparelho:** a experiência ruim com o autor
+    sai das denúncias públicas do leitor (igual em todo aparelho da mesma
+    identidade); a com quem trouxe só existe no aparelho onde a denúncia
+    foi feita na aba.
+  - **Inundação no sync:** o sync pede os eventos recentes da rede com
+    limite por assinatura; quem publica em volume pode empurrar para fora
+    da janela as ações dos contatos, e a aba fica com menos entradas
+    (BACKLOG "Assinatura própria para as ações dos contatos").
+  - **Moderação global vale na aba:** post com `score = −999` (§26) some
+    de todas as abas, inclusive desta; uma brigada que modere post
+    honesto também o tira da aba Contágio (ver §5c).
   - **Bolha ideológica:** a simulação mediu abertura entre cidades (igual
     à do feed global), não diversidade de opinião — o simulador não tem
     opiniões.
@@ -310,8 +329,9 @@ audits só por feio. Defer documentado > silence.
     7 dias trouxe (`sync.ts`), então começa com vínculos de 0,5.
   - **Eclipse:** quem usa 1–2 relays controlados pelo atacante perde a
     vacina e a quarentena dos contatos (o atacante só omite). O ataque
-    fica contido, mas o alcance honesto cai ~25 pontos. A defesa é de
-    produto: piso de diversidade de relays (≥ 6 relays de ≥ 3 operadores).
+    fica contido (0,0%), mas o alcance honesto cai de 40% para 27% na Fase
+    1 (~25 pontos no modelo completo). A defesa é de produto: piso de
+    diversidade de relays (≥ 6 relays de ≥ 3 operadores).
 - **Reopener:** Fase 2 (lockstep, aval, período de experiência; contágio
   como padrão) e Fase 3 (mapa da área e encontros físicos), cada uma
   simulada antes de entrar.

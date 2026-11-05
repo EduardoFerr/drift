@@ -629,11 +629,15 @@ usuário.
   Σ weight(burier) × 0.3 + min(Σ weight(comentaristas), 30)) /
   (idade + 2)^1.5`, depois `created_at` desc, depois `id` asc (ver §23
   "Score weighted" para detalhes) — **em todas as abas**
-- As abas Global, Seguindo e Em alta mostram a mesma ordem para todos
+- As abas Global e Em alta mostram os mesmos posts, na mesma ordem, para
+  todos; a aba Seguindo filtra pelos follows de quem lê, na mesma ordem
 - A aba **Contágio** escolhe o **conjunto** de posts a partir das
   entradas do próprio usuário (quem ele segue, o que ele já impulsionou,
-  o que ele enterrou ou denunciou), pelas regras de
-  `Docs/algoritmos.md` §9; a ordem dentro dela continua a de cima
+  o que ele denunciou), pelas regras de `Docs/algoritmos.md` §9; a ordem
+  dentro dela continua a de cima
+- Na aba Contágio, enterrar continua sendo gosto (§23): o SINK do
+  usuário não pune ninguém. Só a denúncia dele baixa o vínculo com o
+  autor e, se feita com "↪ chegou por" à vista, com quem trouxe o post
 - Proibido: previsão de engajamento, tempo de tela, modelos treinados,
   otimização escondida, sinal que o usuário não vê ou não controla
 - Bloquear / silenciar / seguir continuam filtros **locais** na
@@ -654,21 +658,25 @@ manipulação, captura.
    pessoas (`Docs/simulacao-contagio/`, `Docs/spec-revisao-contagio.md`)
    mostraram uma fazenda paciente de 2.000 contas no feed de 100% das
    pessoas no modelo global, mesmo com antiguidade ancorada no Bitcoin;
-   no contágio local, abaixo de 0,3%. A captura que o artigo temia
-   acontecia justamente por causa da regra.
+   no contágio local, abaixo de 0,3%. A regra tornava possível a captura
+   que o artigo temia.
 2. **É um resultado conhecido:** nenhuma reputação simétrica (igual para
    todos) resiste a contas falsas; as assimétricas, calculadas a partir
    de quem olha, podem resistir (Cheng & Friedman, 2005).
 3. **O medo da bolha continua levado a sério:** a aba é opcional e as
    regras são abertas; as entradas são escolhas explícitas do usuário,
-   não inferências; e a simulação mediu a mesma abertura entre cidades
-   (~55% do feed vindo de fora). Bolha *ideológica* não foi medida —
-   registrada em `Docs/known-limitations.md` §5l.
+   não inferências. Na simulação, ~54% do que chega pela aba vem de
+   outras cidades (no feed global, 72%): ela é mais local, como foi
+   desenhada para ser, sem fechar a pessoa na própria cidade. Bolha
+   *ideológica* não foi medida.
+4. **Tem custo, e ele está registrado:** a primeira fase da aba alcança
+   menos gente e ainda deixa passar parte da isca (contas falsas com
+   conteúdo bom) — `Docs/known-limitations.md` §5l.
 
 **Implementação:** `scoring.ts` é função pura sem inputs do usuário
-individual. As queries Global, Seguindo e Em alta de `feed.ts` são
-genéricas e idênticas entre usuários. `contagion.ts` é função pura cujas
-entradas são as do próprio leitor; a aba usa a mesma `FEED_ORDER`
+individual. As queries Global e Em alta de `feed.ts` são idênticas entre
+usuários; Seguindo só recebe os follows. `contagion.ts` é função pura cujas
+entradas são as do próprio leitor. As 4 abas usam a mesma `FEED_ORDER`
 (travado por `tests/score-decay-parity.test.ts`).
 
 ### 25. Sem Scan Automático Obrigatório de Conteúdo (Sem Chave Mestra Disfarçada)

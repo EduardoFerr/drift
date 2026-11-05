@@ -55,9 +55,9 @@ vi.mock('../src/lib/identity', async (orig) => ({
 }))
 
 import { CONTAGION, computeContagion, tieOf, type ContagionAction, type ContagionInput, type ContagionVerdict } from '../src/lib/contagion'
-import { clearContagionMemory, forgetBadExperience, recordBadExperience } from '../src/lib/contagion-data'
+import { clearContagionMemory, loadContagionInput, recordReportedVia } from '../src/lib/contagion-data'
 import { onNostrEvent, recalcAllScores } from '../src/lib/events'
-import { getContagionFeed, getGlobalFeed } from '../src/lib/feed'
+import { getContagionFeed, getGlobalFeed, getMyAction, refreshFeed, setFeedTab, useFeedStore } from '../src/lib/feed'
 import { useFollowsStore } from '../src/lib/follows'
 import { __resetOrphansForTest } from '../src/lib/orphans'
 
@@ -170,14 +170,63 @@ describe('Contágio — propriedades do núcleo', () => {
     expect(direct.pass).toBe(false)
   })
 
-  it('quarentena: denúncias de contatos somando 1,0 escondem, mesmo post direto', () => {
-    const follows = new Set(['ana', 'bia', 'cris'])
+  it('quarentena: denúncias de contatos somando 1,0 escondem, mesmo post direto (com um vínculo forte)', () => {
+    const follows = new Set(['ana', 'bia', 'dora'])
+    const earned = new Map([['dora', 1]])
     const posts = [{ id: 'd', author: 'ana', createdAt: NOW - HOUR }]
-    const one = computeContagion(base({ follows, posts, reports: [{ postId: 'd', reporter: 'bia', createdAt: NOW - DAY }] })).get('d')!
+    const one = computeContagion(base({ follows, earned, posts, reports: [{ postId: 'd', reporter: 'bia', createdAt: NOW - DAY }] })).get('d')!
     expect(one.pass).toBe(true)
-    const two = computeContagion(base({ follows, posts, reports: [{ postId: 'd', reporter: 'bia', createdAt: NOW - DAY }, { postId: 'd', reporter: 'cris', createdAt: NOW - DAY }] })).get('d')!
-    expect(two.quarantine).toBe(CONTAGION.QUARANTINE)
+    const two = computeContagion(base({ follows, earned, posts, reports: [{ postId: 'd', reporter: 'bia', createdAt: NOW - DAY }, { postId: 'd', reporter: 'dora', createdAt: NOW - DAY }] })).get('d')!
+    expect(two.quarantine).toBe(CONTAGION.TIE_EARNED + CONTAGION.TIE_FOLLOW)
     expect(two.pass).toBe(false)
+  })
+
+  it('difamação: contas só seguidas, quantas forem, nunca escondem nem vacinam além de 0,5', () => {
+    for (const n of [2, 3, 10, 100, 2000]) {
+      const farm = Array.from({ length: n }, (_, i) => `f${i}`)
+      const follows = new Set(['ana', 'autor', ...farm])
+      const earned = new Map([['ana', 1]])
+      const posts = [{ id: 'p', author: 'x', createdAt: NOW - HOUR }, { id: 'd', author: 'autor', createdAt: NOW - HOUR }]
+      const v = computeContagion(base({
+        follows, earned, posts,
+        actions: [spreadBy('ana', 'p'), ...farm.map((f) => buryBy(f, 'p')), ...farm.map((f) => buryBy(f, 'd'))],
+        reports: farm.map((f) => ({ postId: 'p', reporter: f, createdAt: NOW - HOUR })),
+      }))
+      expect(v.get('p')!.vaccine, `${n} contas`).toBe(CONTAGION.WEAK_CAP)
+      expect(v.get('p')!.quarantine, `${n} contas`).toBe(CONTAGION.WEAK_CAP)
+      expect(v.get('p')!.pass, `${n} contas só seguidas escondem o que a Ana trouxe`).toBe(true)
+      expect(v.get('d')!.pass, `${n} contas só seguidas escondem post direto`).toBe(true)
+    }
+  })
+
+  it('post direto não tem "quem trouxe": quem impulsionou não leva culpa nem aparece na pílula', () => {
+    const v = computeContagion(base({
+      follows: new Set(['autor', 'ana']), earned: new Map([['ana', 1]]),
+      posts: [{ id: 'd', author: 'autor', createdAt: NOW - HOUR }],
+      actions: [spreadBy('ana', 'd')],
+    })).get('d')!
+    expect(v.direct).toBe(true)
+    expect(v.via).toBeNull()
+    expect(v.viaAll).toEqual([])
+  })
+
+  it('empatados no maior vínculo dividem a culpa (escolher a chave não escapa)', () => {
+    const v = computeContagion(base({
+      follows: new Set(['00', 'ff', 'mm']), earned: new Map([['00', 1], ['ff', 1]]),
+      posts: [{ id: 'p', author: 'x', createdAt: NOW - HOUR }],
+      actions: [spreadBy('ff', 'p'), spreadBy('00', 'p'), spreadBy('mm', 'p')],
+    })).get('p')!
+    expect(v.viaAll).toEqual(['00', 'ff'])
+  })
+
+  it('a vacina vale enquanto o post pode entrar: republicar o DRIFT depois de 48 h não fura', () => {
+    const follows = new Set(['ana', 'bia', 'caio'])
+    const earned = new Map([['ana', 1], ['bia', 1], ['caio', 1]])
+    const posts = [{ id: 'p', author: 'x', createdAt: NOW - 60 * HOUR }]
+    // Caio e Bia enterraram há 58 h; Ana impulsionou de novo agora
+    const v = computeContagion(base({ follows, earned, posts, actions: [buryBy('caio', 'p', NOW - 58 * HOUR), buryBy('bia', 'p', NOW - 58 * HOUR), spreadBy('ana', 'p', NOW)] })).get('p')!
+    expect(v.vaccine).toBe(16)
+    expect(v.pass).toBe(false)
   })
 
   it('janelas: DRIFT de mais de 48 h, post de mais de 72 h e denúncia de mais de 14 dias não contam', () => {
@@ -234,6 +283,70 @@ describe('Contágio — propriedades do núcleo', () => {
 
   it('quem o leitor não segue não pesa, mesmo que ele já o tenha impulsionado', () => {
     expect(tieOf('ana', new Set(), new Map([['ana', 9]]), new Map())).toBe(0)
+  })
+
+  it('SINK ou denúncia de um contato nunca acrescentam um post à aba', () => {
+    for (let seed = 1; seed <= 20; seed++) {
+      const inp = scenario(seed)
+      const before = computeContagion(inp)
+      const r = rng(seed * 101)
+      const contacts = [...inp.follows]
+      for (let k = 0; k < 15; k++) {
+        const who = contacts[Math.floor(r() * contacts.length)]!
+        const pid = inp.posts[Math.floor(r() * inp.posts.length)]!.id
+        for (const v of [
+          { ...inp, actions: [...inp.actions, buryBy(who, pid, NOW)] },
+          { ...inp, reports: [...inp.reports, { postId: pid, reporter: who, createdAt: NOW }] },
+        ]) {
+          for (const [id, verdict] of computeContagion(v)) {
+            if (verdict.pass) expect(before.get(id)?.pass, `post ${id} entrou depois de SINK/denúncia`).toBe(true)
+          }
+        }
+      }
+    }
+  })
+
+  it('experiência ruim com X só acrescenta post que o próprio X tinha vacinado ou denunciado', () => {
+    // Por desenho: confiar menos em X também pesa menos o SINK e a denúncia de X.
+    for (let seed = 1; seed <= 20; seed++) {
+      const inp = scenario(seed)
+      const before = computeContagion(inp)
+      for (const who of inp.follows) {
+        const after = computeContagion({ ...inp, strikes: new Map([...inp.strikes, [who, (inp.strikes.get(who) ?? 0) + 1]]) })
+        const judged = new Set([...inp.actions.filter((a) => a.actor === who && a.kind === 'bury').map((a) => a.postId), ...inp.reports.filter((x) => x.reporter === who).map((x) => x.postId)])
+        for (const [id, verdict] of after) {
+          if (verdict.pass && !before.get(id)?.pass) expect(judged.has(id), `post ${id} entrou sem ${who} ter vacinado/denunciado`).toBe(true)
+        }
+      }
+    }
+  })
+
+  it('vínculo conquistado com uma experiência ruim cai para fraco (0,3) e entra no teto', () => {
+    const follows = new Set(['ana', 'bia'])
+    const earned = new Map([['ana', 1]])
+    const strikes = new Map([['ana', 1]])
+    expect(tieOf('ana', follows, earned, strikes)).toBe(3)
+    const v = computeContagion(base({ follows, earned, strikes, posts: [{ id: 'p', author: 'x', createdAt: NOW - HOUR }], actions: [spreadBy('ana', 'p'), spreadBy('bia', 'p')] })).get('p')!
+    expect(v.strong).toBe(0)
+    expect(v.weak).toBe(CONTAGION.WEAK_CAP)
+    expect(v.pass).toBe(false)
+  })
+
+  it('a ação do próprio autor no próprio post não conta (nem DRIFT nem SINK)', () => {
+    const follows = new Set(['ana'])
+    const earned = new Map([['ana', 1]])
+    const old = computeContagion(base({ follows, earned, posts: [{ id: 'd', author: 'ana', createdAt: NOW - 80 * HOUR }], actions: [spreadBy('ana', 'd')] })).get('d')
+    expect(old?.pass ?? false, 'republicar o DRIFT não mantém post velho').toBe(false)
+    const own = computeContagion(base({ follows, earned, posts: [{ id: 'd', author: 'ana', createdAt: NOW - HOUR }], actions: [buryBy('ana', 'd')] })).get('d')!
+    expect(own.vaccine).toBe(0)
+  })
+
+  it('post com mais de 4 dias não entra pelo contágio (igual à simulação)', () => {
+    const follows = new Set(['ana'])
+    const earned = new Map([['ana', 1]])
+    const v = computeContagion(base({ follows, earned, posts: [{ id: 'p', author: 'x', createdAt: NOW - 97 * HOUR }], actions: [spreadBy('ana', 'p')] })).get('p')!
+    expect(v.score).toBe(CONTAGION.TIE_EARNED)
+    expect(v.pass).toBe(false)
   })
 
   it('"quem trouxe" é o maior vínculo, com desempate pela chave', () => {
@@ -310,12 +423,18 @@ describe('Contágio — pipeline real', () => {
     expect(ids, 'post recente de quem o leitor segue').toContain(daBia.id)
   })
 
-  it('quarentena: Bia e Cris (0,5 + 0,5) denunciam o que a Ana trouxe', async () => {
-    const antigo = post('ana', NOW - 10 * DAY)
+  it('quarentena: Dora (0,8) e Bia (0,5) denunciam o que a Ana trouxe; Bia e Cris (0,5 + 0,5) sozinhas não escondem', async () => {
+    const daAna = post('ana', NOW - 10 * DAY)
+    const daDora = post('dora', NOW - 10 * DAY)
     const z = post('autorZ', NOW - 5 * HOUR)
-    await ingest(antigo, z, spread('eu', antigo, NOW - 9 * DAY), spread('ana', z), report('bia', z), report('cris', z))
-    follow('ana', 'bia', 'cris')
-    expect(await tab()).not.toContain(z.id)
+    const y = post('autorY', NOW - 5 * HOUR)
+    await ingest(daAna, daDora, z, y, spread('eu', daAna, NOW - 9 * DAY), spread('eu', daDora, NOW - 9 * DAY),
+      spread('ana', z), report('dora', z), report('bia', z),
+      spread('ana', y), report('bia', y), report('cris', y), bury('bia', y), bury('cris', y))
+    follow('ana', 'dora', 'bia', 'cris')
+    const ids = await tab()
+    expect(ids).not.toContain(z.id)
+    expect(ids, 'difamação por contas só seguidas').toContain(y.id)
   })
 
   it('a ordem da aba é a canônica: mesma ordem relativa do feed global', async () => {
@@ -328,7 +447,20 @@ describe('Contágio — pipeline real', () => {
     expect(aba).toEqual(global)
   })
 
-  it('SINK do leitor baixa o vínculo com quem trouxe; desfazer o engano recupera', async () => {
+  /** Linhas locais "quem trouxe" do leitor contra `subject`. */
+  const viaCount = (viewer: string, subject: string) =>
+    (H.conn!.prepare(`SELECT COUNT(DISTINCT post_id) AS n FROM contagion_bad_experiences WHERE viewer_pub = ? AND subject_pub = ?`).get(pk(viewer), pk(subject)) as { n: number }).n
+  /** Experiências ruins que o leitor tem com `who`, como a aba as lê. */
+  const strikesOf = async (who: string, viewer = 'eu') =>
+    (await loadContagionInput(pk(viewer), new Set(), NOW)).strikes.get(pk(who)) ?? 0
+  /** Denúncia feita na aba: o PostViewer publica e registra quem trouxe;
+   *  a denúncia publicada volta pelo relay (eco) e entra pelo pipeline. */
+  const reportInTab = async (p: Ev) => {
+    await recordReportedVia(p.id)
+    await ingest(report('eu', p, NOW - 30 * 60))
+  }
+
+  it('denúncia feita na aba baixa o vínculo com quem trouxe e com o autor', async () => {
     const antigo = post('ana', NOW - 10 * DAY)
     const p1 = post('w1', NOW - 6 * HOUR)
     const p2 = post('w2', NOW - 6 * HOUR)
@@ -336,38 +468,133 @@ describe('Contágio — pipeline real', () => {
     await ingest(antigo, p1, p2, p3, spread('eu', antigo, NOW - 9 * DAY), spread('ana', p1), spread('ana', p2), spread('ana', p3))
     follow('ana')
     expect(await tab()).toEqual(expect.arrayContaining([p1.id, p2.id, p3.id]))
-    // duas experiências ruins com o que a Ana trouxe: vínculo 0,8 → 0
-    await recordBadExperience(p1.id, p1.pubkey)
-    await recordBadExperience(p2.id, p2.pubkey)
+    await reportInTab(p1)
+    await reportInTab(p2)
+    expect(viaCount('eu', 'ana')).toBe(2)
+    expect(viaCount('eu', 'w1'), 'o autor não é gravado: sai da denúncia publicada').toBe(0)
+    expect(await strikesOf('w1')).toBe(1)
+    expect(await strikesOf('ana')).toBe(2)
+    // vínculo da Ana: 0,8 − 2 × 0,5 → 0 — nada mais chega por ela
     expect(await tab()).not.toContain(p3.id)
-    // o leitor desfaz um dos SINKs (impulsiona p2): sobra uma experiência ruim
-    await forgetBadExperience(p2.id)
-    const strikes = H.conn!.prepare(`SELECT COUNT(*) AS n FROM contagion_strikes WHERE subject_pub = ?`).get(pk('ana')) as { n: number }
-    expect(strikes.n).toBe(1)
   })
 
-  it('denunciar e enterrar o mesmo post conta uma vez só', async () => {
+  it('SINK do leitor é gosto: não pune o autor nem quem trouxe (§23)', async () => {
+    const antigo = post('ana', NOW - 10 * DAY)
+    const deW = post('w', NOW - 3 * HOUR)
+    const deW2 = post('w', NOW - 2 * HOUR)
+    const ps = Array.from({ length: 3 }, (_, i) => post(`x${i}`, NOW - 6 * HOUR))
+    await ingest(antigo, deW, deW2, ...ps, spread('eu', antigo, NOW - 9 * DAY), ...ps.map((p) => spread('ana', p)))
+    follow('ana', 'w')
+    expect(await tab()).toEqual(expect.arrayContaining([ps[2]!.id, deW2.id]))
+    // o leitor enterra dois posts que a Ana trouxe e um do autor W que segue
+    await ingest(bury('eu', ps[0]!, NOW - 30 * 60), bury('eu', ps[1]!, NOW - 30 * 60), bury('eu', deW, NOW - 30 * 60))
+    expect(viaCount('eu', 'ana')).toBe(0)
+    expect(await strikesOf('ana')).toBe(0)
+    expect(await strikesOf('w')).toBe(0)
+    const ids = await tab()
+    expect(ids, 'a Ana continua trazendo').toContain(ps[2]!.id)
+    expect(ids, 'o post novo do autor enterrado continua entrando direto').toContain(deW2.id)
+  })
+
+  it('denúncia fora da aba pune só o autor; quem trouxe só perde vínculo com o "chegou por" à vista', async () => {
     const antigo = post('ana', NOW - 10 * DAY)
     const p = post('w', NOW - 6 * HOUR)
     await ingest(antigo, p, spread('eu', antigo, NOW - 9 * DAY), spread('ana', p))
     follow('ana')
     await tab()
-    await recordBadExperience(p.id, p.pubkey)
-    await recordBadExperience(p.id, p.pubkey)
-    const n = H.conn!.prepare(`SELECT COUNT(*) AS n FROM contagion_strikes WHERE subject_pub = ?`).get(pk('ana')) as { n: number }
-    expect(n.n).toBe(1)
+    // feita no global: o PostViewer não registra quem trouxe (arrivedVia null)
+    await ingest(report('eu', p, NOW - 30 * 60))
+    expect(viaCount('eu', 'ana')).toBe(0)
+    expect(await strikesOf('ana')).toBe(0)
+    expect(await strikesOf('w')).toBe(1)
+    expect(await tab(), 'a Ana segue trazendo').toContain(p.id)
   })
 
-  it('experiências ruins só mexem na aba: o feed global continua igual para todos (§24)', async () => {
+  it('o mesmo post conta uma vez: denunciar de novo não dobra a experiência ruim', async () => {
+    const antigo = post('ana', NOW - 10 * DAY)
+    const p = post('w', NOW - 6 * HOUR)
+    await ingest(antigo, p, spread('eu', antigo, NOW - 9 * DAY), spread('ana', p))
+    follow('ana')
+    await tab()
+    await reportInTab(p)
+    await reportInTab(p)
+    expect(await strikesOf('ana')).toBe(1)
+    expect(await strikesOf('w')).toBe(1)
+  })
+
+  it('experiências ruins são de cada identidade: trocar de identidade não as herda', async () => {
+    const antigo = post('ana', NOW - 10 * DAY)
+    const p = post('w', NOW - 6 * HOUR)
+    await ingest(antigo, p, spread('eu', antigo, NOW - 9 * DAY), spread('ana', p))
+    follow('ana')
+    await tab()
+    await reportInTab(p)
+    H.viewer = pk('outra')
+    expect(viaCount('outra', 'ana')).toBe(0)
+    expect(await strikesOf('ana', 'outra')).toBe(0)
+    expect(await strikesOf('w', 'outra')).toBe(0)
+    H.viewer = pk('eu')
+  })
+
+  it('o registro de quem trouxe só mexe na aba: o feed global continua igual para todos (§24)', async () => {
     const antigo = post('ana', NOW - 10 * DAY)
     const ps = Array.from({ length: 5 }, (_, i) => post(`w${i}`, NOW - (i + 2) * HOUR))
     await ingest(antigo, ...ps, spread('eu', antigo, NOW - 9 * DAY), ...ps.map((p) => spread('ana', p)))
     follow('ana')
     const before = (await getGlobalFeed(50, NOW * 1000)).map((p) => p.id)
     await tab()
-    for (const p of ps) await recordBadExperience(p.id, p.pubkey)
+    // só a parte local (o efeito da denúncia publicada no global é o §26 de sempre)
+    for (const p of ps) await recordReportedVia(p.id)
     expect(await tab(), 'a aba do leitor mudou').toEqual([])
     expect((await getGlobalFeed(50, NOW * 1000)).map((p) => p.id)).toEqual(before)
+  })
+
+  it('quem o leitor bloqueou não traz, não vacina e não denuncia (só silenciar mantém as interações)', async () => {
+    const antigo = post('ana', NOW - 10 * DAY)
+    const x = post('autorX', NOW - 5 * HOUR)
+    await ingest(antigo, x, spread('eu', antigo, NOW - 9 * DAY), spread('ana', x))
+    follow('ana')
+    expect(await tab()).toContain(x.id)
+    H.conn!.prepare(`INSERT INTO blocked (npub, blocked_at) VALUES (?, ?)`).run(pk('ana'), NOW)
+    expect(await tab(), 'bloqueada continua trazendo').not.toContain(x.id)
+  })
+
+  it('empate exato entre DRIFT e SINK do leitor: não há vínculo conquistado', async () => {
+    const antigo = post('ana', NOW - 10 * DAY)
+    const x = post('autorX', NOW - 5 * HOUR)
+    await ingest(antigo, x, spread('eu', antigo, NOW - 9 * DAY), bury('eu', antigo, NOW - 9 * DAY), spread('ana', x))
+    follow('ana')
+    expect(await tab()).not.toContain(x.id)
+  })
+
+  it('getMyAction devolve a ação mais recente (o desfazer depende disto)', async () => {
+    const a = post('x', NOW - DAY)
+    const b = post('y', NOW - DAY)
+    const c = post('z', NOW - DAY)
+    await ingest(a, b, c, spread('eu', a, NOW - 3 * HOUR), bury('eu', a, NOW - 2 * HOUR), bury('eu', b, NOW - 3 * HOUR), spread('eu', b, NOW - 2 * HOUR), spread('eu', c, NOW - HOUR), bury('eu', c, NOW - HOUR))
+    expect(await getMyAction(a.id, pk('eu'))).toBe('bury')
+    expect(await getMyAction(b.id, pk('eu'))).toBe('spread')
+    expect(await getMyAction(c.id, pk('eu')), 'empate: o SINK').toBe('bury')
+  })
+
+  it('trocar de aba no meio de uma atualização nunca mostra posts da aba anterior', async () => {
+    // achado do E2E: o refresh em voo da aba global terminava depois da troca
+    // e gravava os posts dela com loaded = true sob o rótulo "contágio"
+    const ps = Array.from({ length: 4 }, (_, i) => post(`w${i}`, NOW - (i + 2) * HOUR))
+    await ingest(...ps)
+    follow() // sem follows: a aba Contágio tem de estar vazia
+    useFeedStore.setState({ tab: 'global', loaded: false, posts: [] } as never)
+    const vistos: { tab: string; n: number }[] = []
+    const unsub = useFeedStore.subscribe((s) => { if (s.loaded) vistos.push({ tab: s.tab, n: s.posts.length }) })
+    const emVoo = refreshFeed()
+    const troca = setFeedTab('contagio')
+    await Promise.all([emVoo, troca])
+    for (let i = 0; i < 50 && !(useFeedStore.getState().loaded && useFeedStore.getState().tab === 'contagio'); i++) await new Promise((r) => setTimeout(r, 5))
+    unsub()
+    expect(useFeedStore.getState().tab).toBe('contagio')
+    expect(useFeedStore.getState().loaded).toBe(true)
+    expect(vistos.filter((v) => v.tab === 'contagio' && v.n > 0), 'aba Contágio exibiu posts do global').toEqual([])
+    useFeedStore.setState({ tab: 'global' } as never)
   })
 
   it('o leitor que enterrou depois de impulsionar perde o vínculo conquistado', async () => {
