@@ -141,6 +141,7 @@ CREATE TABLE IF NOT EXISTS reports (
   weight       REAL NOT NULL,
   created_at   INTEGER NOT NULL,
   kind         INTEGER NOT NULL DEFAULT 9081, -- 9081 Drift | 1984 NIP-56
+  target_pub   TEXT,                     -- tag `p`: autor denunciado (aba Contágio, quando o post não está no cache)
   UNIQUE(post_id, reporter_pub)
 );
 CREATE INDEX IF NOT EXISTS idx_reports_post   ON reports(post_id);

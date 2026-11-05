@@ -158,6 +158,13 @@ export interface Post {
   authorAlias?: string
   authorAvatar?: string
   authorWeight?: number
+  /**
+   * Só na aba Contágio: contatos empatados no maior vínculo que trouxeram
+   * o post (o primeiro é o exibido em "↪ chegou por"). Ausente em post que
+   * entrou direto e em qualquer outra aba. Uma denúncia feita com o post na
+   * tela pune exatamente estes (manifesto §24 emendado).
+   */
+  arrivedVia?: readonly string[]
 }
 
 // ─── User metadata kind 0 (NIP-01 — opt-in identity) ────────────────

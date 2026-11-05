@@ -45,12 +45,11 @@ import {
 } from '../UI/DriftCard'
 import type { Post, RenderHint, ReportReason } from '../../types/drift'
 import { dialog } from '../../lib/dialog'
-import { applyContentFilters } from '../../lib/feed'
+import { applyContentFilters, invalidateFeed } from '../../lib/feed'
 import { usePrefsStore } from '../../lib/prefs'
 import { toggleSlim, useViewModeStore } from '../../lib/view-mode'
 import { reportPost } from '../../lib/protocol'
-import { recordReportedVia } from '../../lib/contagion-data'
-import { ContagionViaChip } from './ContagionViaChip'
+import { recordReport } from '../../lib/contagion-data'
 import { pinPost, unpinPost } from '../../lib/cache'
 import { block, mute } from '../../lib/moderation-local'
 import { follow, unfollow, useFollowsStore } from '../../lib/follows'
@@ -115,9 +114,6 @@ export interface PostViewerProps {
    * sem isso, user via texto sem caminho de saída.
    */
   onOpenLocationSettings?: () => void
-  /** Aba Contágio: contato que trouxe o post ("↪ chegou por X"); null fora
-   *  da aba ou quando o post entrou direto. */
-  arrivedVia?: string | null
   onSpread: () => void
   onBury: () => void
   onClose: () => void
@@ -129,7 +125,6 @@ export function PostViewer({
   pendingAction,
   custom,
   queue,
-  arrivedVia = null,
   onOpenLocationSettings,
   onSpread,
   onBury,
@@ -166,6 +161,9 @@ export function PostViewer({
   // tap-abre/tap-fecha é padrão conhecido. Reincidência do bug #2 (hints
   // viram ruído sobreposto) — removido em vez de reposicionado.
   const [showReport, setShowReport] = useState(false)
+  // Aba Contágio: quem a pílula "↪ chegou por" mostrava quando a denúncia
+  // foi aberta — o modal cita e a denúncia pune exatamente estes.
+  const [reportVias, setReportVias] = useState<readonly string[]>([])
   // V_2026-05-17 (user pedido): long-press 5s mudou semantics.
   //   - Antes: abria ModerationModal (block/mute/report)
   //   - Agora: alterna modo padrão ⇄ modo slim (chrome hidden, card
@@ -302,10 +300,12 @@ export function PostViewer({
     setReporting(true)
     try {
       await reportPost({ postId: post.id, authorPub: post.authorPub, reason })
-      // Aba Contágio: denúncia é experiência ruim com o autor (sai da própria
-      // denúncia publicada) e, se feita na aba com o "chegou por" à vista,
-      // com quem trouxe o post (registro local).
-      if (arrivedVia) void recordReportedVia(post.id)
+      // Aba Contágio: a denúncia é experiência ruim com o autor e com quem a
+      // pílula "↪ chegou por" mostrava quando a denúncia foi aberta
+      // (`reportVias`, o mesmo nome que o modal exibiu). Registro local;
+      // a aba se atualiza já, sem esperar o eco do relay.
+      await recordReport(post.id, post.authorPub, reportVias)
+      invalidateFeed()
       setShowReport(false)
     } catch (err) {
       console.error('report failed', err)
@@ -747,7 +747,6 @@ export function PostViewer({
             {/* Trust Lens inspector chip — bottom-right do card.
                 Aparece só quando lens strength > 0 E post foi tocado. */}
             <LensInspector postId={post.id} authorPub={post.authorPub} />
-            {arrivedVia && <ContagionViaChip viaPub={arrivedVia} />}
         </>
         {queue && queue.next && (
           <>
@@ -854,6 +853,7 @@ export function PostViewer({
           <LazyBoundary fallback={<DriftSkeleton variant="card" />}>
             <ReportModal
               post={post}
+              vias={reportVias}
               pending={reporting}
               onSubmit={handleReport}
               onClose={() => setShowReport(false)}
@@ -892,6 +892,9 @@ export function PostViewer({
             }}
             onReport={() => {
               setModerationOpen(false)
+              // retrato de quem a pílula mostra AGORA: é quem o modal cita e
+              // quem a denúncia pune, mesmo se a aba recalcular no meio
+              setReportVias(post.arrivedVia ?? [])
               setShowReport(true)
             }}
           />

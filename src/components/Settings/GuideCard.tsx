@@ -52,7 +52,7 @@
  *   │ intro: "como Drift funciona, em 5 minutos"        │
  *   │ [ 🗺 os mapas            (4 tópicos)        › ]      │
  *   │ [ ⇅ ações sociais       (6 tópicos)        › ]      │
- *   │ [ ∑ os algoritmos        (6 tópicos)        › ]      │
+ *   │ [ ∑ os algoritmos        (7 tópicos)        › ]      │
  *   │ [ 🔒 privacidade         (4 tópicos)        › ]      │
  *   │ [ 🌱 cultivar a rede     (3 verdades)       › ]      │
  *   └────────────────────────────────────────────────────┘
@@ -280,6 +280,7 @@ function AcoesTopics() {
               pessoa. Não é denúncia (não vira pedido de moderação). Não
               some o post da rede; apenas baixa o ranking. Use
               livremente: dar SINK é menos político do que denunciar.
+              Na aba contágio, o SINK também não tira confiança de ninguém.
             </Responsibility>
           </SettingExplainer>
 
@@ -287,7 +288,7 @@ function AcoesTopics() {
             accordionId="guia-acao-report"
             label="denunciar (report)"
             description="Reporta o post como violação grave — spam, ilegal, abuso. Publica um evento kind 9081 com o motivo."
-            impact="Cada denúncia vale peso ÷ 50 pontos, a partir de peso 20 e 8 semanas de âncora (antes disso vale 0). Quando a soma passa do threshold (5 pontos, ou mais em redes grandes; metade pra ilegal), o post recebe -999 e some do feed. Reports são PÚBLICOS na rede Nostr — sua npub fica visível como quem denunciou."
+            impact="Cada denúncia vale peso ÷ 50 pontos, a partir de peso 20 e 8 semanas de âncora (antes disso vale 0). Quando a soma passa do threshold (5 pontos, ou mais em redes grandes; metade pra ilegal), o post recebe -999 e some do feed. Reports são PÚBLICOS na rede Nostr — sua npub fica visível como quem denunciou. Na sua aba contágio, o que vem do autor — e, se você denunciou ali, de quem trouxe o post (↪) — passa a chegar menos, sem volta."
             defaultExplained="Não tem default. UI sempre mostra warning sobre privacidade do reporter ANTES de enviar."
             reversible={false}
             warning="Seu npub fica visível como reporter. Reports são eventos públicos Nostr — outras pessoas (e o autor do post) podem ver que você denunciou."
@@ -455,6 +456,25 @@ function AlgosTopics() {
               cronológica pura. Não favorece "novo demais" (precisa de
               DRIFTs pra subir) nem "antigo demais" (decay puxa pra
               baixo). O equilíbrio é o que mantém a rede viva.
+            </P>
+          </SettingExplainer>
+
+          <SettingExplainer
+            accordionId="guia-algo-contagio"
+            label="aba contágio — o que chegou pelas pessoas que você segue"
+            description="Recomendação boca a boca: um post de outra pessoa chega quando quem você segue dá DRIFT nele e a confiança somada chega a 0,8. Quem você só segue vale 0,5; quem você já driftou (um post escrito pela pessoa) vale 0,8 e traz sozinho. Posts de até 3 dias de quem você segue entram direto."
+            impact="Quem você só segue soma no máximo 0,5 por post, por mais contas que sejam — é a trava contra fazendas de contas falsas. SINK de contatos desconta; denúncias de contatos somando 1,0 escondem o post. O card mostra ↪ chegou por X. Sua denúncia tira 0,5 do autor e, se feita aqui, de quem trouxe; seu SINK não tira de ninguém."
+            defaultExplained="Aba opcional. A ordem dentro dela é a mesma do feed global — o que muda é só quem entra, calculado no seu aparelho com as suas escolhas, nunca publicado."
+            reversible
+            reference="manifesto §24 (emendado) + Docs/algoritmos.md §9"
+          >
+            <P>
+              Um feed igual para todos é um alvo único: quem compra o topo
+              compra todo mundo de uma vez. Na aba contágio, cada um vê o que
+              chegou pela própria rede — uma fazenda de 2.000 contas que você
+              seguiu de volta vale o mesmo que uma conta só. O que ainda
+              passa: contas falsas que postam coisa boa para ganhar seu DRIFT
+              e depois trazem spam. Se isso acontecer, denuncie o spam.
             </P>
           </SettingExplainer>
 
@@ -659,8 +679,8 @@ const SECTIONS: readonly SectionMeta[] = [
     id: 'algos',
     glyph: '∑',
     title: 'os algoritmos',
-    blurb: 'score, weight, threshold, PPR, decay, lentes',
-    count: '6 tópicos',
+    blurb: 'score, weight, threshold, PPR, decay, contágio, lentes',
+    count: '7 tópicos',
     render: () => <AlgosTopics />,
   },
   {
@@ -696,9 +716,10 @@ function HubLevel({ onOpen }: { onOpen: (id: SectionId) => void }) {
         </h2>
         <P>
           Drift é uma rede social sem dono. Não tem botão "deletar"
-          global, não tem moderador-chefe, não tem algoritmo que decide o
-          que você vê com base em quem você é. Em vez disso, cada gesto
-          seu — DRIFT, SINK, denunciar, seguir — cultiva a rede de um
+          global, não tem moderador-chefe, não tem algoritmo secreto: as
+          regras de todas as abas são públicas, e a aba contágio usa só as
+          suas escolhas (quem você segue, o que você driftou e denunciou).
+          Cada gesto seu — DRIFT, SINK, denunciar, seguir — cultiva a rede de um
           jeito específico. Escolha um tema abaixo pra entender o que cada
           coisa faz e o que isso significa pra você e pros outros.
         </P>

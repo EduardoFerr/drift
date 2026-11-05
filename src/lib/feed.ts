@@ -221,7 +221,13 @@ export async function getContagionFeed(limit = 50, now = Date.now()): Promise<Po
      LIMIT ?`,
     [nowSeconds(now), JSON.stringify(ids), limit],
   )
-  return rows.map(rowToPost)
+  // "Quem trouxe" viaja com o post: a pílula mostra e a denúncia pune
+  // exatamente o que foi calculado nesta leitura (sem estado à parte).
+  return rows.map((row) => {
+    const post = rowToPost(row)
+    const via = verdicts.get(post.id)?.viaAll ?? []
+    return via.length > 0 ? { ...post, arrivedVia: via } : post
+  })
 }
 
 /**

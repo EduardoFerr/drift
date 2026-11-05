@@ -914,10 +914,13 @@ vínculos do próprio leitor: não depende de dado global.
 
 **Experiência ruim é a denúncia.** O SINK do leitor é gosto (manifesto
 §23): vacina o post para quem o segue e tira o post da tela dele, mas
-não pune ninguém. A parte do autor sai das denúncias públicas do próprio
-leitor (tabela `reports`), recalculável a partir dos eventos; a de quem
-trouxe nasce só de denúncia feita na aba, com "↪ chegou por X" à vista,
-e fica local (`contagion_bad_experiences`).
+não pune ninguém. Cada denúncia feita no aparelho grava a experiência
+ruim com o autor (em qualquer aba) e, se feita na aba Contágio, com cada
+contato que a pílula "↪ chegou por" mostrava quando a denúncia foi aberta
+(`contagion_bad_experiences`, local). Denúncias do leitor vindas de outro
+aparelho também contam contra o autor, pela tabela `reports` (com o alvo
+da tag `p` quando o post não está no cache); o cache não apaga posts que
+o leitor denunciou.
 
 ### Exemplo
 
@@ -952,8 +955,18 @@ em 840 feeds por rodada. Custo da Fase 1: o post mais viral alcança ~38%
 das pessoas pela aba (29% com 10% de SINK por gosto; 27% sob eclipse); o
 modelo completo, com encontros físicos e o mapa da área, chega a 82–92%.
 A isca é o que mais passa: acima de 5% das pessoas em metade dos dias da
-simulação, até o lockstep da Fase 2. A aba é opcional e as outras
-continuam lá.
+simulação, até o lockstep da Fase 2. **Ela depende de quanto as pessoas
+denunciam**: a simulação supõe denúncia em 35% dos spams vistos; com 10%,
+a isca vai a 12,4%; com 5%, a 22,3% (revisão em par, 05/11/2026). Um
+gesto privado de cortar quem trouxe, usado em 20% das vezes, segura 10%
+de denúncia em 4,5%. A aba é opcional e as outras continuam lá.
+
+Onde a simulação difere do app: na simulação, "quem trouxe" é um contato
+só (no app, todos os empatados), o SINK de contato vale 2 dias (no app,
+96 h) e o feed medido são os 8 primeiros por pontuação de contágio (no
+app, tudo o que passa, até 50, na ordem canônica). A simulação também não
+aplica a moderação global (−999): uma brigada que esconda post honesto no
+Global esconde na aba Contágio também.
 
 ### Edge cases
 
@@ -965,9 +978,11 @@ continuam lá.
   `Docs/spec-revisao-contagio.md` §4.6.
 - Denunciar o mesmo post de novo conta uma vez (uma experiência ruim por
   pessoa e post).
-- "Quem trouxe" = os contatos de maior vínculo que deram DRIFT. Empatados
-  dividem a experiência ruim (ninguém escapa escolhendo a própria chave);
-  a pílula mostra o primeiro pela chave.
+- "Quem trouxe" = os contatos de maior vínculo que deram DRIFT. Com
+  empate, cada um leva −0,5 inteiro (ninguém escapa escolhendo a própria
+  chave), e a pílula mostra todos ("Ana, Bia +1"). A denúncia pune
+  exatamente os que a pílula mostrava quando foi aberta, mesmo que a aba
+  recalcule no meio.
 - Post direto não tem "quem trouxe": veio pelo follow no autor (nem
   pílula, nem culpa de terceiros).
 - Experiências ruins são permanentes: na simulação, deixá-las expirar em
@@ -976,8 +991,9 @@ continuam lá.
   imutável (§6).
 - "Quem trouxe" é inferido na hora a partir dos vínculos do leitor: nada
   de proveniência é publicado (`cascade.ts`, §28). O registro de quem
-  trouxe o que o leitor denunciou fica em cada aparelho; a parte do autor
-  é igual em todo aparelho da mesma identidade.
+  trouxe o que o leitor denunciou fica em cada aparelho. A parte do autor
+  sobrevive à limpeza do cache; num aparelho novo, contam as denúncias
+  que o sync trouxe.
 - Ação do próprio autor no próprio post não conta (como no ranking
   canônico): republicar o DRIFT não mantém um post velho na aba.
 - Bloquear tira a pessoa da conta (não traz, não vacina, não denuncia);

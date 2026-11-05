@@ -259,7 +259,12 @@ passa de contato em contato.
 
 **Como um post chega aqui:**
 
-- Posts recentes (até 3 dias) de quem você segue entram direto.
+- Posts recentes (até 3 dias) de quem você segue entram direto — enquanto
+  seu vínculo com a pessoa for maior que zero. Uma denúncia sua contra
+  alguém que você só segue já zera: os posts dela saem desta aba
+  (continuam em Seguindo e no Global). Dar SINK depois no único post dela
+  que você driftou desfaz o 0,8 (volta a 0,5) — é desfazer o DRIFT, não
+  punição.
 - Um post de outra pessoa entra quando gente que você segue deu DRIFT
   nele nas últimas 48 h e a força desses vínculos soma **0,8**:
   - quem você só segue vale **0,5**;
@@ -273,12 +278,14 @@ passa de contato em contato.
   o post (quarentena). O teto vale aqui também: quem você só segue soma
   no máximo 0,5, então duas contas só seguidas não escondem nada
   sozinhas.
-- No canto inferior esquerdo do card, **↪ chegou por X** mostra quem
-  trouxe o post (o contato de maior vínculo). Post que entrou direto não
-  mostra.
+- Acima do autor, no card, **↪ chegou por X** mostra quem trouxe o post
+  (o contato de maior vínculo). Se mais de uma pessoa trouxe com o mesmo
+  vínculo, aparece **X, Y +N**. Post que entrou direto não mostra.
 - Sua **denúncia** tira 0,5 do vínculo com o autor, para sempre. Se você
-  denunciou na aba Contágio, com o **↪ chegou por X** na tela, X também
-  perde 0,5. Seu SINK não pune ninguém (ver ↓ SINK).
+  denunciou na aba Contágio, cada pessoa da etiqueta **↪ chegou por**
+  (inclusive as do +N) também perde 0,5. O passo de confirmação da
+  denúncia avisa isso antes do envio. Seu SINK não pune ninguém (ver ↓
+  SINK).
 
 **O que continua igual:** a ordem dentro da aba é a mesma do feed global
 (score público). As regras estão em `Docs/algoritmos.md` §9 e qualquer
@@ -327,8 +334,7 @@ coletiva. Você não pode "cancelar" alguém pra todo mundo via bloqueio.
 
 **O que acontece:**
 
-1. Você escolhe a razão (`spam`, `illegal`, `harassment`, `nsfw`,
-   `misinformation`, `other`).
+1. Você escolhe a razão (`spam`, `illegal`, `harassment`).
 2. ⚠️ **Aviso pré-submit:** sua denúncia é evento Nostr público kind
    9081 — qualquer um sabe que **você** denunciou. Privacidade do
    reporter é zero por design (transparência da moderação).
@@ -360,9 +366,9 @@ coletiva. Você não pode "cancelar" alguém pra todo mundo via bloqueio.
      brigada de poucos)
 
 6. **Na sua aba Contágio:** o autor perde 0,5 de vínculo com você, para
-   sempre (sai da própria denúncia publicada). Se você denunciou na aba
-   Contágio, com **↪ chegou por X** na tela, X também perde 0,5 — esse
-   registro fica só no seu aparelho. Nas abas de quem segue você, sua
+   sempre. Se você denunciou na aba Contágio, cada pessoa da etiqueta
+   **↪ chegou por** também perde 0,5 — esse registro fica só no seu
+   aparelho. O passo de confirmação avisa antes do envio. Nas abas de quem segue você, sua
    denúncia soma na quarentena do post. Ver
    [A aba Contágio](#a-aba-contágio).
 

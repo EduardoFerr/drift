@@ -22,9 +22,13 @@ import type { ReportReason, Post } from '../../types/drift'
 import { FullPageCard } from '../UI/FullPageCard'
 import { DriftButton } from '../UI/DriftButton'
 import { SectionHeader } from '../UI/SectionHeader'
+import { PeopleNames } from './ContagionViaChip'
 
 export interface ReportModalProps {
   post: Post
+  /** Aba Contágio: quem a pílula "↪ chegou por" mostrava — também perdem
+   *  vínculo com esta denúncia (o passo de confirmação diz isso). */
+  vias?: readonly string[]
   pending: boolean
   onSubmit: (reason: ReportReason) => Promise<void> | void
   onClose: () => void
@@ -76,7 +80,7 @@ function toneClasses(tone: ReasonOption['tone'], active: boolean) {
   return base[tone]
 }
 
-export function ReportModal({ post, pending, onSubmit, onClose }: ReportModalProps) {
+export function ReportModal({ post, vias = [], pending, onSubmit, onClose }: ReportModalProps) {
   const [selected, setSelected] = useState<ReportReason | null>(null)
   const [confirmStep, setConfirmStep] = useState(false)
 
@@ -144,6 +148,7 @@ export function ReportModal({ post, pending, onSubmit, onClose }: ReportModalPro
         {confirmStep && selected && (
           <ConfirmStep
             reason={selected}
+            vias={vias}
             pending={pending}
             onBack={() => setConfirmStep(false)}
             onSubmit={handleSubmit}
@@ -157,11 +162,13 @@ export function ReportModal({ post, pending, onSubmit, onClose }: ReportModalPro
 
 function ConfirmStep({
   reason,
+  vias,
   pending,
   onBack,
   onSubmit,
 }: {
   reason: ReportReason
+  vias: readonly string[]
   pending: boolean
   onBack: () => void
   onSubmit: () => void
@@ -200,6 +207,22 @@ function ConfirmStep({
         </div>
         <p className="px-1 font-mono text-[10px] leading-relaxed text-drift-muted/40">
           report é evento nostr imutável. não pode ser desfeito (§6).
+        </p>
+        {/* Aba Contágio (manifesto §24 emendado: nenhum sinal escondido):
+            a denúncia também baixa a confiança da aba — dito ANTES do envio. */}
+        <p
+          role="note"
+          data-testid="report-contagion-note"
+          className="px-1 font-mono text-[10px] leading-relaxed text-drift-warning"
+        >
+          na sua aba contágio, o que vem do autor passa a chegar menos, sem volta.
+          {vias.length > 0 && (
+            <>
+              {' '}o mesmo vale para <PeopleNames pubs={vias} />, que {vias.length > 1 ? 'trouxeram' : 'trouxe'} este
+              post (registro só no seu aparelho).
+            </>
+          )}{' '}
+          denúncia é para spam, golpe ou abuso — para o que só não te agrada, use sink.
         </p>
 
         {reason === 'illegal' && <AuthoritiesBlock />}

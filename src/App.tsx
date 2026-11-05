@@ -13,7 +13,6 @@ import { rebuildIdentityHistory, restartSync, useSyncStore } from './lib/sync'
 import { parseDeepLinkSearch, cleanDeepLinkParams } from './lib/deep-link'
 import { createPost, spreadPost, buryPost } from './lib/protocol'
 import { getMyAction, markFeedSeen, refreshFeed, useFeedStore } from './lib/feed'
-import { getArrivedVia } from './lib/contagion-data'
 import { useFollowsStore } from './lib/follows'
 import {
   advanceCursor,
@@ -265,7 +264,7 @@ function AboutCardLayer({ onClose }: { onClose: () => void }) {
             <div className="space-y-2 pl-3">
               <div className="space-y-2 rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3.5">
                 <ManifestoLine n="§17" text="sem chave mestra — fundador não controla conteúdo" />
-                <ManifestoLine n="§22" text="sem afinidade no feed — ranking é função pura" />
+                <ManifestoLine n="§24" text="algoritmo público, entradas suas — nenhuma regra secreta" />
                 <ManifestoLine n="§15" text="anti-censura por país — Tor + WebRTC" />
                 <ManifestoLine n="§16" text="disponibilidade distribuída — IPFS, sneakernet, BLE" />
                 <ManifestoLine n="§25" text="sem scanner automático — opt-in vence" />
@@ -1395,10 +1394,12 @@ function App() {
                 <PostViewer
                   key={currentPost.id}
                   custom={exitDir}
-                  post={currentPost}
+                  // "↪ chegou por" só existe na própria aba Contágio: um
+                  // post residual da aba anterior (troca em andamento) não
+                  // mostra a pílula nem pune quem trouxe
+                  post={feedTab === 'contagio' || !currentPost.arrivedVia ? currentPost : { ...currentPost, arrivedVia: undefined }}
                   isMine={currentPost.authorPub === boot.identity?.npub}
                   pendingAction={pending[currentPost.id] ?? null}
-                  arrivedVia={feedTab === 'contagio' ? getArrivedVia(currentPost.id) : null}
                   queue={{
                     index: currentIdx,
                     total: posts.length,
@@ -1840,8 +1841,8 @@ function HomeEmpty({ tab }: { tab: FeedTab }) {
       ? 'Você não segue ninguém ainda. Toque ➕ pra criar seu primeiro post — depois siga autores ao abrir os posts deles.'
       : tab === 'contagio'
       ? followsSomeone
-        ? 'Nada novo chegou pelas pessoas que você segue. Drifte posts delas pra fortalecer o vínculo — quem você já driftou traz posts sozinho.'
-        : 'Você ainda não segue ninguém. Aqui aparece o que as pessoas que você segue driftaram — siga autores ao abrir os posts deles.'
+        ? 'Nada novo chegou pelas pessoas que você segue. Quando você drifta um post de alguém que segue, o que essa pessoa driftar passa a chegar aqui. Quem você denunciou traz menos — ou nada.'
+        : 'Você ainda não segue ninguém. Aqui aparecem os posts de quem você segue e o que essas pessoas driftaram — siga autores ao abrir os posts deles.'
       : tab === 'trending'
       ? 'Nada em alta nas últimas 24h. Driftar um post recente vai puxar ele pro trending.'
       : 'Nenhum post no feed ainda. Toque ➕ pra publicar o primeiro — ele vai dar a volta pelos relays e voltar.'

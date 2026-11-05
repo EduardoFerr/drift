@@ -16,15 +16,19 @@ Suas": regras públicas e determinísticas, entradas do próprio usuário.
   DRIFT, na vacina e na quarentena (contas só seguidas não trazem nem
   escondem nada sozinhas). A ordem é a canônica. `src/lib/contagion.ts`
   (núcleo puro), `src/lib/contagion-data.ts` (SQLite), `Docs/algoritmos.md` §9.
-- **"↪ chegou por X"** — pílula no card da aba Contágio com o contato de
-  maior vínculo que trouxe o post (`ContagionViaChip`). Post direto não
-  mostra.
+- **"↪ chegou por X"** — etiqueta no texto do card da aba Contágio, acima
+  do autor, com os contatos de maior vínculo que trouxeram o post ("Ana,
+  Bia +1" no empate). Post direto não mostra.
 - **Experiência ruim = denúncia** — sua denúncia tira 0,5 do vínculo com o
-  autor (derivado das suas denúncias públicas) e, se feita na aba com a
-  pílula à vista, com quem trouxe o post (tabela local
-  `contagion_bad_experiences`, nunca publicada). O SINK continua sendo gosto
-  e não pune ninguém (§23): na simulação, punir no SINK derrubava o alcance
-  honesto de 29% para 5% com 10% de SINK por gosto.
+  autor e, se feita na aba, com cada contato que a etiqueta mostrava
+  (tabela local `contagion_bad_experiences`, nunca publicada). O passo de
+  confirmação da denúncia avisa isso antes do envio. A punição é
+  permanente: o cache não apaga posts que você denunciou e `reports`
+  guarda o alvo (tag `p`, coluna `target_pub`). O SINK continua sendo
+  gosto e não pune ninguém (§23): na simulação, punir no SINK derrubava o
+  alcance honesto de 29% para 5% com 10% de SINK por gosto.
+- **Guia do app** — tópico "aba contágio"; textos que negavam a aba
+  corrigidos (introdução, tela Sobre, denunciar, SINK).
 - **Índices** `spreads(spreader_pub, created_at)`, `buries(burier_pub,
   created_at)`, `reports(reporter_pub, created_at)`.
 - **Simulação reproduzível no repositório** — `Docs/simulacao-contagio/`
@@ -36,7 +40,11 @@ Suas": regras públicas e determinísticas, entradas do próprio usuário.
   independente no app real).
 
 ### Changed
-- Manifesto §24 emendado (motivo e simulação no próprio artigo).
+- Manifesto §24 emendado (motivo e simulação no próprio artigo); notas em
+  §22 (vínculo não é reputação) e §26 (efeito local da denúncia).
+- Denúncia e a ingestão de denúncias atualizam o feed na hora (a aba
+  Contágio não espera o próximo evento).
+- Abas cabem em 320 px (tracking e padding menores abaixo de 375 px).
 - Testes que travavam "3 abas usam `FEED_ORDER`" agora travam 4.
 
 Auditoria do algoritmo (2026-11-03, `Docs/auditoria-algoritmo-2026-11.md`):

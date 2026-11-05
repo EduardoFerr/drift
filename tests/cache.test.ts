@@ -102,14 +102,17 @@ describe('evictOldPosts', () => {
     expect(sql).toContain('author_pub != ?') // próprios excluídos
     expect(sql).toContain('s.post_id IS NULL')
     expect(sql).toContain('pn.post_id IS NULL')
+    // denunciados pelo user ficam: a aba Contágio deriva deles a
+    // experiência ruim (permanente) com o autor
+    expect(sql).toContain('LEFT JOIN reports r ON r.post_id = p.id AND r.reporter_pub = ?')
+    expect(sql).toContain('r.post_id IS NULL')
     // Ordering: mais frios primeiro (score ASC, depois antigos)
     expect(sql).toContain('ORDER BY p.score ASC, p.created_at ASC')
 
-    // npub aparece 2x (spread filter + author filter)
-    expect(params[0]).toBe(ME)
-    expect(params[1]).toBe(ME)
+    // npub aparece 3x (spread filter + report filter + author filter)
+    expect(params.slice(0, 3)).toEqual([ME, ME, ME])
     // limit = overflow (100) + EVICTION_BATCH (500) = 600
-    expect(params[2]).toBe(600)
+    expect(params[3]).toBe(600)
   })
 
   it('chama invalidateFeed só quando algo foi removido', async () => {

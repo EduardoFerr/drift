@@ -65,19 +65,23 @@ export async function evictOldPosts(currentNpub: string): Promise<number> {
   // pela moderação comunitária. Isso NÃO viola invariante #13 (que
   // proíbe deletar como decisão de moderação) — eviction é gestão de
   // espaço, não censura.
+  //   - denunciados pelo user (a aba Contágio deriva deles a experiência
+  //     ruim com o autor, que é permanente — revisão em par 2026-11-05)
   const result = await db.exec<{ id: string }>(
     `DELETE FROM posts WHERE id IN (
        SELECT p.id FROM posts p
        LEFT JOIN spreads s ON p.id = s.post_id AND s.spreader_pub = ?
        LEFT JOIN pinned  pn ON pn.post_id = p.id
+       LEFT JOIN reports r ON r.post_id = p.id AND r.reporter_pub = ?
        WHERE p.author_pub != ?
          AND s.post_id IS NULL
          AND pn.post_id IS NULL
+         AND r.post_id IS NULL
        ORDER BY p.score ASC, p.created_at ASC
        LIMIT ?
      )
      RETURNING id`,
-    [currentNpub, currentNpub, toRemove],
+    [currentNpub, currentNpub, currentNpub, toRemove],
   )
 
   const removed = result.length

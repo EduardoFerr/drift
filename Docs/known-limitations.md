@@ -302,7 +302,35 @@ audits só por feio. Defer documentado > silence.
     vezes; o app não tem esse gesto (BACKLOG "Deixar de seguir quem
     trouxe"; com ele, 1,8%). Punir também no SINK baixaria a isca para
     1,4%, mas com 10% de SINK por gosto derruba o alcance honesto de 29%
-    para 5% e deixa 30% dos feeds quase vazios (spec §4.6).
+    para 5% e deixa 30% dos feeds quase vazios (spec §4.6). **Os 2,9%
+    supõem denúncia em 35% dos spams vistos**: com 10%, a isca vai a 12,4%;
+    com 5%, a 22,3% (revisão em par, Satoshi). O gesto privado de cortar
+    quem trouxe é a alavanca de maior retorno e é condição para a aba virar
+    padrão.
+  - **Funil do Global:** a fazenda domina o feed global; quem segue e dá
+    DRIFT numa isca lá cria, por escolha própria, o vínculo de 0,8 que traz
+    spam na aba. Aproximação: 0,5%–2% de DRIFT em isca por dia ativo → isca
+    de 7,7% a 20,4%. Exigir DRIFT em 2 dias não compensa (−7 pontos de
+    alcance).
+  - **Fazenda postando spam pelas próprias contas:** conta de isca que já
+    vale 0,8 posta spam direto (o caminho direto só exige vínculo > 0) —
+    6,5% na simulação; as rodadas publicadas supõem que a fazenda só
+    impulsiona o spam do dono.
+  - **Culpa trocada:** o atacante posta algo bom, um contato honesto dá
+    DRIFT, e depois troca mídia sem hash, nome ou avatar por abuso; quem
+    denunciar na aba pune o contato honesto (1–3% dos vínculos honestos em
+    24 semanas). Defesa futura: só mídia verificada na aba e uma lista
+    local "quem perdeu vínculo por denúncia sua" com "perdoar" (o atacante
+    não consegue disparar o perdão).
+  - **Difamação com vínculo forte:** uma conta de isca (0,8) + uma só
+    seguida (0,5) somam 1,3 e põem qualquer post em quarentena, inclusive
+    post direto de amigo, sem o leitor ver. Pequeno hoje (0,5% dos
+    leitores); a métrica certa é "posts honestos escondidos", não "% que vê
+    ataque".
+  - **Vínculos invisíveis e sem volta:** o leitor não vê os vínculos nem as
+    experiências ruins registradas, e uma denúncia por engano não se desfaz
+    (quem ele só segue some da aba de vez). Reopener: tela "seus vínculos"
+    (BACKLOG "Por que vi isto").
   - **Alcance:** o post mais viral chega a ~38% pela aba (29% com 10% de
     SINK por gosto; 82–92% com encontros físicos e o mapa da área, Fases
     2–3).
@@ -311,9 +339,12 @@ audits só por feio. Defer documentado > silence.
     de influência real. Contido pela denúncia, que baixa o vínculo com o
     autor e com quem trouxe (0,1% veem ataque, pico 9%).
   - **Quem trouxe fica em cada aparelho:** a experiência ruim com o autor
-    sai das denúncias públicas do leitor (igual em todo aparelho da mesma
-    identidade); a com quem trouxe só existe no aparelho onde a denúncia
-    foi feita na aba.
+    é gravada no aparelho e também sai das denúncias do leitor que o sync
+    trouxe (com o alvo da tag `p`); num aparelho novo, contam só essas. A
+    com quem trouxe só existe no aparelho onde a denúncia foi feita na aba.
+  - **Denúncia offline:** o envio aos relays não é confirmado (bug à parte
+    em `transport/wss.ts`); a denúncia feita sem rede pune localmente o
+    autor e quem trouxe, mas não sai do aparelho.
   - **Inundação no sync:** o sync pede os eventos recentes da rede com
     limite por assinatura; quem publica em volume pode empurrar para fora
     da janela as ações dos contatos, e a aba fica com menos entradas
@@ -329,8 +360,8 @@ audits só por feio. Defer documentado > silence.
     7 dias trouxe (`sync.ts`), então começa com vínculos de 0,5.
   - **Eclipse:** quem usa 1–2 relays controlados pelo atacante perde a
     vacina e a quarentena dos contatos (o atacante só omite). O ataque
-    fica contido (0,0%), mas o alcance honesto cai de 40% para 27% na Fase
-    1 (~25 pontos no modelo completo). A defesa é de produto: piso de
+    fica contido (0,0%), mas o alcance honesto cai para 27% na Fase 1
+    (38% sem eclipse; ~25 pontos no modelo completo). A defesa é de produto: piso de
     diversidade de relays (≥ 6 relays de ≥ 3 operadores).
 - **Reopener:** Fase 2 (lockstep, aval, período de experiência; contágio
   como padrão) e Fase 3 (mapa da área e encontros físicos), cada uma

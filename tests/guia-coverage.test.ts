@@ -44,7 +44,7 @@ describe('GuideCard — cobertura de tópicos', () => {
   })
 
   describe('algoritmos (6 algoritmos)', () => {
-    const ALGOS = ['score', 'weight', 'threshold', 'ppr', 'decay', 'lentes'] as const
+    const ALGOS = ['score', 'weight', 'threshold', 'ppr', 'decay', 'contagio', 'lentes'] as const
     it.each(ALGOS)('tem accordionId guia-algo-%s', (a) => {
       expect(GUIDE_SRC).toMatch(new RegExp(`accordionId=["']guia-algo-${a}["']`))
     })

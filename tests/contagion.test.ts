@@ -55,7 +55,7 @@ vi.mock('../src/lib/identity', async (orig) => ({
 }))
 
 import { CONTAGION, computeContagion, tieOf, type ContagionAction, type ContagionInput, type ContagionVerdict } from '../src/lib/contagion'
-import { clearContagionMemory, loadContagionInput, recordReportedVia } from '../src/lib/contagion-data'
+import { loadContagionInput, recordReport } from '../src/lib/contagion-data'
 import { onNostrEvent, recalcAllScores } from '../src/lib/events'
 import { getContagionFeed, getGlobalFeed, getMyAction, refreshFeed, setFeedTab, useFeedStore } from '../src/lib/feed'
 import { useFollowsStore } from '../src/lib/follows'
@@ -349,6 +349,17 @@ describe('Contágio — propriedades do núcleo', () => {
     expect(v.pass).toBe(false)
   })
 
+  it('empate exato DRIFT × SINK do mesmo contato: o SINK vence em qualquer ordem de chegada', () => {
+    const posts = [{ id: 'p', author: 'x', createdAt: NOW - 3 * HOUR }]
+    const base0 = { follows: new Set(['ana']), earned: new Map([['ana', 1]]), posts }
+    for (const actions of [[spreadBy('ana', 'p', NOW - HOUR), buryBy('ana', 'p', NOW - HOUR)], [buryBy('ana', 'p', NOW - HOUR), spreadBy('ana', 'p', NOW - HOUR)]]) {
+      const v = computeContagion(base({ ...base0, actions })).get('p')!
+      expect(v.score, 'o DRIFT empatado não conta').toBe(0)
+      expect(v.vaccine).toBe(CONTAGION.TIE_EARNED)
+      expect(v.pass).toBe(false)
+    }
+  })
+
   it('"quem trouxe" é o maior vínculo, com desempate pela chave', () => {
     const v = computeContagion(base({
       follows: new Set(['b', 'a', 'c']), earned: new Map([['a', 1], ['b', 1]]),
@@ -377,7 +388,7 @@ const ev = (kind: number, who: string, t: number, tags: string[][], content = ''
 const post = (who: string, t: number) => ev(9078, who, t, [['drift-version', '1']], JSON.stringify({ subposts: [{ text: 'oi' }] }))
 const spread = (who: string, p: Ev, t = NOW - HOUR) => ev(9079, who, t, [['e', p.id], ['p', p.pubkey]])
 const bury = (who: string, p: Ev, t = NOW - HOUR) => ev(9080, who, t, [['e', p.id]])
-const report = (who: string, p: Ev, t = NOW - HOUR) => ev(9081, who, t, [['e', p.id], ['reason', 'spam']])
+const report = (who: string, p: Ev, t = NOW - HOUR) => ev(9081, who, t, [['e', p.id], ['p', p.pubkey], ['reason', 'spam']])
 const ingest = async (...es: Ev[]) => {
   for (const e of es) await onNostrEvent(e as never)
   await new Promise((r) => setTimeout(r, 130))
@@ -393,7 +404,6 @@ describe('Contágio — pipeline real', () => {
     H.conn!.exec(SCHEMA)
     H.viewer = pk('eu')
     __resetOrphansForTest()
-    clearContagionMemory()
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(NOW * 1000)
   })
@@ -453,10 +463,12 @@ describe('Contágio — pipeline real', () => {
   /** Experiências ruins que o leitor tem com `who`, como a aba as lê. */
   const strikesOf = async (who: string, viewer = 'eu') =>
     (await loadContagionInput(pk(viewer), new Set(), NOW)).strikes.get(pk(who)) ?? 0
-  /** Denúncia feita na aba: o PostViewer publica e registra quem trouxe;
-   *  a denúncia publicada volta pelo relay (eco) e entra pelo pipeline. */
+  /** "Quem trouxe" de um post, como a aba o entrega (o que a pílula mostra). */
+  const viasOf = async (p: Ev) => (await getContagionFeed(50, NOW * 1000)).find((x) => x.id === p.id)?.arrivedVia ?? []
+  /** Denúncia feita na aba: o PostViewer publica, grava o autor e quem a
+   *  pílula mostrava; a denúncia publicada volta pelo relay (eco). */
   const reportInTab = async (p: Ev) => {
-    await recordReportedVia(p.id)
+    await recordReport(p.id, p.pubkey, await viasOf(p))
     await ingest(report('eu', p, NOW - 30 * 60))
   }
 
@@ -468,14 +480,57 @@ describe('Contágio — pipeline real', () => {
     await ingest(antigo, p1, p2, p3, spread('eu', antigo, NOW - 9 * DAY), spread('ana', p1), spread('ana', p2), spread('ana', p3))
     follow('ana')
     expect(await tab()).toEqual(expect.arrayContaining([p1.id, p2.id, p3.id]))
+    // o leitor viu as duas pílulas antes de denunciar
+    const vias1 = await viasOf(p1)
+    const vias2 = await viasOf(p2)
+    expect(vias1).toEqual([pk('ana')])
     await reportInTab(p1)
-    await reportInTab(p2)
-    expect(viaCount('eu', 'ana')).toBe(2)
-    expect(viaCount('eu', 'w1'), 'o autor não é gravado: sai da denúncia publicada').toBe(0)
+    expect(viaCount('eu', 'w1'), 'o autor também fica gravado no aparelho').toBe(1)
     expect(await strikesOf('w1')).toBe(1)
+    // Ana: 0,8 − 0,5 = 0,3 (fraca) — sozinha já não traz nada
+    expect(await tab()).not.toEqual(expect.arrayContaining([p2.id]))
+    expect(await viasOf(p2), 'fora da aba, sem pílula: denunciar agora não pune a Ana').toEqual([])
+    // denúncia de p2 aberta quando a pílula ainda mostrava a Ana
+    await recordReport(p2.id, p2.pubkey, vias2)
+    expect(viaCount('eu', 'ana')).toBe(2)
     expect(await strikesOf('ana')).toBe(2)
-    // vínculo da Ana: 0,8 − 2 × 0,5 → 0 — nada mais chega por ela
+    // vínculo da Ana: 0,8 − 2 × 0,5 → 0
     expect(await tab()).not.toContain(p3.id)
+  })
+
+  it('a punição do autor é permanente: sobrevive à limpeza do cache e vale num aparelho que nunca viu o post', async () => {
+    const deW = post('w', NOW - 6 * HOUR)
+    const deZ = post('z', NOW - 6 * HOUR)
+    await ingest(deW, deZ)
+    // 1) denúncia feita aqui: registro local; o post sai do cache depois
+    await recordReport(deW.id, deW.pubkey, [])
+    H.conn!.prepare(`DELETE FROM posts WHERE id = ?`).run(deW.id)
+    expect(await strikesOf('w')).toBe(1)
+    // 2) denúncia vinda de outro aparelho (sync) e post fora do cache: o
+    //    alvo vem da tag `p` da denúncia
+    await ingest(report('eu', deZ, NOW - 30 * 60))
+    H.conn!.prepare(`DELETE FROM posts WHERE id = ?`).run(deZ.id)
+    expect(await strikesOf('z')).toBe(1)
+    // 3) aparelho novo: a denúncia chega, o post nunca chegou
+    const nunca = post('y', NOW - 6 * HOUR)
+    await ingest(report('eu', nunca, NOW - 30 * 60))
+    expect(await strikesOf('y')).toBe(1)
+  })
+
+  it('empate no maior vínculo: o post traz todos os empatados, e a denúncia pune exatamente os mostrados', async () => {
+    const daAna = post('ana', NOW - 10 * DAY)
+    const daDora = post('dora', NOW - 10 * DAY)
+    const p = post('w', NOW - 6 * HOUR)
+    await ingest(daAna, daDora, p, spread('eu', daAna, NOW - 9 * DAY), spread('eu', daDora, NOW - 9 * DAY), spread('ana', p))
+    follow('ana', 'dora')
+    // a pílula foi mostrada só com a Ana; a Dora impulsiona depois
+    const mostrados = await viasOf(p)
+    expect(mostrados).toEqual([pk('ana')])
+    await ingest(spread('dora', p, NOW - 20 * 60))
+    expect([...(await viasOf(p))].sort()).toEqual([pk('ana'), pk('dora')].sort())
+    await recordReport(p.id, p.pubkey, mostrados)
+    expect(viaCount('eu', 'ana')).toBe(1)
+    expect(viaCount('eu', 'dora'), 'a Dora não estava na tela').toBe(0)
   })
 
   it('SINK do leitor é gosto: não pune o autor nem quem trouxe (§23)', async () => {
@@ -502,7 +557,8 @@ describe('Contágio — pipeline real', () => {
     await ingest(antigo, p, spread('eu', antigo, NOW - 9 * DAY), spread('ana', p))
     follow('ana')
     await tab()
-    // feita no global: o PostViewer não registra quem trouxe (arrivedVia null)
+    // feita no global: o post de lá não carrega "quem trouxe" (vias vazio)
+    await recordReport(p.id, p.pubkey, [])
     await ingest(report('eu', p, NOW - 30 * 60))
     expect(viaCount('eu', 'ana')).toBe(0)
     expect(await strikesOf('ana')).toBe(0)
@@ -544,7 +600,7 @@ describe('Contágio — pipeline real', () => {
     const before = (await getGlobalFeed(50, NOW * 1000)).map((p) => p.id)
     await tab()
     // só a parte local (o efeito da denúncia publicada no global é o §26 de sempre)
-    for (const p of ps) await recordReportedVia(p.id)
+    for (const p of ps) await recordReport(p.id, p.pubkey, [pk('ana')])
     expect(await tab(), 'a aba do leitor mudou').toEqual([])
     expect((await getGlobalFeed(50, NOW * 1000)).map((p) => p.id)).toEqual(before)
   })
@@ -557,6 +613,26 @@ describe('Contágio — pipeline real', () => {
     expect(await tab()).toContain(x.id)
     H.conn!.prepare(`INSERT INTO blocked (npub, blocked_at) VALUES (?, ?)`).run(pk('ana'), NOW)
     expect(await tab(), 'bloqueada continua trazendo').not.toContain(x.id)
+  })
+
+  it('bloqueado também não vacina nem põe em quarentena', async () => {
+    const daAna = post('ana', NOW - 10 * DAY)
+    const daDora = post('dora', NOW - 10 * DAY)
+    const daCris = post('cris', NOW - 10 * DAY)
+    const v = post('autorV', NOW - 5 * HOUR)
+    const q = post('autorQ', NOW - 5 * HOUR)
+    await ingest(daAna, daDora, daCris, v, q,
+      spread('eu', daAna, NOW - 9 * DAY), spread('eu', daDora, NOW - 9 * DAY), spread('eu', daCris, NOW - 9 * DAY),
+      spread('ana', v), bury('dora', v),
+      spread('ana', q), report('dora', q), report('cris', q))
+    follow('ana', 'dora', 'cris')
+    let ids = await tab()
+    expect(ids, 'vacina da Dora anula a Ana').not.toContain(v.id)
+    expect(ids, 'Dora + Cris (16) escondem').not.toContain(q.id)
+    H.conn!.prepare(`INSERT INTO blocked (npub, blocked_at) VALUES (?, ?)`).run(pk('dora'), NOW)
+    ids = await tab()
+    expect(ids, 'bloqueada não vacina').toContain(v.id)
+    expect(ids, 'bloqueada não denuncia (Cris sozinha: 8 < 10)').toContain(q.id)
   })
 
   it('empate exato entre DRIFT e SINK do leitor: não há vínculo conquistado', async () => {

@@ -96,8 +96,9 @@ export interface ContagionVerdict {
   contributors: { pub: string; tie: number }[]
   /** Contato de maior vínculo que trouxe o post; null se entrou direto. */
   via: string | null
-  /** Todos os empatados no maior vínculo: dividem a experiência ruim, para
-   *  que ninguém escape da culpa escolhendo a própria chave. */
+  /** Todos os empatados no maior vínculo: cada um leva a experiência ruim
+   *  inteira (ninguém escapa da culpa escolhendo a própria chave), e a
+   *  pílula mostra todos. */
   viaAll: string[]
 }
 

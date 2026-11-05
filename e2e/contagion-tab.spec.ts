@@ -127,11 +127,17 @@ async function dismissOnboarding(page: Page): Promise<void> {
 }
 
 /** "Quem trouxe" do post na última leitura da aba (o que a pílula mostra). */
-async function arrivedVia(page: Page, postId: string): Promise<string | null> {
+/** "Quem trouxe" do post na aba ativa (o que a pílula mostra): todos os empatados. */
+async function arrivedViaAll(page: Page, postId: string): Promise<string[]> {
   return page.evaluate(async (id) => {
-    const cd = await import('/src/lib/contagion-data.ts')
-    return cd.getArrivedVia(id)
+    const f = await import('/src/lib/feed.ts')
+    const p = f.useFeedStore.getState().posts.find((x: { id: string }) => x.id === id) as { arrivedVia?: string[] } | undefined
+    return [...(p?.arrivedVia ?? [])]
   }, postId)
+}
+
+async function arrivedVia(page: Page, postId: string): Promise<string | null> {
+  return (await arrivedViaAll(page, postId))[0] ?? null
 }
 
 /** Registro local "quem trouxe" do que o leitor denunciou na aba. */
@@ -175,15 +181,24 @@ async function advance(page: Page, times: number): Promise<void> {
 }
 
 /** Denuncia o card atual pelo caminho do usuário: ⋮ → moderar → denunciar → spam → confirmar. */
-async function reportCurrentCard(page: Page): Promise<void> {
+/**
+ * Denuncia o card atual pelo caminho do usuário: ⋮ → moderar → denunciar →
+ * spam → confirmar. Devolve o aviso que o passo de confirmação mostrou
+ * ANTES do envio (manifesto §24: nenhum sinal escondido).
+ */
+async function reportCurrentCard(page: Page): Promise<string> {
   await page.getByRole('button', { name: 'abrir ações' }).first().click()
   await page.getByRole('button', { name: 'moderar' }).click()
   await page.getByRole('dialog', { name: 'moderação' }).getByRole('button', { name: /^denunciar/ }).click()
   const modal = page.getByRole('dialog', { name: 'denunciar post' })
   await modal.getByRole('button', { name: /^spam/ }).click()
   await modal.getByRole('button', { name: 'continuar →' }).click()
+  const note = modal.getByTestId('report-contagion-note')
+  await expect(note).toBeVisible()
+  const text = (await note.textContent()) ?? ''
   await modal.getByRole('button', { name: 'denunciar', exact: true }).click()
   await expect(modal).toHaveCount(0, { timeout: 10_000 })
+  return text
 }
 
 /** Eco do relay: no modo hermético a denúncia publicada não volta sozinha. */
@@ -242,7 +257,7 @@ test.describe('aba Contágio', () => {
       expect(await follows(alice.page, await viewer(alice.page))).toEqual([])
       await openTab(alice.page, 'contágio')
       expect(await tabIds(alice.page)).toEqual([])
-      await expect(alice.page.getByText(/Você ainda não segue ninguém\. Aqui aparece o que as pessoas que você segue driftaram/)).toBeVisible()
+      await expect(alice.page.getByText(/Você ainda não segue ninguém\. Aqui aparecem os posts de quem você segue e o que essas pessoas driftaram/)).toBeVisible()
     } finally {
       await alice.context.close()
     }
@@ -311,24 +326,6 @@ test.describe('aba Contágio', () => {
           expect(post!.author, `${name}: post próprio na aba`).not.toBe(me)
           const spreaders = await sql<{ p: string }>(s.page, `SELECT spreader_pub AS p FROM spreads WHERE post_id = ? AND created_at >= ?`, [id, now - 48 * HOUR])
           const viaRede = (fs.has(post!.author) && post!.created_at >= now - 72 * HOUR) || spreaders.some((r) => fs.has(r.p))
-          if (!viaRede) {
-            const all = await sql<{ p: string; t: number }>(s.page, `SELECT spreader_pub AS p, created_at AS t FROM spreads WHERE post_id = ?`, [id])
-            const app = await s.page.evaluate(async (id) => {
-              const f = await import('/src/lib/feed.ts')
-              const fo = await import('/src/lib/follows.ts')
-              const cd = await import('/src/lib/contagion-data.ts')
-              const ident = await import('/src/lib/identity.ts')
-              const me = (await ident.getCurrentNpub()) as string
-              const following = fo.useFollowsStore.getState().following as Set<string>
-              const v = (await cd.computeContagionFor(me, following, Math.floor(Date.now() / 1000))).get(id)
-              const fresh = (await f.getContagionFeed(50)).map((p: { id: string }) => p.id.slice(0, 8))
-              const store = f.useFeedStore.getState().posts.map((p: { id: string }) => p.id.slice(0, 8))
-              return { tab: f.useFeedStore.getState().tab, loaded: f.useFeedStore.getState().loaded, storeFollows: [...following].map((p) => p.slice(0, 8)), veredicto: v ?? null,
-                guarda: String(f.refreshFeed).includes('refreshPending = true'), fresh, store, mesmaLista: JSON.stringify(fresh) === JSON.stringify(store) }
-            }, id)
-            console.log(JSON.stringify({ name, id, author: post!.author, authorSeguido: fs.has(post!.author), idadeH: (now - post!.created_at) / HOUR,
-              spreads: all.map((r) => ({ seguido: fs.has(r.p), idadeH: +((now - r.t) / HOUR).toFixed(3) })), oracleFollows: [...fs].map((p) => p.slice(0, 8)), app }))
-          }
           expect(viaRede, `${name}: post ${id.slice(0, 8)} não veio de quem ${name} segue`).toBe(true)
         }
       } finally {
@@ -347,7 +344,7 @@ test.describe('aba Contágio', () => {
       await goToCard(page, first)
       const via = await arrivedVia(page, first)
       expect(via, 'o card enterrado chegou pela Alice').not.toBeNull()
-      await expect(page.getByTestId('contagion-via')).toBeVisible()
+      await expect(page.getByTestId('contagion-via').first()).toBeVisible()
       const author = await authorOf(page, first)
       const card = page.getByText(await firstText(page, first), { exact: true })
       await expect(card.first()).toBeVisible()
@@ -364,7 +361,7 @@ test.describe('aba Contágio', () => {
     }
   })
 
-  test('8. denúncia pela interface: na aba registra quem trouxe e o eco pune o autor; fora da aba, nunca quem trouxe', async ({ browser }) => {
+  test('8. denúncia pela interface: avisa antes, pune o autor sempre e quem trouxe só na aba; a aba se atualiza na hora', async ({ browser }) => {
     const bob = await setupUser(browser, 'bob')
     try {
       const page = bob.page
@@ -378,43 +375,90 @@ test.describe('aba Contágio', () => {
       expect(await arrivedVia(page, elsewhere)).toBe(alice)
 
       // 1) fora da aba não há "chegou por": denunciar no global um post que
-      //    chegou pela Alice na aba NÃO registra ninguém — a regra é o lugar
-      //    da denúncia (com a pílula à vista), não o post
+      //    chegou pela Alice na aba pune só o autor — a regra é o lugar da
+      //    denúncia (com a pílula à vista), não o post
       await openTab(page, 'global')
       await goToCard(page, elsewhere)
       await expect(page.getByTestId('contagion-via')).toHaveCount(0)
-      await reportCurrentCard(page)
-      await page.waitForTimeout(1_000)
-      expect(await badRows(page, elsewhere), 'denúncia no global não registra quem trouxe').toEqual([])
+      const noteGlobal = await reportCurrentCard(page)
+      expect(noteGlobal, 'o aviso fala do autor').toContain('o que vem do autor passa a chegar menos')
+      expect(noteGlobal, 'sem pílula, o aviso não cita ninguém mais').not.toContain('o mesmo vale para')
+      const authorElsewhere = await authorOf(page, elsewhere)
+      await expect.poll(async () => (await badRows(page, elsewhere)).map((r) => r.s), { timeout: 10_000 }).toEqual([authorElsewhere])
       expect(await strikesOf(page, alice), 'a Alice segue intacta').toBe(0)
+      expect(await strikesOf(page, authorElsewhere), 'o autor já perde, sem esperar o relay').toBe(1)
 
-      // 2) na aba, com a pílula à vista, a denúncia registra quem trouxe
+      // 2) na aba, com a pílula à vista, a denúncia avisa e registra quem trouxe
       await openTab(page, 'contágio')
       await goToCard(page, target)
       const via = (await arrivedVia(page, target))!
       const author = await authorOf(page, target)
       expect(via, 'Bob só segue a Alice: é ela quem traz').toBe(alice)
-      await expect(page.getByTestId('contagion-via')).toBeVisible()
+      await expect(page.getByTestId('contagion-via').first()).toBeVisible()
 
-      await reportCurrentCard(page)
-      await expect.poll(async () => (await badRows(page, target)).length, { timeout: 10_000 }).toBeGreaterThan(0)
+      const noteTab = await reportCurrentCard(page)
+      expect(noteTab, 'o aviso cita quem trouxe antes do envio').toContain('o mesmo vale para')
+      await expect.poll(async () => (await badRows(page, target)).length, { timeout: 10_000 }).toBe(2)
       const rows = await badRows(page, target)
       expect(rows.every((r) => r.v === me), 'o registro é do leitor').toBe(true)
-      expect(rows.map((r) => r.s)).toContain(via)
-      expect(rows.map((r) => r.s), 'o autor não é gravado: sai da denúncia publicada').not.toContain(author)
+      expect(rows.map((r) => r.s).sort()).toEqual([via, author].sort())
       expect(await strikesOf(page, via)).toBe(1)
+      expect(author, 'os dois posts são do Frank').toBe(authorElsewhere)
+      expect(await strikesOf(page, author), 'dois posts dele denunciados').toBe(2)
 
-      // a denúncia publicada volta pelo relay e conta contra o autor
+      // a denúncia publicada volta pelo relay: a mesma, conta uma vez só
       await echoReport(page, target, author)
-      await expect.poll(() => strikesOf(page, author), { timeout: 10_000 }).toBe(1)
+      await page.waitForTimeout(500)
+      expect(await strikesOf(page, author)).toBe(2)
 
       // 3) Alice: 0,8 − 0,5 = 0,3 — o que ela impulsiona deixa de chegar
-      //    sozinho; os posts recentes dela continuam entrando direto
-      await openTab(page, 'global')
+      //    sozinho, e a aba se atualiza na hora (sem trocar de aba)
+      await expect.poll(() => tabIds(page), { timeout: 10_000 }).not.toContain(elsewhere)
+      for (const id of await tabIds(page)) expect(await authorOf(page, id), 'só posts diretos da Alice sobram').toBe(alice)
+    } finally {
+      await bob.context.close()
+    }
+  })
+
+  test('9. empate: dois contatos de 0,8 trazem o post — a pílula e o aviso mostram os dois, e a denúncia pune exatamente os dois', async ({ browser }) => {
+    const bob = await setupUser(browser, 'bob')
+    try {
+      const page = bob.page
+      const me = await viewer(page)
+      const { alice, frank, heidi, bob: bobId } = NAMED_BY_NAME as Record<string, { pub: string; sk: Uint8Array }>
+      const now = Math.floor(Date.now() / 1000)
+      const mkPost = (who: { sk: Uint8Array }, text: string, t: number) => finalizeEvent(
+        { kind: 9078, created_at: t, tags: [['drift-version', '1'], ['client', 'drift-official']], content: JSON.stringify({ subposts: [{ id: text, type: 'text', text, imageUrl: null, order: 0, layout: 'text' }] }) },
+        who.sk,
+      )
+      const mkDrift = (who: { sk: Uint8Array }, p: { id: string; pubkey: string }, t: number) => finalizeEvent({ kind: 9079, created_at: t, tags: [['e', p.id], ['p', p.pubkey]], content: '' }, who.sk)
+      // Bob passa a seguir o Frank e já impulsionou um post dele (0,8);
+      // Alice e Frank impulsionam um post da Heidi, que o Bob não segue
+      const doFrank = mkPost(frank!, `e2e frank ${now}`, now - 300)
+      const alvo = mkPost(heidi!, `e2e empate ${now}`, now - 240)
+      const evs = [doFrank, mkDrift(bobId!, doFrank, now - 200), alvo, mkDrift(alice!, alvo, now - 120), mkDrift(frank!, alvo, now - 90)]
+      await page.evaluate(async ({ evs, frankPub }) => {
+        const e = await import('/src/lib/events.ts')
+        const fo = await import('/src/lib/follows.ts')
+        for (const ev of evs) await e.onNostrEvent(ev)
+        const st = fo.useFollowsStore.getState()
+        fo.useFollowsStore.setState({ following: new Set([...(st.following as Set<string>), frankPub]) } as never)
+        await new Promise((r) => setTimeout(r, 300))
+        await e.recalcAllScores()
+      }, { evs, frankPub: frank!.pub })
+
       await openTab(page, 'contágio')
-      const after = await tabIds(page)
-      expect(after, 'nada mais chega pela Alice').not.toContain(elsewhere)
-      for (const id of after) expect(await authorOf(page, id), 'só posts diretos da Alice sobram').toBe(alice)
+      expect((await arrivedViaAll(page, alvo.id)).sort(), 'os dois empatados em 0,8').toEqual([alice!.pub, frank!.pub].sort())
+      await goToCard(page, alvo.id)
+      const pill = page.getByTestId('contagion-via').first()
+      await expect(pill).toBeVisible()
+      await expect(pill.locator('.sr-only')).toContainText(' e ')
+
+      const note = await reportCurrentCard(page)
+      expect(note, 'o aviso cita os dois, no plural').toContain('trouxeram')
+      await expect.poll(async () => (await badRows(page, alvo.id)).map((r) => r.s).sort(), { timeout: 10_000 })
+        .toEqual([alice!.pub, frank!.pub, heidi!.pub].sort())
+      expect((await badRows(page, alvo.id)).every((r) => r.v === me)).toBe(true)
     } finally {
       await bob.context.close()
     }
@@ -436,8 +480,8 @@ test.describe('aba Contágio', () => {
         if (cur === null) break
         const via = await arrivedVia(page, cur)
         if (via) {
-          await expect(pill).toBeVisible()
-          await expect(pill).toContainText('chegou por')
+          await expect(pill.first()).toBeVisible()
+          await expect(pill.first()).toContainText('chegou por')
           seen.via = true
         } else {
           await expect(pill).toHaveCount(0)

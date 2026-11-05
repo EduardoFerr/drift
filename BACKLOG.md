@@ -49,6 +49,18 @@ em `Docs/simulacao-contagio/` e `Docs/spec-revisao-contagio.md`.
   quem você segue, e a aba Contágio fica com menos entradas. Correção:
   assinatura de kinds 9079/9080/9081 com `authors` = seus follows —
   bloqueio: nenhum, trabalho a fazer (Fase 2).
+- [ ] **Medir e defender o que a revisão em par achou** (Satoshi, 05/11) —
+  rodadas com Global e Contágio no mesmo mundo (funil: 7,7–20,4% de isca),
+  `farmSpamDirect` (6,5%), troca de mídia/perfil depois do DRIFT (1–3% dos
+  vínculos honestos levam culpa), métrica "posts honestos escondidos"
+  (difamação com vínculo forte); defesas: só mídia verificada na aba,
+  lista local "quem perdeu vínculo por denúncia sua" com "perdoar" —
+  bloqueio: nenhum, trabalho a fazer.
+- [ ] **Alinhar a simulação ao app** — "quem trouxe" = todos os empatados,
+  SINK de contato 96 h, feed = tudo o que passa (até 50) na ordem canônica
+  (Ted, revisão em par) — bloqueio: nenhum.
+- [ ] **`getMyAction` numa consulta só** — hoje 2 por post a cada mudança
+  de posts, em todas as abas (Ted) — bloqueio: nenhum.
 - [ ] **Deixar de seguir quem trouxe, em 1 toque, a partir da pílula ↪** —
   contexto: a simulação das versões v1–v7 contava com o leitor cortando o
   vínculo que trouxe spam em 40% das vezes; o app não tem esse gesto, e a

@@ -399,6 +399,16 @@ function applyMigrations(schema: string) {
       sql: `ALTER TABLE reports ADD COLUMN kind INTEGER NOT NULL DEFAULT 9081`,
     },
     {
+      // Aba Contágio (revisão em par 2026-11-05): a experiência ruim com o
+      // autor sai das denúncias do leitor. Guardar a tag `p` deixa a punição
+      // valer mesmo quando o post denunciado sai do cache ou não veio no
+      // sync de um aparelho novo. Linhas antigas: null (cai no JOIN com posts).
+      name: 'add_target_pub_to_reports',
+      table: 'reports',
+      column: 'target_pub',
+      sql: `ALTER TABLE reports ADD COLUMN target_pub TEXT`,
+    },
+    {
       // Satoshi devsec 2026-05-20 Gap B — Sybil edge-refresh defense.
       // Antes: temporalDecay usava updated_at (refresh-on-write) — Sybil
       // re-segue/re-drifta pra zerar age. Agora created_at IMUTÁVEL após

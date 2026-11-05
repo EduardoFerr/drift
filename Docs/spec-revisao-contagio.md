@@ -204,10 +204,32 @@ honesto. Três opções, na configuração do app (sem corte de vínculo):
 Punir no SINK compra pouca defesa contra a isca e desmonta a rede
 honesta: um SINK de gosto num post trazido por alguém já derruba o vínculo
 conquistado (0,8 → 0,3) e a pessoa para de trazer posts. Decisão: **só a
-denúncia pune**, que é intenção explícita ("isto é spam/abuso"). A rodada
-da manhã, com o corte de vínculo em 40%, apontou o mesmo (isca 1,4% ×
-1,5%; alcance com SINK de gosto 5% × 29%). Rodadas `fase1_both__*`,
+denúncia pune**, que é intenção explícita ("isto é spam/abuso"). As
+rodadas `decisao_*` (base `fase1_v0`: corte de vínculo em 40% e "quem
+trouxe" também em post direto) apontaram o mesmo (isca 1,4% × 1,5%;
+alcance com SINK de gosto 5% × 29%). Rodadas `fase1_both__*`,
 `fase1_viaSink__*`, `fase1__*` e `decisao_*` da bateria.
+
+### 4.7 Sensibilidade (revisão em par, 05/11/2026)
+
+Rodadas do revisor adversarial sobre a configuração do app (flags novas,
+neutras quando desligadas; `isca` reproduz 2,9% · pico 10,6%):
+
+| Suposição mexida | isca |
+|---|---|
+| denúncia em 35% dos spams vistos (base) | 2,9% |
+| denúncia em 10% | 12,4% (13,0% na seed 23) |
+| denúncia em 5% | 22,3% |
+| 10% de denúncia + SINK punindo | 1,5–1,6% (mas derruba o alcance honesto, §4.6) |
+| 10% de denúncia + corte de quem trouxe em 20% / 40% | 4,5% / 2,9% |
+| seguir e dar DRIFT numa isca do Global em 0,5% / 1% / 2% dos dias ativos | 7,7% / 12,7% / 20,4% |
+| contas de isca postando spam direto | 6,5% |
+| punição do autor expirando em 30 / 7 dias (enganados + isca) | 6,1% / 9,1% (base 0,1%) |
+| seeds 7, 11, 23, 42 | 2,6–2,9% |
+
+O que segura: a seed e o teto de itens do feed. O que mais derruba: a
+taxa de denúncia e o funil do Global. A punição do autor que expirava com
+a limpeza do cache foi corrigida antes do merge.
 
 ## 5. O que esta simulação não prova
 
@@ -219,7 +241,9 @@ da manhã, com o corte de vínculo em 40%, apontou o mesmo (isca 1,4% ×
 - **Cliente real ≠ simulação:** janela de sync de 7 dias, latência, relays com conteúdos diferentes.
 - **v7 sem as outras peças não foi testado.** Talvez o teto sozinho baste para parte delas.
 - **SINK de gosto uniforme.** Cada pessoa enterra 10% de tudo ao acaso; gosto real se concentra (um assunto, um autor) e pode zerar menos vínculos, ou mais.
-- **Taxas de reação fixas.** SINK 50% e denúncia 35% diante de spam são suposições; a defesa contra a isca na Fase 1 depende da denúncia.
+- **Taxas de reação fixas.** SINK 50% e denúncia 35% diante de spam são suposições; a defesa contra a isca na Fase 1 depende da denúncia (§4.7).
+- **Simulação × app.** Na simulação, "quem trouxe" é um contato só (no app, todos os empatados), o SINK de contato vale 2 dias (no app, 96 h) e o feed medido são os 8 primeiros por pontuação de contágio (no app, tudo o que passa, até 50, na ordem canônica). A simulação não aplica a moderação global (−999), que no app vale também na aba.
+- **Contágio isolado do Global.** As rodadas não colocam o feed global e a aba Contágio no mesmo mundo; o funil (§4.7) foi aproximado.
 
 ## 6. Literatura usada
 

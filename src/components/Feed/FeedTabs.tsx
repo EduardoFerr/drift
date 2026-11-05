@@ -66,7 +66,9 @@ export function FeedTabs({ onActiveTabTap }: FeedTabsProps = {}) {
   )
 
   return (
-    <div className="flex items-stretch font-mono text-[12px] uppercase tracking-[2px]">
+    // 4 abas: abaixo de 375 px o tracking/padding cheio estourava a largura
+    // ("contág" cortado a 320 px — WCAG 1.4.10 Reflow)
+    <div className="flex items-stretch font-mono text-[12px] uppercase tracking-[1px] min-[375px]:tracking-[2px]">
       <div className="relative flex flex-1 items-stretch" role="tablist" aria-label="feed">
         {tabs.map((t) => (
           <FeedTabBtn
@@ -83,9 +85,10 @@ export function FeedTabs({ onActiveTabTap }: FeedTabsProps = {}) {
             title={
               tab === t.id
                 ? 'tocar de novo: atualizar + voltar ao topo'
-                : unseenByTab[t.id] > 0
-                ? `${unseenByTab[t.id]} ${unseenByTab[t.id] === 1 ? 'novo' : 'novos'}`
-                : t.hint
+                : [
+                    t.hint,
+                    unseenByTab[t.id] > 0 && `${unseenByTab[t.id]} ${unseenByTab[t.id] === 1 ? 'novo' : 'novos'}`,
+                  ].filter(Boolean).join(' · ') || undefined
             }
           >
             {t.label}
@@ -141,7 +144,7 @@ function FeedTabBtn({
       // indicador de active-state é o underline animado (m.span no
       // container). Tab "em alta" parecia "ter caixa" porque era
       // a última focada; agora foco e ativa têm visuais distintos.
-      className={`relative flex-1 px-2 py-[10px] text-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-drift-accent2 ${
+      className={`relative flex-1 px-1 py-[10px] text-center transition-colors min-[375px]:px-2 focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-drift-accent2 ${
         active
           ? 'text-drift-text'
           : 'text-drift-muted hover:text-drift-text'
