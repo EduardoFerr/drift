@@ -1,6 +1,12 @@
 # Lentes Pluggable + Shareable — Design Doc
 
-> **Status:** PROPOSED (Sprint N+1 SPIKE)
+> **Status:** PROPOSED (Sprint N+1 SPIKE). **Estado em 2026-11-06:** o
+> registry (`src/lib/lens/`) está ligado ao feed — duas lentes ("quem você
+> segue primeiro", que é a mistura de `Docs/algoritmos.md` §6, e a
+> cronológica), só em Global e Em alta, escolha guardada em
+> `user_prefs.active_lens`. O multiplicador `viewMultiplier` descrito
+> abaixo não é mais o da lente (a simulação mostrou que ele não mudava
+> nada). Composição e compartilhamento seguem como proposta.
 > **Origin:** Ted persona dispatch 2026-05-20 (audit "promessa vs impl"
 > + user brief "lentes ainda não são plugáveis nem compartilháveis")
 > **Manifesto refs:** §17 (sem chave mestra), §22 (sem reputação

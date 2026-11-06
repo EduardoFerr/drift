@@ -20,8 +20,9 @@ te interessa.
 - 🔑 Sua identidade é uma **chave criptográfica** (`nsec1…`) gerada no
   seu dispositivo. Sem email, sem telefone, sem cadastro.
 - 📊 O score que ordena o feed é uma **fórmula pública**. Todos os
-  clientes Drift no mundo veem o feed global **na mesma ordem** (a menos
-  que você ligue a "Lente" — explicado abaixo). A aba **contágio** escolhe
+  clientes Drift no mundo veem o feed global **na mesma ordem** — a menos
+  que você ligue a **lente**, que põe posts de quem você segue entre os
+  primeiros, só na sua tela (explicado abaixo). A aba **contágio** escolhe
   posts pelas suas próprias escolhas, com regras igualmente públicas.
 - 🚫 Não existe "moderador supremo". Conteúdo problemático é escondido
   pela **comunidade via denúncias** — nem o criador do Drift consegue
@@ -236,8 +237,8 @@ event), mas:
 
 - Aba "Seguindo" do feed filtra posts dos seus follows
 - Aba "Contágio" traz o que essas pessoas driftaram (ver abaixo)
-- Trust Lens (se ligada) usa seus follows pra calcular o grafo de
-  influência local
+- A lente (se ligada) põe posts de quem você segue entre os primeiros
+  das abas global e em alta, só na sua tela
 - Outros clientes Nostr (Damus, Snort, Coracle) entendem essa lista —
   sua rede é portátil
 
@@ -426,40 +427,51 @@ Brasil, etc.). Drift esconde do feed, mas não substitui ação legal —
   Tauri, ainda não disponível como PWA).
 - **Onion-only:** modo paranoia máxima — só conecta a relays `.onion`.
 
-### 🔭 Sua Lente (Trust Lens)
+### 🔭 Sua lente
 
-Slider 0-100% que **reordena o feed localmente** baseado em quem você
-segue + drifts seus. **Default: desligada.**
+Põe posts de **quem você segue** entre os primeiros das abas **global** e
+**em alta**, só na sua tela. **Padrão: desligada.**
 
-- **Strength = 0:** feed canônico bit-exact — você vê na mesma ordem
-  que todo mundo (manifesto §24).
-- **Strength > 0:** posts de quem você acompanha (e do entorno deles)
-  sobem no SEU feed. **Não afeta o que os outros veem.**
+- **Força 0 (desligada):** a ordem de sempre — a mesma de todo mundo que
+  tem os mesmos posts (manifesto §24).
+- **Força k:** k de cada 100 cards dessas abas vão para posts de quem você
+  segue, na ordem de sempre. Com 50, um card sim, um não; com 100,
+  primeiro todos eles, depois o resto. De cada pessoa, no máximo 2 posts
+  (os de mais pontos, de até 7 dias).
+- **Quem conta:** quem você segue, menos quem você bloqueou, silenciou ou
+  denunciou — uma denúncia basta, inclusive de um post que a pessoa trouxe
+  na aba contágio. Amigos de amigos não contam: o app só guarda a sua
+  lista.
+- **O que ela nunca faz:** tirar um post de quem você segue do lugar que ele
+  já tinha, subir post que a comunidade afundou, trazer post de quem você
+  não segue ou mexer nas abas seguindo e contágio.
+- **Quando um post subiu pela lente,** o card mostra o chip "lente". Toque
+  nele e veja o motivo: quem você segue, a sua força e o lugar que o post
+  teria sem a lente.
 
-**Em desenvolvimento — lentes pluggable + compostas:**
+**Outra lente:** "cronológica" — os mesmos posts das abas global e em
+alta, do mais novo para o mais velho. A escolha fica guardada no aparelho.
 
-Hoje só existe a Sua Lente (PPR padrão). A próxima fase
-([`Docs/lens-pluggable-design.md`](lens-pluggable-design.md)) traz:
-- **Múltiplas lentes** (cronológica, image-first, customizadas)
-- **Importar lente de outros** via JSON / URL / QR (a *receita*; cada
-  cliente recomputa LOCAL — manifesto §24 preservado)
-- **Composição via teoria de conjuntos:** união (A ∪ B), interseção
-  (A ∩ B), diferença (A − B), diferença simétrica (A △ B), complemento
-  (¬A). Exemplo: "minha lente PLUS posts com imagem" = `ppr ∪ image-first`
+**Ajustes (só com a lente ligada):**
 
-**Sub-toggles (só aparecem quando lente ativa):**
+- **"Destacar o que a lente adiantou":** o chip "lente" fica preenchido e
+  ganha ↑. Padrão desligado.
+- **"Mostrar quem você segue no mapa":** no mapa da sua rede, os pontos de
+  quem você segue ganham cor. Só você vê. Padrão desligado.
 
-- **"Mostrar quando a lente reordenou":** chip "lente" no canto fica
-  mais visível em posts que foram afetados pelo reorder. Default OFF.
-- **"Esquecer follows antigos":** follows sem atividade ≥30 dias pesam
-  menos no walk PPR. Half-life 30d. Default OFF (preserva determinismo
-  bit-exact pra users existentes).
+**Na simulação** (2.250 pessoas, 24 semanas): com força 50, cerca de
+{{sem.M50.fromF}}% dos 8 primeiros cards passam a ser de quem a pessoa
+segue (sem lente: {{sem.comum.fromF}}%); com 100, {{sem.M100.fromF}}%. O
+preço é um feed mais fechado — menos posts de outras cidades — e, se você
+seguir de volta uma conta falsa, o spam dela sobe junto (no máximo 2
+posts) até você denunciar. A lente não protege contra fazendas de contas; para isso, use a
+aba contágio. Detalhes em [`Docs/algoritmos.md`](algoritmos.md) §6.
 
 **O que NÃO acontece:**
 
-- ❌ Sua lente **NUNCA é compartilhada**. Vive 100% local.
-- ❌ Lente **NUNCA altera o score canônico** (`s_global` no SQLite).
-  Só multiplica no momento da renderização (`s_local`).
+- ❌ Sua lente **nunca é compartilhada** nem publicada. Vive no aparelho.
+- ❌ A lente **nunca muda os pontos** de post nenhum. Ela só decide a
+  ordem que a sua tela mostra, a cada leitura do feed.
 
 ### ⚙️ Menu Detalhado (5 flags granulares)
 
@@ -495,12 +507,12 @@ Power user pode trocar:
 | Drift escaneia automaticamente o que você publica | §25 — operador do scanner herdaria chave mestra |
 | Existe "moderador supremo" que apaga posts | §17 — sem chave mestra disfarçada |
 | Seu `nsec1…` é enviado pra algum servidor | §3 — identidade no dispositivo, sempre |
-| Feed é personalizado sem você escolher | §24 — mesma ordem em todas as abas; global e em alta são iguais pra todos; seguindo e contágio só usam as suas escolhas, com regras públicas |
+| Feed é personalizado sem você escolher | §24 — mesma ordem em todas as abas; global e em alta são iguais pra todos (a lente muda a ordem delas só se você ligar); seguindo e contágio só usam as suas escolhas, com regras públicas |
 | Posts são apagados quando reports passam threshold | §17 — só score = -999 esconde; cliente alternativo exibe |
 | Bury penaliza o autor | §23 — bury é julgamento estético, não punição |
 | Existe "boost pago" pra subir no feed | §22 — score determinístico, sem reputação subjetiva nem ad |
 | Coleta de telemetria comportamental | §28 — privacidade pelo mínimo |
-| "Lente" altera o feed que os outros veem | §24 — view-layer carve-out estrito |
+| A lente altera o feed que os outros veem | §24 — a lente muda só a ordem da sua tela; nada é publicado e os pontos dos posts não mudam |
 | Você é forçado a usar relay específico | §17 — você escolhe seus relays |
 
 ---

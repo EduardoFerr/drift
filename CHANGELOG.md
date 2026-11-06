@@ -4,6 +4,55 @@ All notable changes to the Drift client. Uses [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+Lente ligada ao feed (2026-11-06). A tela "sua lente" prometia reordenar
+o feed desde maio, mas nada no app aplicava a lente. Agora aplica, com uma
+regra nova, simulada antes (`Docs/simulacao-lente/`, página "Drift: lente
+no feed") — a fórmula de antes, ligada como estava, não mudava nada. A
+exceção da lente foi escrita no manifesto §24.
+
+### Added
+- **A lente no feed (a mistura)** — só nas abas Global e Em alta, só com a
+  lente ligada: com força k, k de cada 100 cards vão para posts de quem você
+  segue, na ordem de sempre (50 = um sim, um não; 100 = primeiro todos
+  eles). De cada pessoa, no máximo 2 posts (os de mais pontos, de até 7
+  dias) — quem posta sem parar não toma a lente. Nunca rebaixa um post que
+  escolheu, não adianta post afundado pela comunidade (score < 0), não traz
+  post de quem você não segue e não muda o tamanho da aba (os de quem você
+  segue que estavam fora dos 50 empurram o fim). Seguindo e Contágio não
+  mudam. "Quem você segue" usa o vínculo da aba Contágio com corte mais alto
+  (`tieOf ≥ 5`): sem bloqueados e silenciados, e uma denúncia basta para a
+  pessoa sair. Se ler a sua rede falhar, a aba sai na ordem de sempre. Função pura e só com inteiros
+  (`src/lib/lens/order.ts:mixNetwork`); `feed.ts:withLens` lê os posts da
+  sua rede com a mesma SQL, o mesmo relógio e o mesmo limite da aba. Na
+  simulação (2.250 pessoas): dos 8 primeiros, de quem a pessoa segue
+  {{sem.comum.fromF}}% → {{sem.M50.fromF}}% (força 50) → {{sem.M100.fromF}}% (100).
+- **Chip "lente" que diz a verdade** — aparece só no post que a lente
+  adiantou (`Post.lensLift`, em memória) e explica: você segue a pessoa, a
+  sua força, o lugar que o post teria sem a lente.
+- **Lente escolhida guardada** — `user_prefs.active_lens` (antes voltava à
+  padrão a cada abertura). A cronológica passa a valer de fato: os mesmos
+  posts de Global e Em alta, do mais novo para o mais velho.
+- **Reação automática** — mexer na força, trocar de lente, seguir, bloquear
+  ou silenciar refaz a aba (`startFeedLensSync`).
+- **PPR exato** (`computePprExact`) — a média do mesmo passeio, sem sorteio:
+  mesma rede, mesmos números em qualquer aparelho e em qualquer dia. As
+  cores do mapa da sua rede usam ele (antes: Monte Carlo com semente
+  pessoa + dia e rede lida sem ORDER BY).
+
+### Changed
+- Tela "sua lente", guia do app (`GuideCard`), banner de convite e
+  `Docs/guia-do-usuario.md` dizem exatamente o que a lente faz (antes:
+  "entorno", "drifts mútuos", PageRank, "feed quase só com quem você
+  acompanha").
+- `Docs/algoritmos.md` §6 reescrita (a mistura, simulação, por que não o
+  multiplicador); §5 (PPR exato, hoje só no mapa); §7 (decaimento sem efeito
+  hoje); manifesto §24 com a regra da lente.
+
+### Removed
+- Toggle "esquecer follows antigos" — só agia em `lens_edges`, que o app
+  nunca preenche; não tinha efeito nenhum.
+- `applyLensToPost` (multiplicador por post, sem chamador).
+
 Contágio local, Fase 1 (2026-11-05). **Emenda ao manifesto §24** — de
 "Sem Algoritmo Personalizado de Feed" para "Algoritmo Público, Entradas
 Suas": regras públicas e determinísticas, entradas do próprio usuário.

@@ -620,6 +620,11 @@ autor (§23 preservado). Ver arquitetura §8.
 > Algoritmo Personalizado de Feed" e exigia a mesma ordem global para
 > todos. A emenda e o motivo estão abaixo; o texto original segue no
 > histórico do repositório.
+>
+> **2026-11-06:** a regra da lente foi escrita aqui. A tela "sua lente"
+> prometia reordenar o feed desde maio de 2026, mas nada no app aplicava a
+> lente; ao ligá-la, a exceção passou a constar das regras (simulação em
+> `Docs/simulacao-lente/`).
 
 Ranking é determinístico e público. Nenhuma regra é secreta, nenhum
 sinal é escondido do usuário, nada sai do dispositivo. O que pode
@@ -633,9 +638,20 @@ usuário.
 - Ordem do feed é função pura: `score = (Σ weight(spreader) −
   Σ weight(burier) × 0.3 + min(Σ weight(comentaristas), 30)) /
   (idade + 2)^1.5`, depois `created_at` desc, depois `id` asc (ver §23
-  "Score weighted" para detalhes) — **em todas as abas**
+  "Score weighted" para detalhes) — **em todas as abas**; a única exceção
+  é a lente, abaixo, que o próprio usuário liga
 - As abas Global e Em alta mostram os mesmos posts, na mesma ordem, para
-  todos; a aba Seguindo filtra pelos follows de quem lê, na mesma ordem
+  todos que não ligaram a lente; a aba Seguindo filtra pelos follows de
+  quem lê, na mesma ordem
+- A **lente** é opcional e começa desligada. Ligada, muda a ordem só das
+  abas Global e Em alta e só no aparelho de quem a ligou: com força k, k de
+  cada 100 lugares vão para posts de quem o usuário segue, na ordem de
+  cima — no máximo 2 por pessoa, de até 7 dias, e só de quem ele nunca
+  denunciou (uma denúncia basta para a pessoa sair). Nunca rebaixa um
+  desses posts, nunca adianta post que a comunidade afundou, nunca traz
+  post de quem ele não segue. As entradas são do usuário (a força, quem ele
+  segue, quem ele denunciou); a regra está em `Docs/algoritmos.md` §6. Nada
+  é publicado; desligada, a ordem volta a ser a de todos
 - A aba **Contágio** escolhe o **conjunto** de posts a partir das
   entradas do próprio usuário (quem ele segue, o que ele já impulsionou,
   o que ele denunciou, de quem ele não quer mais receber recomendações),
@@ -682,12 +698,23 @@ manipulação, captura.
 4. **Tem custo, e ele está registrado:** a primeira fase da aba alcança
    menos gente e ainda deixa passar parte da isca (contas falsas com
    conteúdo bom) — `Docs/known-limitations.md` §5l.
+5. **A lente é afinidade, e explícita** (2026-11-06): quem liga escolhe a
+   força, a regra é pública e o custo foi medido. Na simulação, com força
+   100, os 8 primeiros vindos de outra cidade caem de {{sem.comum.poro}}%
+   para {{sem.M100.poro}}% e o post mais pontuado chega a {{sem.M100.reach}}%
+   das pessoas (sem lente: {{sem.comum.reach}}%); com força 50, o alcance
+   não muda. Ela começa desligada e as outras abas continuam iguais para
+   todos.
 
 **Implementação:** `scoring.ts` é função pura sem inputs do usuário
 individual. As queries Global e Em alta de `feed.ts` são idênticas entre
 usuários; Seguindo só recebe os follows. `contagion.ts` é função pura cujas
 entradas são as do próprio leitor. As 4 abas usam a mesma `FEED_ORDER`
-(travado por `tests/score-decay-parity.test.ts`).
+(travado por `tests/score-decay-parity.test.ts`). A lente
+(`lens/order.ts:mixNetwork`, só Global e Em alta, só com força > 0) é
+função pura das entradas do leitor, aplicada em memória e nunca gravada
+(travado por `tests/lens-order.test.ts` e
+`tests/lens-feed-pipeline.test.ts`).
 
 ### 25. Sem Scan Automático Obrigatório de Conteúdo (Sem Chave Mestra Disfarçada)
 

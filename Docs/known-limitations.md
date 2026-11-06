@@ -99,6 +99,100 @@ audits só por feio. Defer documentado > silence.
   PROFUNDIDADE do follow-graph, não da interação — já funcionam.
 - **Reopener:** quando wirar `recordEdge` no ingest de SPREAD próprio
   (interação ponderada live) — vira increment "Fase 2b+".
+- **2026-11-06:** o toggle "esquecer follows antigos" (decaimento GAP-1) saiu
+  da tela "sua lente": só age em `lens_edges`, que continua vazio, e a lista
+  NIP-02 não guarda desde quando você segue cada pessoa. O PPR passou a ser
+  exato (`computePprExact`) e hoje só colore o mapa; a ordem do feed não usa
+  PPR (§4c).
+
+### 4c. Lente: só quem você segue diretamente conta (2026-11-06)
+
+- **Issue:** a lente no feed (`Docs/algoritmos.md` §6) prioriza só posts de
+  quem você segue (vínculo > 0). Amigos de amigos não entram: o app guarda
+  só a SUA lista de quem você segue (o sync não baixa o kind 3 dos
+  contatos). Os textos antigos prometiam "entorno" e "drifts mútuos".
+- **Risk:** LOW. A lente faz menos do que um PPR de vários saltos faria;
+  não esconde nem traz nada de fora.
+- **Mitigation:** textos dizem exatamente "quem você segue". O PPR de vários
+  saltos (com `W_BIAS`, diversidade de caminhos) existe no código, mas sem
+  defesa testada contra conta falsa seguida por um contato.
+- **Reopener:** quando o app baixar o kind 3 dos contatos (Fase 2 do
+  contágio) E houver simulação de amigo-de-amigo com fazenda seguida de
+  volta por contatos — só então "sua rede" pode crescer além de um salto.
+
+### 4d. Lente: spam de conta falsa que você seguiu de volta sobe junto
+
+- **Issue:** a lente adianta posts de quem você segue. Se você segue de volta
+  uma conta da fazenda, o spam dela sobe com a lente. Simulação (2.250
+  pessoas, 10% de follow-back, contas postando spam impulsionado): pessoas
+  que veem spam de alguém que seguem, {{syb.comum.sybF}}% sem lente →
+  {{syb.M50.sybF}}% (força 50) → {{syb.M100.sybF}}% (100), com as pessoas
+  reagindo ao feed comum; reagindo ao próprio feed com a lente (e
+  denunciando), {{sybF50.M50.sybF}}% e {{sybF100.M100.sybF}}%.
+- **Risk:** MEDIUM para quem segue de volta sem olhar. A aba Seguindo já
+  mostra esse spam do mesmo jeito; a lente leva para Global e Em alta.
+- **Mitigation:** a lente começa desligada; uma denúncia tira a pessoa da
+  sua rede (`tieOf ≥ TIE_FOLLOW`); no máximo 2 posts por pessoa, de até 7
+  dias; post afundado pela comunidade (score < 0) não ganha prioridade;
+  −999 nunca aparece. Referência: na aba Seguindo, {{syb.SEG.sybF}}%.
+  "Só quem você já impulsionou" foi simulado e descartado: no mundo frio
+  quase ninguém entra ({{frio.S100.fromF}}% dos 8 primeiros com força 100).
+- **Reopener:** usuário reportar spam de conta seguida dominando a lente, OU
+  dado real mostrando follow-back de fazenda em escala — decidir com o user
+  (candidato: gesto privado "não adiantar X" sem denunciar, BACKLOG).
+
+### 4e. Lente: feed mais fechado (por cidade) e alcance menor em 100%
+
+- **Issue:** com a lente, o feed fica mais da sua rede. Simulação: dos 8
+  primeiros, vindos de outra cidade, {{sem.comum.poro}}% → {{sem.M50.poro}}%
+  (50) → {{sem.M100.poro}}% (100); o post honesto de mais pontos chega a
+  {{sem.M100.reach}}% das pessoas em 100% (sem lente: {{sem.comum.reach}}%).
+  Bolha de ideias não foi medida.
+- **Risk:** LOW-MEDIUM (escolha explícita, opcional, desligável).
+- **Mitigation:** começa desligada; a tela diz o que acontece; Global e Em
+  alta continuam iguais para quem não liga; a força 50 não mexe no alcance.
+- **Reopener:** dado real de muita gente em 100% OU medida de bolha de ideias.
+
+### 4e2. Lente: dois aparelhos podem mostrar ordens diferentes
+
+- **Issue:** a lente usa a lista de quem você segue, bloqueios e denúncias
+  que estão NESTE aparelho. Até a sincronização chegar ao outro aparelho,
+  as ordens podem divergir.
+- **Risk:** LOW (só a ordem da sua tela; nada publicado).
+- **Mitigation:** a mesma entrada dá a mesma ordem (determinística, teste
+  embaralha entrada).
+- **Reopener:** reclamação de usuário com dois aparelhos.
+
+### 4e3. Lente: simulação não cobre contas-ímã nem ritmo desigual
+
+- **Issue:** a simulação dá a todo mundo o mesmo ritmo de posts e não tem
+  contas seguidas por milhares; "reagindo ao próprio feed" supõe que todos
+  usam a lente na mesma força.
+- **Risk:** LOW-MEDIUM (os números são ordem de grandeza).
+- **Mitigation:** teto de 2 por pessoa limita qualquer conta seguida.
+- **Reopener:** dado real de uso OU simulação com distribuição de
+  seguidores de cauda longa.
+
+### 4f. Lente não é defesa contra fazenda de contas
+
+- **Issue:** quando a fazenda compra o topo do Global, a lente só empurra o
+  spam para baixo onde houver posts da sua rede para pôr na frente
+  ({{faz.comum.atk}}% → {{faz.M100.atk}}% veem spam com força 100). A defesa é
+  a aba Contágio (`Docs/algoritmos.md` §9).
+- **Risk:** n/a (não é promessa da lente; os textos não prometem).
+- **Reopener:** n/a.
+
+### 4g. Mapa: cores de proximidade quase sempre azuis
+
+- **Issue:** `pinColor` usa faixas fixas sobre o PPR bruto (≥ 0,7 laranja,
+  ≥ 0,3 amarelo). Com o grafo de um salto, o PPR de cada pessoa seguida é
+  1/n: com 4 ou mais seguidos, todos ficam azuis; o laranja quase nunca
+  aparece. A legenda do mapa ("PPR ≥ 0,7") fala de algo que raramente
+  acontece.
+- **Risk:** LOW (cosmético, opt-in).
+- **Mitigation:** o toggle diz só "os pontos de quem você segue ganham cor".
+- **Reopener:** normalizar as faixas pelo maior PPR (ppr/máx) OU grafo de
+  vários saltos (§4c) — decidir com o user (mexe no mapa).
 
 ---
 

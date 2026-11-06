@@ -20,7 +20,10 @@
 > - `src/lib/moderation.ts` — threshold dinâmico e pontos de report
 > - `src/lib/ots.ts`, `ots-client.ts`, `ots-anchors.ts`, `ots-stamper.ts`
 >   — âncora de antiguidade OpenTimestamps/Bitcoin (NIP-03)
-> - `src/lib/trust/{ppr,edges,constants}.ts` — Trust Lens
+> - `src/lib/trust/{ppr,edges,constants}.ts` — proximidade (PPR) e
+>   arestas da lente; hoje colorem o mapa da sua rede (§4, §5)
+> - `src/lib/lens/order.ts` (+ `lens/strategies/*`, `feed.ts:withLens`) —
+>   a lente no feed, abas Global e Em alta (§6; ligada em 2026-11-06)
 > - `src/lib/contagion.ts` (+ `contagion-data.ts`) — contágio local da
 >   aba Contágio (§9; manifesto §24 emendado em 2026-11-05)
 >
@@ -37,8 +40,8 @@
 3. [Threshold dinâmico de moderação](#3-threshold-dinâmico-de-moderação)
 4. [Trust Lens — Edge influence](#4-trust-lens--edge-influence)
 5. [Trust Lens — Personalized PageRank (PPR)](#5-trust-lens--personalized-pagerank-ppr)
-6. [Trust Lens — View multiplier (s_local)](#6-trust-lens--view-multiplier-s_local)
-7. [Trust Lens — Temporal decay (GAP-1, opt-in)](#7-trust-lens--temporal-decay-gap-1-opt-in)
+6. [Lente no feed — a mistura](#6-lente-no-feed--a-mistura)
+7. [Trust Lens — Temporal decay (GAP-1, sem efeito hoje)](#7-trust-lens--temporal-decay-gap-1-sem-efeito-hoje)
 8. [Cenários integrados (fim-a-fim)](#8-cenários-integrados-fim-a-fim)
 9. [Contágio local — aba Contágio (Fase 1)](#9-contágio-local--aba-contágio-fase-1)
 
@@ -49,8 +52,8 @@
 **Onde:** `src/lib/ranking.ts:computeRanking` (numerador) +
 `src/lib/feed.ts:DECAYED_SCORE` (decay na leitura) +
 `src/lib/scoring.ts` (fórmula pura)
-**Manifesto:** §7 (determinismo), §22 (score não-subjetivo), §24 (sem
-afinidade no feed canônico)
+**Manifesto:** §7 (determinismo), §22 (score não-subjetivo), §24 (ordem
+igual nas abas; a lente, opcional, é a exceção — §6)
 
 ### Conceito
 
@@ -58,7 +61,9 @@ O score é o número que ordena o feed canônico. **Igual pra todos os
 clientes Drift que têm o mesmo conjunto de eventos** — sem
 personalização. Combina engajamento ponderado (peso de quem espalhou,
 enterrou e comentou) com decaimento temporal (posts ficam relevantes
-por horas, não minutos).
+por horas, não minutos). O score nunca muda por pessoa; quem liga a lente
+(§6) muda só a ordem que o próprio aparelho mostra nas abas Global e Em
+alta.
 
 ### Fórmula
 
@@ -484,30 +489,45 @@ quase-zerado preserva massa PPR em vizinhança real.
 
 ## 5. Trust Lens — Personalized PageRank (PPR)
 
-**Onde:** `src/lib/trust/ppr.ts:computePpr`
-**Manifesto:** §24 (view-layer carve-out), §28 (local-only)
+**Onde:** `src/lib/trust/ppr.ts:computePprExact` (o app) e
+`computePpr` (o mesmo passeio por sorteio, referência dos testes)
+**Manifesto:** §7 (determinismo), §28 (local-only)
+**Uso hoje:** cores do mapa da sua rede e pontes. A ORDEM do feed não usa
+PPR (§6): na produção o grafo é só você → quem você segue, e o PPR dá o
+mesmo valor (1/n) a todo mundo que você segue.
 
 ### Conceito
 
-Monte Carlo random walk a partir do `source` (sua identidade). Conta
-quantas vezes cada outro nó é visitado em K walks. Mais visitas =
-"mais próximo" no grafo de confiança = boost no view multiplier.
+Passeio aleatório a partir do `source` (sua identidade): quanto mais o
+passeio passa por alguém, mais "perto" essa pessoa está no grafo. O app
+calcula a **média exata** desse passeio, passo a passo
+(`computePprExact`, desde 2026-11-06): sem sorteio, sem relógio, com soma
+em ordem fixa — mesma rede, mesmos números em qualquer aparelho e em
+qualquer dia. Antes era Monte Carlo com semente pessoa + dia e a rede lida
+do banco sem ORDER BY: dois aparelhos podiam discordar e o valor mudava à
+meia-noite (UTC). Teste: `tests/trust-lens-ppr-exact.test.ts` (valores à
+mão, 50 ordens de chegada bit a bit, convergência do Monte Carlo para o
+exato).
 
-### Algoritmo
+### Algoritmo (o passeio)
 
 ```
 for k in 1..K:
-  walk = [source]
+  current = source
   for step in 1..L:
-    if rng() < α: break                 // teleport-back (damping)
+    if rng() < α: break                  // para (damping)
     next = sampleNeighborByInfluence(current)
-    if next is null: break                 // dead-end → encerra o walk
-    walk.append(next)
-  for node in walk[1:]:                  // exclui source
-    visits[node] += 1
+    if next is null: current = source; continue   // beco: volta ao leitor, sem visita
+    current = next
+    if current != source: visits[current] += 1
 if totalVisits == 0: return empty Map    // cold-start guard
 for target in visits: ppr[target] = visits[target] / totalVisits
 ```
+
+O exato faz a mesma conta com a massa de probabilidade em vez de K
+sorteios: a cada passo, a massa de cada nó para com α, o resto vai aos
+vizinhos na proporção da influência (beco → volta ao leitor), e a massa
+que chega a um nó (≠ leitor) soma visitas.
 
 Parâmetros (`trust/constants.ts:PPR_PARAMS`):
 
@@ -571,8 +591,8 @@ D → E (influence 0.5)
 
 Se `totalVisits === 0` (source sem out-edges, OU todos walks
 terminaram com damping em step 0), retorna `new Map()` vazio.
-`getPprForAuthor()` retorna 0 → multiplier 1.0 → feed canônico
-inalterado. **Lens off naturalmente quando não tem grafo.**
+`getPprForAuthor()` retorna 0 → o mapa usa a cor padrão. (A lente do feed
+não lê PPR — §6.)
 
 ### Log-transform pós-PPR
 
@@ -615,93 +635,218 @@ Target alcançado por 1 intermediário só (1 path) fica dim (×0.7).
 
 ---
 
-## 6. Trust Lens — View multiplier (s_local)
+## 6. Lente no feed — a mistura
 
-**Onde:** `src/lib/trust/ppr.ts:viewMultiplier`
-**Manifesto:** §24 (s_local NUNCA persisted, NUNCA shared)
+**Onde:** `src/lib/lens/order.ts:mixNetwork` (a regra) +
+`src/lib/lens/strategies/ppr-trust.ts` (a lente "quem você segue
+primeiro") + `src/lib/feed.ts:withLens` (só Global e Em alta) +
+`src/lib/contagion-data.ts:lensNetworkAuthors` ("sua rede")
+**Manifesto:** §24 (algoritmo público, entradas suas — a lente é a
+exceção explícita à ordem igual nas abas Global e Em alta), §7
+(determinismo), §28 (nada gravado nem publicado)
+**Simulação:** `Docs/simulacao-lente/` (página "Drift: lente no feed")
 
 ### Conceito
 
-A função que **finaliza** a lente: multiplier aplicado em
-`s_global` no render path do feed pra obter `s_local`. **VIVE NO
-RENDER**, nunca toca SQLite.
+A lente é opcional e começa desligada. Ligada, ela põe posts de **quem você
+segue** entre os primeiros das abas **Global** e **Em alta**: com força k
+(0 a 100), k de cada 100 lugares da aba vão para posts da sua rede, na
+ordem de sempre (§1); os outros lugares, para o resto, também na ordem de
+sempre. Com 50, um card sim, um não; com 100, primeiro os posts da sua
+rede. De cada pessoa entram no máximo 2 posts (os de mais pontos, de até 7
+dias). Seguindo e Contágio não mudam: as duas já são feitas da sua rede.
 
-### Fórmula
+Ela roda no aparelho a cada leitura do feed. Nada é gravado em `posts`,
+nada é publicado; desligada, a aba volta à ordem de todo mundo.
+
+### "Sua rede"
+
+Quem você segue, sem você mesmo, sem bloqueados e sem silenciados, e sem
+nenhuma experiência ruim com a pessoa: **uma denúncia basta**. Usa o
+vínculo da aba Contágio (§9) com corte mais alto — `tie(u) ≥ 5` (o valor
+de "você segue") em vez de `> 0`. Uma denúncia sua de um post dela, ou um
+post que você denunciou e que chegou por ela na aba Contágio, tira 5; nem
+quem você já impulsionou (8) fica: 8 − 5 = 3 < 5. Na aba Contágio a mesma
+pessoa ainda pode trazer posts com vínculo 3; na lente, não.
+
+Só quem você segue diretamente conta. O app guarda a sua lista de quem você
+segue (NIP-02), não a dos seus contatos; o PPR (§5) nesse grafo de um
+salto dá o mesmo valor a todo mundo que você segue, então a ordem não usa
+PPR. Amigos de amigos só entram quando o app tiver a lista deles **e** uma
+defesa contra contas falsas seguidas por um contato
+(`Docs/known-limitations.md`).
+
+### Regra
 
 ```
-ppr_normalized = log(1 + 100·ppr_score) / log(101)
-mutual = max(0, mutual_spread_post)
-strength = clamp(0, 1, slider_value / 100)
-raw = ALPHA_VIEW
-    + BETA_MAX  × strength × ppr_normalized
-    + GAMMA_MAX × strength × mutual
-multiplier = clamp(S_LOCAL_MIN, S_LOCAL_MAX, raw)
-s_local = s_global × multiplier
+aba   = os N primeiros na ordem canônica (§1; N = 50)
+rede  = posts da sua rede de até 7 dias (Em alta: as 24 h da aba), com
+        score ≥ 0, mesmo relógio da aba, os N primeiros na ordem canônica,
+        no máximo 2 por pessoa (os 2 primeiros dela) — podem estar fora
+        da aba. Ordem dentro de `rede`: primeiro os que já estão na aba,
+        na ordem da aba; depois os de fora, na ordem canônica. Post lido
+        nas duas consultas vale como está na aba.
+resto = posts da aba que não estão em `rede`, na ordem canônica
+
+para p = 0, 1, …, (tamanho da aba − 1):
+  cota(p) = ⌊(p + 1) · k / 100⌋
+  se ainda há post em `rede` e
+       (posts da rede já postos < cota(p)            ← a cota
+        ou o lugar que o próximo da rede tinha na aba ≤ p   ← nunca rebaixa
+        ou `resto` acabou):
+     lugar p ← próximo de `rede`
+  senão:
+     lugar p ← próximo de `resto`
 ```
 
-Constantes (`VIEW_MULTIPLIER`):
+Com k = 0 a função devolve a aba como veio. Só inteiros e comparações: não
+há número novo de ponto flutuante, então a ordem é a mesma em qualquer
+motor JavaScript.
 
-| Param | Valor |
-|---|---:|
-| ALPHA_VIEW | 1.0 |
-| BETA_MAX | 1.5 |
-| GAMMA_MAX | 0.4 |
-| S_LOCAL_MIN | 0.1 |
-| S_LOCAL_MAX | 3.0 |
+### Exemplo
 
-### strength=0 → multiplier=1.0 bit-exact
+A aba tem m1, m2, m3, m4 (de quem você não segue) e, em 5º, s1 (de quem você
+segue). Fora da aba há s2, também de quem você segue.
 
-Quando slider em 0%:
-```
-raw = 1.0 + 1.5 × 0 × ... + 0.4 × 0 × ... = 1.0
-multiplier = clamp(0.1, 3.0, 1.0) = 1.0
-s_local = s_global × 1.0 = s_global
-```
+| força | resultado | o que aconteceu |
+|---:|---|---|
+| 0 | m1 m2 m3 m4 s1 | a ordem de sempre |
+| 50 | m1 **s1** m2 **s2** m3 | um sim, um não; s2 entrou, m4 saiu (o fim da aba) |
+| 100 | **s1 s2** m1 m2 m3 | primeiro a sua rede |
+| 10 | m1 m2 m3 m4 s1 | a cota ainda não chegou (1 a cada 10) |
 
-**Lens OFF preserva feed canônico bit-exact.** Conformance test #19.
+Se s1 já estivesse em 1º, continuaria em 1º com qualquer força (a lente
+nunca rebaixa). Se s1 tivesse score −2 (afundado), ficaria em 5º. Se a
+mesma pessoa tivesse s1, s2 e s3, só os 2 de mais pontos subiriam; o
+terceiro fica onde a ordem de sempre o põe.
 
-### Simulação multi-cenário (strength=100%, slider em "máximo")
+**Por que o teto e a janela.** Sem eles, uma conta seguida que posta 50
+vezes por dia ocupa toda a cota da lente (inundação), e post velho da sua
+rede ganha lugar de post novo. Com 2 por pessoa e 7 dias, inundar não rende
+mais que postar 2 vezes.
 
-| ppr | normalized | mutual | raw | multiplier | s_global=10 → s_local |
-|---:|---:|---:|---:|---:|---:|
-| 0.000 | 0.000 | 0 | 1.00 | 1.00 | 10.0 (sem boost) |
-| 0.001 | 0.022 | 0 | 1.03 | 1.03 | 10.3 |
-| 0.010 | 0.150 | 0 | 1.22 | 1.22 | 12.2 |
-| 0.050 | 0.388 | 0 | 1.58 | 1.58 | 15.8 |
-| 0.100 | 0.520 | 0 | 1.78 | 1.78 | 17.8 |
-| 0.500 | 0.852 | 0 | 2.28 | 2.28 | 22.8 |
-| 1.000 | 1.000 | 0 | 2.50 | 2.50 | 25.0 |
-| 0.100 | 0.520 | 1 | 2.18 | 2.18 | 21.8 (mutual ajuda) |
-| 0.100 | 0.520 | 5 | 3.78 | **3.00** (cap) | 30.0 |
+### Simulação (2.250 pessoas, 6 cidades, 24 semanas; e uma rede de 225)
 
-### Simulação strength variável (ppr=0.05, mutual=0)
+Mundo da simulação do contágio, motor real de ranking, desempate do app.
+Para cada pessoa, os 8 primeiros da aba. "Mistura" é a função do app
+(`mixNetwork`), empacotada e chamada pela simulação. Média das últimas 6
+semanas:
 
-| strength | boost | multiplier | s_local |
-|---:|---:|---:|---:|
-| 0%   | 0%   | 1.00 | 10.0 |
-| 25%  | 14.6% | 1.15 | 11.5 |
-| 50%  | 29.1% | 1.29 | 12.9 |
-| 75%  | 43.7% | 1.44 | 14.4 |
-| 100% | 58.2% | 1.58 | 15.8 |
+| | sem lente | mistura 50 | mistura 100 |
+|---|---:|---:|---:|
+| dos 8, de quem a pessoa segue (rede grande) | {{sem.comum.fromF}}% | {{sem.M50.fromF}}% | {{sem.M100.fromF}}% |
+| idem, rede pequena (225 pessoas) | {{peq.comum.fromF}}% | {{peq.M50.fromF}}% | {{peq.M100.fromF}}% |
+| dos 8, vindos de outra cidade | {{sem.comum.poro}}% | {{sem.M50.poro}}% | {{sem.M100.poro}}% |
+| pessoas que veem o post honesto de mais pontos | {{sem.comum.reach}}% | {{sem.M50.reach}}% | {{sem.M100.reach}}% |
+| fazenda de 2.000 contas: pessoas que veem o spam | {{faz.comum.atk}}% | {{faz.M50.atk}}% | {{faz.M100.atk}}% |
+| contas falsas seguidas de volta: veem spam de quem seguem | {{syb.comum.sybF}}% | {{syb.M50.sybF}}% | {{syb.M100.sybF}}% |
+| idem, com as pessoas reagindo ao próprio feed (denunciam → sai da rede) | — | {{sybF50.M50.sybF}}% | {{sybF100.M100.sybF}}% |
+| idem, aba Seguindo (referência: lá o post de quem você segue sempre aparece) | {{syb.SEG.sybF}}% | | |
+| mundo frio (quase ninguém impulsiona): dos 8, de quem a pessoa segue | {{frio.comum.fromF}}% | {{frio.M50.fromF}}% | {{frio.M100.fromF}}% |
+| conta seguida que posta sem parar (inundação): dos 8, dela | {{inu.comum.sybF}}% | {{inu.M50.sybF}}% | {{inu.M100.sybF}}% |
+| idem, aba Seguindo (referência) | {{inu.SEG.sybF}}% | | |
+| post-isca impulsionado por fazenda: pessoas que veem | {{isca.comum.atk}}% | {{isca.M50.atk}}% | {{isca.M100.atk}}% |
 
-**Linear (BUG-6 fix):** Marshall removeu `strength²` porque slider
-visual é perceptualmente linear (Norman heurística). 50% = metade do
-boost máximo, não 25%.
+Leitura: a mistura entrega o que a tela promete; não chega a 100% porque
+cada pessoa segue uns 12 perfis e nem todos postam toda semana. O preço é
+um feed mais fechado (mais da própria cidade) e, em 100%, o post mais
+pontuado chega a menos gente. A lente **não** é defesa contra fazenda: os
+posts da sua rede empurram o spam para baixo em parte das pessoas, mas a
+defesa é a aba Contágio (§9). Quem segue de volta uma conta falsa passa a
+ver o spam dela no alto — como já via na aba Seguindo — até denunciar: aí a
+conta sai da sua rede. Na inundação, o teto de 2 por pessoa deixa a conta
+que posta sem parar no mesmo patamar da aba Seguindo. Determinismo: entrada
+embaralhada, mesmo feed em todas as amostras.
+
+O que a simulação **não** cobre: o mundo dela é mais quente que o Drift de
+hoje (mais votos), todo mundo posta no mesmo ritmo, não há contas-ímã
+seguidas por milhares, e "reagindo ao próprio feed" supõe que todas as
+pessoas usam a lente na mesma força. Os números são ordem de grandeza, não
+previsão.
+
+### Por que não a fórmula de antes (multiplicador)
+
+Até 06/11/2026 esta seção descrevia `s_local = s_global × clip(1 + 1,5·k·
+log(1 + 100·ppr)/log(101) + 0,4·k·mútuos, 0,1, 3,0)`, e nenhuma parte do
+app a aplicava (o PR-4b, de 17/05, foi reduzido "sem tocar feed.ts"; o
+PR-5 entregou só a tela). Ligada como estava escrita, na simulação:
+
+- **não fazia nada:** na rede grande, {{sem.A100.fromF}}% dos 8 primeiros
+  de quem a pessoa segue (sem lente: {{sem.comum.fromF}}%). Post sem voto
+  tem score 0, e 0 × 2,5 = 0 — no Drift de hoje, quase todo post;
+- **score negativo de quem você segue descia mais** (× 2,5 empurra para
+  baixo);
+- **ficava mais fraca quanto mais gente você segue:** o PPR de cada um é
+  1/n;
+- **não era determinística:** o PPR por sorteio usa semente pessoa + dia e
+  a lista lida do banco sem ORDER BY — dois aparelhos com os mesmos eventos
+  podiam ver ordens diferentes, e ela mudava sozinha à meia-noite (UTC);
+- **só reordenava os 50 da aba:** posts da sua rede raramente estão lá.
+
+O multiplicador consertado (proximidade exata, sinal certo) ficou em
+{{sem.B100.fromF}}%; "cada post da sua rede passa à frente de até força ×
+50" ficou em {{sem.R100.fromF}}% (rede pequena: {{peq.R100.fromF}}%).
+
+### O que aparece na tela
+
+- Card adiantado pela lente: chip **lente** no canto (com "destacar o que a
+  lente adiantou" ligado, preenchido e com ↑). Toque: "Você segue …; com a
+  sua lente em k%, k de cada 100 cards…; sem a lente, este post estaria em
+  Xº; com ela, está em Yº" (ou "estava fora dos primeiros da aba").
+  `Post.lensLift = { from, to }`, só em memória.
+- Tela "sua lente": a força em palavras ("1 em cada 2 cards é de quem você
+  segue"), a regra inteira em "como funciona".
+
+### Edge cases
+
+- Sem ninguém na sua rede → a aba de sempre, com qualquer força.
+- Seus próprios posts nunca sobem (você não está na sua rede).
+- Post escondido pela comunidade (score = −999) não aparece em aba nenhuma,
+  com ou sem lente.
+- A lente cronológica (a outra do app): os mesmos posts da aba, do mais novo
+  para o mais velho; também só em Global e Em alta.
+- Força e lente escolhida ficam em `user_prefs` (`lens_strength`,
+  `active_lens`), só neste aparelho.
+- Mexer na força, trocar de lente, seguir/deixar de seguir, bloquear ou
+  silenciar refaz a aba (debounce de 150 ms, `startFeedLensSync`).
+- A leitura usa um relógio só: a aba e os posts da sua rede são pontuados no
+  mesmo instante.
+- Dois aparelhos seus podem mostrar ordens diferentes se a lista de quem
+  você segue, os bloqueios ou as denúncias ainda não chegaram aos dois — a
+  lente usa o que este aparelho tem.
+- Se ler os posts da sua rede falhar, a aba sai na ordem de sempre (a lente
+  nunca derruba o feed).
 
 ### O que NUNCA pode acontecer (LOCK_VIA_TEST)
 
-1. `s_local` ser escrito em `posts.score` (manifesto §24 broken)
-2. `s_local` ser shared via Nostr event
-3. `lens_strength > 0` afetar feed quando user nunca abriu Settings
-4. `strength=0` produzir multiplier ≠ 1.0
+1. Força 0 mudar a ordem de qualquer aba (`tests/lens-order.test.ts`,
+   `tests/lens-feed-pipeline.test.ts`)
+2. A lente trazer post de quem não é da sua rede, rebaixar post que ela
+   escolheu, trazer mais de 2 posts da mesma pessoa ou post com mais de 7
+   dias (`tests/lens-order.test.ts`, `tests/lens-feed-pipeline.test.ts`)
+2b. Quem você denunciou uma vez continuar na sua rede
+   (`tests/lens-feed-pipeline.test.ts`)
+3. Seguindo ou Contágio mudarem com a lente ligada
+   (`tests/lens-feed-pipeline.test.ts`, `e2e/lens-feed.spec.ts`)
+4. A ordem depender da ordem de chegada dos eventos ou da lista de quem você
+   segue (`tests/lens-feed-pipeline.test.ts`)
+5. A lente gravar qualquer coisa no banco (dump igual antes e depois)
+6. Post com −999 aparecer
 
 ---
 
-## 7. Trust Lens — Temporal decay (GAP-1, opt-in)
+## 7. Trust Lens — Temporal decay (GAP-1, sem efeito hoje)
 
 **Onde:** `src/lib/trust/ppr.ts:temporalDecay`
 **Shipped:** 2026-05-20 [`2de0fc0`]
 **Gating:** `UserPrefs.lens_ppr_decay_enabled` (default `false`)
+
+> **Estado em 2026-11-06:** sem efeito. O decaimento só age em
+> `lens_edges` (arestas por interação), que o app nunca preenche — o PPR
+> cai no grafo de follows, e a lista NIP-02 não guarda desde quando você
+> segue cada pessoa. O toggle "esquecer follows antigos" saiu da tela "sua
+> lente" (prometia algo que não acontecia). O código fica para quando as
+> arestas por interação forem ligadas (`Docs/known-limitations.md` §4b).
 
 ### Conceito
 
@@ -780,13 +925,13 @@ após primeiro INSERT trava esse vetor. 4 conformance tests
 **Setup:**
 - Autor: identidade com âncora OTS de 1 semana (weight ≈ 1)
 - Post: 0h de idade, 1 spreader (peso 50), 0 buries
-- Lens: OFF (strength=0)
+- Lente: desligada (força 0)
 
 **Pipeline:**
 1. `weight(autor) = antiquity(1 sem)=1 + engagement(0) = 1`
    → autor publica até 1 subpost (cap iniciante)
 2. `score_base = 50`, `score = 50 / (0+2)^1.5 = 17.68` (canônico)
-3. `s_local = 17.68 × 1.0 = 17.68` (lens off, bit-exact)
+3. Lente desligada: a aba sai do SQL exatamente na ordem canônica.
 
 ### Cenário B — Post moderado pela comunidade
 
@@ -820,40 +965,40 @@ após primeiro INSERT trava esse vetor. 4 conformance tests
    semana de antiguidade custa uma semana de verdade, provada no
    Bitcoin; ou convencer identidades com peso a espalhá-lo
 
-### Cenário D — User power liga Trust Lens
+### Cenário D — Bia liga a lente em 50%
 
 **Setup:**
-- Slider em 75%, lens estável (PPR já computado)
-- Autor X: PPR score 0.05 (top da rede do user), mutual=2
-- Post de X: `s_global = 5.0`
+- Bia segue Ana e Caio; nunca denunciou nenhum dos dois
+- A aba Global tem 50 posts; o primeiro post da Ana está em 12º, sem voto
+  (score 0); um post do Caio de ontem está fora dos 50
+- Força 50
 
 **Pipeline:**
-1. `ppr_normalized = log(1 + 100×0.05) / log(101) = 0.388`
-2. `raw = 1.0 + 1.5×0.75×0.388 + 0.4×0.75×2 = 1.0 + 0.437 + 0.600 = 2.037`
-3. `multiplier = clamp(0.1, 3.0, 2.037) = 2.037`
-4. `s_local = 5.0 × 2.037 = 10.18`
+1. `rede` = posts da Ana e do Caio com score ≥ 0 que passam no filtro da
+   Global, na ordem canônica: Ana (12º), Caio (fora)
+2. Lugar 0: cota ⌊1·50/100⌋ = 0 → 1º da aba de sempre
+3. Lugar 1: cota ⌊2·50/100⌋ = 1 > 0 postos → o post da Ana
+4. Lugar 2: cota 1, já posto 1 → 2º da aba de sempre
+5. Lugar 3: cota 2 > 1 → o post do Caio (entra; o 50º sai)
+6. Daí em diante só o resto, na ordem de sempre
 
-Post de X aparece **2× mais alto** no feed local do user. Outros users
-(que NÃO seguem X) veem `s_global=5.0` puro — feed canônico preservado
-(§24).
+Na tela da Bia: o post da Ana em 2º com o chip "lente" ("sem a lente,
+estaria em 12º"). Para quem não ligou a lente — ou não segue a Ana — nada
+muda (§24).
 
-### Cenário E — User liga decay temporal (GAP-1)
+### Cenário E — Bia denuncia um spam do Caio
 
-**Setup do Cenário D**, agora com `lens_ppr_decay_enabled = true`. Edge
-do autor X foi `updated_at` há 45 dias (user parou de driftar X).
+**Setup do Cenário D**, e a Bia denuncia um post do Caio.
 
 **Pipeline:**
-1. `decay(45d, 30d) = 2^(-1.5) = 0.354`
-2. `influence_decayed = 0.378 × 0.354 = 0.134` (visto pelo walker; SQLite
-   permanece 0.378)
-3. PPR walk redistribui visitas — X recebe menos massa
-4. Suponha `ppr_score(X)` caia de 0.05 → 0.02
-5. `ppr_normalized = log(1+2)/log(101) = 0.238`
-6. `raw = 1.0 + 1.5×0.75×0.238 + 0.4×0.75×2 = 1.0 + 0.268 + 0.600 = 1.868`
-7. `s_local = 5.0 × 1.868 = 9.34` (vs 10.18 sem decay)
-
-Post de X ainda aparece boostado, mas menos — refletindo que user
-"esqueceu" X.
+1. `tie(Caio) = 5 − 5 × 1 = 0` → o Caio sai da "sua rede" (a mesma regra
+   da aba Contágio, §9)
+2. Na próxima leitura, os posts dele voltam ao lugar de sempre (ou somem
+   da aba, se estavam fora dos 50)
+3. A denúncia não se desfaz (é evento publicado e a experiência ruim é
+   permanente, §9). Se depois a Bia impulsionar um post escrito pelo Caio,
+   o vínculo vira `8 − 5 = 3 > 0` e ele volta à sua rede; com duas
+   denúncias (`8 − 10`), não volta. Os posts dele continuam na aba Seguindo.
 
 ---
 
@@ -861,7 +1006,8 @@ Post de X ainda aparece boostado, mas menos — refletindo que user
 
 ### Conceito
 
-Todas as abas usam a mesma ordem (§1). Global e Em alta mostram os mesmos
+Todas as abas usam a mesma ordem (§1; a lente, se o leitor a ligar, muda a
+ordem só de Global e Em alta — §6). Global e Em alta mostram os mesmos
 posts para todo mundo; Seguindo filtra pelos follows de quem lê. A aba
 **Contágio** mostra o que chegou ao leitor **pelas pessoas que ele
 segue**, como um vírus que passa de contato em contato: um post entra
@@ -1080,15 +1226,19 @@ Global esconde na aba Contágio também.
 | `calculateScore` é determinístico (mesmo input → mesmo output) | `tests/scoring.test.ts` | §7 |
 | `calculateWeight` é função pura (sem `Date.now()`) | `tests/weight.test.ts` | §7, §22 |
 | `getReportThreshold` é função pura | `tests/moderation.test.ts` | §7, §26 |
-| `s_local` NUNCA escrito em `posts.score` | `tests/trust-lens-conformance.test.ts` #2 | §24 |
-| `strength=0` → `multiplier=1.0` bit-exact | `tests/trust-lens-math.test.ts` #19 | §24 |
+| A lente nunca grava nada no banco (dump igual antes e depois) | `tests/lens-feed-pipeline.test.ts`, `tests/trust-lens-conformance.test.ts` #2 | §24, §28 |
+| Lente com força 0 = a ordem de sempre, bit a bit, em todas as abas | `tests/lens-order.test.ts`, `tests/lens-feed-pipeline.test.ts` | §24 |
+| Lente: só Global e Em alta; Seguindo e Contágio não mudam | `tests/lens-feed-pipeline.test.ts`, `e2e/lens-feed.spec.ts` | §24 |
+| Lente: nunca traz post de fora da sua rede, nunca rebaixa post da sua rede, não adianta post afundado nem ressuscita −999 | `tests/lens-order.test.ts`, `tests/lens-feed-pipeline.test.ts` | §24, §26 |
+| Lente: mesma entrada em qualquer ordem de chegada → mesma aba; mais força nunca põe post da rede mais abaixo | `tests/lens-order.test.ts`, `tests/lens-feed-pipeline.test.ts` | §7 |
+| Lente: quem você denunciou sai da sua rede (o mesmo vínculo da aba Contágio) | `tests/lens-feed-pipeline.test.ts` | §24 |
+| PPR exato: mesma rede em qualquer ordem → mesmos números, bit a bit; sem relógio | `tests/trust-lens-ppr-exact.test.ts` | §7 |
 | `computeInfluence` ∈ (0, 1) bounds | `tests/trust-lens-math.test.ts` #10 | §22 |
 | `temporalDecay` ∈ (0, 1] + monotonic | `tests/trust-lens-math.test.ts` #22-#27 | §7 |
-| Feed canônico inalterado pra users sem lens habilitada | `tests/feed.test.ts` | §24 |
 | Contas só seguidas nunca passam o limiar da aba Contágio, por mais que sejam | `tests/contagion.test.ts` | §24, §22 |
 | Aba Contágio: mesma entrada em qualquer ordem → mesmos veredictos e mesmo "quem trouxe" | `tests/contagion.test.ts` | §7 |
 | Impulsionar nunca tira um post da aba Contágio (monotonia) | `tests/contagion.test.ts` | §7 |
-| As 4 abas usam a mesma ordenação canônica (`FEED_ORDER`) | `tests/score-decay-parity.test.ts`, `tests/scoring-pipeline-conformance.test.ts` | §8, §24 |
+| As 4 abas (e os candidatos da lente) saem do SQL na mesma ordenação canônica (`FEED_ORDER`) | `tests/score-decay-parity.test.ts`, `tests/scoring-pipeline-conformance.test.ts` | §8, §24 |
 | Experiências ruins do leitor só mexem na aba dele; o global não muda | `tests/contagion.test.ts` | §24 |
 | Contas só seguidas não escondem nada sozinhas (teto também na vacina e na quarentena) | `tests/contagion.test.ts` | §24, §26 |
 | "Não trazer mais por X": X nunca traz nem vira "quem trouxe"; sozinho, não esconde nada; marcar só muda posts em que X agiu | `tests/contagion.test.ts` | §24 |
@@ -1097,9 +1247,11 @@ Global esconde na aba Contágio também.
 
 ---
 
-*Última atualização: 2026-11-05 (§9 — contágio local, aba Contágio,
-Fase 1; manifesto §24 emendado; revisão em par: teto simétrico, só a
-denúncia pune, "↪ chegou por"). Anterior: 2026-11-03 (auditoria do
+*Última atualização: 2026-11-06 (§6 — a lente ligada ao feed: a mistura,
+só em Global e Em alta, "sua rede" = vínculo da aba Contágio; §5 — PPR
+exato; §7 — decaimento sem efeito hoje). Anterior: 2026-11-05 (§9 —
+contágio local, aba Contágio, Fase 1; manifesto §24 emendado; revisão em
+par: teto simétrico, só a denúncia pune, "↪ chegou por"). Antes: 2026-11-03 (auditoria do
 algoritmo — motor global, âncora OpenTimestamps, moderação derivada). Source-of-truth está no código —
 quando este doc divergir, código vence. Reportar dessincronia via
 issue ou pair-review HIMYM.*

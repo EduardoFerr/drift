@@ -17,6 +17,38 @@ Formato:
 - Item aberto: `- [ ] <decisão> — contexto: <origem> — bloqueio: <quem/quê>`
 - Item fechado: `- [x] <decisão> — fechado YYYY-MM-DD em <commit-hash> — <1 linha resolução>`
 
+## Lente no feed (2026-11-06)
+
+Lente ligada ao feed (abas Global e Em alta; a mistura —
+`Docs/algoritmos.md` §6, simulação em `Docs/simulacao-lente/`).
+
+- [x] **Ligar a lente ao feed** — fechado 2026-11-06 em [{{HASH}}] — a
+  fórmula documentada (multiplicador) não mudava nada na simulação; vai a
+  mistura (k de cada 100 cards para quem você segue, sem rebaixar, sem
+  adiantar afundado, até 2 posts por pessoa, até 7 dias); "sua rede" =
+  quem você segue sem nenhuma denúncia; textos verdadeiros; manifesto §24
+  com a regra.
+- [ ] **Painel "seu algoritmo" com a regra da lente** — contexto: o PR de UI
+  (branch `worktree-agent-ac66198609c2bda35`, `SeuAlgoritmoCard.tsx`) ainda
+  não está em main; quando entrar, a ficha da lente deve dizer a regra da
+  mistura (e a ficha de Global/Em alta, que a ordem muda com a lente
+  ligada) — bloqueio: merge do PR de UI.
+- [ ] **Gesto privado "não adiantar X" na lente** — contexto:
+  `Docs/known-limitations.md` §4d (spam de conta seguida de volta sobe,
+  no máximo 2 posts, até denunciar). Teto por pessoa e "uma denúncia basta"
+  já entraram; "só vínculo conquistado" foi simulado e descartado (mundo
+  frio). Falta um jeito de tirar alguém da lente sem denunciar nem deixar
+  de seguir — bloqueio: decisão de UX.
+- [ ] **Simulação com contas-ímã e ritmo desigual** — contexto:
+  known-limitations §4e3 (todo mundo posta no mesmo ritmo; sem contas
+  seguidas por milhares) — bloqueio: nenhum (trabalho de simulação).
+- [ ] **Amigos de amigos na lente** — contexto: known-limitations §4c —
+  bloqueio: Fase 2 do contágio (kind 3 dos contatos) + simulação com
+  fazenda seguida por contatos.
+- [ ] **Cores do mapa por proximidade quase sempre azuis** — contexto:
+  known-limitations §4g (faixas fixas sobre PPR bruto 1/n) — bloqueio:
+  decisão (mexe no mapa).
+
 ## Contágio local (2026-11-05)
 
 Fase 1 shipada (aba "contágio"; manifesto §24 emendado). Simulação e spec
@@ -1330,10 +1362,10 @@ B1-B9 + Lily Material Ripple report + audits paralelos.)
   concreto onde uma única estratégia não basta, OU N+3 finalizar
   abstrações (useLensToggle 1.5) e abrir capacidade para compor.
 
-- [ ] **Persistência `active_lens` em UserPrefs** — POC shipou volátil
-  (lens ativa some no reload). Defer N+3/N+4. Bloqueio: schema bump
-  + migration. Reopener: user reportar "perdi minha lente ao recarregar"
-  OU lente custom shareable chegar (precisa persistir pra ter sentido).
+- [x] **Persistência `active_lens` em UserPrefs** — fechado 2026-11-06 em
+  [{{HASH}}] — `user_prefs.active_lens` (chave solta, como `lens_strength`;
+  sem schema bump), gravada por `chooseLens` e restaurada no boot
+  (`restoreChosenLens`). Necessária quando a lente passou a valer no feed.
 
 - [ ] **useLensToggle hook (DRY 3 toggles SuaLenteCard)** — Sprint
   N+3 P1.5 (D1 no plan Satoshi). Estimativa 1d. Bloqueio: aguardar
@@ -1769,6 +1801,11 @@ B1-B9 + Lily Material Ripple report + audits paralelos.)
   de features novas), Marshall (vocabulary lock conferir). Eventualmente
   Phase 1.5 pode trazer visualização no mapa (já no plan §2).
   Bloqueio: HIMYM dispatch + decisão de scope (quick polish vs redesign).
+  **2026-11-06 [{{HASH}}]:** parte resolvida com a lente ligada — o
+  rótulo diz o efeito concreto ("1 em cada 2 cards é de quem você
+  segue"), o chip "lente" diz por que cada post subiu, "como funciona" tem
+  a regra inteira, o toggle sem efeito saiu. Redesign visual continua
+  aberto.
 
 ## UX / Design — adicionados 2026-05-17 (sessão noite IV)
 
