@@ -180,7 +180,7 @@ audits só por feio. Defer documentado > silence.
     (`MAX_FUTURE_SKEW_SECONDS`) e a idade nunca fica negativa no decay: o
     máximo é 15 min a mais na janela de 7 dias e vencer desempates entre
     posts com 0 pontos. Na lente cronológica, um post datado +15 min fica
-    em 1º — vale para qualquer autor entre os 50 da aba.
+    em 1º — vale para qualquer autor entre os primeiros da aba.
   - O corte de 7 dias / 24 h usa o relógio do aparelho: dois aparelhos com
     relógios diferentes discordam perto da borda (como o feed inteiro).
   - "Score < 0 não sobe" é tudo-ou-nada: um único SINK de alguém com peso

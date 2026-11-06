@@ -171,7 +171,7 @@ async function closeLayers(page: Page): Promise<void> {
 async function setStrengthViaUi(page: Page, pct: 0 | 50 | 100): Promise<void> {
   await openLensCard(page)
   await page.getByRole('button', { name: `ajustar pra ${pct}%` }).click()
-  const label = { 0: 'desligada — a ordem de todo mundo', 50: '1 em cada 2 cards é de quem você segue', 100: 'primeiro, todos de quem você segue' }[pct]
+  const label = { 0: 'desligada — a ordem de todo mundo', 50: '1 em cada 2 cards é de quem você segue', 100: 'primeiro, os de quem você segue' }[pct]
   await expect(page.getByTestId('lens-label')).toHaveText(label)
   await expect.poll(() => page.evaluate(async () => (await import('/src/lib/trust-lens.ts')).useLensStore.getState().strength)).toBe(pct / 100)
   await closeLayers(page)
@@ -284,8 +284,9 @@ test.describe('lente no feed', () => {
       await expectTabMatchesOracle(page, 'global', 50)
       const posts = await storePosts(page)
       const rede = await networkOf(page, await viewer(page))
-      // a regra na tela: o 2º card é da rede (se houver posts dela na aba)
-      if (posts.some((p) => rede.has(p.authorPub))) expect(rede.has(posts[1]!.authorPub) || rede.has(posts[0]!.authorPub)).toBe(true)
+      // a regra na tela: se a lente adiantou algo, um dos 2 primeiros cards é da rede
+      // (posts da rede que a lente não escolhe — 3º da pessoa, > 7 dias, afundado — não contam)
+      if (posts.some((p) => p.lensLift)) expect(rede.has(posts[1]!.authorPub) || rede.has(posts[0]!.authorPub)).toBe(true)
       await openTab(page, 'trending')
       await expectTabMatchesOracle(page, 'trending', 50)
 
@@ -445,7 +446,9 @@ test.describe('lente no feed', () => {
       const page = ctx.pages()[0] ?? (await ctx.newPage())
       await page.goto(`${base}/?dev-seed=lite&as=carol`)
       await waitSeedSettled(page)
-      await page.getByRole('dialog', { name: 'onboarding do drift' }).getByRole('button', { name: 'pular' }).click({ timeout: 3_000 }).catch(() => {})
+      // perfil novo: o onboarding pode abrir alguns segundos depois do seed
+      // (máquina carregada); 3 s não bastavam e ele cobria o botão de config
+      await page.getByRole('dialog', { name: 'onboarding do drift' }).getByRole('button', { name: 'pular' }).click({ timeout: 15_000 }).catch(() => {})
       return { ctx, page }
     }
     let { ctx, page } = await open()
