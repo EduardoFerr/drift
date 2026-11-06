@@ -752,9 +752,9 @@ export function PostViewer({
                 />
               )}
             </button>
-            {/* Trust Lens inspector chip — bottom-right do card.
-                Aparece só quando lens strength > 0 E post foi tocado. */}
-            <LensInspector postId={post.id} authorPub={post.authorPub} />
+            {/* Chip "lente" — canto inferior direito. Só aparece quando a
+                lente adiantou ESTE post (Post.lensLift, Global/Em alta). */}
+            <LensInspector authorPub={post.authorPub} lensLift={post.lensLift} />
         </>
         {queue && queue.next && (
           <>

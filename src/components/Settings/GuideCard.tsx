@@ -3,7 +3,7 @@
  *
  * Hub exploratório que explica o QUE serve cada coisa no Drift: os
  * mapas (4 contextos), as ações sociais (DRIFT/SINK/REPORT/BLOCK/MUTE/
- * PIN), os algoritmos (score, weight, threshold, PPR/Trust Lens, decay
+ * PIN), os algoritmos (score, weight, threshold, a lente, decay
  * temporal, lentes pluggable), as garantias de privacidade e a
  * responsabilidade que o usuário tem ao "cultivar" a rede.
  *
@@ -195,22 +195,18 @@ function MapsTopics() {
             accordionId="guia-map-network"
             label="mapa da sua rede (network)"
             description={networkCopy.purpose}
-            impact="Mostra o mesmo conjunto de pontos do global, mas filtrado por quem você segue (NIP-02) e tingido pela sua lente (Trust Lens). Cores indicam confiança local — laranja = alta, azul = baixa/desconhecido."
-            defaultExplained="Modo opt-in dentro do mapa. Não afeta seu feed canônico — é só visualização. Se você não usa Trust Lens nem segue ninguém, fica vazio."
+            impact="Mostra o mesmo conjunto de pontos do global, filtrado por quem você segue (NIP-02). Com 'mostrar quem você segue no mapa' ligado (na tela da lente), os pontos de quem você segue ganham cor."
+            defaultExplained="Modo opt-in dentro do mapa. Não muda nenhum feed — é só visualização. Se você não segue ninguém, fica vazio."
             reversible
             reference="manifesto §24"
           >
             <P>
-              Network é uma lente local — funciona no seu device, com
-              seus dados, e não muda o que outras pessoas veem. Manifesto
-              §24 garante que ranking é função pura de score; sua lente
-              reordena LOCALMENTE sem alterar o feed canônico que outros
-              clientes Drift veem.
+              O mapa da sua rede funciona no seu aparelho, com os seus
+              dados, e não muda o que outras pessoas veem.
             </P>
             <Responsibility>
-              Você decide qual lente aplicar. Você pode trocar de lente,
-              desligar, ou usar lente customizada — sem que isso afete a
-              rede dos outros. É a sua janela, não a régua do mundo.
+              É a sua janela, não a régua do mundo: quem está no mapa
+              depende de quem você segue, e isso só você vê.
             </Responsibility>
           </SettingExplainer>
 
@@ -378,7 +374,7 @@ function AlgosTopics() {
             accordionId="guia-algo-score"
             label="score (popularidade do post)"
             description="Quanto cada post 'vale' na rede. É a soma dos PESOS de quem deu DRIFT, menos 0,3 × o peso de quem deu SINK, mais o peso de quem comentou (até 30), dividido por um decay temporal."
-            impact="Score determina ordem no feed Global. Sobe com DRIFTs, cai com SINKs, cai com o tempo (decay). Não há personalização — todo cliente Drift calcula o MESMO score pra cada post (manifesto §24)."
+            impact="Score determina ordem no feed Global. Sobe com DRIFTs, cai com SINKs, cai com o tempo (decay). Todo cliente Drift calcula o MESMO score pra cada post (manifesto §24); a lente, se você ligar, muda só a ordem na sua tela — o score continua o mesmo."
             defaultExplained="Função pura: mesma entrada, mesma saída. Não consulta servidor central — cada cliente calcula localmente a partir dos eventos Nostr que recebeu."
             reversible
             reference="Docs/algoritmos.md §1"
@@ -426,19 +422,20 @@ function AlgosTopics() {
 
           <SettingExplainer
             accordionId="guia-algo-ppr"
-            label="PPR (Personalized PageRank) / Trust Lens"
-            description="Mede o quão 'próximo' cada autor está de você, na sua rede de follows (NIP-02). Vai de 0 (desconhecido) a 1 (você mesmo)."
-            impact="Quando Trust Lens está ativa (opt-in), PPR vira um multiplier LOCAL que reordena seu feed sem alterar o score canônico. Você vê primeiro quem está mais próximo da sua rede social — sem que isso afete o que outros veem."
-            defaultExplained="Lens off por default. User decide ativar e ajustar força (0-100%). Manifesto §24: PPR nunca é persisted em posts.score, nunca shared via Nostr, nunca escapa do device."
+            label="sua lente — quem você segue primeiro"
+            description="Opcional, começa desligada. Com força k, k de cada 100 cards das abas global e em alta vão para posts de quem você segue, na ordem de sempre."
+            impact="Com 50, um card sim, um não; com 100, primeiro todos eles. De cada pessoa, no máximo 2 posts (os de mais pontos, de até 7 dias). Um post que a lente adianta nunca fica abaixo do lugar que já tinha; post afundado pela comunidade não sobe; post de quem você não segue nunca entra. Quem você bloqueou, silenciou ou denunciou fica de fora — uma denúncia basta. Seguindo e contágio não mudam. O card adiantado mostra o chip 'lente' com o motivo."
+            defaultExplained="Desligada por padrão. Calculada no seu aparelho a cada leitura do feed; nada é publicado, os pontos dos posts não mudam e a ordem dos outros também não. Desligue e tudo volta à ordem de todo mundo."
             reversible
-            reference="manifesto §24 (adendo Trust Lens 2026-05-17) + Docs/algoritmos.md §5"
+            reference="manifesto §24 + Docs/algoritmos.md §6"
           >
             <Responsibility>
-              Trust Lens é a sua perspectiva, não a régua da rede. Você
-              decide quanta lente aplicar. Você decide trocar por outra
-              lente quando quiser. É a versão honesta de "algoritmo
-              personalizado" — explícito, local, reversível, e
-              não-escondido do user.
+              A lente é afinidade explícita: você escolhe ver mais a sua
+              rede. O preço, medido na simulação, é um feed mais fechado —
+              menos posts de outras cidades. Se você seguir de volta uma
+              conta falsa, até 2 posts dela por vez podem subir: denuncie e ela
+              sai da sua lente na hora. Contra fazendas de contas, a defesa é a
+              aba contágio.
             </Responsibility>
           </SettingExplainer>
 
@@ -449,7 +446,7 @@ function AlgosTopics() {
             impact="Garante que feed sempre tem coisa nova no topo, mesmo sem moderação. Post viral de ontem cai naturalmente; post fresco com poucos DRIFTs pode subir acima dele."
             defaultExplained="Função pura, parâmetros fixos no código. Manifesto §7: determinismo — mesmo timestamp, mesmo decay, em qualquer cliente."
             reversible
-            reference="Docs/algoritmos.md §7"
+            reference="Docs/algoritmos.md §1"
           >
             <P>
               Decay é o que diferencia feed do Drift de timeline
@@ -483,20 +480,20 @@ function AlgosTopics() {
 
           <SettingExplainer
             accordionId="guia-algo-lentes"
-            label="lentes pluggable (avançado)"
-            description="Trust Lens é só UMA lente possível. O Drift está construindo um registry de lentes — você poderá trocar PPR por outra fórmula (ex: cronológica pura, diversidade geográfica, foco em certas categorias)."
-            impact="Quando lentes pluggable shipa (Sprint N+2 POC), você poderá baixar / importar lente como plugin local. Cada lente continua sendo aplicada no view-boundary do render — nunca persisted, nunca shared (mesma invariante de Trust Lens)."
-            defaultExplained="Roadmap. Manifesto §24 garante que NENHUMA lente afeta o feed canônico — só a sua visualização."
+            label="outras lentes (avançado)"
+            description="Hoje o app tem duas lentes, escolhidas na tela da lente: 'quem você segue primeiro' e 'cronológica' (os mesmos posts das abas global e em alta, do mais novo para o mais velho)."
+            impact="A escolha fica guardada no seu aparelho. Importar ou combinar lentes ainda não existe; é plano (Docs/lens-pluggable-design.md). Toda lente vale só para a sua tela — nunca é gravada no score nem publicada."
+            defaultExplained="Padrão: 'quem você segue primeiro', com força 0 (desligada)."
             reversible
-            reference="Docs/lens-pluggable-design.md (PROPOSED)"
+            reference="Docs/algoritmos.md §6 + Docs/lens-pluggable-design.md"
             level="advanced"
           >
             <P>
               Lentes existem pra resolver um dilema: você quer
               personalização sem se entregar a um algoritmo central.
-              Solução Drift: o algoritmo personalizado vive no SEU
-              device, sob sua escolha explícita, e o feed canônico
-              continua determinístico pra todo mundo.
+              Solução Drift: a regra é pública, roda no SEU aparelho, sob
+              sua escolha explícita, e as abas continuam iguais pra quem
+              não liga a lente.
             </P>
           </SettingExplainer>
           </div>
@@ -622,8 +619,8 @@ function ResponsabilidadeTopics() {
           <P>
             Manifesto §17: Drift não tem chave mestra. Não existe botão
             "deletar" global, não existe banimento de npub pela
-            administração. O que existe é (a) sua lente local (block /
-            mute / Trust Lens), (b) reports comunitários que viram
+            administração. O que existe é (a) o que você decide no seu
+            aparelho (bloquear, silenciar, a lente), (b) reports comunitários que viram
             threshold dinâmico, e (c) o fato de que clientes alternativos
             podem mostrar conteúdo que o oficial esconde.
           </P>
@@ -682,7 +679,7 @@ const SECTIONS: readonly SectionMeta[] = [
     id: 'algos',
     glyph: '∑',
     title: 'os algoritmos',
-    blurb: 'score, weight, threshold, PPR, decay, contágio, lentes',
+    blurb: 'score, weight, threshold, lente, decay, contágio',
     count: '7 tópicos',
     render: () => <AlgosTopics />,
   },

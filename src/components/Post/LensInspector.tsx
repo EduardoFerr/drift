@@ -1,107 +1,45 @@
 /**
- * LensInspector — chip discreto + sheet de explicação no PostViewer.
+ * LensInspector — chip "lente" + folha que explica por que o post subiu.
  *
- * Chip aparece no canto inferior-direito do card APENAS quando a Trust
- * Lens está ativa (strength > 0) E o post foi efetivamente reordenado
- * (autor tem PPR > 0 OU houve drift mútuo no entorno). Tap → sheet com
- * 1-2 frases explicando por que.
+ * O chip aparece só quando a lente adiantou ESTE post nas abas Global ou
+ * Em alta (`Post.lensLift`, calculado na leitura do feed). A folha diz o
+ * motivo real, com os números da regra pública (Docs/algoritmos.md §6):
+ * você segue o autor; com a lente em k%, k de cada 100 cards vão para quem
+ * você segue; o post estava no lugar X (ou fora da aba) e foi para o Y.
  *
- * Conteúdo da sheet:
- *   - "@<short> (que você acompanha) deu drift neste post."
- *   - "@<short> (autor) é seguido por N pessoas que você acompanha."
+ * Nada aqui consulta o banco nem é gravado (manifesto §24/§28). O nome vem
+ * com o começo e o fim da chave, como na folha "chegou por": copiar o nome
+ * de alguém é fácil, a chave não.
  *
- * SEM score numérico. SEM grafo desenhado. SEM npub completo (apenas
- * short alias). Barney P0.5 — path leak guard: npubs NUNCA são logged,
- * sheet content NUNCA persisted. Manifesto §28.
- *
- * Acessibilidade:
- *   - Chip ≥44px hit area (h-11 min-w-[44px])
- *   - aria-label descritivo
- *   - SlideUpOverlay já implementa focus trap + ESC
- *
- * Plano: `Docs/plans/trust-lens-phase1-plan.md` §1.5 (Lily decisions).
+ * Acessibilidade: chip ≥ 44 px; aria-label descritivo; SlideUpOverlay
+ * cuida do foco e do Esc.
  */
 
-import { useEffect, useState } from 'react'
-import { db } from '../../lib/db'
-import { useFollowsStore } from '../../lib/follows'
-import { useLensStore, getPprForAuthor } from '../../lib/trust-lens'
+import { useState } from 'react'
+import { useLensStore } from '../../lib/trust-lens'
 import { usePrefsStore } from '../../lib/prefs'
 import { SlideUpOverlay } from '../UI/SlideUpOverlay'
 import { ModalHeader } from '../UI/ModalHeader'
 import { EyeIcon } from '../UI/Icons'
+import { PersonNameKey } from './ContagionViaChip'
+import type { Post } from '../../types/drift'
 
 interface InspectorProps {
-  postId: string
   authorPub: string
+  lensLift?: Post['lensLift']
 }
 
-interface InspectorData {
-  /** Quantas pessoas que eu sigo deram drift neste post. */
-  followsDrifted: number
-  /** Quantas pessoas que eu sigo também seguem o autor (FoF count). */
-  authorFofCount: number
-  /** Short alias de um drifter conhecido (primeiro encontrado). */
-  driftedExample: string | null
-}
+/** "1º", "12º" — lugar na aba, contado a partir de 1. */
+const ordinal = (i: number) => `${i + 1}º`
 
-function shortAlias(npub: string): string {
-  return `anon…${npub.slice(-6)}`
-}
-
-export function LensInspector({ postId, authorPub }: InspectorProps) {
+export function LensInspector({ authorPub, lensLift }: InspectorProps) {
   const strength = useLensStore((s) => s.strength)
-  const following = useFollowsStore((s) => s.following)
-  // PR-5 (2026-05-20): opt-in indicator visual. Default OFF — chip
-  // existente já comunica "lente atuou aqui" para quem investiga.
-  // Quando ON, adiciona glyph ↕ + estilo filled (mais visível). User
-  // power que quer ver explicitamente cada reorder ativa.
-  const showReorderIndicator = usePrefsStore(
-    (s) => s.lens_show_reorder_indicator,
-  )
+  // Opt-in: chip preenchido + seta, pra quem quer ver cada adiantamento.
+  const showReorderIndicator = usePrefsStore((s) => s.lens_show_reorder_indicator)
   const [open, setOpen] = useState(false)
-  const [data, setData] = useState<InspectorData | null>(null)
 
-  // Compute "should chip show" — strength > 0 E lens tocou no post.
-  const pprAuthor = getPprForAuthor(authorPub)
-  const shouldShow = strength > 0 && (pprAuthor > 0 || following.has(authorPub))
-
-  useEffect(() => {
-    if (!open || data) return
-    let cancelled = false
-    void (async () => {
-      // Drifters que eu sigo (intersection no SQL pra evitar full scan).
-      const rows = await db.exec<{ spreader_pub: string }>(
-        `SELECT spreader_pub FROM spreads WHERE post_id = ? LIMIT 200`,
-        [postId],
-      )
-      const drifted = rows
-        .map((r) => r.spreader_pub)
-        .filter((pub) => following.has(pub))
-      const fofRows = await db.exec<{ n: number }>(
-        `SELECT COUNT(*) AS n FROM follows
-         WHERE following_pub = ?
-           AND follower_pub IN (
-             SELECT following_pub FROM follows WHERE follower_pub = (
-               SELECT value FROM user_prefs WHERE key = 'active_identity'
-             )
-           )`,
-        [authorPub],
-      )
-      const fof = fofRows[0]?.n ?? 0
-      if (cancelled) return
-      setData({
-        followsDrifted: drifted.length,
-        authorFofCount: fof,
-        driftedExample: drifted[0] ?? null,
-      })
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [open, postId, authorPub, following, data])
-
-  if (!shouldShow) return null
+  if (!lensLift || !(strength > 0)) return null
+  const k = Math.max(1, Math.min(100, Math.round(strength * 100)))
 
   return (
     <>
@@ -116,64 +54,38 @@ export function LensInspector({ postId, authorPub }: InspectorProps) {
             ? 'border border-drift-accent2 bg-drift-accent2/15 text-drift-accent2 hover:bg-drift-accent2/25'
             : 'border border-drift-accent2/40 bg-drift-surface/85 text-drift-accent2 hover:border-drift-accent2 hover:bg-drift-surface/95'
         }`}
-        aria-label={
-          showReorderIndicator
-            ? 'este post foi reordenado pela lente — toque pra entender'
-            : 'por que este post está aqui'
-        }
-        title={
-          showReorderIndicator
-            ? 'reordenado pela lente'
-            : 'por que este post está aqui'
-        }
+        aria-label="a lente adiantou este post — toque pra ver por quê"
+        title="a lente adiantou este post"
         data-no-longpress="true"
+        data-testid="lens-chip"
       >
         <EyeIcon size={14} />
         <span className="font-mono text-[10px] uppercase tracking-meta">
-          {showReorderIndicator ? 'lente ↕' : 'lente'}
+          {showReorderIndicator ? 'lente ↑' : 'lente'}
         </span>
       </button>
 
       {open && (
-        <SlideUpOverlay onClose={() => setOpen(false)} ariaLabel="por que este post está aqui">
+        <SlideUpOverlay onClose={() => setOpen(false)} ariaLabel="por que a lente adiantou este post">
           <ModalHeader title="sua lente" onClose={() => setOpen(false)} />
-          <div className="space-y-3 px-1 pt-1 font-mono text-[12px] leading-relaxed text-drift-text">
-            {data === null ? (
-              <p className="text-drift-muted/60">analisando…</p>
-            ) : (
-              <>
-                {data.followsDrifted > 0 && (
-                  <p>
-                    <span className="text-drift-accent2">
-                      {data.driftedExample
-                        ? shortAlias(data.driftedExample)
-                        : `${data.followsDrifted} pessoa(s) que você acompanha`}
-                    </span>{' '}
-                    {data.followsDrifted > 1 && data.driftedExample
-                      ? `e mais ${data.followsDrifted - 1}`
-                      : ''}{' '}
-                    deu drift neste post.
-                  </p>
-                )}
-                {data.authorFofCount > 0 && (
-                  <p>
-                    <span className="text-drift-accent2">{shortAlias(authorPub)}</span>{' '}
-                    (autor) é seguido por {data.authorFofCount} pessoa(s) que
-                    você acompanha.
-                  </p>
-                )}
-                {data.followsDrifted === 0 && data.authorFofCount === 0 && (
-                  <p className="text-drift-muted/70">
-                    A Lente está ativa, mas não encontrou sinais diretos da
-                    sua rede neste post. O reordenamento veio do entorno
-                    indireto.
-                  </p>
-                )}
-                <p className="pt-2 text-[10px] uppercase tracking-meta text-drift-muted/40">
-                  análise local — manifesto §24
-                </p>
-              </>
-            )}
+          <div className="space-y-3 px-1 pt-1 font-mono text-[12px] leading-relaxed text-drift-text" data-testid="lens-sheet">
+            <p className="flex min-w-0 flex-wrap items-baseline gap-x-1">
+              <span>Você segue</span>
+              <span className="flex min-w-0 text-drift-accent2"><PersonNameKey pub={authorPub} /></span>
+            </p>
+            <p>
+              {k === 100
+                ? 'Com a sua lente em 100%, os posts de quem você segue vêm primeiro nas abas global e em alta, na ordem de sempre.'
+                : `Com a sua lente em ${k}%, ${k} de cada 100 cards das abas global e em alta vão para posts de quem você segue, na ordem de sempre.`}
+            </p>
+            <p>
+              {lensLift.from === null
+                ? `Este post estava fora dos primeiros da aba e entrou no ${ordinal(lensLift.to)} lugar.`
+                : `Sem a lente, este post estaria em ${ordinal(lensLift.from)}; com ela, está em ${ordinal(lensLift.to)}.`}
+            </p>
+            <p className="text-drift-muted">
+              A lente é calculada no seu aparelho e não muda a ordem de ninguém além da sua. Desligada, a aba volta à ordem de todo mundo.
+            </p>
           </div>
         </SlideUpOverlay>
       )}

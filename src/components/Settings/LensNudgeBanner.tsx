@@ -99,9 +99,9 @@ export function LensNudgeBanner() {
               </>
             }
           >
-            Você pode reordenar o feed localmente, priorizando pessoas
-            próximas da sua rede. Nada sai do seu dispositivo, nada muda
-            pros outros.
+            Você pode pôr posts de quem você segue entre os primeiros do
+            global e do em alta. Fica no seu aparelho; a ordem dos outros
+            não muda.
           </DriftAlert>
         </m.div>
       )}

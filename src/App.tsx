@@ -2326,7 +2326,7 @@ function SettingsRoot({ onClose }: { onClose: () => void }) {
         {
           target: 'sua-lente',
           label: 'sua lente',
-          hint: 'reordenamento local — feed na sua perspectiva',
+          hint: 'quem você segue primeiro em global e em alta',
           icon: EyeIcon,
         },
         {

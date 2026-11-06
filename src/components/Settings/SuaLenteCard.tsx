@@ -1,30 +1,23 @@
 /**
- * SuaLenteCard — controle user-facing da Trust Lens (Phase 1).
+ * SuaLenteCard — controle da lente (Docs/algoritmos.md §6; manifesto §24).
  *
- * Slider 0-100% com snap stops em 0/50/100. Labels descritivos (ação,
- * não adjetivo abstrato) + helper text dinâmico + CTA "ver feed agora"
- * pra teste imediato. Lily UX polish 2026-05-17.
+ * A lente põe posts de quem você segue entre os primeiros das abas Global e
+ * Em alta: com força k%, k de cada 100 cards vão para eles, na ordem de
+ * sempre. Seguindo e Contágio não mudam. Os textos aqui dizem exatamente o
+ * que a regra faz — nada de "entorno", "drifts mútuos" ou PageRank: na
+ * produção o app só guarda a sua lista de quem você segue.
  *
- * Manifesto §24 (carve-out view-layer): valor do slider afeta APENAS
- * `s_local` computado no view-boundary do feed. NUNCA persisted em
- * `posts.score`. NUNCA shared via event.
- *
- * Persistência: `lens_strength` (REAL 0..1) em `user_prefs`. Default 0
- * (lens off — feed canônico bit-exact). Idempotente: setLensStrength
- * normaliza para [0, 1].
- *
- * Plano: `Docs/plans/trust-lens-phase1-plan.md` §1.5.
+ * Slider 0–100% com paradas em 0/50/100. Persistência: `lens_strength`
+ * (REAL 0..1) e `active_lens` em `user_prefs`, só neste aparelho. Padrão:
+ * desligada — a ordem de todo mundo.
  */
 
 import { useEffect, useState } from 'react'
 import { setLensStrength, useLensStore } from '../../lib/trust-lens'
 import { db } from '../../lib/db'
 import { usePrefsStore, setPref } from '../../lib/prefs'
-import {
-  listLenses,
-  setActiveLens,
-  useLensRegistryStore,
-} from '../../lib/lens/registry'
+import { listLenses, useLensRegistryStore } from '../../lib/lens/registry'
+import { chooseLens } from '../../lib/lens/init'
 import { FullPageCard } from '../UI/FullPageCard'
 import { DriftButton } from '../UI/DriftButton'
 import { Collapse } from '../UI/Collapse'
@@ -35,58 +28,55 @@ interface CardProps {
 }
 
 const SNAP_STOPS = [0, 0.5, 1] as const
-const SNAP_THRESHOLD = 0.06 // ±6% snap window em torno dos stops
+const SNAP_THRESHOLD = 0.06 // ±6% de janela em torno das paradas
+
+/** Força do slider (0..1) em pontos inteiros (0..100). */
+const pctOf = (strength: number) => Math.max(0, Math.min(100, Math.round(strength * 100)))
 
 /**
- * Label DESCRITIVO da ação (Lily polish 2026-05-17): substitui adjetivos
- * abstratos ("Nenhuma/Suave/Moderada") por descrições do efeito real.
- * User entende o que vai mudar no feed antes de mover o slider.
+ * O efeito, em palavras: quantos cards vão para quem você segue. Frações
+ * simples quando batem (1 em cada 2, 3 em cada 4); senão, "k de cada 100".
  */
-function labelFor(strength: number): string {
-  if (strength < 0.05) return 'sem reordenação'
-  if (strength < 0.34) return 'levemente prioriza quem você segue'
-  if (strength < 0.67) return 'prioriza quem você segue'
-  if (strength < 0.95) return 'prioriza forte quem você segue'
-  return 'prioriza apenas sua rede próxima'
+export function lensLabel(k: number): string {
+  if (k <= 0) return 'desligada — a ordem de todo mundo'
+  if (k >= 100) return 'primeiro, todos de quem você segue'
+  for (const d of [2, 3, 4, 5, 10]) {
+    const n = Math.round((k * d) / 100)
+    if (n >= 1 && Math.abs(n / d - k / 100) < 0.005) {
+      return `${n} em cada ${d} cards ${n === 1 ? 'é' : 'são'} de quem você segue`
+    }
+  }
+  return `${k} de cada 100 cards são de quem você segue`
 }
 
-/** Helper text com exemplo concreto do efeito. */
-function helperText(strength: number): string {
-  if (strength === 0) {
-    return 'Feed em ordem canônica — drifts, sinks e idade. É a mesma ordem do feed global em qualquer cliente Drift.'
+/** O que muda, com a regra inteira (Docs/algoritmos.md §6). */
+export function lensHelper(k: number): string {
+  if (k <= 0) {
+    return 'A ordem de sempre: pontos de quem deu DRIFT, SINK e comentou (pelo peso de cada um), divididos pela idade do post. É a mesma para todo mundo que tem os mesmos posts.'
   }
-  if (strength < 0.34) {
-    return 'Posts de quem você acompanha (e do entorno deles) sobem um pouco. Resto do feed quase inalterado.'
+  if (k >= 100) {
+    return 'Nas abas global e em alta, primeiro vêm os posts de quem você segue (na ordem de sempre; de cada pessoa, no máximo 2, de até 7 dias), depois o resto. Post que a comunidade afundou não sobe.'
   }
-  if (strength < 0.67) {
-    return 'Posts da sua rede social local (follows + mutual drifts) ganham peso significativo. Vozes fora da rede continuam aparecendo.'
-  }
-  if (strength < 0.95) {
-    return 'Feed fortemente reordenado em torno dos follows. Posts fora da sua rede ficam raros.'
-  }
-  return 'Feed quase só com quem você acompanha + entorno próximo. Descoberta de novas vozes cai drasticamente.'
+  return `Nas abas global e em alta, ${k} de cada 100 cards vão para posts de quem você segue, na ordem de sempre, enquanto houver posts deles; os outros, para o resto. De cada pessoa, no máximo 2 posts (os de mais pontos, de até 7 dias). Um post que a lente adianta nunca fica abaixo do lugar que já tinha.`
 }
 
 export function SuaLenteCard({ onClose }: CardProps) {
   const strength = useLensStore((s) => s.strength)
   const [local, setLocal] = useState<number>(strength)
-  // Sprint N+2 P0.2 — lens registry reativo. activeId muda → re-render
-  // (Chronological lens não tem slider; dropdown decide se mostra).
+  // Lente ativa (quem você segue primeiro | cronológica) — reativa.
   const activeId = useLensRegistryStore((s) => s.activeId)
-  // `version` subscription pra re-render quando lentes chegam ao registry
-  // (caso UI montar antes de initBuiltinLenses; raro mas defensivo).
+  // `version`: re-render quando lentes chegam ao registry (UI montada antes do boot).
   useLensRegistryStore((s) => s.version)
   const lenses = listLenses()
   const showStrengthControls = activeId === 'ppr-trust'
 
-  // Sincroniza com store se mudar de fora (ex: boot load).
+  // Sincroniza com o store se mudar de fora (ex.: boot).
   useEffect(() => {
     setLocal(strength)
   }, [strength])
 
   function commitStrength(raw: number) {
     let next = Math.max(0, Math.min(1, raw))
-    // Snap to stops dentro da janela.
     for (const stop of SNAP_STOPS) {
       if (Math.abs(next - stop) <= SNAP_THRESHOLD) {
         next = stop
@@ -95,8 +85,7 @@ export function SuaLenteCard({ onClose }: CardProps) {
     }
     setLocal(next)
     setLensStrength(next)
-    // Persiste em user_prefs (chave dedicada — sai do schema de UserPrefs
-    // pra evitar churn de migração até Phase 2). REAL 0..1.
+    // Só neste aparelho (user_prefs), nunca publicado. REAL 0..1.
     void db.run(
       `INSERT INTO user_prefs (key, value) VALUES ('lens_strength', ?)
        ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
@@ -105,46 +94,35 @@ export function SuaLenteCard({ onClose }: CardProps) {
   }
 
   function onSliderChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const pct = Number(e.target.value)
-    commitStrength(pct / 100)
+    commitStrength(Number(e.target.value) / 100)
   }
 
-  const pct = Math.round(local * 100)
-  const isActive = local > 0
+  const pct = pctOf(local)
+  const isActive = pct > 0
 
   return (
     <FullPageCard
       onClose={onClose}
       title="sua lente"
-      ariaLabel="sua lente — reordenamento local do feed"
+      ariaLabel="sua lente — posts de quem você segue entre os primeiros"
     >
-      {/* Lily audit 2026-05-18 fixes coordenados:
-          P0: track slider com fill linear-gradient (não default browser-cinza)
-          P1: label dinâmico demoted de heading uppercase pra dado sentence-case
-              text-[18px] semibold (resposta, não seção)
-          P2: tick dots no track + remoção de "desligado/meio/máximo" textuais
-          P3: "como funciona" colapsado por default (accordion via SectionHeader)
-          P4: inner card aninhado removido (espaço respira) */}
       <div className="space-y-5 px-4 py-5">
         <p className="font-mono text-[12px] leading-relaxed text-drift-body">
-          A Lente reordena seu feed <strong>localmente</strong>, no
-          momento da visualização. Não muda o feed dos outros, não é
-          compartilhada e não afeta o score canônico dos posts.
+          A lente põe posts de <strong>quem você segue</strong> entre os
+          primeiros das abas <strong>global</strong> e <strong>em alta</strong>.
+          Ela roda no seu aparelho: não muda a ordem de ninguém além da
+          sua, não é publicada e não mexe no score dos posts. As abas
+          seguindo e contágio não mudam.
         </p>
 
-        {/* Sprint N+2 P0.2 — seletor de estratégia. POC ship com 2 lentes
-            (PPR Trust default + Cronológica). Composição §6 (∪ ∩ −) +
-            shareable config defer Sprint N+3.
-            Volátil: troca não persiste em UserPrefs (reset on reload).
-            Documentado em tests/lens-plugin-conformance.test.ts. */}
         <label className="block space-y-2">
           <span className="block font-mono text-[11px] uppercase tracking-meta text-drift-muted">
-            estratégia
+            lente
           </span>
           <select
             value={activeId}
-            onChange={(e) => setActiveLens(e.target.value)}
-            aria-label="estratégia da lente"
+            onChange={(e) => void chooseLens(e.target.value)}
+            aria-label="qual lente"
             className="w-full cursor-pointer rounded border border-drift-border/40 bg-drift-surface px-3 py-2 font-mono text-[12px] text-drift-text focus:border-drift-accent2 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
           >
             {lenses.map((l) => (
@@ -153,161 +131,108 @@ export function SuaLenteCard({ onClose }: CardProps) {
               </option>
             ))}
           </select>
-          {/* Descrição da lente atual — user entende o que muda antes de aplicar */}
           <span className="block font-mono text-[10px] leading-relaxed text-drift-muted">
             {lenses.find((l) => l.id === activeId)?.description ?? ''}
           </span>
         </label>
 
-        {/* Slider region — sem inner card aninhado. divider-y como
-            agrupamento visual leve.
-            Sprint N+2 P0.2: só renderiza pra lentes que usam strength
-            (chronological não tem intensidade — esconde slider). */}
+        {/* Força: só na lente "quem você segue primeiro" (a cronológica não tem). */}
         {showStrengthControls && (
-        <div className="space-y-3 border-y border-drift-border/30 py-5">
-          {/* P1: dado é a estrela. Sentence-case display 18px semibold,
-              não uppercase heading. Olho vai direto pra resposta. */}
-          <div className="flex items-baseline justify-between gap-3">
-            <span className="font-display text-[18px] font-semibold leading-snug text-drift-text">
-              {labelFor(local)}
-            </span>
-            <span className="shrink-0 font-mono text-[13px] tabular-nums text-drift-muted">
-              {pct}%
-            </span>
-          </div>
+          <div className="space-y-3 border-y border-drift-border/30 py-5">
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="font-display text-[18px] font-semibold leading-snug text-drift-text" data-testid="lens-label">
+                {lensLabel(pct)}
+              </span>
+              <span className="shrink-0 font-mono text-[13px] tabular-nums text-drift-muted">
+                {pct}%
+              </span>
+            </div>
 
-          {/* P0: slider com track preenchido. CSS custom via inline style
-              + appearance-none. linear-gradient narra visualmente o valor
-              independente do número (Apple Settings pattern). */}
-          <div className="relative">
-            <input
-              type="range"
-              min={0}
-              max={100}
-              step={1}
-              value={pct}
-              onChange={onSliderChange}
-              aria-label="intensidade da lente"
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={pct}
-              aria-valuetext={labelFor(local)}
-              className="lens-slider h-11 w-full cursor-pointer appearance-none rounded-full bg-transparent focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
-              style={{
-                // Custom track via background-image gradient. Vendor-
-                // prefixed thumb stays via accent-color CSS prop.
-                background: `linear-gradient(to right, var(--drift-accent2) 0%, var(--drift-accent2) ${pct}%, var(--drift-surface) ${pct}%, var(--drift-surface) 100%)`,
-                accentColor: 'var(--drift-accent2)',
-              }}
-            />
-          </div>
+            <div className="relative">
+              <input
+                type="range"
+                min={0}
+                max={100}
+                step={1}
+                value={pct}
+                onChange={onSliderChange}
+                aria-label="força da lente"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={pct}
+                aria-valuetext={lensLabel(pct)}
+                className="lens-slider h-11 w-full cursor-pointer appearance-none rounded-full bg-transparent focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
+                style={{
+                  background: `linear-gradient(to right, var(--drift-accent2) 0%, var(--drift-accent2) ${pct}%, var(--drift-surface) ${pct}%, var(--drift-surface) 100%)`,
+                  accentColor: 'var(--drift-accent2)',
+                }}
+              />
+            </div>
 
-          {/* P2: dots clicáveis alinhados aos snap stops (0/50/100), sem
-              labels textuais. Tooltip carrega o nome. */}
-          <div className="relative -mt-2 flex justify-between px-1">
-            {SNAP_STOPS.map((stop) => {
-              const stopPct = stop * 100
-              const isAtStop = Math.abs(local - stop) < SNAP_THRESHOLD
-              return (
-                <button
-                  key={stop}
-                  type="button"
-                  onClick={() => commitStrength(stop)}
-                  className={`flex h-3 w-3 items-center justify-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40 ${
-                    isAtStop
-                      ? 'bg-drift-accent2'
-                      : 'bg-drift-border hover:bg-drift-accent2/60'
-                  }`}
-                  title={
-                    stop === 0
-                      ? 'desligado — feed canônico'
-                      : stop === 0.5
-                      ? 'meio — sua rede pesa, fora dela ainda aparece'
-                      : 'máximo — quase só sua rede'
-                  }
-                  aria-label={`ajustar pra ${stopPct}%`}
-                />
-              )
-            })}
-          </div>
+            <div className="relative -mt-2 flex justify-between px-1">
+              {SNAP_STOPS.map((stop) => {
+                const isAtStop = Math.abs(local - stop) < SNAP_THRESHOLD
+                return (
+                  <button
+                    key={stop}
+                    type="button"
+                    onClick={() => commitStrength(stop)}
+                    className={`flex h-3 w-3 items-center justify-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40 ${
+                      isAtStop ? 'bg-drift-accent2' : 'bg-drift-border hover:bg-drift-accent2/60'
+                    }`}
+                    title={
+                      stop === 0
+                        ? 'desligada — a ordem de todo mundo'
+                        : stop === 0.5
+                        ? 'metade — um card sim, um não'
+                        : 'máximo — primeiro quem você segue'
+                    }
+                    aria-label={`ajustar pra ${stop * 100}%`}
+                  />
+                )
+              })}
+            </div>
 
-          <p className="font-mono text-[11px] leading-relaxed text-drift-body/85">
-            {helperText(local)}
-          </p>
-        </div>
+            <p className="font-mono text-[11px] leading-relaxed text-drift-body/85" data-testid="lens-helper">
+              {lensHelper(pct)}
+            </p>
+          </div>
         )}
 
-        {/* PR-5 (2026-05-20): toggles opt-in (indicador de reorder, decay
-            de follows, cor no mapa). Default OFF.
-
-            Lily CLS fix (2026-05-28): toggles SEMPRE no DOM quando a
-            estratégia usa strength (showStrengthControls), nunca gateados
-            por `isActive`. Antes: `isActive && <Toggle/>` montava/desmontava
-            ao mover o slider 0→>0, empurrando o conteúdo abaixo (reflow =
-            layout shift). Manifesto perf CLS < 0.1.
-            Quando strength === 0 (lente off) os toggles ficam `disabled`
-            + dimmed com hint "ative a lente pra usar" — espaço reservado
-            constante, zero CLS, e semanticamente correto (estes ajustes só
-            têm efeito com a lente reordenando).
-            LOCK_VIA_TEST: tests/sua-lente-cls-conformance.test.ts — toggles
-            não podem voltar a ser gateados por strength/isActive.
-            Sprint N+2 P0.2: showStrengthControls gateia a estratégia —
-            sub-toggles PPR-específicos não fazem sentido em Chronological. */}
+        {/* Sub-toggles sempre no DOM (zero CLS); desabilitados com a lente
+            desligada. LOCK_VIA_TEST: tests/sua-lente-cls-conformance.test.ts. */}
         {showStrengthControls && (
           <div className="space-y-0">
             <ReorderIndicatorToggle disabled={!isActive} />
-            <PprDecayToggle disabled={!isActive} />
             <MapColorsToggle disabled={!isActive} />
           </div>
         )}
 
-        {/* CTA "ver feed agora" — só aparece quando lens ativa */}
-        {isActive && (
+        {isActive && showStrengthControls && (
           <div className="flex justify-end">
-            <DriftButton
-              variant="primary"
-              size="md"
-              onClick={onClose}
-              className="inline-flex items-center gap-2"
-            >
+            <DriftButton variant="primary" size="md" onClick={onClose} className="inline-flex items-center gap-2">
               <EyeIcon size={14} />
               ver feed agora
             </DriftButton>
           </div>
         )}
 
-        {/* P3: "como funciona" colapsado por default. User que quer
-            entender PageRank/NIP-02 expande. Wall-of-text não compete
-            mais com slider. */}
         <ComoFuncionaCollapse />
       </div>
     </FullPageCard>
   )
 }
 
-/**
- * Sub-toggle "mostrar quando a lente reordenou" — PR-5 (2026-05-20).
- *
- * Default OFF. Quando ON, o LensInspector chip muda de estilo (filled
- * + glyph ↕) pra marcar explicitamente posts afetados pelo reorder.
- * Útil pra user power validar comportamento da lente; novice user
- * prefere o chip discreto default.
- *
- * `disabled` (Lily CLS fix 2026-05-28): renderizado SEMPRE no DOM; quando
- * a lente está off (strength 0) fica desabilitado + dimmed. Espaço
- * reservado constante = zero layout shift ao mover o slider.
- */
+/** "destacar o que a lente adiantou" — opt-in, padrão desligado. */
 function ReorderIndicatorToggle({ disabled }: { disabled: boolean }) {
   const enabled = usePrefsStore((s) => s.lens_show_reorder_indicator)
   return (
     <ToggleRow
       disabled={disabled}
-      title="mostrar quando a lente reordenou"
-      description={
-        'chip "lente" fica preenchido + glyph ↕ pra marcar posts afetados. opt-in.'
-      }
+      title="destacar o que a lente adiantou"
+      description={'o chip "lente" fica preenchido e ganha ↑ nos posts que subiram por causa da lente.'}
       checked={enabled}
-      ariaLabel="mostrar indicador quando a lente reordenou posts"
+      ariaLabel="destacar os posts que a lente adiantou"
       onChange={(checked) => {
         void setPref('lens_show_reorder_indicator', checked)
       }}
@@ -316,55 +241,19 @@ function ReorderIndicatorToggle({ disabled }: { disabled: boolean }) {
 }
 
 /**
- * Sub-toggle "decay temporal nos follows antigos" — GAP-1 (2026-05-20).
- *
- * Default OFF (preserva math canônico bit-exact). Quando ON, edges
- * antigos pesam menos no walk PPR — útil pra user com grafo de follows
- * antigo + comportamento atual divergente. Half-life fixa em 30 dias.
- *
- * Aplicado APENAS no walk-time — `lens_edges.influence` no SQLite
- * permanece bit-exact (writer não muda).
- *
- * `disabled` (Lily CLS fix 2026-05-28): ver ReorderIndicatorToggle.
- */
-function PprDecayToggle({ disabled }: { disabled: boolean }) {
-  const enabled = usePrefsStore((s) => s.lens_ppr_decay_enabled)
-  return (
-    <ToggleRow
-      disabled={disabled}
-      title="esquecer follows antigos"
-      description="follows + drifts sem atividade ≥ 30 dias pesam menos. half-life 30d. opt-in."
-      checked={enabled}
-      ariaLabel="aplicar decay temporal a follows antigos"
-      onChange={(checked) => {
-        void setPref('lens_ppr_decay_enabled', checked)
-      }}
-    />
-  )
-}
-
-/**
- * Sub-toggle "mostrar confiança no mapa" — Trust Lens D 2026-05-21.
- *
- * Default OFF (Satoshi audit anterior: cor por trust list vaza info
- * adversarial pra observer casual com acesso ao device). Quando ON,
- * nós do SpreadMap (modo global/network) ganham cor por tier discreto
- * de PPR score: blue (low) → yellow (mid) → orange (high). Spreader
- * sem edge → cor default (preserva privacy quem não está na rede).
- *
- * Manifesto §24 view-layer + §28 zero novo dado vazado.
- *
- * `disabled` (Lily CLS fix 2026-05-28): ver ReorderIndicatorToggle.
+ * "mostrar quem você segue no mapa" — opt-in (Satoshi: cor por proximidade
+ * revela a sua rede a quem olha a tela). Os pontos de quem você segue ganham
+ * cor pela proximidade calculada no aparelho; o resto fica na cor padrão.
  */
 function MapColorsToggle({ disabled }: { disabled: boolean }) {
   const enabled = usePrefsStore((s) => s.lens_show_in_map)
   return (
     <ToggleRow
       disabled={disabled}
-      title="mostrar confiança no mapa"
-      description="pins no spread-map ganham cor por nível de confiança local (azul/amarelo/laranja). visível apenas pra você. opt-in."
+      title="mostrar quem você segue no mapa"
+      description="no mapa da sua rede, os pontos de quem você segue ganham cor. só você vê."
       checked={enabled}
-      ariaLabel="colorir pins do mapa por confiança local"
+      ariaLabel="colorir no mapa os pontos de quem você segue"
       onChange={(checked) => {
         void setPref('lens_show_in_map', checked)
       }}
@@ -372,18 +261,7 @@ function MapColorsToggle({ disabled }: { disabled: boolean }) {
   )
 }
 
-/**
- * ToggleRow — linha de sub-toggle opt-in da lente (Lily CLS fix 2026-05-28).
- *
- * Extraído dos 3 sub-toggles (reorder/decay/mapa) pra centralizar o
- * handling de `disabled`: quando a lente está off (strength 0) a linha
- * fica dimmed, o checkbox `disabled` (não-clicável), e um hint discreto
- * "ative a lente pra usar" aparece no lugar onde antes não havia nada —
- * mantendo a altura aproximadamente constante e evitando layout shift.
- *
- * O `opacity`/`color` transita suavemente, mas respeita
- * prefers-reduced-motion (motion-reduce:transition-none).
- */
+/** Linha de sub-toggle: dimmed + disabled com a lente desligada (altura constante). */
 function ToggleRow({
   disabled,
   title,
@@ -406,11 +284,9 @@ function ToggleRow({
       }`}
     >
       <div className="space-y-0.5">
-        <span className="block font-mono text-[12px] text-drift-text">
-          {title}
-        </span>
+        <span className="block font-mono text-[12px] text-drift-text">{title}</span>
         <span className="block font-mono text-[10px] leading-relaxed text-drift-muted">
-          {disabled ? 'ative a lente pra usar — ajuste a intensidade acima.' : description}
+          {disabled ? 'ligue a lente pra usar — ajuste a força acima.' : description}
         </span>
       </div>
       <input
@@ -425,19 +301,12 @@ function ToggleRow({
   )
 }
 
-/**
- * Sub-card colapsável "como funciona" — info densa (PageRank, NIP-02,
- * manifesto §24) escondida atrás de disclosure. User power que quer
- * entender expande; novice ignora.
- */
+/** "como funciona" — a regra inteira, colapsada por padrão. */
 function ComoFuncionaCollapse() {
-  // Phase 6 (2026-05-20): expansão default vem da flag user pref —
-  // menu_detail_show_how_it_works. Quando true, abre automaticamente.
   const defaultOpen = usePrefsStore((s) => s.menu_detail_show_how_it_works)
   const showAlgorithm = usePrefsStore((s) => s.menu_detail_show_algorithm)
   const showManifesto = usePrefsStore((s) => s.menu_detail_show_manifesto)
   const [open, setOpen] = useState(defaultOpen)
-  // Reage a mudança da pref pós-mount (user toggle no Menu Detalhado).
   useEffect(() => {
     setOpen(defaultOpen)
   }, [defaultOpen])
@@ -452,35 +321,45 @@ function ComoFuncionaCollapse() {
         <span>como funciona</span>
         <span aria-hidden="true">{open ? '−' : '+'}</span>
       </button>
-      {/* Collapse (grid-rows + opacity) — expand/collapse suave em vez de
-          pop instantâneo. Respeita prefers-reduced-motion. pt-3 fica DENTRO
-          do Collapse pra não reservar espaço quando colapsado. */}
       <Collapse open={open}>
         <div className="space-y-2 pt-3 font-mono text-[11px] leading-relaxed text-drift-body/85">
           <p>
-            <span className="text-drift-accent2">Grafo:</span> usa quem
-            você acompanha + posts que você deu drift.
+            <span className="text-drift-accent2">Quem conta:</span> quem você
+            segue — menos quem você bloqueou, silenciou ou denunciou. Uma
+            denúncia basta, e vale também para quem trouxe, na aba contágio,
+            um post que você denunciou. Amigos de amigos não contam: o app só
+            guarda a sua lista.
           </p>
-          {/* Parágrafo de algoritmo gateado por menu_detail_show_algorithm
-              (Phase 6). Default off — só entusiastas precisam do nome. */}
+          <p>
+            <span className="text-drift-accent2">Onde:</span> só nas abas
+            global e em alta. Seguindo e contágio continuam na ordem de sempre.
+          </p>
+          <p>
+            <span className="text-drift-accent2">Quais posts:</span> de cada
+            pessoa, no máximo 2 (os de mais pontos), de até 7 dias e que a
+            comunidade não afundou.
+          </p>
+          <p>
+            <span className="text-drift-accent2">Nunca:</span> põe um post que
+            ela adianta abaixo do lugar que ele já tinha, nem traz post de quem
+            você não segue.
+          </p>
           {showAlgorithm && (
             <p>
-              <span className="text-drift-accent2">Cálculo:</span>{' '}
-              influência local de cada autor sobre o seu feed (algoritmo
-              Personalized PageRank).
+              <span className="text-drift-accent2">Regra:</span> com força k%,
+              entre os primeiros N cards, pelo menos N × k ÷ 100 (arredondado
+              para baixo) são posts que a lente adianta, enquanto houver;
+              dentro de cada grupo, a ordem de sempre.
             </p>
           )}
           <p>
-            <span className="text-drift-accent2">Local:</span> tudo no
-            seu dispositivo. Não vaza, não é compartilhada, não fica em
-            cache na nuvem.
+            <span className="text-drift-accent2">Local:</span> calculada no
+            seu aparelho a cada leitura do feed. Nada é gravado nem publicado.
           </p>
-          {/* Manifesto §24 gateado por menu_detail_show_manifesto
-              (Phase 6). Default off — jargão normativo. */}
           {showManifesto && (
             <p className="pt-1 text-drift-muted">
-              Manifesto §24 — visualização local, não ranking canônico.
-              Você pode desligar a qualquer momento e o feed volta ao normal.
+              Manifesto §24 — algoritmo público, entradas suas. Desligue a
+              lente e o feed volta à ordem de todo mundo.
             </p>
           )}
         </div>
