@@ -374,7 +374,7 @@ function AlgosTopics() {
             accordionId="guia-algo-score"
             label="score (popularidade do post)"
             description="Quanto cada post 'vale' na rede. É a soma dos PESOS de quem deu DRIFT, menos 0,3 × o peso de quem deu SINK, mais o peso de quem comentou (até 30), dividido por um decay temporal."
-            impact="Score determina ordem no feed Global. Sobe com DRIFTs, cai com SINKs, cai com o tempo (decay). Todo cliente Drift calcula o MESMO score pra cada post (manifesto §24); a lente, se você ligar, muda só a ordem na sua tela — o score continua o mesmo."
+            impact="Score determina ordem no feed Global. Sobe com DRIFTs, cai com SINKs, cai com o tempo (decay). Todo cliente Drift calcula o MESMO score pra cada post (manifesto §24); a lente, se você ligar, muda só a sua tela (a ordem e quais posts aparecem entre os primeiros) — o score continua o mesmo."
             defaultExplained="Função pura: mesma entrada, mesma saída. Não consulta servidor central — cada cliente calcula localmente a partir dos eventos Nostr que recebeu."
             reversible
             reference="Docs/algoritmos.md §1"
@@ -424,7 +424,7 @@ function AlgosTopics() {
             accordionId="guia-algo-ppr"
             label="sua lente — quem você segue primeiro"
             description="Opcional, começa desligada. Com força k, k de cada 100 cards das abas global e em alta vão para posts de quem você segue, na ordem de sempre."
-            impact="Com 50, um card sim, um não; com 100, primeiro todos eles. De cada pessoa, no máximo 2 posts (os de mais pontos, de até 7 dias). Um post que a lente adianta nunca fica abaixo do lugar que já tinha; post afundado pela comunidade não sobe; post de quem você não segue nunca entra. Quem você bloqueou, silenciou ou denunciou fica de fora — uma denúncia basta. Seguindo e contágio não mudam. O card adiantado mostra o chip 'lente' com o motivo."
+            impact="Com 50, um card sim, um não; com 100, primeiro eles. De cada pessoa, no máximo 2 posts (os de mais pontos, de até 7 dias). Um post que a lente adianta nunca fica abaixo do lugar que já tinha; post afundado pela comunidade não sobe; post de quem você não segue nunca entra. Quem você bloqueou, silenciou ou denunciou fica de fora — uma denúncia basta. Seguindo e contágio não mudam. O card adiantado mostra o chip 'lente' com o motivo."
             defaultExplained="Desligada por padrão. Calculada no seu aparelho a cada leitura do feed; nada é publicado, os pontos dos posts não mudam e a ordem dos outros também não. Desligue e tudo volta à ordem de todo mundo."
             reversible
             reference="manifesto §24 + Docs/algoritmos.md §6"

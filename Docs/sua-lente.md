@@ -56,7 +56,7 @@ Três travas:
    segue (pontos negativos), a lente não o adianta: ele fica onde estava.
 3. **Não traz post de fora da sua rede.** Os posts de quem você segue que
    estavam fora dos 50 da aba podem entrar; para isso, saem os últimos da
-   aba — sempre de quem você não segue. A aba continua com o mesmo tamanho.
+   aba — nunca um post que a lente escolheu. A aba continua com o mesmo tamanho.
 
 Exemplo, força 50: a aba tem m1, m2, m3, m4 (de quem você não segue) e, em
 5º, s1 (de quem você segue); fora da aba há s2, também de quem você segue.

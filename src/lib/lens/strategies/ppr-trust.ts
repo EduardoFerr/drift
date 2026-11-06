@@ -12,8 +12,9 @@
  *
  * A regra (mixNetwork, src/lib/lens/order.ts): com força k%, k de cada 100
  * lugares da aba vão para posts de quem você segue, na ordem de sempre;
- * nunca rebaixa um post da sua rede; post afundado pela comunidade não
- * ganha prioridade; a aba mantém o tamanho.
+ * no máximo 2 posts por pessoa, de até 7 dias; nunca rebaixa um post
+ * escolhido; post afundado pela comunidade não ganha prioridade; a aba
+ * mantém o tamanho.
  *
  * Força 0 → devolve o MESMO array (a ordem de sempre, bit a bit).
  * Manifesto §7: função pura das entradas (força, aba, posts da rede).

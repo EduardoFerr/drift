@@ -35,14 +35,16 @@ const pctOf = (strength: number) => Math.max(0, Math.min(100, Math.round(strengt
 
 /**
  * O efeito, em palavras: quantos cards vão para quem você segue. Frações
- * simples quando batem (1 em cada 2, 3 em cada 4); senão, "k de cada 100".
+ * simples só quando são exatas (1 em cada 2, 3 em cada 4): a cota é
+ * ⌊(p+1)·k/100⌋, então "1 em cada 3" para k = 33 seria mentira no 3º card.
+ * Senão, "k de cada 100".
  */
 export function lensLabel(k: number): string {
   if (k <= 0) return 'desligada — a ordem de todo mundo'
-  if (k >= 100) return 'primeiro, todos de quem você segue'
+  if (k >= 100) return 'primeiro, os de quem você segue'
   for (const d of [2, 3, 4, 5, 10]) {
-    const n = Math.round((k * d) / 100)
-    if (n >= 1 && Math.abs(n / d - k / 100) < 0.005) {
+    const n = (k * d) / 100
+    if (Number.isInteger(n) && n >= 1) {
       return `${n} em cada ${d} cards ${n === 1 ? 'é' : 'são'} de quem você segue`
     }
   }
@@ -123,7 +125,7 @@ export function SuaLenteCard({ onClose }: CardProps) {
             value={activeId}
             onChange={(e) => void chooseLens(e.target.value)}
             aria-label="qual lente"
-            className="w-full cursor-pointer rounded border border-drift-border/40 bg-drift-surface px-3 py-2 font-mono text-[12px] text-drift-text focus:border-drift-accent2 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
+            className="min-h-[44px] w-full cursor-pointer rounded border border-drift-border/40 bg-drift-surface px-3 py-2 font-mono text-[12px] text-drift-text focus:border-drift-accent2 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
           >
             {lenses.map((l) => (
               <option key={l.id} value={l.id}>
@@ -177,9 +179,7 @@ export function SuaLenteCard({ onClose }: CardProps) {
                     key={stop}
                     type="button"
                     onClick={() => commitStrength(stop)}
-                    className={`flex h-3 w-3 items-center justify-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40 ${
-                      isAtStop ? 'bg-drift-accent2' : 'bg-drift-border hover:bg-drift-accent2/60'
-                    }`}
+                    className="group -m-4 flex h-11 w-11 items-center justify-center rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
                     title={
                       stop === 0
                         ? 'desligada — a ordem de todo mundo'
@@ -188,7 +188,15 @@ export function SuaLenteCard({ onClose }: CardProps) {
                         : 'máximo — primeiro quem você segue'
                     }
                     aria-label={`ajustar pra ${stop * 100}%`}
-                  />
+                  >
+                    {/* ponto de 12 px desenhado; a área de toque é o botão de 44 px */}
+                    <span
+                      aria-hidden="true"
+                      className={`block h-3 w-3 rounded-full transition-colors ${
+                        isAtStop ? 'bg-drift-accent2' : 'bg-drift-border group-hover:bg-drift-accent2/60'
+                      }`}
+                    />
+                  </button>
                 )
               })}
             </div>
@@ -316,7 +324,7 @@ function ComoFuncionaCollapse() {
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="flex w-full items-center justify-between gap-2 py-1 font-mono text-[11px] uppercase tracking-meta text-drift-muted hover:text-drift-accent2 focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2/40"
+        className="flex min-h-[44px] w-full items-center justify-between gap-2 py-1 font-mono text-[11px] uppercase tracking-meta text-drift-muted hover:text-drift-accent2 focus:outline-none focus-visible:ring-2 focus-visible:ring-drift-accent2/40"
       >
         <span>como funciona</span>
         <span aria-hidden="true">{open ? '−' : '+'}</span>

@@ -111,27 +111,28 @@ async function oracle(page: Page, tab: 'global' | 'trending', k: number): Promis
   if (k === 0) return tabList.map((p) => p.id)
   const rede = await networkOf(page, await viewer(page))
   const inTab = new Map(tabList.map((p, i) => [p.id, i]))
-  // candidatos: os 50 primeiros posts da sua rede de até 7 dias (o mesmo limite da aba);
-  // afundados não; no máximo 2 por pessoa (os de mais pontos — a ordem já é a canônica)
+  // escolhidos, pela regra publicada: posts da sua rede de até 7 dias, não
+  // afundados, no máximo 2 por pessoa (os de mais pontos) — e SÓ ENTÃO os 50
+  // primeiros (o limite da aba). A lista toda já vem na ordem canônica.
   const perAuthor = new Map<string, number>()
   const net = all
-    .filter((p) => rede.has(p.a) && p.t >= nowSec - 7 * 86_400)
-    .slice(0, WIN)
-    .filter((p) => p.s >= 0)
+    .filter((p) => rede.has(p.a) && p.t >= nowSec - 7 * 86_400 && p.s >= 0)
     .filter((p) => { const n = perAuthor.get(p.a) ?? 0; perAuthor.set(p.a, n + 1); return n < 2 })
+    .slice(0, WIN)
   const netIds = new Set(net.map((p) => p.id))
   const rest = tabList.filter((p) => !netIds.has(p.id))
+  // Escrito como contagem (não como o laço do app): até o lugar p, quantos
+  // escolhidos devem estar na tela? Pelo menos a cota ⌊(p+1)·k/100⌋, pelo
+  // menos os escolhidos que já estavam na aba até p (nunca rebaixa), e todos
+  // os que faltam quando o resto acaba. Nunca mais do que existem.
+  const chosenInTabUpTo = (p: number) => net.filter((x) => (inTab.get(x.id) ?? Infinity) <= p).length
   const out: string[] = []
-  let i = 0
-  let j = 0
-  for (let p = 0; out.length < tabList.length; p++) {
-    const head = net[i]
-    const due = head !== undefined && (inTab.get(head.id) ?? Infinity) <= p
-    if (head !== undefined && (i < Math.floor(((p + 1) * k) / 100) || due || j >= rest.length)) {
-      out.push(head.id)
-      i++
-    } else if (j < rest.length) out.push(rest[j++]!.id)
-    else break
+  let usedNet = 0
+  let usedRest = 0
+  for (let p = 0; p < tabList.length; p++) {
+    const want = Math.min(net.length, Math.max(Math.floor(((p + 1) * k) / 100), chosenInTabUpTo(p)))
+    const takeNet = usedNet < want || usedRest >= rest.length
+    out.push(takeNet ? net[usedNet++]!.id : rest[usedRest++]!.id)
   }
   return out
 }

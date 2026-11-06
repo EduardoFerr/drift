@@ -6,7 +6,8 @@
  *     que a lente do feed lê (src/lib/lens/strategies/ppr-trust.ts →
  *     mixNetwork; Docs/algoritmos.md §6). A ORDEM do feed não usa PPR: na
  *     produção o grafo é só a sua lista de quem você segue, e a lente usa
- *     "sua rede" (vínculo > 0, a mesma regra da aba Contágio) direto;
+ *     "sua rede" (quem você segue sem nenhuma denúncia: vínculo ≥
+ *     TIE_FOLLOW, corte mais alto que o da aba Contágio) direto;
  *   - o PPR (`pprScores`) e as pontes, que colorem o mapa da sua rede
  *     (toggle "mostrar quem você segue no mapa") — Docs/algoritmos.md §5;
  *   - regras de filtro (CRUD; sem uso no feed ainda).

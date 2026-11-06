@@ -333,6 +333,43 @@ describe('ligada', () => {
     expect(posts.find((p) => p.id === n.f0!.id)?.lensLift).toBeDefined()
   })
 
+  it('quem posta sem parar não tira os outros da lente (teto de 2 por pessoa antes de qualquer limite)', async () => {
+    // quebra: cortar os candidatos da rede num LIMIT antes do teto por pessoa —
+    // 120 posts novos e sem voto de uma conta seguida ocupariam todas as linhas
+    const n = await freshDevice('natural')
+    const quiet = post('terceira', NOW - 90 * 60)
+    await onNostrEvent(quiet as never)
+    for (let i = 0; i < 120; i++) await onNostrEvent(post('colega', NOW - 60 - i) as never)
+    await new Promise((r) => setTimeout(r, 130))
+    await recalcAllScores()
+    follow([...FOLLOWED, 'terceira'])
+    setLensStrength(1)
+    for (const tab of ['global', 'trending'] as const) {
+      const posts = await tabPosts(tab)
+      const lifted = posts.filter((p) => p.lensLift)
+      expect(lifted.map((p) => p.id)).toContain(quiet.id)
+      expect(lifted.filter((p) => p.authorPub === pk('colega')).length).toBeLessThanOrEqual(2)
+      if (tab === 'global') expect(lifted.map((p) => p.id)).toContain(n.f0!.id)
+    }
+  })
+
+  it('a aba trocada enquanto a lente lê a sua rede: fica a aba nova, sem marca da lente', async () => {
+    // quebra: o resultado da leitura do Global sobrescrever Seguindo
+    await freshDevice('natural')
+    const following = (await tabIds('following'))
+    setLensStrength(1)
+    useFeedStore.setState({ tab: 'global', loaded: false })
+    const pending = refreshFeed()
+    useFeedStore.setState({ tab: 'following', loaded: false })
+    await pending
+    await new Promise((r) => setTimeout(r, 400)) // o refresh pendente roda sozinho
+    const s = useFeedStore.getState()
+    expect(s.tab).toBe('following')
+    expect(s.loaded).toBe(true)
+    expect(s.posts.map((p) => p.id)).toEqual(following)
+    expect(s.posts.some((p) => p.lensLift)).toBe(false)
+  })
+
   it('se a leitura da sua rede falhar, a aba sai na ordem de sempre (a lente nunca derruba o feed)', async () => {
     // quebra: um erro na lente (SQL, arquivo do motor que sumiu depois de um
     // deploy) virar "falha ao carregar" na aba Global
@@ -382,8 +419,10 @@ describe('determinismo e nada gravado', () => {
 
   it('aplicar a lente não grava nada: o banco fica idêntico', async () => {
     await freshDevice('natural')
-    const dump = () => JSON.stringify(['posts', 'users', 'spreads', 'buries', 'reports', 'user_prefs'].map((t) =>
-      H.conn!.prepare(`SELECT * FROM ${t} ORDER BY 1`).all()))
+    // todas as tabelas (lens_*, contagion_*, pontuação…), não uma lista escolhida
+    const tables = (H.conn!.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name`).all() as Array<{ name: string }>).map((r) => r.name)
+    expect(tables.length).toBeGreaterThan(10)
+    const dump = () => JSON.stringify(tables.map((t) => H.conn!.prepare(`SELECT * FROM "${t}" ORDER BY 1`).all()))
     const before = dump()
     for (const k of [0.25, 0.5, 1]) {
       setLensStrength(k)
@@ -418,5 +457,19 @@ describe('reação a mudanças', () => {
     } finally {
       stop()
     }
+  })
+
+  it('depois de desligar a reação, mexer na força não refaz a aba', async () => {
+    // quebra: o unsubscribe de startFeedLensSync não soltar alguma assinatura
+    await freshDevice('natural')
+    const stop = startFeedLensSync()
+    useFeedStore.setState({ tab: 'global', loaded: false })
+    await refreshFeed()
+    await new Promise((r) => setTimeout(r, 400)) // escoa refresh pendente da carga dos eventos
+    const off = useFeedStore.getState().posts.map((p) => p.id)
+    stop()
+    setLensStrength(1)
+    await new Promise((r) => setTimeout(r, 400))
+    expect(useFeedStore.getState().posts.map((p) => p.id)).toEqual(off)
   })
 })

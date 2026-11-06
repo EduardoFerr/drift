@@ -21,7 +21,7 @@ import { useFollowsStore } from './follows'
 import { getCurrentNpub } from './identity'
 import { applyActiveLens, activeLensNeedsNetwork } from './lens/init'
 import { useLensRegistryStore } from './lens/registry'
-import { LENS_MAX_AGE_DAYS } from './lens/order'
+import { LENS_MAX_AGE_DAYS, LENS_MAX_PER_AUTHOR } from './lens/order'
 import { useLensStore } from './trust-lens'
 import { normalizeLayout } from '../types/drift'
 import { parseImetaTag as parseImetaTagSync, type BlobMeta } from './nip94'
@@ -283,6 +283,11 @@ const LENS_TABS: ReadonlySet<FeedTab> = new Set<FeedTab>(['global', 'trending'])
  * (`LENS_MAX_AGE_DAYS`): no Global, sem isso, um post antigo com um voto
  * (score > 0 para sempre) passaria à frente de todo post novo sem voto. Em
  * alta já recorta 24 h.
+ *
+ * O score ≥ 0 e o teto de `LENS_MAX_PER_AUTHOR` posts por pessoa (os de mais
+ * pontos) valem ANTES do LIMIT: senão uma conta seguida que posta sem parar
+ * ocuparia todas as linhas e tiraria os outros da lente. `mixNetwork`
+ * reaplica os dois filtros (segunda trava).
  */
 export async function getNetworkCandidates(
   tab: 'global' | 'trending',
@@ -295,11 +300,19 @@ export async function getNetworkCandidates(
   const windowMs = tab === 'trending' ? TRENDING_WINDOW_HOURS * 3600 * 1000 : LENS_MAX_AGE_DAYS * 86_400_000
   const window = 'AND p.created_at >= ?'
   params.push(Math.floor((now - windowMs) / 1000))
-  params.push(limit)
+  params.push(LENS_MAX_PER_AUTHOR, limit)
   const rows = await db.exec<PostRow>(
-    `${POST_SELECT}
-     WHERE p.score > -999 AND p.author_pub IN (SELECT value FROM json_each(?)) ${window}
-     ${FEED_ORDER}
+    `SELECT * FROM (
+       SELECT q.*, ROW_NUMBER() OVER (
+         PARTITION BY q.author_pub ORDER BY q.score_now DESC, q.created_at DESC, q.id ASC
+       ) AS lens_rank
+       FROM (
+         ${POST_SELECT}
+         WHERE p.score > -999 AND p.author_pub IN (SELECT value FROM json_each(?)) ${window}
+       ) q
+       WHERE q.score_now >= 0
+     ) WHERE lens_rank <= ?
+     ORDER BY score_now DESC, created_at DESC, id ASC
      LIMIT ?`,
     params,
   )
@@ -309,9 +322,9 @@ export async function getNetworkCandidates(
 /**
  * Aplica a lente ativa à aba (só Global e Em alta). A aba chega na ordem
  * canônica; a lente decide a ordem final e, se pedir, recebe os posts de
- * quem o leitor segue — "sua rede" pela mesma regra da aba Contágio
- * (vínculo > 0: segue, não bloqueou, a denúncia dele não zerou), menos os
- * silenciados. Nada é gravado: o resultado vive só no store.
+ * quem o leitor segue — "sua rede": segue, não bloqueou, não silenciou e
+ * nenhuma denúncia (vínculo ≥ TIE_FOLLOW, corte mais alto que o da aba
+ * Contágio). Nada é gravado: o resultado vive só no store.
  */
 async function withLens(tab: FeedTab, canonical: Post[], limit: number, now: number): Promise<Post[]> {
   if (!LENS_TABS.has(tab)) return canonical

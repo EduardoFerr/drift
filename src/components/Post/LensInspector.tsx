@@ -75,7 +75,7 @@ export function LensInspector({ authorPub, lensLift }: InspectorProps) {
             </p>
             <p>
               {k === 100
-                ? 'Com a sua lente em 100%, os posts de quem você segue vêm primeiro nas abas global e em alta, na ordem de sempre.'
+                ? 'Com a sua lente em 100%, os posts de quem você segue vêm primeiro nas abas global e em alta, na ordem de sempre (até 2 de cada pessoa, de até 7 dias).'
                 : `Com a sua lente em ${k}%, ${k} de cada 100 cards das abas global e em alta vão para posts de quem você segue, na ordem de sempre.`}
             </p>
             <p>

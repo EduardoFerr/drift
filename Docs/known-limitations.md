@@ -108,7 +108,7 @@ audits só por feio. Defer documentado > silence.
 ### 4c. Lente: só quem você segue diretamente conta (2026-11-06)
 
 - **Issue:** a lente no feed (`Docs/algoritmos.md` §6) prioriza só posts de
-  quem você segue (vínculo > 0). Amigos de amigos não entram: o app guarda
+  quem você segue (sem bloqueio, silêncio ou denúncia — `tie ≥ TIE_FOLLOW`). Amigos de amigos não entram: o app guarda
   só a SUA lista de quem você segue (o sync não baixa o kind 3 dos
   contatos). Os textos antigos prometiam "entorno" e "drifts mútuos".
 - **Risk:** LOW. A lente faz menos do que um PPR de vários saltos faria;
@@ -172,6 +172,31 @@ audits só por feio. Defer documentado > silence.
 - **Mitigation:** teto de 2 por pessoa limita qualquer conta seguida.
 - **Reopener:** dado real de uso OU simulação com distribuição de
   seguidores de cauda longa.
+
+### 4e4. Lente: sutilezas da regra (revisão em pares, 2026-11-06)
+
+- **Issue:**
+  - `created_at` é do autor. No futuro, o app aceita até 15 min
+    (`MAX_FUTURE_SKEW_SECONDS`) e a idade nunca fica negativa no decay: o
+    máximo é 15 min a mais na janela de 7 dias e vencer desempates entre
+    posts com 0 pontos. Na lente cronológica, um post datado +15 min fica
+    em 1º — vale para qualquer autor entre os 50 da aba.
+  - O corte de 7 dias / 24 h usa o relógio do aparelho: dois aparelhos com
+    relógios diferentes discordam perto da borda (como o feed inteiro).
+  - "Score < 0 não sobe" é tudo-ou-nada: um único SINK de alguém com peso
+    num post novo e sem votos de quem você segue tira a prioridade dele na
+    lente de todos que o seguem.
+  - Posts silenciados ou de bloqueados somem só na tela: ocupam lugar na
+    aba, então "k de cada 100" e o "estava em Xº, está em Yº" do chip
+    contam cards que você não vê.
+  - Um post de quem você segue que a lente NÃO escolheu (o 3º da pessoa,
+    com mais de 7 dias ou afundado) pode descer quando outros sobem.
+- **Risk:** LOW (só a ordem da sua tela; os textos dizem "nunca abaixo"
+  só para os posts que a lente adianta).
+- **Mitigation:** limite de 15 min no futuro; o score é entrada pública e
+  igual para todos; a regra é a mesma em todos os aparelhos.
+- **Reopener:** relato de SINK direcionado contra posts de seguidos, OU
+  reclamação de post datado no futuro no topo da cronológica.
 
 ### 4f. Lente não é defesa contra fazenda de contas
 

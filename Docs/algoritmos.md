@@ -681,9 +681,11 @@ defesa contra contas falsas seguidas por um contato
 ```
 aba   = os N primeiros na ordem canônica (§1; N = 50)
 rede  = posts da sua rede de até 7 dias (Em alta: as 24 h da aba), com
-        score ≥ 0, mesmo relógio da aba, os N primeiros na ordem canônica,
-        no máximo 2 por pessoa (os 2 primeiros dela) — podem estar fora
-        da aba. Ordem dentro de `rede`: primeiro os que já estão na aba,
+        score ≥ 0, mesmo relógio da aba, no máximo 2 por pessoa (os 2
+        primeiros dela na ordem canônica) e, só depois do teto, os N
+        primeiros na ordem canônica — podem estar fora da aba. (O teto vem
+        antes do limite N no SQL: senão quem posta sem parar ocuparia as N
+        linhas.) Ordem dentro de `rede`: primeiro os que já estão na aba,
         na ordem da aba; depois os de fora, na ordem canônica. Post lido
         nas duas consultas vale como está na aba.
 resto = posts da aba que não estão em `rede`, na ordem canônica
@@ -824,7 +826,8 @@ O multiplicador consertado (proximidade exata, sinal certo) ficou em
 2. A lente trazer post de quem não é da sua rede, rebaixar post que ela
    escolheu, trazer mais de 2 posts da mesma pessoa ou post com mais de 7
    dias (`tests/lens-order.test.ts`, `tests/lens-feed-pipeline.test.ts`)
-2b. Quem você denunciou uma vez continuar na sua rede
+2b. Quem você denunciou uma vez continuar na sua rede, ou uma conta seguida
+   que posta sem parar tirar os outros da lente
    (`tests/lens-feed-pipeline.test.ts`)
 3. Seguindo ou Contágio mudarem com a lente ligada
    (`tests/lens-feed-pipeline.test.ts`, `e2e/lens-feed.spec.ts`)

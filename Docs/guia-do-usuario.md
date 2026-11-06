@@ -436,14 +436,14 @@ Põe posts de **quem você segue** entre os primeiros das abas **global** e
   tem os mesmos posts (manifesto §24).
 - **Força k:** k de cada 100 cards dessas abas vão para posts de quem você
   segue, na ordem de sempre. Com 50, um card sim, um não; com 100,
-  primeiro todos eles, depois o resto. De cada pessoa, no máximo 2 posts
+  primeiro eles, depois o resto. De cada pessoa, no máximo 2 posts
   (os de mais pontos, de até 7 dias).
 - **Quem conta:** quem você segue, menos quem você bloqueou, silenciou ou
   denunciou — uma denúncia basta, inclusive de um post que a pessoa trouxe
   na aba contágio. Amigos de amigos não contam: o app só guarda a sua
   lista.
-- **O que ela nunca faz:** tirar um post de quem você segue do lugar que ele
-  já tinha, subir post que a comunidade afundou, trazer post de quem você
+- **O que ela nunca faz:** pôr um post que ela adianta abaixo do lugar que
+  ele já tinha, subir post que a comunidade afundou, trazer post de quem você
   não segue ou mexer nas abas seguindo e contágio.
 - **Quando um post subiu pela lente,** o card mostra o chip "lente". Toque
   nele e veja o motivo: quem você segue, a sua força e o lugar que o post

@@ -13,7 +13,7 @@ exceção da lente foi escrita no manifesto §24.
 ### Added
 - **A lente no feed (a mistura)** — só nas abas Global e Em alta, só com a
   lente ligada: com força k, k de cada 100 cards vão para posts de quem você
-  segue, na ordem de sempre (50 = um sim, um não; 100 = primeiro todos
+  segue, na ordem de sempre (50 = um sim, um não; 100 = primeiro
   eles). De cada pessoa, no máximo 2 posts (os de mais pontos, de até 7
   dias) — quem posta sem parar não toma a lente. Nunca rebaixa um post que
   escolheu, não adianta post afundado pela comunidade (score < 0), não traz
