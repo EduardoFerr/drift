@@ -20,7 +20,7 @@ Suas": regras públicas e determinísticas, entradas do próprio usuário.
   do autor, com os contatos de maior vínculo que trouxeram o post ("Ana,
   Bia +1" no empate). Post direto não mostra.
 - **"Não trazer mais por X"** — tocar na etiqueta abre a folha "chegou
-  por", com um botão por pessoa (nome + fim da chave): os DRIFTs dela
+  por", com um botão por pessoa (nome + começo e fim da chave): os DRIFTs dela
   param de trazer post, e o SINK e a denúncia dela passam a pesar como os
   de quem você só segue (sozinha, ela não esconde nada); os posts dela
   continuam. Não pune, não é publicado (tabela local `contagion_no_bring`)

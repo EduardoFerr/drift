@@ -2809,7 +2809,9 @@ function BootView({ state }: { state: BootState }) {
           detail={
             state.storage === null
               ? state.step === 'db'
-                ? state.dbProgress ?? 'abrindo os dados deste aparelho…'
+                ? state.dbSlow
+                  ? 'ainda trabalhando nos dados deste aparelho — pode esperar ou recarregar, sem perder nada'
+                  : state.dbProgress ?? 'abrindo os dados deste aparelho…'
                 : 'aguardando'
               : state.storage === 'opfs'
               ? 'storage: OPFS (persistente)'
@@ -2823,6 +2825,12 @@ function BootView({ state }: { state: BootState }) {
                   label: '↻ recarregar',
                   onClick: reloadPage,
                   title: 'tenta abrir OPFS de novo — modo memória é fallback temporário',
+                }
+              : state.storage === null && state.step === 'db' && state.dbSlow
+              ? {
+                  label: '↻ recarregar',
+                  onClick: reloadPage,
+                  title: 'recarregar é seguro: o banco desfaz o trabalho pela metade e retoma',
                 }
               : undefined
           }

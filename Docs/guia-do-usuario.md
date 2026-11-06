@@ -286,9 +286,10 @@ passa de contato em contato.
   parar de receber o que ela drifta. Os posts que ela escreve continuam
   chegando; o que ela afunda ou denuncia passa a pesar como o de alguém
   que você só segue — sozinha, ela não esconde nada da sua aba. Não é
-  punição, ninguém fica sabendo e fica só no seu aparelho. Na folha e na
-  lista, o nome vem com o fim da chave (…a1b2c3), para você saber que é a
-  pessoa certa. Enquanto a folha está aberta a aba não muda; ela se atualiza
+  punição, ninguém fica sabendo e fica só no seu aparelho. Na folha, na
+  lista e no aviso da denúncia, o nome vem com o começo e o fim da chave
+  (1a2b3c4d…5e6f7a8b): se alguém copiar o nome de um amigo seu, a chave
+  não bate — confira com a do perfil dele. Enquanto a folha está aberta a aba não muda; ela se atualiza
   quando você fecha. Desfaça na hora, com **desfazer** na própria folha,
   ou depois em config → conteúdo → listas → **não trazem**. Serve para o
   contato que vive driftando coisa que você não quer, sem precisar

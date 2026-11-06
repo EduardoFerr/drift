@@ -161,21 +161,41 @@ function sqliteNames(type: 'table' | 'index'): Set<string> {
  * dezenas de segundos, e assim o progresso fica salvo entre recargas (nada
  * de refazer tudo do zero) e o main thread vê sinal de vida. O resto do
  * schema (tabelas novas, instruções que já existem) vai numa transação só.
+ *
+ * Índice é otimização: se um falhar mesmo depois das tentativas (ex.: o
+ * aparelho sem espaço), ele fica para o próximo boot e sai do schema deste
+ * — senão a transação do schema repetiria o mesmo CREATE INDEX e o boot
+ * travaria a cada recarga.
+ *
+ * Esta etapa roda ANTES das migrações: índice sobre coluna criada por
+ * migração vai no SQL da própria migração, não no schema.sql.
  */
 async function applySchema(schema: string): Promise<void> {
-  const tables = sqliteNames('table')
+  // a primeira leitura depois de abrir é a que desfaz um journal deixado
+  // por recarga: entra nas novas tentativas também
+  let tables = new Set<string>()
+  let indexes = new Set<string>()
+  await withRetry('leitura do schema', () => {
+    tables = sqliteNames('table')
+    indexes = sqliteNames('index')
+  })
+  let toApply = schema
   if (tables.size > 0) {
-    const indexes = sqliteNames('index')
     const missing = schemaIndexes(schema).filter((ix) => !indexes.has(ix.name) && tables.has(ix.table))
     for (const [i, ix] of missing.entries()) {
       reply({
         log: `criando índice ${ix.name} (${ix.table})…`,
         progress: `organizando os dados deste aparelho (${i + 1} de ${missing.length})…`,
       })
-      await withRetry(`índice ${ix.name}`, () => db!.exec(ix.sql))
+      try {
+        await withRetry(`índice ${ix.name}`, () => db!.exec(ix.sql))
+      } catch (err) {
+        log(`índice ${ix.name} adiado para o próximo boot: ${err instanceof Error ? err.message : err}`)
+        toApply = toApply.replace(ix.sql, `-- ${ix.name}: adiado (falhou neste boot)`)
+      }
     }
   }
-  await withRetry('schema', () => inTransaction(() => db!.exec(schema)))
+  await withRetry('schema', () => inTransaction(() => db!.exec(toApply)))
 }
 
 async function init(schema: string): Promise<{ hasOpfs: boolean; storage: StorageMode }> {

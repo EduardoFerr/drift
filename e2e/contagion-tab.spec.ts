@@ -404,6 +404,9 @@ test.describe('aba Contágio', () => {
 
       const noteTab = await reportCurrentCard(page)
       expect(noteTab, 'o aviso cita quem trouxe antes do envio').toContain('que trouxe este post')
+      // a culpa é permanente: o aviso mostra a chave de quem trouxe, não só o
+      // nome (uma isca com o nome de um amigo não inibe a denúncia)
+      expect(noteTab).toContain(`${via.slice(0, 8)}…${via.slice(-8)}`)
       await expect.poll(async () => (await badRows(page, target)).length, { timeout: 10_000 }).toBe(2)
       const rows = await badRows(page, target)
       expect(rows.every((r) => r.v === me), 'o registro é do leitor').toBe(true)
@@ -506,8 +509,9 @@ test.describe('aba Contágio', () => {
       await expect(sheet).toBeVisible()
       const cut = sheet.getByRole('button', { name: /^não trazer mais por/ })
       const undo = sheet.getByRole('button', { name: 'desfazer' })
-      // nome com o fim da chave: quem copia o nome da Alice não se passa por ela
-      await expect(sheet.getByRole('listitem').first()).toContainText(`…${alice.slice(-6)}`)
+      // nome com começo e fim da chave (64 bits): quem copia o nome da Alice
+      // não consegue copiar também a chave
+      await expect(sheet.getByRole('listitem').first()).toContainText(`${alice.slice(0, 8)}…${alice.slice(-8)}`)
       await cut.click()
       // a confirmação é anunciada e o foco vai para o "desfazer" da linha
       // (o botão tocado some; sem isso o foco cairia fora do diálogo)

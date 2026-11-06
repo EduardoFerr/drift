@@ -34,6 +34,10 @@
 //  - no estouro, o worker é encerrado.
 const INIT_IDLE_TIMEOUT_MS = 30_000
 const INIT_MAX_MS = 600_000
+/** Depois de aberto, tanto tempo sem progresso: a tela avisa que ainda
+ *  está trabalhando e oferece recarregar (no app instalado não há botão
+ *  do navegador) — sem encerrar o worker. */
+const INIT_SLOW_HINT_MS = 60_000
 
 interface Pending {
   resolve: (v: unknown) => void
@@ -76,7 +80,9 @@ function call<T>(type: string, payload: Record<string, unknown> = {}): Promise<T
   })
 }
 
-export function initDb(opts: { onProgress?: (message: string) => void } = {}): Promise<InitResult> {
+export function initDb(
+  opts: { onProgress?: (message: string) => void; onSlow?: () => void } = {},
+): Promise<InitResult> {
   if (initPromise) return initPromise
 
   console.log('[db] criando worker SQLite…')
@@ -153,11 +159,13 @@ export function initDb(opts: { onProgress?: (message: string) => void } = {}): P
   const initCall = call<InitResult>('init')
   let idle: ReturnType<typeof setTimeout> | undefined
   let cap: ReturnType<typeof setTimeout> | undefined
+  let slow: ReturnType<typeof setTimeout> | undefined
   const stopTimers = () => {
     onInitProgress = null
     onInitOpened = null
     clearTimeout(idle)
     clearTimeout(cap)
+    clearTimeout(slow)
   }
   const timeout = new Promise<never>((_, reject) => {
     const fail = (message: string) => {
@@ -178,7 +186,12 @@ export function initDb(opts: { onProgress?: (message: string) => void } = {}): P
     let opened = false
     const arm = () => {
       clearTimeout(idle)
-      if (opened) return // banco aberto: só o teto total
+      clearTimeout(slow)
+      if (opened) {
+        // banco aberto: só o teto total — e, se demorar, a tela avisa
+        slow = setTimeout(() => opts.onSlow?.(), INIT_SLOW_HINT_MS)
+        return
+      }
       idle = setTimeout(() => {
         console.error(`[db] init do worker SQLite sem sinal de vida por ${INIT_IDLE_TIMEOUT_MS} ms (WASM ou OPFS?)`)
         fail(
@@ -189,7 +202,7 @@ export function initDb(opts: { onProgress?: (message: string) => void } = {}): P
     onInitProgress = arm
     onInitOpened = () => {
       opened = true
-      clearTimeout(idle)
+      arm()
     }
     arm()
     cap = setTimeout(() => {

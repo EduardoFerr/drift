@@ -75,6 +75,19 @@ em `Docs/simulacao-contagio/` e `Docs/spec-revisao-contagio.md`.
   locais → não trazem. Bateria `gesto_*` (spec §4.8): com 10% de denúncia,
   isca 12,4% → 4,8% (uso 20%) → 2,6% (uso 40%), sem custo de alcance; não
   pega spam direto de quem a pessoa segue.
+- [ ] **Fallback kvvfs morto dentro do Worker (grave, pré-existente)** —
+  contexto: revisão Barney+Satoshi de 05/11/2026: `db.worker.ts` testa
+  `typeof localStorage`, que é sempre `'undefined'` num Worker; quem não
+  tem OPFS cai direto em memória e perde tudo a cada recarga — inclusive a
+  identidade — achando que está no modo "localStorage, persistente" —
+  bloqueio: decidir o caminho (kvvfs pelo main thread, IndexedDB no
+  worker, ou avisar e bloquear o boot sem persistência).
+- [ ] **Motor da aba Contágio no precache do service worker** — contexto:
+  revisão Ted+Marshall: o chunk sob demanda (`contagion-data-*.js`) fica
+  fora do `globPatterns`; a pré-carga logo depois do boot e o estado
+  `failed` cobrem o deploy novo, mas uma sessão offline que nunca baixou o
+  chunk não abre a aba — bloqueio: nenhum (nome estável via
+  `manualChunks` + entrada no precache, ~6 KB).
 - [ ] **Folhas (`SlideUpOverlay`) sem Esc nem gestão de foco** — contexto:
   revisão de UX de 05/11/2026 (pré-existente): não fecham com Esc, não
   põem o foco no diálogo ao abrir, não o prendem dentro e não o devolvem

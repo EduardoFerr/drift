@@ -8,6 +8,12 @@
 -- Regra invariante: APENAS onNostrEvent() escreve em tabelas de
 -- domínio (posts, spreads, buries, reports, users). Identity, sync_log
 -- e user_prefs são exceções operacionais locais.
+--
+-- Índices (`CREATE INDEX IF NOT EXISTS nome ON tabela(...);`): num banco
+-- que já existe, os que faltam são criados ANTES do resto do schema e
+-- ANTES das migrações (db.worker.ts, applySchema), um por vez. Índice
+-- sobre coluna criada por migração (ALTER TABLE) vai no SQL da migração,
+-- não aqui — senão o boot de quem atualiza quebra.
 -- ═══════════════════════════════════════════════════════════════════
 
 -- ── Identidade local ──────────────────────────────────────────────

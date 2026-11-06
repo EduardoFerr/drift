@@ -1050,9 +1050,10 @@ Global esconde na aba Contágio também.
   devolver à aba um post que só ele tinha vacinado. Não mexe no vínculo
   (não é experiência ruim) e vale por identidade: trocar de identidade no
   aparelho não leva a lista junto.
-- A folha "chegou por" e a lista "não trazem" mostram o nome com o fim da
-  chave (…a1b2c3): uma conta que copia o nome de um amigo não se passa por
-  ele.
+- A folha "chegou por", a lista "não trazem" e o aviso da denúncia mostram
+  o nome com o começo e o fim da chave (1a2b3c4d…5e6f7a8b, 64 bits): copiar
+  o nome de um amigo é fácil, copiar também a chave é inviável (só o fim,
+  6 caracteres, sairia em minutos numa CPU comum).
 - A aba só se atualiza quando a folha "chegou por" fecha, mesmo que chegue
   evento do relay com ela aberta (`holdFeed` em `feed.ts`): atualizar antes
   tiraria o post, e a folha junto, no meio da ação.

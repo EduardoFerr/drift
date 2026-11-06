@@ -119,6 +119,12 @@ export interface BootState {
    */
   dbProgress: string | null
   /**
+   * O SQLite abriu mas está há mais de 60 s sem progresso (trabalho longo ou
+   * travado). BootView avisa e oferece recarregar — recarregar é seguro: o
+   * SQLite desfaz a transação pela metade.
+   */
+  dbSlow: boolean
+  /**
    * Falhas non-fatal que aconteceram durante o boot mas não impediram
    * `step === 'ready'`. UI usa pra mostrar indicador "modo degradado"
    * sem bloquear o app. Sprint 6 do roadmap pós-auditoria.
@@ -146,6 +152,7 @@ const INITIAL: BootState = {
   devSeedActive: false,
   seedProgress: null,
   dbProgress: null,
+  dbSlow: false,
   degradedReasons: [],
 }
 
@@ -259,9 +266,10 @@ async function doBootstrap(): Promise<void> {
 
     setBoot((p) => ({ ...p, step: 'db' }))
     const { hasOpfs, storage } = await initDb({
-      onProgress: (dbProgress) => setBoot((p) => ({ ...p, dbProgress })),
+      onProgress: (dbProgress) => setBoot((p) => ({ ...p, dbProgress, dbSlow: false })),
+      onSlow: () => setBoot((p) => ({ ...p, dbSlow: true })),
     })
-    setBoot((p) => ({ ...p, hasOpfs, storage, dbProgress: null }))
+    setBoot((p) => ({ ...p, hasOpfs, storage, dbProgress: null, dbSlow: false }))
 
     // ─── Dev-seed (Sprint N+5 E2E) ─────────────────────────────────
     //

@@ -25,34 +25,42 @@ export function PersonName({ pub }: { pub: string }) {
   return <>{meta?.displayName?.trim() || meta?.name?.trim() || `anon…${pub.slice(-6)}`}</>
 }
 
+/** Começo e fim da chave ("1a2b3c4d…5e6f7a8b"): 64 bits — forjar uma chave
+ *  com o mesmo começo e fim de um amigo é inviável; só o fim (6 caracteres,
+ *  24 bits) sai em minutos numa CPU comum. */
+export function keyMark(pub: string): string {
+  return `${pub.slice(0, 8)}…${pub.slice(-8)}`
+}
+
 /**
- * Nome + fim da chave ("Ana …a1b2c3"), onde a escolha importa (folha
- * "chegou por", lista "não trazem"): uma conta que copia o nome de um amigo
- * não se passa por ele. Mesma convenção do `anon…<6>` do AuthorChip; sem
- * nome, o fim da chave já é o nome.
+ * Nome + começo e fim da chave ("Ana 1a2b3c4d…5e6f7a8b"), onde a escolha
+ * importa (folha "chegou por", lista "não trazem", aviso da denúncia): uma
+ * conta que copia o nome de um amigo fica fácil de distinguir.
  */
 export function PersonNameKey({ pub }: { pub: string }) {
   const meta = useUserMetadata(pub)
-  const name = meta?.displayName?.trim() || meta?.name?.trim()
-  if (!name) return <span className="min-w-0 truncate">{`anon…${pub.slice(-6)}`}</span>
-  // dentro de um pai `flex min-w-0`: o nome corta com reticências, o fim
-  // da chave nunca some (é ele que distingue a pessoa de quem a imita)
+  const name = meta?.displayName?.trim() || meta?.name?.trim() || 'anon'
+  // dentro de um pai `flex min-w-0`: o nome corta com reticências, a chave
+  // nunca some; normal-case: dentro de botão em maiúsculas ela fica igual à
+  // da linha
   return (
     <>
       <span className="min-w-0 truncate">{name}</span>
-      <span className="shrink-0 text-drift-muted">&nbsp;…{pub.slice(-6)}</span>
+      <span className="shrink-0 normal-case text-drift-muted">&nbsp;{keyMark(pub)}</span>
     </>
   )
 }
 
-/** "Ana", "Ana e Bia", "Ana, Bia e Caio". */
-export function PeopleNames({ pubs }: { pubs: readonly string[] }) {
+/** "Ana", "Ana e Bia", "Ana, Bia e Caio" — com `withKey`, cada nome com o
+ *  começo e o fim da chave (onde há punição em jogo: a denúncia). */
+export function PeopleNames({ pubs, withKey = false }: { pubs: readonly string[]; withKey?: boolean }) {
   return (
     <>
       {pubs.map((pub, i) => (
         <span key={pub}>
           {i > 0 && (i === pubs.length - 1 ? ' e ' : ', ')}
           <PersonName pub={pub} />
+          {withKey && <span className="normal-case text-drift-muted"> ({keyMark(pub)})</span>}
         </span>
       ))}
     </>

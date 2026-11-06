@@ -226,7 +226,7 @@ function ConfirmStep({
           {vias.length > 0 && (
             <>
               {followsAuthor ? 'o mesmo vale para ' : 'na sua aba contágio, o que vem de '}
-              <PeopleNames pubs={vias} />, que {vias.length > 1 ? 'trouxeram' : 'trouxe'} este post
+              <PeopleNames pubs={vias} withKey />, que {vias.length > 1 ? 'trouxeram' : 'trouxe'} este post
               {!followsAuthor && ', passa a chegar menos, sem volta'} (registro só no seu aparelho).{' '}
             </>
           )}
