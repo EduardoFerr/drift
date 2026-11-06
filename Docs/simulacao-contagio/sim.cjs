@@ -63,8 +63,9 @@ function runModel(E, cfg, model, onFrame) {
   const U = []
   const byCity = CITIES.map(() => [])
   CITIES.forEach((c, ci) => {
-    for (let i = 0; i < c.pop; i++) {
-      const founder = i < Math.round(c.pop * 0.2)
+    const pop = cfg.popScale ? Math.max(5, Math.round(c.pop * cfg.popScale)) : c.pop // rede pequena (simulação da lente)
+    for (let i = 0; i < pop; i++) {
+      const founder = i < Math.round(pop * 0.2)
       const u = { idx: U.length, id: 'h' + U.length, kind: 'honesto', home: ci,
         join: founder ? 0 : Math.floor(rnd() * 42), act: 0.3 + 0.6 * rnd(), pend: -1, cow: [] }
       U.push(u); byCity[ci].push(u.idx)
@@ -117,6 +118,8 @@ function runModel(E, cfg, model, onFrame) {
   }
   for (let v = 0; v < NH; v++) for (const u of [...fol[v]]) if (rnd() < 0.5) fol[u].add(v)
   if (spammer) for (let k = 0; k < 10; k++) follow(pick(byCity[0]), spammer.idx)
+  // simulação da lente: o spammer veterano seguido por uma fração das pessoas (inundação)
+  if (spammer && cfg.spammerFollowers) for (let v = 0; v < NH; v++) if (rnd() < cfg.spammerFollowers) follow(v, spammer.idx)
   const deceived = []
   if (farmer) for (let k = 0; k < Math.round(NH * (cfg.deceivedPct ?? 0.02)); k++) { const v = Math.floor(rnd() * NH); follow(v, farmer.idx); deceived.push(v) }
 
@@ -353,6 +356,7 @@ function runModel(E, cfg, model, onFrame) {
 
   // ── Modelo global: motor real ─────────────────────────────────
   let gTop = [] // [{pi}]
+  let gWin = [] // janela canônica (os N primeiros) — simulação da lente
   let gOut = null
   const histEdges = new Map() // `${s}|${a}` (posts com > 21 dias)
   let histDay = 0
@@ -388,14 +392,20 @@ function runModel(E, cfg, model, onFrame) {
       if (!r || r.moderated) continue
       ranked.push({ pi: p.i, s: r.score })
     }
-    ranked.sort((a, b) => b.s - a.s || a.pi - b.pi)
+    // appOrder (simulação da lente): desempate do app (created_at DESC antes do id); sem a flag, o de sempre
+    ranked.sort((a, b) => b.s - a.s || (cfg.appOrder ? posts[b.pi].day - posts[a.pi].day : 0) || a.pi - b.pi)
     gTop = ranked.slice(0, 8)
+    gWin = ranked.slice(0, cfg.lensWindow || 50)
+    if (cfg.onGlobal) cfg.onGlobal(day, ranked, gOut)
   }
 
   function feedOf(v, day) {
     if (model === 'contagio') return feedContagion(v, day).feed
-    return gTop
+    return cfg.lensFeed ? cfg.lensFeed(v, day, gWin) : gTop
   }
+
+  // gancho da simulação da lente (Docs/simulacao-lente/): referências ao mundo, sem efeito no sorteio
+  if (cfg.onWorld) cfg.onWorld({ U, NH, fol, posts, loc, byCity, joined, drd, reportsBy })
 
   // ── Loop ──────────────────────────────────────────────────────
   const reach = new Map() // pi → Set(viewers)
@@ -458,18 +468,23 @@ function runModel(E, cfg, model, onFrame) {
           if (cfg.sinkLearn && tmode === 'viaSink' && it.ch === 'cont' && it.via >= 0 && it.via !== p.a) negAdd(i, it.via, day)
           else if (cfg.sinkLearn && tmode === 'both' && !cfg.tasteNoStrike) { negAdd(i, p.a, day); if (it.via >= 0 && it.via !== p.a) negAdd(i, it.via, day) }
           else if (cfg.sinkLearn && cfg.tasteStrikeViaOnly && it.ch === 'cont' && it.via >= 0 && it.via !== p.a) negAdd(i, it.via, day)
-        } else if (rnd() < 0.8) actOn(u, p, day, true, loc[i])
+        } else if (rnd() < (cfg.driftProb ?? 0.8)) actOn(u, p, day, true, loc[i]) // driftProb: mundo "frio" (simulação da lente)
       }
     }
     // spammer veterano: bom comportamento 3 semanas, depois spam diário
-    if (spammer) { lastActive[spammer.idx] = day; if (day < 21) { if (rnd() < 0.3) newPost(spammer, day, 0) } else newPost(spammer, day, 0, true) }
+    // (spammerFlood, simulação da lente: N spams por dia em vez de 1 — inundação)
+    if (spammer) { lastActive[spammer.idx] = day; if (day < 21) { if (rnd() < 0.3) newPost(spammer, day, 0) } else for (let k = 0; k < (cfg.spammerFlood || 1); k++) newPost(spammer, day, 0, true) }
     // fazenda: dono posta spam diário; 2000 chaves dão DRIFT, cada uma "em" uma cidade
     if (farmer && day >= cfg.farmStart) {
       const sp = newPost(farmer, day, loc[farmer.idx], true)
       for (const f of farm) if (!cfg.farmRot || rnd() < cfg.farmRot) actOn(f, sp, day, true, loc[f.idx])
       // fazenda adaptada ao v5: contas postam isca (conteúdo bom) para ganhar DRIFT de quem as segue
       if (cfg.farmContent) for (const f of farm) if (rnd() < cfg.farmContent) newPost(f, day, loc[f.idx], false, true)
-      if (cfg.farmSpamDirect && day >= (cfg.farmSpamFrom ?? 0)) for (const f of farm) if (rnd() < cfg.farmSpamDirect) newPost(f, day, loc[f.idx], true)
+      if (cfg.farmSpamDirect && day >= (cfg.farmSpamFrom ?? 0)) for (const f of farm) if (rnd() < cfg.farmSpamDirect) {
+        const ds = newPost(f, day, loc[f.idx], true)
+        // simulação da lente: a fazenda impulsiona o spam direto das próprias contas (N DRIFTs cada)
+        if (cfg.farmSpamBoost) for (let k = 0; k < cfg.farmSpamBoost; k++) { const g = farm[Math.floor(rnd() * farm.length)]; if (g !== f) actOn(g, ds, day, true, -1) }
+      }
       // fazendeiro adaptado ao aval: posta isca para os enganados darem DRIFT nele; a fazenda impulsiona tudo
       if (cfg.farmerBait && rnd() < cfg.farmerBait) { const b = newPost(farmer, day, loc[farmer.idx], false, true); for (const f of farm) actOn(f, b, day, true, loc[f.idx]) }
       // camuflagem contra o lockstep: cada conta dá DRIFT em posts honestos aleatórios para diversificar o histórico
@@ -522,7 +537,7 @@ function runModel(E, cfg, model, onFrame) {
       if (loc[i] !== u.home) f |= 8
       n++
       const st = { quarHidden: 0, vacHidden: 0 }
-      const res = model === 'contagio' ? feedContagion(i, day, { stat: st }) : { feed: gTop, hidden: null }
+      const res = model === 'contagio' ? feedContagion(i, day, { stat: st }) : { feed: cfg.lensFeed ? cfg.lensFeed(i, day, gWin) : gTop, hidden: null }
       if (st.quarHidden + st.vacHidden > 0) honHid++
       honHidN += st.quarHidden + st.vacHidden
       const feed = res.feed

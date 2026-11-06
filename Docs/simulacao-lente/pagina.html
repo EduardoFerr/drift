@@ -1,0 +1,483 @@
+<title>Drift: lente no feed</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: cabeçalho + palavras da página + controles; o feed de uma pessoa (3 colunas animadas) ao
+   lado do mapa de todo mundo; gráficos ao longo das 24 semanas; veredito e achados embaixo. */
+:root {
+  --bg: #f3eee6; --surface: #fbf7ef; --surface-2: #ece5d9; --border: #b9ad97;
+  --text: #26241f; --body: #3e3a32; --muted: #6e6555;
+  --accent: #8a5e54; --accent2: #5d6240;
+  --net: #3f6749; --net-soft: #d9e6d6; --attack: #99463a; --attack-soft: #f1d9d3; --viral: #b3742f; --dot: #a69c8a;
+  --l0: #6e6555; --l25: #8fa07e; --l50: #5f8a5e; --l100: #2f5a3a;
+  --font-display: 'Syne', 'Arial Black', system-ui, sans-serif;
+  --font-mono: 'DM Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0e0e12; --surface: #16161c; --surface-2: #1c1c24; --border: #3f3f4e;
+  --text: #ededf3; --body: #c5c5d2; --muted: #a8a8bb;
+  --accent: #c4604f; --accent2: #a48570;
+  --net: #7fb085; --net-soft: #1f3324; --attack: #e25c4f; --attack-soft: #3a1d1a; --viral: #e8b87a; --dot: #4a4a5a;
+  --l0: #a8a8bb; --l25: #6f8d73; --l50: #8fbf93; --l100: #c3e8c6; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0e0e12; --surface: #16161c; --surface-2: #1c1c24; --border: #3f3f4e;
+  --text: #ededf3; --body: #c5c5d2; --muted: #a8a8bb;
+  --accent: #c4604f; --accent2: #a48570;
+  --net: #7fb085; --net-soft: #1f3324; --attack: #e25c4f; --attack-soft: #3a1d1a; --viral: #e8b87a; --dot: #4a4a5a;
+  --l0: #a8a8bb; --l25: #6f8d73; --l50: #8fbf93; --l100: #c3e8c6; color-scheme: dark }
+
+* { box-sizing: border-box }
+body { background: var(--bg); color: var(--body); font-family: var(--font-mono); font-size: 13px; line-height: 1.55 }
+.wrap { max-width: 1240px; margin: 0 auto; padding-block: 20px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 18px }
+h1 { font-family: var(--font-display); font-weight: 800; font-size: clamp(30px, 6vw, 52px); line-height: 1; margin: 0; color: var(--accent); text-wrap: balance }
+h2 { font-family: var(--font-display); font-weight: 700; font-size: 15px; margin: 0; color: var(--text); text-transform: lowercase }
+.lede { margin: 8px 0 0; max-width: 78ch; color: var(--muted) }
+.lede b { color: var(--text); font-weight: 500 }
+.panel { border: 1px solid var(--border); border-radius: 12px; background: var(--surface); padding: 12px; min-width: 0 }
+.panel > header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 2px 8px; margin-bottom: 8px }
+.hint { font-size: 11px; color: var(--muted) }
+.gloss dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 8px 18px; margin: 0 }
+.gloss dl > div { min-width: 0 }
+.gloss dt { color: var(--text); font-weight: 500 }
+.gloss dd { margin: 0; color: var(--body) }
+.bar { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface) }
+.seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--border); border-radius: 10px; overflow: hidden }
+.seg button { font: inherit; text-transform: uppercase; letter-spacing: 0.08em; font-size: 11px; padding: 8px 10px; min-height: 36px; background: transparent; color: var(--body); border: 0; cursor: pointer }
+.seg button[aria-pressed="true"] { background: var(--accent2); color: var(--bg) }
+.seg button .rec { font-size: 9px; letter-spacing: 0.1em; opacity: 0.8 }
+.btn { font: inherit; font-size: 12px; padding: 8px 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); cursor: pointer; min-width: 44px; min-height: 36px }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+.clock { font-variant-numeric: tabular-nums; color: var(--text); min-width: 17ch }
+.clock b { font-family: var(--font-display); font-size: 18px; font-weight: 700 }
+.scrub { flex: 1 1 240px; display: grid; gap: 2px; min-width: 0 }
+.scrub input { width: 100%; accent-color: var(--accent) }
+.ticks { display: flex; justify-content: space-between; font-size: 10px; color: var(--muted) }
+.narr #now { margin: 0; max-width: 92ch; color: var(--text); font-size: 14px; line-height: 1.6; min-height: 4.8em }
+.main { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 18px; align-items: start }
+@media (max-width: 900px) { .main { grid-template-columns: minmax(0, 1fr) } }
+.feedcols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px }
+.feedcols.two { grid-template-columns: repeat(2, minmax(0, 1fr)) }
+.col h3 { margin: 0 0 6px; font-size: 11px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text) }
+.col h3 span { display: block; font-size: 10px; letter-spacing: 0.04em; text-transform: none; font-variant-numeric: tabular-nums; color: var(--muted); font-weight: 400 }
+.stack { position: relative; height: calc(8 * 50px) }
+.card { position: absolute; left: 0; right: 0; height: 44px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface-2);
+  padding: 4px 8px 4px 12px; overflow: hidden; transition: transform 0.55s cubic-bezier(.2,.8,.2,1), opacity 0.4s; font-size: 11px; line-height: 1.35 }
+.card::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 5px; background: var(--dot) }
+.card.net { background: var(--net-soft); border-color: var(--net) }
+.card.net::before { background: var(--net) }
+.card.atk { background: var(--attack-soft); border-color: var(--attack) }
+.card.atk::before { background: var(--attack) }
+.card .l1 { color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums }
+.card .l2 { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.card .up { color: var(--net); font-weight: 500 }
+.card.leaving { opacity: 0 }
+.card.entering { opacity: 0 }
+.rank { position: absolute; left: -2px; font-size: 9px; color: var(--muted) }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 8px; font-size: 11px; color: var(--muted) }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px }
+.legend .dotnet { background: var(--net); border-radius: 50% }
+.legend .ring { border: 2px solid var(--attack); border-radius: 50%; background: transparent }
+.legend .plain { background: var(--dot); border-radius: 50% }
+canvas { display: block; width: 100%; max-width: 100%; border-radius: 8px; background: var(--surface-2) }
+.charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 14px }
+.chart { min-width: 0 }
+.chart h3 { margin: 0 0 2px; font-size: 12px; font-weight: 500; color: var(--text); text-wrap: balance }
+.chart h3 span { display: block; color: var(--muted); font-size: 11px; font-weight: 400 }
+.chart svg { width: 100%; height: auto; display: block; overflow: visible }
+.mlegend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 11px; color: var(--muted); margin-bottom: 6px }
+.mlegend i { display: inline-block; width: 14px; height: 3px; margin-right: 6px; vertical-align: 3px; border-radius: 2px }
+.tablewrap { overflow-x: auto }
+.verd { width: 100%; border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums }
+.verd th, .verd td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--border); vertical-align: top }
+.verd th { font-weight: 500; color: var(--muted); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase }
+.verd td:first-child { color: var(--text) }
+.good { color: var(--net) } .bad { color: var(--attack) } .flat { color: var(--muted) }
+.vars { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px }
+.vars article { min-width: 0; border-left: 3px solid var(--border); padding-left: 10px }
+.vars article.rec { border-left-color: var(--net) }
+.vars h3 { font-family: var(--font-display); font-size: 15px; margin: 0 0 4px; color: var(--text) }
+.vars p { margin: 0 }
+.findings { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px }
+.findings article { min-width: 0 }
+.findings h3 { font-family: var(--font-display); font-size: 16px; margin: 0 0 6px; color: var(--text); text-wrap: balance }
+.findings p { margin: 0 0 8px; max-width: 65ch }
+.tag { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase }
+.tag.pass { color: var(--net) } .tag.fail { color: var(--attack) } .tag.mid { color: var(--viral) }
+.foot { font-size: 11px; color: var(--muted); max-width: 100ch }
+.foot code { font-size: 11px }
+@media (prefers-reduced-motion: reduce) { .card { transition: none } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>drift · a lente no feed</h1>
+    <p class="lede">A tela "sua lente" prometia pôr <b>quem você segue</b> no alto do feed, mas nada no app aplicava isso. Antes de ligar, simulamos: as mesmas <b>6 cidades e 2.250 pessoas</b> da simulação do contágio, por <b>24 semanas</b>, com a pontuação calculada pelo motor real do app, e uma rede pequena de 225 pessoas. Para cada pessoa, comparamos o feed sem lente com o feed nas lentes possíveis, com força 50 e 100, e sob ataque.</p>
+  </header>
+
+  <section class="panel gloss" aria-labelledby="t-gl">
+    <header><h2 id="t-gl">palavras desta página</h2></header>
+    <dl>
+      <div><dt id="g-feed">feed e aba</dt><dd>A fila de posts que você vê. O app tem 4 abas: global e em alta (iguais para todo mundo), seguindo e contágio (feitas da sua rede).</dd></div>
+      <div><dt id="g-pts">pontos</dt><dd>O número que ordena o feed: o peso de quem impulsionou (DRIFT), menos um pouco o de quem afundou (SINK), mais os comentários, dividido pela idade do post. É igual para todo mundo.</dd></div>
+      <div><dt id="g-lente">lente</dt><dd>Ajuste do seu aparelho que põe posts de quem você segue entre os primeiros das abas global e em alta. Não muda o que os outros veem e não é publicada.</dd></div>
+      <div><dt id="g-forca">força</dt><dd>De 0 a 100. Na mistura, força 50 quer dizer um card sim, um não de quem você segue; força 100, primeiro todos eles.</dd></div>
+      <div><dt id="g-rede">sua rede</dt><dd>Quem você segue, menos quem você bloqueou, silenciou ou denunciou. É a mesma regra da aba contágio.</dd></div>
+      <div><dt id="g-50">os 50 da aba</dt><dd>A aba mostra os 50 posts de mais pontos. Aqui contamos os 8 primeiros, os que a pessoa realmente vê.</dd></div>
+      <div><dt id="g-afundado">afundado</dt><dd>Post com pontos negativos: pesou mais quem afundou do que quem impulsionou.</dd></div>
+      <div><dt id="g-fazenda">fazenda de contas</dt><dd>2.000 contas falsas de um atacante, que impulsionam juntas o spam do dono.</dd></div>
+      <div><dt id="g-sybil">conta falsa seguida</dt><dd>Conta da fazenda que segue gente real; 10% das pessoas seguem de volta e passam a ter uma conta falsa na própria rede.</dd></div>
+      <div><dt id="g-eclipse">eclipse</dt><dd>O atacante controla os relays (servidores que repassam os posts) de 30% das pessoas e some com metade dos posts honestos que chegariam a elas.</dd></div>
+    </dl>
+  </section>
+
+  <div class="bar" role="group" aria-label="controles">
+    <div class="seg" role="group" aria-label="cenário" id="scenbtns"></div>
+    <div class="seg" role="group" aria-label="lente" id="varbtns"></div>
+    <button type="button" class="btn" id="play" aria-label="pausar">❚❚</button>
+    <div class="seg" role="group" aria-label="velocidade">
+      <button type="button" data-speed="1" aria-pressed="true">1×</button>
+      <button type="button" data-speed="2" aria-pressed="false">2×</button>
+      <button type="button" data-speed="4" aria-pressed="false">4×</button>
+    </div>
+    <div class="clock" aria-live="polite"><b id="wk">semana 0</b> <span id="dy">dia 0</span></div>
+    <label class="scrub" for="time">
+      <input type="range" id="time" min="0" max="83" value="0" step="1" aria-label="linha do tempo">
+      <span class="ticks"><span>sem 0</span><span>4</span><span>8</span><span>12</span><span>16</span><span>20</span><span>24</span></span>
+    </label>
+  </div>
+
+  <section class="panel narr" aria-labelledby="t-now">
+    <header><h2 id="t-now">o que está acontecendo</h2><span class="hint" id="nowtag"></span></header>
+    <p id="now" aria-live="polite"></p>
+  </section>
+
+  <div class="main">
+    <section class="panel" aria-labelledby="t-feed">
+      <header><h2 id="t-feed">o feed de uma pessoa</h2><div class="seg" role="group" aria-label="pessoa" id="personbtns"></div></header>
+      <p class="hint" id="personhint" style="margin:0 0 8px"></p>
+      <div class="feedcols" id="cols"></div>
+      <div class="legend">
+        <span><i style="background:var(--net)"></i>post de quem a pessoa segue</span>
+        <span><i style="background:var(--attack)"></i>spam do atacante</span>
+        <span><i style="background:var(--dot)"></i>outras pessoas</span>
+        <span><b class="up">↑ era Nº</b> = lugar que tinha sem a lente</span>
+      </div>
+    </section>
+    <section class="panel" aria-labelledby="t-map">
+      <header><h2 id="t-map">todo mundo</h2><div class="seg" role="group" aria-label="força no mapa" id="mapbtns"></div></header>
+      <canvas id="cv" role="img" aria-label="pessoas das 6 cidades"></canvas>
+      <div class="legend">
+        <span><i class="dotnet"></i>metade ou mais dos 8 primeiros é de quem a pessoa segue</span>
+        <span><i class="ring"></i>vê spam do atacante nos 8 primeiros</span>
+        <span><i class="plain"></i>demais pessoas</span>
+      </div>
+      <p class="hint" id="maphint" style="margin:6px 0 0"></p>
+    </section>
+  </div>
+
+  <section class="panel" aria-labelledby="t-ch">
+    <header><h2 id="t-ch">ao longo das 24 semanas</h2><span class="hint">porcentagem das pessoas (ou dos 8 primeiros); linha vertical = agora</span></header>
+    <div class="mlegend" id="mlegend"></div>
+    <div class="charts" id="charts"></div>
+  </section>
+
+  <section class="panel" aria-labelledby="t-var">
+    <header><h2 id="t-var">as lentes testadas</h2></header>
+    <div class="vars" id="vars"></div>
+  </section>
+
+  <section class="panel" aria-labelledby="t-ver">
+    <header><h2 id="t-ver">veredito</h2><span class="hint">média das últimas 6 semanas · sem lente → força 50 → força 100</span></header>
+    <div class="tablewrap"><table class="verd" id="verd"></table></div>
+    <p class="hint" style="margin:8px 0 0">Força 100 em cada lente: dos 8 primeiros, quantos são de quem a pessoa segue.</p>
+    <div class="tablewrap"><table class="verd" id="verd2"></table></div>
+  </section>
+
+  <section class="panel" aria-labelledby="t-cl">
+    <header><h2 id="t-cl">quando as pessoas reagem ao próprio feed</h2><span class="hint">as rodadas acima usam o feed comum para decidir o que cada pessoa impulsiona, afunda e denuncia; aqui, o feed com a mistura</span></header>
+    <div class="tablewrap"><table class="verd" id="closed"></table></div>
+  </section>
+
+  <section class="panel" aria-labelledby="t-ach">
+    <header><h2 id="t-ach">o que a simulação mostrou</h2></header>
+    <div class="findings" id="findings"></div>
+  </section>
+
+  <p class="foot" id="foot"></p>
+</div>
+
+<script>
+const DATA = /*__DATA__*/null
+const $ = (s) => document.querySelector(s)
+const pct = (x) => (x == null ? '—' : x > 0 && x < 0.005 ? '<1' : String(Math.round(x * 100)))
+const M = { fromF: 0, atk: 1, sybF: 2, poro: 3, reach: 4, same: 5 }
+const CONF = DATA.configs
+const state = { s: 0, v: 'M', t: 0, person: 0, mapK: 1, playing: true, speed: 1 }
+const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+if (reduced) state.playing = false
+const scen = () => DATA.scen[state.s]
+const confsOf = (v) => (v === 'C' ? ['comum', 'C'] : ['comum', v + '50', v + '100'])
+const confLabel = (c) => (c === 'comum' ? 'sem lente' : c === 'C' ? 'cronológica' : c === 'SEG' ? 'aba seguindo' : `força ${c.slice(1)}`)
+const last21 = (sc, c, k) => { const L = sc.series.slice(-21); return L.reduce((a, x) => a + x.m[c][M[k]], 0) / L.length }
+
+// ── controles ─────────────────────────────────────────────────────
+function seg(el, items, cur, onPick) {
+  el.innerHTML = ''
+  items.forEach(([key, html], i) => {
+    const b = document.createElement('button')
+    b.type = 'button'; b.innerHTML = html; b.setAttribute('aria-pressed', String(key === cur))
+    b.addEventListener('click', () => onPick(key, i))
+    el.appendChild(b)
+  })
+}
+function drawControls() {
+  seg($('#scenbtns'), DATA.scen.map((x, i) => [i, x.label]), state.s, (i) => { state.s = i; state.t = Math.min(state.t, scen().series.length - 1); render(true) })
+  seg($('#varbtns'), DATA.variants.map((x) => [x.k, x.label + (x.rec ? ' <span class="rec">· vai pro app</span>' : '')]), state.v, (k) => { state.v = k; render(true) })
+  seg($('#personbtns'), scen().featured.map((f, i) => [i, f.name]), state.person, (i) => { state.person = i; render(true) })
+  const mk = state.v === 'C' ? [[0, 'desligada'], [1, 'cronológica']] : [[0, 'desligada'], [1, 'força 50'], [2, 'força 100']]
+  if (state.mapK >= mk.length) state.mapK = mk.length - 1
+  seg($('#mapbtns'), mk, state.mapK, (k) => { state.mapK = k; render(false) })
+}
+document.querySelectorAll('[data-speed]').forEach((b) => b.addEventListener('click', () => {
+  state.speed = +b.dataset.speed
+  document.querySelectorAll('[data-speed]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)))
+}))
+$('#play').addEventListener('click', () => { state.playing = !state.playing; syncPlay() })
+function syncPlay() { $('#play').textContent = state.playing ? '❚❚' : '▶'; $('#play').setAttribute('aria-label', state.playing ? 'pausar' : 'tocar') }
+$('#time').addEventListener('input', (e) => { state.t = +e.target.value; render(false) })
+
+// ── o feed de uma pessoa ──────────────────────────────────────────
+const colState = new Map() // col index → Map(pi → el)
+const CITY = (h) => (h < 0 ? 'fazenda' : 'cidade ' + DATA.cities[h].name)
+function drawFeeds(reset) {
+  const sc = scen(), t = state.t, p = state.person
+  const confs = confsOf(state.v)
+  const cols = $('#cols')
+  if (reset || cols.childElementCount !== confs.length) {
+    cols.className = 'feedcols' + (confs.length === 2 ? ' two' : '')
+    cols.innerHTML = ''
+    colState.clear()
+    confs.forEach((c, ci) => {
+      const col = document.createElement('div'); col.className = 'col'
+      col.innerHTML = `<h3>${confLabel(c)} <span id="cn${ci}"></span></h3><div class="stack" id="st${ci}"></div>`
+      cols.appendChild(col)
+      colState.set(ci, new Map())
+    })
+  }
+  const feeds = sc.feeds[t][p], scores = sc.scores[t] || {}
+  const f = sc.featured[p]
+  confs.forEach((c, ci) => {
+    const ids = feeds[c] || []
+    const stack = document.getElementById('st' + ci), live = colState.get(ci)
+    let netN = 0
+    const keep = new Set(ids.map(String))
+    for (const [pi, el] of live) if (!keep.has(pi)) {
+      el.classList.add('leaving'); live.delete(pi)
+      setTimeout(() => el.remove(), reduced ? 0 : 420)
+    }
+    ids.forEach((pi, pos) => {
+      const info = sc.posts[pi] || { h: -1, d: 0, k: 'hon', f: [0, 0, 0] }
+      const isNet = info.f[p] === 1
+      if (isNet) netN++
+      const s = scores[pi]
+      const pts = s ? Math.round(s[0]) : 0
+      const from = s ? s[1] : null
+      const lifted = c !== 'comum' && from != null && from > pos
+      let el = live.get(String(pi))
+      if (!el) {
+        el = document.createElement('div'); el.className = 'card entering'
+        el.style.transform = `translateY(${pos * 50}px)`
+        stack.appendChild(el); live.set(String(pi), el)
+        requestAnimationFrame(() => el.classList.remove('entering'))
+      }
+      el.className = 'card' + (info.k === 'atk' ? ' atk' : isNet ? ' net' : '')
+      el.style.transform = `translateY(${pos * 50}px)`
+      const kind = info.k === 'atk' ? 'spam' : isNet ? 'rede' : info.k === 'isca' ? 'falsa, post bom' : 'outra pessoa'
+      el.innerHTML = `<div class="l1">${pos + 1}. ${CITY(info.h)} · ${pts} pts</div><div class="l2">${kind}${lifted ? ` · <span class="up">↑ era ${from >= 50 ? 'fora da aba' : from + 1 + 'º'}</span>` : ''}</div>`
+    })
+    document.getElementById('cn' + ci).textContent = ids.length ? `${netN} de ${ids.length} da rede de ${f.name}` : 'vazio'
+  })
+  $('#personhint').textContent = `${f.name} mora na ${CITY(f.home)} e segue ${f.follows} pessoas. Cada coluna é o mesmo dia visto com uma lente diferente.`
+}
+
+// ── mapa ───────────────────────────────────────────────────────────
+const cv = $('#cv'), ctx = cv.getContext('2d')
+const decoded = new Map()
+function flagsAt(s, t) {
+  const key = s + ':' + t
+  let a = decoded.get(key)
+  if (!a) {
+    const bin = atob(DATA.scen[s].flags[t]); const u8 = new Uint8Array(bin.length)
+    for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i)
+    a = new Uint32Array(u8.buffer); decoded.set(key, a)
+    if (decoded.size > 400) decoded.delete(decoded.keys().next().value)
+  }
+  return a
+}
+const CITY_POS = [[0.17, 0.3], [0.5, 0.3], [0.83, 0.3], [0.17, 0.78], [0.5, 0.78], [0.83, 0.78]]
+function css(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim() }
+function drawMap() {
+  const sc = scen(), t = state.t
+  const w = cv.clientWidth || 500, h = Math.round(w * 0.62), dpr = window.devicePixelRatio || 1
+  if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); cv.style.height = h + 'px' }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+  ctx.clearRect(0, 0, w, h)
+  const confs = confsOf(state.v)
+  const c = confs[Math.min(state.mapK, confs.length - 1)]
+  const ci = CONF.indexOf(c), fi = DATA.fconf.indexOf(c)
+  const fl = flagsAt(state.s, t)
+  const day = sc.series[t].d
+  const counts = new Array(6).fill(0)
+  const big = sc.people.length > 1000
+  const R = big ? 1.9 : 3.6, gap = big ? 4.3 : 8.4
+  const colNet = css('--net'), colAtk = css('--attack'), colDot = css('--dot'), colText = css('--muted')
+  ctx.font = '11px ' + css('--font-mono')
+  ctx.fillStyle = colText; ctx.textAlign = 'center'
+  DATA.cities.forEach((cy, i) => ctx.fillText('cidade ' + cy.name, CITY_POS[i][0] * w, CITY_POS[i][1] * h - (big ? 64 : 46)))
+  let seeAtk = 0, seeNet = 0, n = 0
+  for (let i = 0; i < sc.people.length; i++) {
+    const [home, join] = sc.people[i]
+    if (join >= day) continue
+    n++
+    const k = counts[home]++
+    const ang = k * 2.39996, rad = gap * Math.sqrt(k) * 0.62
+    const x = CITY_POS[home][0] * w + Math.cos(ang) * rad, y = CITY_POS[home][1] * h + Math.sin(ang) * rad
+    const atk = (fl[i] >> ci) & 1, net = fi >= 0 ? (fl[i] >>> (16 + fi)) & 1 : 0
+    if (atk) seeAtk++
+    if (net) seeNet++
+    ctx.beginPath(); ctx.arc(x, y, R, 0, 6.2832)
+    if (net) { ctx.fillStyle = colNet; ctx.fill() } else { ctx.fillStyle = colDot; ctx.fill() }
+    if (atk) { ctx.strokeStyle = colAtk; ctx.lineWidth = big ? 1.2 : 1.8; ctx.stroke() }
+  }
+  cv.setAttribute('aria-label', `${n} pessoas; ${pct(seeAtk / n)}% veem spam do atacante; ${pct(seeNet / n)}% têm metade ou mais do feed vinda de quem seguem (${confLabel(c)})`)
+  $('#maphint').textContent = `${confLabel(c)}: ${pct(seeNet / n)}% das pessoas têm metade ou mais dos 8 primeiros vinda de quem seguem; ${pct(seeAtk / n)}% veem spam do atacante.`
+}
+
+// ── gráficos ───────────────────────────────────────────────────────
+const CHARTS = [
+  ['fromF', 'dos 8 primeiros, quantos são de quem a pessoa segue', 'por pessoa, média'],
+  ['atk', 'pessoas que veem spam do atacante', 'nos 8 primeiros'],
+  ['sybF', 'pessoas que veem spam de alguém que seguem', 'contas falsas seguidas de volta'],
+  ['poro', 'dos 8 primeiros, quantos vêm de outra cidade', 'abertura do feed'],
+  ['reach', 'pessoas que veem o post honesto de mais pontos', 'alcance'],
+]
+const LINE = { comum: '--l0', '25': '--l25', '50': '--l50', '100': '--l100', C: '--accent' }
+function lineVar(c) { return c === 'comum' ? LINE.comum : c === 'C' ? LINE.C : LINE[c.slice(1)] }
+function chartConfs() { return state.v === 'M' ? ['comum', 'M25', 'M50', 'M100'] : confsOf(state.v) }
+function drawCharts() {
+  const sc = scen(), S = sc.series, n = S.length
+  const confs = chartConfs()
+  $('#mlegend').innerHTML = confs.map((c) => `<span><i style="background:var(${lineVar(c)})"></i>${confLabel(c)}</span>`).join('')
+  const W = 300, H = 120, pl = 30, pb = 16, pt = 6
+  $('#charts').innerHTML = CHARTS.map(([k, title, sub]) => {
+    const x = (i) => pl + (i / Math.max(1, n - 1)) * (W - pl - 6)
+    const y = (v) => pt + (1 - v) * (H - pt - pb)
+    const grid = [0, 0.5, 1].map((v) => `<line x1="${pl}" x2="${W - 6}" y1="${y(v)}" y2="${y(v)}" stroke="var(--border)" stroke-width="0.6"/><text x="${pl - 4}" y="${y(v) + 3}" font-size="9" text-anchor="end" fill="var(--muted)">${v * 100}%</text>`).join('')
+    const lines = confs.map((c) => `<polyline fill="none" stroke="var(${lineVar(c)})" stroke-width="${c === 'comum' ? 1.4 : 1.8}" points="${S.map((s, i) => x(i).toFixed(1) + ',' + y(s.m[c][M[k]]).toFixed(1)).join(' ')}"/>`).join('')
+    const now = `<line x1="${x(state.t)}" x2="${x(state.t)}" y1="${pt}" y2="${H - pb}" stroke="var(--accent)" stroke-width="1" stroke-dasharray="3 3"/>`
+    const cur = confs.map((c) => `${confLabel(c).replace('força ', '')} ${pct(S[state.t].m[c][M[k]])}%`).join(' · ')
+    const xt = [0, 4, 8, 12, 16, 20, 24].map((wk) => `<text x="${x(Math.min(n - 1, wk * 7 / 2 - 1))}" y="${H - 3}" font-size="9" text-anchor="middle" fill="var(--muted)">${wk}</text>`).join('')
+    return `<div class="chart"><h3>${title} <span>${sub}</span></h3><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${title}: ${cur}">${grid}${lines}${now}${xt}</svg><p class="hint" style="margin:0">${cur}</p></div>`
+  }).join('')
+}
+
+// ── narrativa ──────────────────────────────────────────────────────
+function narrate() {
+  const sc = scen(), s = sc.series[state.t]
+  const v = DATA.variants.find((x) => x.k === state.v)
+  const m = s.m, cf = confsOf(state.v)
+  const wk = Math.floor(s.d / 7)
+  const base = `Dia ${s.d}, ${s.n.toLocaleString('pt-BR')} pessoas no app. Sem lente, ${pct(m.comum[0])}% dos 8 primeiros de cada pessoa são de quem ela segue e ${pct(m.comum[1])}% das pessoas veem spam do atacante.`
+  let lens
+  if (state.v === 'C') lens = ` Com a cronológica, ${pct(m.C[0])}% são de quem ela segue, ${pct(m.C[1])}% veem spam e ${pct(m.C[4])}% veem o post honesto de mais pontos (sem lente: ${pct(m.comum[4])}%).`
+  else {
+    const a = m[cf[1]], b = m[cf[2]]
+    lens = ` Com a lente "${v.label}": em força 50, ${pct(a[0])}% de quem ela segue e ${pct(a[1])}% veem spam; em força 100, ${pct(b[0])}% e ${pct(b[1])}%.`
+    if (b[2] - m.comum[2] > 0.02) lens += ` Spam de alguém que a pessoa segue: ${pct(m.comum[2])}% sem lente, ${pct(b[2])}% em força 100.`
+    if (m.comum[4] - b[4] > 0.03) lens += ` O post honesto de mais pontos chega a ${pct(b[4])}% das pessoas (sem lente: ${pct(m.comum[4])}%).`
+  }
+  if (s.d < 15) lens += ' Nas duas primeiras semanas ninguém tem peso para votar ainda: os pontos são todos zero e a ordem é por idade.'
+  $('#now').textContent = base + lens
+  $('#nowtag').textContent = `${sc.label} · ${v.label}`
+  $('#wk').textContent = 'semana ' + wk
+  $('#dy').textContent = 'dia ' + s.d
+  $('#time').max = String(sc.series.length - 1)
+  $('#time').value = String(state.t)
+}
+
+// ── tabelas ────────────────────────────────────────────────────────
+function cls(delta, goodUp) { if (Math.abs(delta) < 0.02) return 'flat'; return (delta > 0) === goodUp ? 'good' : 'bad' }
+function drawTables() {
+  const v = state.v, cf = confsOf(v)
+  const head = `<thead><tr><th>cenário</th><th>de quem segue nos 8</th><th>veem spam</th><th>spam de quem seguem</th><th>de outra cidade</th><th>veem o de mais pontos</th></tr></thead>`
+  const cell = (sc, k, goodUp) => {
+    const vals = cf.map((c) => last21(sc, c, k))
+    const last = vals[vals.length - 1]
+    return `<td class="${cls(last - vals[0], goodUp)}">${vals.map((x) => pct(x) + '%').join(' → ')}</td>`
+  }
+  $('#verd').innerHTML = head + '<tbody>' + DATA.scen.map((sc) => `<tr><td>${sc.label}</td>${cell(sc, 'fromF', true)}${cell(sc, 'atk', false)}${cell(sc, 'sybF', false)}${cell(sc, 'poro', true)}${cell(sc, 'reach', true)}</tr>`).join('') + '</tbody>'
+  const vs = DATA.variants.filter((x) => x.k !== 'C')
+  $('#verd2').innerHTML = `<thead><tr><th>cenário</th><th>sem lente</th>${vs.map((x) => `<th>${x.label}</th>`).join('')}<th>aba seguindo (referência)</th></tr></thead><tbody>` +
+    DATA.scen.map((sc) => `<tr><td>${sc.label}</td><td>${pct(last21(sc, 'comum', 'fromF'))}%</td>${vs.map((x) => `<td class="${cls(last21(sc, x.k + '100', 'fromF') - last21(sc, 'comum', 'fromF'), true)}">${pct(last21(sc, x.k + '100', 'fromF'))}%</td>`).join('')}<td>${pct(last21(sc, 'SEG', 'fromF'))}%</td></tr>`).join('') + '</tbody>'
+  const rows = Object.entries(DATA.closed).map(([key, r]) => {
+    const conf = key.includes('M50') ? 'M50' : 'M100'
+    const L = r.series.slice(-21), a = (i) => L.reduce((s, x) => s + x.m[conf][i], 0) / L.length, c = (i) => L.reduce((s, x) => s + x.m.comum[i], 0) / L.length
+    return `<tr><td>${r.label}</td><td>${pct(a(0))}%</td><td>${pct(c(1))}% → ${pct(a(1))}%</td><td>${pct(c(2))}% → ${pct(a(2))}%</td><td>${pct(c(3))}% → ${pct(a(3))}%</td><td>${pct(c(4))}% → ${pct(a(4))}%</td></tr>`
+  })
+  $('#closed').innerHTML = `<thead><tr><th>rodada</th><th>de quem segue nos 8</th><th>veem spam (comum → lente)</th><th>spam de quem seguem</th><th>de outra cidade</th><th>veem o de mais pontos</th></tr></thead><tbody>${rows.join('') || '<tr><td colspan="6">sem rodadas fechadas</td></tr>'}</tbody>`
+}
+
+function drawVariants() {
+  $('#vars').innerHTML = DATA.variants.map((x) => `<article class="${x.rec ? 'rec' : ''}"><p class="tag ${x.rec ? 'pass' : 'mid'}">${x.rec ? 'vai pro app' : 'testada'}</p><h3>${x.label}</h3><p>${x.desc}</p></article>`).join('')
+}
+
+function drawFindings() {
+  const S = (k) => DATA.scen.find((x) => x.key === k)
+  const a = (k, c, m) => (S(k) ? last21(S(k), c, m) : null)
+  const cl = (key, conf, i) => { const r = DATA.closed[key]; if (!r) return null; const L = r.series.slice(-21); return L.reduce((s, x) => s + x.m[conf][i], 0) / L.length }
+  const F = [
+    ['fail', 'a fórmula de antes não fazia nada', `Ligada como estava escrita, a lente multiplicava os pontos de quem você segue e só reordenava os 50 posts da aba. Na rede grande, dos 8 primeiros, ${pct(a('sem_ataque', 'A100', 'fromF'))}% passavam a ser de quem a pessoa segue, contra ${pct(a('sem_ataque', 'comum', 'fromF'))}% sem lente. O consertado não muda o quadro (${pct(a('sem_ataque', 'B100', 'fromF'))}%): post sem voto tem zero pontos, e zero vezes 2,5 continua zero. "Por lugares" chega a ${pct(a('sem_ataque', 'R100', 'fromF'))}% na rede grande e ${pct(a('pequena_sem_ataque', 'R100', 'fromF'))}% na pequena.`],
+    ['pass', 'a mistura entrega o que a tela promete', `Com força 50, ${pct(a('sem_ataque', 'M50', 'fromF'))}% dos 8 primeiros são de quem a pessoa segue (rede pequena: ${pct(a('pequena_sem_ataque', 'M50', 'fromF'))}%); com 100, ${pct(a('sem_ataque', 'M100', 'fromF'))}%. Não chega a 100% porque cada pessoa segue em média uns 12 perfis e nem todos postam toda semana: quando acabam os posts da rede, o resto da aba segue a ordem de sempre.`],
+    ['mid', 'o preço: um feed mais fechado', `Dos 8 primeiros, os vindos de outra cidade caem de ${pct(a('sem_ataque', 'comum', 'poro'))}% para ${pct(a('sem_ataque', 'M50', 'poro'))}% com força 50 e ${pct(a('sem_ataque', 'M100', 'poro'))}% com 100. O post honesto de mais pontos chega a ${pct(a('sem_ataque', 'M100', 'reach'))}% das pessoas com força 100 (sem lente: ${pct(a('sem_ataque', 'comum', 'reach'))}%). Com 50, nada muda no alcance. É o custo de escolher ver mais a sua rede, e a lente começa desligada.`],
+    ['fail', 'contas falsas que você seguiu de volta', `Se a pessoa segue de volta uma conta da fazenda, a mistura traz o spam dela para o alto: na rede grande, ${pct(a('sybil', 'M100', 'sybF'))}% das pessoas passam a ver spam de alguém que seguem (sem lente: ${pct(a('sybil', 'comum', 'sybF'))}%). A aba seguindo já mostra esse spam do mesmo jeito. Quando a pessoa denuncia, a conta sai da sua rede, como na aba contágio: com as pessoas reagindo ao próprio feed, fica em ${pct(cl('sybil__fechada_M100', 'M100', 2))}% com força 100 e ${pct(cl('sybil__fechada_M50', 'M50', 2))}% com 50.`],
+    ['mid', 'a lente não é defesa contra a fazenda', `Quando a fazenda compra o topo do global, ${pct(a('fazenda', 'comum', 'atk'))}% das pessoas veem o spam sem lente e ${pct(a('fazenda', 'M100', 'atk'))}% com a mistura em 100: os posts da sua rede empurram o spam para baixo em parte das pessoas, mas a defesa contra fazenda é a aba contágio. No eclipse, a lente só pode adiantar o que chega: quem está eclipsado perde metade dos posts da própria rede junto.`],
+    ['pass', 'teto de 2 por pessoa: inundar não rende', `Uma conta seguida por 10% das pessoas posta 30 vezes por dia. Com a mistura em 100, ela aparece nos 8 primeiros de ${pct(a('inundacao', 'M100', 'sybF'))}% das pessoas — perto dos ${pct(a('inundacao', 'SEG', 'sybF'))}% da aba seguindo, que mostra tudo de quem você segue. Sem o teto, ela tomaria a cota inteira de quem a segue.`],
+    ['pass', 'funciona no mundo frio', `Com quase ninguém impulsionando (como o Drift hoje), a mistura em 100 põe ${pct(a('frio', 'M100', 'fromF'))}% dos 8 primeiros na sua rede (sem lente: ${pct(a('frio', 'comum', 'fromF'))}%). "Só quem você já impulsionou" quase não age: ${pct(a('frio', 'S100', 'fromF'))}% — por isso ficou de fora.`],
+    ['mid', 'isca seguida de volta', `Contas que postam coisa boa para ganhar impulsos e depois trazem spam: ${pct(a('isca', 'comum', 'atk'))}% das pessoas veem o spam sem lente, ${pct(a('isca', 'M100', 'atk'))}% com a mistura em 100. Uma denúncia tira a conta da sua rede, mesmo que você já a tenha impulsionado.`],
+    ['pass', 'mesma entrada, mesma ordem', 'Embaralhando a ordem em que os posts e a lista de quem a pessoa segue chegam, a mistura deu o mesmo feed em todas as amostras. A fórmula de antes, não: com a lista lida em outra ordem (outro aparelho), o sorteio do cálculo de proximidade mudava o feed de parte das pessoas, e ela mudava sozinha a cada dia.'],
+  ]
+  $('#findings').innerHTML = F.map(([tag, h, p]) => `<article><p class="tag ${tag}">${{ pass: 'resultado', fail: 'problema', mid: 'custo' }[tag]}</p><h3>${h}</h3><p>${p}</p></article>`).join('') +
+    `<article><p class="tag mid">limites</p><h3>o que esta simulação não prova</h3><p>O grafo social é sintético. As pessoas escolhem o que ver só pelos 8 primeiros. Na malha aberta, reagem ao feed comum. O mundo usa uma semente só (as rodadas do contágio variaram ±8 pontos entre sementes). O mundo é mais quente que o Drift de hoje (salvo o "mundo frio"), todo mundo posta no mesmo ritmo e não há contas seguidas por milhares. Na malha fechada, todas as pessoas usam a lente na mesma força. A rede pequena tem 225 pessoas; o Drift hoje pode ser menor ainda. Bolha de ideias não foi medida, só a de cidade.</p></article>`
+}
+
+function drawFoot() {
+  $('#foot').innerHTML = 'Para quem desenvolve. Mundo de <code>Docs/simulacao-contagio/sim.cjs</code> (seed 7, 24 semanas, medição a cada 2 dias) no modelo global com o motor real (<code>src/lib/ranking.ts</code>) e o desempate do app (score DESC, created_at DESC, id ASC). Janela da aba = 50 (<code>FEED_INITIAL_LIMIT</code>); medido = 8 primeiros. Mistura = a função do app <code>mixNetwork</code> (<code>src/lib/lens/order.ts</code>), empacotada e chamada pela simulação: cota ⌊(p+1)·k/100⌋ de lugares da rede entre os p+1 primeiros, sem rebaixar post escolhido, post da rede com score &lt; 0 sem prioridade, no máximo 2 posts por pessoa, posts de até 7 dias, aba com o mesmo tamanho. "Sua rede" = <code>tieOf ≥ 5</code> (segue e nunca denunciou: uma denúncia tira 5, e nem quem você já impulsionou — 8 — fica). S = mistura só com quem tem vínculo conquistado (8). Seguindo = a aba seguindo, para referência. A = <code>PprTrustLens.apply</code> antigo: score × <code>viewMultiplier</code> com PPR Monte Carlo do app (K=1000, L=6, α=0,15, semente pessoa+dia). B = score × (1 + 1,5·k·proximidade), score negativo ÷; R = lugar − ⌊k·50·proximidade⌋. Cenários: fazenda = spammer veterano + fazenda de 2.000 contas (início no dia 14) + brigada de 300; paciente = contas criadas no dia 0, camuflagem (2 impulsos honestos por conta e dia), ataque no dia 28, follow-back 10%; contas falsas seguidas = follow-back 10% e, do dia 28, 5% das contas postam spam por dia com 20 impulsos da fazenda; eclipse = 30% das pessoas perdem metade dos posts honestos que chegariam a elas. Determinismo: 1 em cada 15 pessoas por medição, entrada embaralhada (mistura, multiplicador, por lugares) e lista de quem segue em ordem inversa (fórmula de antes). Manifesto §24 (algoritmo público, entradas suas), §7 (determinismo), §28 (nada publicado). Código: <code>Docs/simulacao-lente/</code>.'
+}
+
+// ── laço ───────────────────────────────────────────────────────────
+function render(reset) {
+  if (reset) drawControls()
+  const sc = scen()
+  state.t = Math.max(0, Math.min(state.t, sc.series.length - 1))
+  narrate(); drawFeeds(reset); drawMap(); drawCharts()
+  if (reset) drawTables()
+}
+let acc = 0, lastTs = 0
+function tick(ts) {
+  if (state.playing) {
+    acc += Math.min(200, ts - (lastTs || ts)) * state.speed
+    if (acc > 900) { acc = 0; state.t = (state.t + 1) % scen().series.length; render(false) }
+  }
+  lastTs = ts
+  requestAnimationFrame(tick)
+}
+const startT = scen().series.findIndex((s) => s.d >= 112)
+state.t = startT >= 0 ? startT : 0
+drawVariants(); drawFindings(); drawFoot(); syncPlay(); render(true)
+requestAnimationFrame(tick)
+let rs = 0
+window.addEventListener('resize', () => { clearTimeout(rs); rs = setTimeout(() => drawMap(), 120) })
+</script>
