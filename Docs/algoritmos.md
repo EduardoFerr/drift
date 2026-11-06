@@ -21,6 +21,8 @@
 > - `src/lib/ots.ts`, `ots-client.ts`, `ots-anchors.ts`, `ots-stamper.ts`
 >   — âncora de antiguidade OpenTimestamps/Bitcoin (NIP-03)
 > - `src/lib/trust/{ppr,edges,constants}.ts` — Trust Lens
+> - `src/lib/contagion.ts` (+ `contagion-data.ts`) — contágio local da
+>   aba Contágio (§9; manifesto §24 emendado em 2026-11-05)
 >
 > Quando este doc divergir do código, **o código vence**. Atualizar
 > este doc após mudar fórmulas (LOCK_VIA_TEST trava conformance, mas
@@ -38,6 +40,7 @@
 6. [Trust Lens — View multiplier (s_local)](#6-trust-lens--view-multiplier-s_local)
 7. [Trust Lens — Temporal decay (GAP-1, opt-in)](#7-trust-lens--temporal-decay-gap-1-opt-in)
 8. [Cenários integrados (fim-a-fim)](#8-cenários-integrados-fim-a-fim)
+9. [Contágio local — aba Contágio (Fase 1)](#9-contágio-local--aba-contágio-fase-1)
 
 ---
 
@@ -854,6 +857,218 @@ Post de X ainda aparece boostado, mas menos — refletindo que user
 
 ---
 
+## 9. Contágio local — aba Contágio (Fase 1)
+
+### Conceito
+
+Todas as abas usam a mesma ordem (§1). Global e Em alta mostram os mesmos
+posts para todo mundo; Seguindo filtra pelos follows de quem lê. A aba
+**Contágio** mostra o que chegou ao leitor **pelas pessoas que ele
+segue**, como um vírus que passa de contato em contato: um post entra
+quando contatos deram DRIFT nele e a soma da força desses vínculos
+chega a 0,8. As regras são públicas e determinísticas; só as
+**entradas** são do leitor (quem ele segue, o que ele já impulsionou, o
+que ele denunciou, quem ele bloqueou, de quem ele não quer mais receber
+recomendações). A **ordem** dentro da aba continua a canônica (§1).
+Manifesto §24, emendado em 2026-11-05.
+
+Por que existe: numa ordem global igual para todos, uma fazenda de
+contas paciente compra o topo de todo mundo de uma vez. A simulação
+(`Docs/simulacao-contagio/`, `Docs/spec-revisao-contagio.md`) mostrou a
+fazenda de 2.000 contas no feed de 100% das pessoas no modelo global e
+abaixo de 0,3% no contágio local. É o resultado de Cheng & Friedman
+(2005): nenhuma reputação simétrica resiste a contas falsas; as
+assimétricas, calculadas a partir de quem olha, podem resistir.
+
+### Fórmula (décimos inteiros — a soma não depende da ordem)
+
+```
+tie(u) = 0                                   se o leitor não segue u ou o bloqueou
+       = max(0, base(u) − 5 × ruins(u))      senão
+base(u) = 8   se o leitor já impulsionou algo que u escreveu (ação líquida)
+        = 5   se só segue
+ruins(u) = posts distintos que o leitor DENUNCIOU e que eram de u, ou que
+           chegaram por u e foram denunciados na aba (permanente)
+
+Σ⁺(S) = Σ tie(u) dos u em S com tie(u) > 5  +  min(Σ tie(u) dos com tie(u) ≤ 5, 5)
+        ← teto: os vínculos fracos (≤ 0,5) somam no máximo 0,5
+
+Para cada post p (nunca os do próprio leitor), usando a AÇÃO MAIS RECENTE
+de cada contato em p (no empate exato, o SINK) e ignorando a ação do
+próprio autor em p:
+  traz(p)       = Σ⁺(contatos com DRIFT em p nas últimas 48 h,
+                     menos os marcados "não trazer mais")
+  vacina(p)     = Σ⁺(contatos com SINK em p nas últimas 96 h)
+  quarentena(p) = Σ⁺(contatos que denunciaram p nos últimos 14 dias)
+                  ← na vacina e na quarentena, os marcados "não trazer mais"
+                    entram na parte dos fracos (teto 5), seja qual for o vínculo
+  direto(p)     = autor seguido com tie > 0 e post com até 72 h
+
+p entra ⇔ quarentena(p) < 10
+        ∧ 10·direto(p) + traz(p) − vacina(p) > 0
+        ∧ (direto(p) ∨ (idade(p) ≤ 4 dias ∧ traz(p) ≥ 8))
+```
+
+O **teto para vínculos fracos** é a peça central: contas que o leitor só
+segue somam no máximo 0,5 por post, então nunca passam o limiar sozinhas,
+por mais que sejam, revezem, camuflem o histórico ou se escondam atrás de
+relays. Ele vale do mesmo jeito na vacina e na quarentena: contas só
+seguidas também não escondem nada sozinhas (difamação). Só usa os
+vínculos do próprio leitor: não depende de dado global.
+
+**Experiência ruim é a denúncia.** O SINK do leitor é gosto (manifesto
+§23): vacina o post para quem o segue e tira o post da tela dele, mas
+não pune ninguém. Cada denúncia feita no aparelho grava a experiência
+ruim com o autor (em qualquer aba) e, se feita na aba Contágio, com cada
+contato que a pílula "↪ chegou por" mostrava quando a denúncia foi aberta
+(`contagion_bad_experiences`, local). Denúncias do leitor vindas de outro
+aparelho também contam contra o autor, pela tabela `reports` (com o alvo
+da tag `p` quando o post não está no cache); o cache não apaga posts que
+o leitor denunciou.
+
+**Gesto "não trazer mais por X".** Tocar na pílula "↪ chegou por" abre a
+folha "chegou por", com um botão por pessoa. O gesto corta as
+recomendações de X: os DRIFTs dele param de trazer post, e o SINK (vacina)
+e a denúncia (quarentena) dele passam a pesar como os de quem o leitor só
+segue — sozinho, X não esconde nada. Os posts que X escreve continuam
+entrando direto. Não pune ninguém (o vínculo não muda), não é publicado
+(tabela local `contagion_no_bring`) e se desfaz na própria folha
+("desfazer") ou em config → conteúdo → listas → não trazem. É o jeito de
+dizer "esse contato me traz lixo" sem denunciar post honesto e sem deixar
+de seguir em público.
+
+Por que o SINK e a denúncia de X também caem: na primeira versão eles
+continuavam com o vínculo inteiro. Uma conta de isca cortada — e por isso
+nunca mais denunciada, porque o leitor deixa de ver o spam dela — ficava
+com 0,8 para sempre e podia esconder post honesto: sozinha, a vacina dela
+anula o que chegou por um vínculo forte; com qualquer conta só seguida, a
+quarentena passa de 10 (revisão em par de 05/11/2026; tabela abaixo).
+
+### Exemplo
+
+Bia segue Ana (já impulsionou um post dela → 0,8), Caio e Duda (só segue
+→ 0,5 cada).
+
+| Post | O que aconteceu | Conta | Entra? |
+|---|---|---|---|
+| X | Ana deu DRIFT há 3 h | traz 8 | sim, "↪ chegou por Ana" |
+| Y | Caio e Duda deram DRIFT | traz min(5 + 5, 5) = 5 | não |
+| Z | Ana deu DRIFT; Caio e Duda denunciaram | quarentena min(5 + 5, 5) = 5 < 10 | sim (fracos não escondem) |
+| Q | Post de Duda de ontem; Ana e Caio denunciaram | quarentena 8 + 5 = 13 | não |
+| W | Post de Caio de ontem; Ana deu SINK | direto: 10 − 8 = 2 > 0 | sim, sem pílula |
+| V | Ana deu DRIFT; Bia já denunciou 2 posts que vieram pela Ana | tie(Ana) = 8 − 10 → 0 | não |
+| S | Ana deu DRIFT; Bia já deu SINK em 5 posts da Ana | tie(Ana) = 8 (SINK não pune) | sim |
+| N | Ana deu DRIFT; Bia marcou "não trazer mais por Ana" | traz 0 | não (posts da própria Ana continuam entrando) |
+| M | Post de Caio de ontem; Ana, marcada "não trazer mais", deu SINK e denunciou | vacina e quarentena min(8, 5) = 5: 10 − 5 = 5 > 0 e 5 < 10 | sim (marcada, a Ana sozinha não esconde) |
+
+### Simulação (2.250 pessoas, 6 cidades, 24 semanas, fazenda de 2.000 contas)
+
+| Ataque | % que vê ataque, Fase 1 (app) | Modelo completo (v7, Fases 2–3) |
+|---|---|---|
+| fazenda com follow-back 10% | 0,0% | 0,3% |
+| fazenda camuflada / revezando / paciente | 0,0% | 0,2% |
+| eclipse (30% dos clientes em relays do atacante) | 0,0% | 0,2% |
+| difamação (a fazenda enterra e denuncia post honesto) | 0,0% | — |
+| enganados (10%) + isca do fazendeiro | 0,1% (pico 9%) | 1,8% |
+| contas da fazenda postando isca (conteúdo bom) | **2,9%** (pico 11%) | 0,2% |
+
+Rodadas `fase1__*` da bateria: a configuração do app sem ninguém usar o
+gesto "não trazer mais" (limite conservador). Ordem de chegada
+embaralhada: 0 diferenças em 840 feeds por rodada. Custo da Fase 1: o post mais viral alcança ~38%
+das pessoas pela aba (29% com 10% de SINK por gosto; 27% sob eclipse); o
+modelo completo, com encontros físicos e o mapa da área, chega a 82–92%.
+A isca é o que mais passa: acima de 5% das pessoas em metade dos dias da
+simulação, até o lockstep da Fase 2. **Ela depende de quanto as pessoas
+denunciam**: a simulação supõe denúncia em 35% dos spams vistos; com 10%,
+a isca vai a 12,4%; com 5%, a 22,3% (revisão em par, 05/11/2026). A
+aba é opcional e as outras continuam lá.
+
+**O gesto "não trazer mais por X" na simulação** (rodadas `gesto_r*_c*`:
+r = % dos spams vistos que a pessoa denuncia; c = % das vezes que ela
+usa o gesto contra quem trouxe o spam). Média das últimas 6 semanas, %
+das pessoas que veem ataque:
+
+| Ataque | denúncia 35% · sem gesto / 20% / 40% | denúncia 10% · sem gesto / 20% / 40% |
+|---|---|---|
+| isca (contas da fazenda postando conteúdo bom) | 2,9 / 1,8 / 1,6 | 12,4 / **4,8** / 2,6 |
+| isca + 10% enterrando por gosto | 2,3 / 1,5 / 1,4 | 11,7 / 3,8 / 2,5 |
+| enganados (10%) + isca | 0,1 / 0,1 / 0,1 | 2,5 / 2,5 / 2,5 |
+| sem ataque (alcance do post mais viral) | 37,8 / 37,8 / 37,8 | 37,8 / 37,8 / 37,8 |
+| isca que difama — leitores com post honesto escondido, **regra do app** (cortado pesa como fraco) | 0,5 / 0,4 / 0,2 | 2,7 / **0,4** / 0,2 |
+| isca que difama — idem, **primeira versão** (cortado seguia com o vínculo inteiro) | 0,5 / 12,3 / 18,3 | 2,7 / **26,9** / 31,1 |
+
+O gesto segura a isca mesmo quando quase ninguém denuncia. Sem ataque,
+nada muda — mas a simulação só usa o gesto contra spam: quem corta um
+contato por gosto deixa de receber o que ele traria, como ao deixar de
+seguir. Ele **não ajuda** quando o spam vem direto de alguém que a pessoa
+segue (os enganados seguem o fazendeiro): ali, só denunciar ou deixar de
+seguir. A última linha é o porquê da regra: com o vínculo inteiro, a isca
+cortada escondia post honesto de até 31% dos leitores e deixava 7,6% das
+abas quase vazias (rodadas `gesto_forte_*`).
+
+Onde a simulação difere do app: na simulação, "quem trouxe" é um contato
+só (no app, todos os empatados), o SINK de contato vale 2 dias (no app,
+96 h) e o feed medido são os 8 primeiros por pontuação de contágio (no
+app, tudo o que passa, até 50, na ordem canônica). A simulação também não
+aplica a moderação global (−999): uma brigada que esconda post honesto no
+Global esconde na aba Contágio também.
+
+### Edge cases
+
+- Sem follows → aba vazia, com convite a seguir (não há fallback global).
+- Por que o SINK não pune: na simulação, com cada pessoa enterrando 10%
+  dos posts honestos por gosto, punir no SINK zerava 25% dos vínculos
+  honestos e derrubava o alcance de 29% para 5%. O preço é a isca passar
+  mais (2,9% × 1,4% das pessoas). Detalhes em
+  `Docs/spec-revisao-contagio.md` §4.6.
+- Denunciar o mesmo post de novo conta uma vez (uma experiência ruim por
+  pessoa e post).
+- "Quem trouxe" = os contatos de maior vínculo que deram DRIFT. Com
+  empate, cada um leva −0,5 inteiro (ninguém escapa escolhendo a própria
+  chave), e a pílula mostra todos ("Ana, Bia +1"). A denúncia pune
+  exatamente os que a pílula mostrava quando foi aberta, mesmo que a aba
+  recalcule no meio.
+- Post direto não tem "quem trouxe": veio pelo follow no autor (nem
+  pílula, nem culpa de terceiros).
+- Experiências ruins são permanentes: na simulação, deixá-las expirar em
+  30 dias fez "enganados + isca" voltar de 2,1% para 20,1% (TrustGuard,
+  WWW 2005, descreve o ataque de quem oscila). A denúncia também é evento
+  imutável (§6).
+- "Quem trouxe" é inferido na hora a partir dos vínculos do leitor: nada
+  de proveniência é publicado (`cascade.ts`, §28). O registro de quem
+  trouxe o que o leitor denunciou fica em cada aparelho. A parte do autor
+  sobrevive à limpeza do cache; num aparelho novo, contam as denúncias
+  que o sync trouxe.
+- Ação do próprio autor no próprio post não conta (como no ranking
+  canônico): republicar o DRIFT não mantém um post velho na aba.
+- Bloquear tira a pessoa da conta (não traz, não vacina, não denuncia);
+  silenciar só esconde os posts dela; "não trazer mais" tira os DRIFTs
+  dela e põe o SINK e a denúncia dela no balde dos fracos (os posts dela
+  continuam entrando direto).
+- O marcado "não trazer mais" nunca traz post nem vira "quem trouxe" e,
+  sozinho, não esconde nada; marcar só muda posts em que ele agiu — e pode
+  devolver à aba um post que só ele tinha vacinado. Não mexe no vínculo
+  (não é experiência ruim) e vale por identidade: trocar de identidade no
+  aparelho não leva a lista junto.
+- A folha "chegou por", a lista "não trazem" e o aviso da denúncia mostram
+  o nome com o começo e o fim da chave (1a2b3c4d…5e6f7a8b, 64 bits): copiar
+  o nome de um amigo é fácil, copiar também a chave é inviável (só o fim,
+  6 caracteres, sairia em minutos numa CPU comum).
+- A aba só se atualiza quando a folha "chegou por" fecha, mesmo que chegue
+  evento do relay com ela aberta (`holdFeed` em `feed.ts`): atualizar antes
+  tiraria o post, e a folha junto, no meio da ação.
+- SINK de contato vale 96 h, enquanto o post ainda pode entrar; senão o
+  atacante republicaria o DRIFT depois que a vacina expirasse.
+- A moderação comunitária global (§3) continua valendo: post com
+  `score = −999` não aparece em aba nenhuma.
+
+### Manifesto
+
+§24 (emendado), §7 (determinismo: mesmas entradas, mesmo feed), §28
+(tudo local, nada publicado), §26 (moderação global preservada).
+
+---
+
 ## Apêndice — invariantes que NUNCA podem quebrar (LOCK_VIA_TEST)
 
 | Invariante | Arquivo | Manifesto |
@@ -870,10 +1085,21 @@ Post de X ainda aparece boostado, mas menos — refletindo que user
 | `computeInfluence` ∈ (0, 1) bounds | `tests/trust-lens-math.test.ts` #10 | §22 |
 | `temporalDecay` ∈ (0, 1] + monotonic | `tests/trust-lens-math.test.ts` #22-#27 | §7 |
 | Feed canônico inalterado pra users sem lens habilitada | `tests/feed.test.ts` | §24 |
+| Contas só seguidas nunca passam o limiar da aba Contágio, por mais que sejam | `tests/contagion.test.ts` | §24, §22 |
+| Aba Contágio: mesma entrada em qualquer ordem → mesmos veredictos e mesmo "quem trouxe" | `tests/contagion.test.ts` | §7 |
+| Impulsionar nunca tira um post da aba Contágio (monotonia) | `tests/contagion.test.ts` | §7 |
+| As 4 abas usam a mesma ordenação canônica (`FEED_ORDER`) | `tests/score-decay-parity.test.ts`, `tests/scoring-pipeline-conformance.test.ts` | §8, §24 |
+| Experiências ruins do leitor só mexem na aba dele; o global não muda | `tests/contagion.test.ts` | §24 |
+| Contas só seguidas não escondem nada sozinhas (teto também na vacina e na quarentena) | `tests/contagion.test.ts` | §24, §26 |
+| "Não trazer mais por X": X nunca traz nem vira "quem trouxe"; sozinho, não esconde nada; marcar só muda posts em que X agiu | `tests/contagion.test.ts` | §24 |
+| SINK do leitor não pune ninguém na aba Contágio | `tests/contagion.test.ts`, `e2e/contagion-tab.spec.ts` | §23 |
+| Denúncia fora da aba nunca pune quem trouxe | `e2e/contagion-tab.spec.ts` | §24 |
 
 ---
 
-*Última atualização: 2026-11-03 (auditoria do algoritmo — motor global,
-âncora OpenTimestamps, moderação derivada). Source-of-truth está no código —
+*Última atualização: 2026-11-05 (§9 — contágio local, aba Contágio,
+Fase 1; manifesto §24 emendado; revisão em par: teto simétrico, só a
+denúncia pune, "↪ chegou por"). Anterior: 2026-11-03 (auditoria do
+algoritmo — motor global, âncora OpenTimestamps, moderação derivada). Source-of-truth está no código —
 quando este doc divergir, código vence. Reportar dessincronia via
 issue ou pair-review HIMYM.*

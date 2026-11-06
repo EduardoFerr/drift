@@ -8,6 +8,12 @@
 -- Regra invariante: APENAS onNostrEvent() escreve em tabelas de
 -- domínio (posts, spreads, buries, reports, users). Identity, sync_log
 -- e user_prefs são exceções operacionais locais.
+--
+-- Índices (`CREATE INDEX IF NOT EXISTS nome ON tabela(...);`): num banco
+-- que já existe, os que faltam são criados ANTES do resto do schema e
+-- ANTES das migrações (db.worker.ts, applySchema), um por vez. Índice
+-- sobre coluna criada por migração (ALTER TABLE) vai no SQL da migração,
+-- não aqui — senão o boot de quem atualiza quebra.
 -- ═══════════════════════════════════════════════════════════════════
 
 -- ── Identidade local ──────────────────────────────────────────────
@@ -97,6 +103,9 @@ CREATE TABLE IF NOT EXISTS spreads (
 );
 CREATE INDEX IF NOT EXISTS idx_spreads_post    ON spreads(post_id);
 CREATE INDEX IF NOT EXISTS idx_spreads_created ON spreads(created_at);
+-- Aba Contágio: "o que esta pessoa impulsionou" (vínculo conquistado e
+-- DRIFTs recentes dos contatos).
+CREATE INDEX IF NOT EXISTS idx_spreads_spreader ON spreads(spreader_pub, created_at);
 
 -- ── Buries ───────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS buries (
@@ -109,6 +118,7 @@ CREATE TABLE IF NOT EXISTS buries (
   UNIQUE(post_id, burier_pub)
 );
 CREATE INDEX IF NOT EXISTS idx_buries_post ON buries(post_id);
+CREATE INDEX IF NOT EXISTS idx_buries_burier ON buries(burier_pub, created_at);
 
 -- ── Reports ──────────────────────────────────────────────────────
 -- Reports (kind 9081 Drift native + kind 1984 NIP-56 dual stack).
@@ -137,10 +147,12 @@ CREATE TABLE IF NOT EXISTS reports (
   weight       REAL NOT NULL,
   created_at   INTEGER NOT NULL,
   kind         INTEGER NOT NULL DEFAULT 9081, -- 9081 Drift | 1984 NIP-56
+  target_pub   TEXT,                     -- tag `p`: autor denunciado (aba Contágio, quando o post não está no cache)
   UNIQUE(post_id, reporter_pub)
 );
 CREATE INDEX IF NOT EXISTS idx_reports_post   ON reports(post_id);
 CREATE INDEX IF NOT EXISTS idx_reports_reason ON reports(reason);
+CREATE INDEX IF NOT EXISTS idx_reports_reporter ON reports(reporter_pub, created_at);
 
 -- ── Comments (Track C — kind 1111 NIP-22) ───────────────────────
 -- Threads de comentários reusando NIP-22 (manifesto §29 compat). Drift
@@ -220,6 +232,35 @@ CREATE TABLE IF NOT EXISTS blocked (
 CREATE TABLE IF NOT EXISTS muted (
   npub      TEXT PRIMARY KEY,
   muted_at  INTEGER NOT NULL
+);
+
+-- ── Aba Contágio (manifesto §24 emendado) ────────────────────────
+-- Estado local do user, como blocked/muted: não é publicado e não entra
+-- em DOMAIN_TABLES (rebuild preserva). Cada identidade do aparelho tem o
+-- seu (`viewer_pub`).
+--
+-- Gesto "não trazer mais por X": os DRIFTs de X deixam de trazer post para
+-- este leitor e o SINK e a denúncia de X pesam como os de quem ele só segue;
+-- os posts diretos de X continuam.
+-- Desfazível na própria folha ou em config → conteúdo → listas → não trazem.
+CREATE TABLE IF NOT EXISTS contagion_no_bring (
+  viewer_pub  TEXT NOT NULL,
+  subject_pub TEXT NOT NULL,
+  created_at  INTEGER NOT NULL,            -- unix seconds
+  PRIMARY KEY (viewer_pub, subject_pub)
+);
+
+-- Quem trouxe o que o leitor denunciou: denúncia feita no aparelho grava
+-- uma linha para o autor (em qualquer aba) e uma por contato que a pílula
+-- "↪ chegou por" mostrava (só na aba Contágio). Cada post distinto tira
+-- 0,5 do vínculo (src/lib/contagion.ts). Denúncias do leitor vindas de
+-- outro aparelho entram pela tabela `reports`.
+CREATE TABLE IF NOT EXISTS contagion_bad_experiences (
+  viewer_pub  TEXT NOT NULL,
+  subject_pub TEXT NOT NULL,
+  post_id     TEXT NOT NULL,
+  created_at  INTEGER NOT NULL,
+  PRIMARY KEY (viewer_pub, subject_pub, post_id)
 );
 
 -- ── Usuários (perfis agregados) ──────────────────────────────────

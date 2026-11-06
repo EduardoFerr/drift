@@ -69,6 +69,11 @@ interface OutMessage {
   result?: unknown
   error?: string
   log?: string
+  /** Etapa do init: 'opened' = o banco abriu (WASM e OPFS ok); daqui em
+   *  diante o trabalho é SQL e o main thread não mata o worker por silêncio. */
+  stage?: 'opened'
+  /** Trabalho longo do init, em linguagem simples, para a tela de boot. */
+  progress?: string
 }
 
 function reply(msg: OutMessage) {
@@ -77,6 +82,120 @@ function reply(msg: OutMessage) {
 
 function log(message: string) {
   reply({ log: message })
+}
+
+/**
+ * Várias instruções numa transação só. No OPFS em disco cada transação
+ * cria, sincroniza e apaga `drift.db-journal` (~100 ms no Windows, medido
+ * em 2026-11-05); o schema tem dezenas de instruções e a reconstrução de
+ * domínio, o dobro. Em transações avulsas o primeiro boot passava de 15 s,
+ * estourava o prazo do init e o próximo boot refazia tudo (laço).
+ */
+function inTransaction(run: () => void): void {
+  if (!db) throw new Error('DB not initialized — inTransaction')
+  try {
+    db.exec('BEGIN')
+  } catch (err) {
+    // uma tentativa anterior deixou a transação aberta (ROLLBACK falhou)
+    if (!/within a transaction/i.test(String(err))) throw err
+    db.exec('ROLLBACK')
+    db.exec('BEGIN')
+  }
+  try {
+    run()
+    db.exec('COMMIT')
+  } catch (err) {
+    try {
+      db.exec('ROLLBACK')
+    } catch {
+      /* transação já abortada */
+    }
+    throw err
+  }
+}
+
+/** Erro de E/S ou de trava que pode passar sozinho: o worker de uma página
+ *  recém-fechada ainda está soltando os arquivos do OPFS. */
+function isTransientIo(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err)
+  return /SQLITE_(IOERR|BUSY)|disk I\/O error|database is locked/i.test(msg)
+}
+
+/** Até 4 tentativas para erro passageiro de E/S (cada uma dá sinal de vida
+ *  ao main thread). */
+async function withRetry(what: string, run: () => void): Promise<void> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      run()
+      return
+    } catch (err) {
+      if (attempt >= 4 || !isTransientIo(err)) throw err
+      log(`${what}: erro passageiro (${err instanceof Error ? err.message : err}) — nova tentativa ${attempt + 1}/4`)
+      await new Promise((r) => setTimeout(r, 500 * attempt))
+    }
+  }
+}
+
+/** `CREATE INDEX IF NOT EXISTS nome ON tabela(...)` do schema (uma linha cada). */
+function schemaIndexes(schema: string): Array<{ name: string; table: string; sql: string }> {
+  const out: Array<{ name: string; table: string; sql: string }> = []
+  const re = /^\s*CREATE\s+INDEX\s+IF\s+NOT\s+EXISTS\s+(\w+)\s+ON\s+(\w+)\s*\([^;]*\);/gim
+  for (let m = re.exec(schema); m; m = re.exec(schema)) out.push({ name: m[1]!, table: m[2]!, sql: m[0].trim() })
+  return out
+}
+
+function sqliteNames(type: 'table' | 'index'): Set<string> {
+  const rows = db!.exec({
+    sql: `SELECT name FROM sqlite_master WHERE type = ?`,
+    bind: [type],
+    returnValue: 'resultRows',
+    rowMode: 'object',
+  }) as Array<{ name: string }>
+  return new Set(rows.map((r) => r.name))
+}
+
+/**
+ * Aplica o schema. Índice novo sobre tabela que já existe (atualização do
+ * app num banco com dados) é criado antes, um por vez, cada um na sua
+ * transação e com log: num celular lento com tabela grande pode levar
+ * dezenas de segundos, e assim o progresso fica salvo entre recargas (nada
+ * de refazer tudo do zero) e o main thread vê sinal de vida. O resto do
+ * schema (tabelas novas, instruções que já existem) vai numa transação só.
+ *
+ * Índice é otimização: se um falhar mesmo depois das tentativas (ex.: o
+ * aparelho sem espaço), ele fica para o próximo boot e sai do schema deste
+ * — senão a transação do schema repetiria o mesmo CREATE INDEX e o boot
+ * travaria a cada recarga.
+ *
+ * Esta etapa roda ANTES das migrações: índice sobre coluna criada por
+ * migração vai no SQL da própria migração, não no schema.sql.
+ */
+async function applySchema(schema: string): Promise<void> {
+  // a primeira leitura depois de abrir é a que desfaz um journal deixado
+  // por recarga: entra nas novas tentativas também
+  let tables = new Set<string>()
+  let indexes = new Set<string>()
+  await withRetry('leitura do schema', () => {
+    tables = sqliteNames('table')
+    indexes = sqliteNames('index')
+  })
+  let toApply = schema
+  if (tables.size > 0) {
+    const missing = schemaIndexes(schema).filter((ix) => !indexes.has(ix.name) && tables.has(ix.table))
+    for (const [i, ix] of missing.entries()) {
+      reply({
+        log: `criando índice ${ix.name} (${ix.table})…`,
+        progress: `organizando os dados deste aparelho (${i + 1} de ${missing.length})…`,
+      })
+      try {
+        await withRetry(`índice ${ix.name}`, () => db!.exec(ix.sql))
+      } catch (err) {
+        log(`índice ${ix.name} adiado para o próximo boot: ${err instanceof Error ? err.message : err}`)
+        toApply = toApply.replace(ix.sql, `-- ${ix.name}: adiado (falhou neste boot)`)
+      }
+    }
+  }
+  await withRetry('schema', () => inTransaction(() => db!.exec(toApply)))
 }
 
 async function init(schema: string): Promise<{ hasOpfs: boolean; storage: StorageMode }> {
@@ -137,6 +256,9 @@ async function init(schema: string): Promise<{ hasOpfs: boolean; storage: Storag
     storageMode = 'memory'
   }
   log(`banco aberto (modo: ${storageMode}) · executando schema…`)
+  // Daqui em diante é trabalho SQL: o main thread troca o prazo de silêncio
+  // pelo teto total (matar no meio só faria o próximo boot refazer tudo).
+  reply({ stage: 'opened' })
 
   // PRAGMA busy_timeout = 5000 — quando uma operação encontra o DB locked
   // (raro em single-worker, mas pode ocorrer em race windows com OPFS sync
@@ -147,11 +269,12 @@ async function init(schema: string): Promise<{ hasOpfs: boolean; storage: Storag
   // momentânea (e.g., schema migration concorrente com first invalidateFeed)
   // explode visivelmente. 5000ms é largo o suficiente pra absorver retries
   // de lock contention típica em OPFS WASM (Drift faz <100 op/s típico).
-  // Aplicado APÓS open + ANTES de schema.exec pra cobrir migrações.
-  db.exec('PRAGMA busy_timeout = 5000')
+  // Durante o init vale 1 s (cada tentativa de applySchema fica curta e dá
+  // sinal de vida entre elas); volta a 5 s no fim do init.
+  db.exec('PRAGMA busy_timeout = 1000')
 
   try {
-    db.exec(schema)
+    await applySchema(schema)
   } catch (err) {
     // User feedback 2026-05-17: pós-update do app, db.exec(schema) falha
     // com NoModificationAllowedError em /drift.db-journal porque o worker
@@ -181,6 +304,15 @@ async function init(schema: string): Promise<{ hasOpfs: boolean; storage: Storag
         const root = await navigator.storage.getDirectory()
         for (const name of ['drift.db-journal', 'drift.db-wal']) {
           try {
+            // Journal com conteúdo é a cópia de desfazer de uma transação
+            // interrompida (recarga ou worker encerrado no meio): apagá-lo
+            // corromperia o banco — onde mora a identidade. Só some o vazio;
+            // o com conteúdo o próprio SQLite desfaz ao reabrir.
+            const file = await (await root.getFileHandle(name)).getFile()
+            if (file.size > 0) {
+              log(`${name} tem ${file.size} bytes — não apaga (o SQLite desfaz a transação ao reabrir)`)
+              continue
+            }
             await root.removeEntry(name)
             log(`removed OPFS file ${name}`)
           } catch {
@@ -192,8 +324,8 @@ async function init(schema: string): Promise<{ hasOpfs: boolean; storage: Storag
       }
       try {
         db = new sqlite3.oo1.OpfsDb('/drift.db')
-        db.exec('PRAGMA busy_timeout = 5000')
-        db.exec(schema)
+        db.exec('PRAGMA busy_timeout = 1000')
+        await applySchema(schema)
         log('self-heal funcionou — schema aplicado após cleanup')
       } catch (retryErr) {
         if (retryErr instanceof Error && retryErr.name === 'NoModificationAllowedError') {
@@ -202,6 +334,10 @@ async function init(schema: string): Promise<{ hasOpfs: boolean; storage: Storag
         }
         throw retryErr
       }
+    } else if (storageMode === 'opfs' && /SQLITE_BUSY|database is locked/i.test(String(err))) {
+      // Trava que não passou em 4 tentativas: outra aba segura o banco.
+      log('schema: banco travado após 4 tentativas — provável outra aba aberta')
+      throw new Error('MULTI_TAB_CONFLICT')
     } else {
       throw err
     }
@@ -221,6 +357,7 @@ async function init(schema: string): Promise<{ hasOpfs: boolean; storage: Storag
   // continua a mesma. Manifesto §3 (identidade portável, dispositivo
   // descartável) faz isso ser aceitável.
   applyMigrations(schema)
+  db.exec('PRAGMA busy_timeout = 5000')
 
   return { hasOpfs: storageMode === 'opfs', storage: storageMode }
 }
@@ -256,18 +393,34 @@ const DOMAIN_TABLES = [
 function rebuildDomainSchema(schema: string) {
   if (!db) throw new Error('DB not initialized — rebuildDomainSchema')
   log('reconstruindo schema de domínio (preserva identity + user_prefs)…')
-  for (const t of DOMAIN_TABLES) {
-    try {
-      db.exec(`DROP TABLE IF EXISTS ${t}`)
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
-      log(`drop ${t} falhou (continuando): ${msg}`)
-    }
-  }
-  // schema.sql usa CREATE TABLE IF NOT EXISTS — recria os DOMAIN_TABLES
-  // dropados, mantém identity + user_prefs intactos (não foram dropados).
-  db.exec(schema)
+  // Uma transação só: rápido no OPFS em disco e atômico — se qualquer DROP
+  // ou a recriação falhar, tudo é desfeito (as tabelas voltam como estavam)
+  // e o erro sobe. Sem try/catch por DROP: um erro que já desfaz a
+  // transação (IOERR, FULL) deixaria o resto rodar fora dela.
+  inTransaction(() => {
+    for (const t of DOMAIN_TABLES) db!.exec(`DROP TABLE IF EXISTS ${t}`)
+    // schema.sql usa CREATE TABLE IF NOT EXISTS — recria os DOMAIN_TABLES
+    // dropados, mantém identity + user_prefs intactos (não foram dropados).
+    db!.exec(schema)
+  })
   log('schema de domínio reconstruído com sucesso')
+}
+
+/** Banco sem nenhum post nem voto: nada a converter num rebuild de domínio
+ *  (o caso de todo primeiro acesso). Na dúvida (tabela ausente), diz não. */
+function domainIsEmpty(): boolean {
+  if (!db) return false
+  try {
+    const rows = db.exec({
+      sql: `SELECT (EXISTS(SELECT 1 FROM posts) OR EXISTS(SELECT 1 FROM spreads)
+              OR EXISTS(SELECT 1 FROM buries) OR EXISTS(SELECT 1 FROM reports)) AS has`,
+      returnValue: 'resultRows',
+      rowMode: 'object',
+    }) as Array<{ has: number }>
+    return rows[0]?.has === 0
+  } catch {
+    return false
+  }
 }
 
 function tableHasColumn(table: string, column: string): boolean {
@@ -399,6 +552,16 @@ function applyMigrations(schema: string) {
       sql: `ALTER TABLE reports ADD COLUMN kind INTEGER NOT NULL DEFAULT 9081`,
     },
     {
+      // Aba Contágio (revisão em par 2026-11-05): a experiência ruim com o
+      // autor sai das denúncias do leitor. Guardar a tag `p` deixa a punição
+      // valer mesmo quando o post denunciado sai do cache ou não veio no
+      // sync de um aparelho novo. Linhas antigas: null (cai no JOIN com posts).
+      name: 'add_target_pub_to_reports',
+      table: 'reports',
+      column: 'target_pub',
+      sql: `ALTER TABLE reports ADD COLUMN target_pub TEXT`,
+    },
+    {
       // Satoshi devsec 2026-05-20 Gap B — Sybil edge-refresh defense.
       // Antes: temporalDecay usava updated_at (refresh-on-write) — Sybil
       // re-segue/re-drifta pra zerar age. Agora created_at IMUTÁVEL após
@@ -507,8 +670,14 @@ function applyMigrations(schema: string) {
     const current = rows.length > 0 ? parseInt(rows[0]!.value, 10) || 0 : 0
 
     if (current < 6) {
-      log(`schema_v=${current} < 6 — rebuild de domínio (posts.id UUID → event.id hex)`)
-      rebuildDomainSchema(schema)
+      if (domainIsEmpty()) {
+        // Primeiro acesso: o schema acabou de ser criado, não há post com id
+        // UUID para converter. Reconstruir aqui só dobrava o tempo do boot.
+        log(`schema_v=${current} < 6 num banco sem posts nem votos — nada a converter`)
+      } else {
+        log(`schema_v=${current} < 6 — rebuild de domínio (posts.id UUID → event.id hex)`)
+        rebuildDomainSchema(schema)
+      }
     }
 
     // schema_v=7 (Fase 6.2): peers_known para Peer Registry WebRTC.
@@ -610,16 +779,27 @@ function applyMigrations(schema: string) {
   }
 }
 
+/** Init em andamento: as outras mensagens esperam por ele (durante as
+ *  esperas do init o banco já está aberto, mas o schema ainda não). */
+let initRunning: Promise<unknown> | null = null
+
 self.onmessage = async (e: MessageEvent<InMessage>) => {
   const { id, type } = e.data
   try {
     if (type === 'init') {
       // V10.11 — schema importado direto no worker; payload não traz mais.
-      const result = await init(schema)
-      reply({ id, ok: true, result })
+      const running = init(schema)
+      initRunning = running
+      try {
+        const result = await running
+        reply({ id, ok: true, result })
+      } finally {
+        initRunning = null
+      }
       return
     }
 
+    if (initRunning) await initRunning.catch(() => undefined)
     if (!db) throw new Error('DB not initialized')
 
     if (type === 'rebuild') {

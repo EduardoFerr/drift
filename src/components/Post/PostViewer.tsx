@@ -45,10 +45,11 @@ import {
 } from '../UI/DriftCard'
 import type { Post, RenderHint, ReportReason } from '../../types/drift'
 import { dialog } from '../../lib/dialog'
-import { applyContentFilters } from '../../lib/feed'
+import { applyContentFilters, invalidateFeed } from '../../lib/feed'
 import { usePrefsStore } from '../../lib/prefs'
 import { toggleSlim, useViewModeStore } from '../../lib/view-mode'
 import { reportPost } from '../../lib/protocol'
+import { ContagionViaContext } from './ContagionViaChip'
 import { pinPost, unpinPost } from '../../lib/cache'
 import { block, mute } from '../../lib/moderation-local'
 import { follow, unfollow, useFollowsStore } from '../../lib/follows'
@@ -66,6 +67,9 @@ import { useCommentCountsStore } from '../../lib/comment-counts'
 
 // Round CWV-2 — lazy: ReportModal (raríssimo, gesture explícito) e
 // SpreadMap (1.1 MB MapLibre + Deck.gl ArcLayer, só ao abrir map toggle).
+const ContagionViaSheet = lazy(() =>
+  import('./ContagionViaSheet').then((m) => ({ default: m.ContagionViaSheet })),
+)
 const ReportModal = lazy(() =>
   import('./ReportModal').then((m) => ({ default: m.ReportModal })),
 )
@@ -160,6 +164,11 @@ export function PostViewer({
   // tap-abre/tap-fecha é padrão conhecido. Reincidência do bug #2 (hints
   // viram ruído sobreposto) — removido em vez de reposicionado.
   const [showReport, setShowReport] = useState(false)
+  // Aba Contágio: quem a pílula "↪ chegou por" mostrava quando a denúncia
+  // foi aberta — o modal cita e a denúncia pune exatamente estes.
+  const [reportVias, setReportVias] = useState<readonly string[]>([])
+  // Aba Contágio: folha "chegou por" (gesto "não trazer mais por X")
+  const [viaSheet, setViaSheet] = useState<readonly string[] | null>(null)
   // V_2026-05-17 (user pedido): long-press 5s mudou semantics.
   //   - Antes: abria ModerationModal (block/mute/report)
   //   - Agora: alterna modo padrão ⇄ modo slim (chrome hidden, card
@@ -295,7 +304,16 @@ export function PostViewer({
     if (reporting) return
     setReporting(true)
     try {
+      // Aba Contágio: a denúncia é experiência ruim com o autor e com quem a
+      // pílula "↪ chegou por" mostrava quando a denúncia foi aberta
+      // (`reportVias`, o mesmo nome que o modal exibiu). Registro local;
+      // a aba se atualiza já, sem esperar o eco do relay. O módulo (fora do
+      // chunk de entrada) carrega ANTES de publicar: se a carga falhar, a
+      // denúncia não sai pela metade, sem o registro que o modal prometeu.
+      const { recordReport } = await import('../../lib/contagion-data')
       await reportPost({ postId: post.id, authorPub: post.authorPub, reason })
+      await recordReport(post.id, post.authorPub, reportVias)
+      invalidateFeed()
       setShowReport(false)
     } catch (err) {
       console.error('report failed', err)
@@ -323,7 +341,7 @@ export function PostViewer({
 
   async function handleBlock() {
     const ok = await dialog.confirm(
-      `Posts e interações deste autor somem do SEU feed (manifesto §24 — filtro local).\nNão muda o score nem afeta outros usuários.\nVocê pode desbloquear depois em Configurações → listas.`,
+      `Posts e interações deste autor somem do SEU feed (manifesto §24 — filtro local).\nNão muda o score nem afeta outros usuários.\nVocê pode desbloquear depois em config → conteúdo → listas.`,
       { title: 'bloquear autor', dangerous: true, okLabel: 'bloquear' },
     )
     if (!ok) return
@@ -793,12 +811,14 @@ export function PostViewer({
                 !revealed ? 'pointer-events-none blur-xl' : ''
               }`}
             >
-              <SubpostCarousel
-                subposts={post.subposts}
-                index={subpostIdx}
-                post={post}
-                onSelect={setSubpostIdx}
-              />
+              <ContagionViaContext.Provider value={setViaSheet}>
+                <SubpostCarousel
+                  subposts={post.subposts}
+                  index={subpostIdx}
+                  post={post}
+                  onSelect={setSubpostIdx}
+                />
+              </ContagionViaContext.Provider>
             </div>
 
             {!revealed && (
@@ -839,10 +859,19 @@ export function PostViewer({
       </AnimatePresence>
 
       <AnimatePresence>
+        {viaSheet && (
+          <LazyBoundary fallback={<DriftSkeleton variant="card" />}>
+            <ContagionViaSheet vias={viaSheet} onClose={() => setViaSheet(null)} />
+          </LazyBoundary>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
         {showReport && (
           <LazyBoundary fallback={<DriftSkeleton variant="card" />}>
             <ReportModal
               post={post}
+              vias={reportVias}
               pending={reporting}
               onSubmit={handleReport}
               onClose={() => setShowReport(false)}
@@ -881,6 +910,9 @@ export function PostViewer({
             }}
             onReport={() => {
               setModerationOpen(false)
+              // retrato de quem a pílula mostra AGORA: é quem o modal cita e
+              // quem a denúncia pune, mesmo se a aba recalcular no meio
+              setReportVias(post.arrivedVia ?? [])
               setShowReport(true)
             }}
           />

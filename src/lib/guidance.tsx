@@ -98,10 +98,10 @@ export const ONBOARDING_RULES: readonly GuidanceRule[] = [
       <>
         <p>
           Drift é uma rede social descentralizada onde o conteúdo deriva pelo{' '}
-          <span className="text-drift-accent">comportamento humano</span> — não por algoritmo.
+          <span className="text-drift-accent">comportamento humano</span> — não por algoritmo secreto.
         </p>
         <p>
-          Sem servidor central, sem feed personalizado, sem bolha. Posts imutáveis, identidade portável.
+          Sem servidor central, regras públicas, sem bolha imposta. Posts imutáveis, identidade portável.
         </p>
         <p className="text-drift-muted">
           Sem censura — nem pelo fundador.
@@ -131,7 +131,7 @@ export const ONBOARDING_RULES: readonly GuidanceRule[] = [
           </li>
         </ul>
         <p className="text-drift-muted">
-          Sem like, sem follow obrigatório. O score é determinístico — todos veem a mesma ordem.
+          Sem like, sem follow obrigatório. O score é público e determinístico — a ordem é a mesma em qualquer cliente.
         </p>
       </>
     ),

@@ -53,7 +53,7 @@ function labelFor(strength: number): string {
 /** Helper text com exemplo concreto do efeito. */
 function helperText(strength: number): string {
   if (strength === 0) {
-    return 'Feed em ordem canônica — drifts, sinks e idade. Todos os clientes Drift veem a mesma ordem.'
+    return 'Feed em ordem canônica — drifts, sinks e idade. É a mesma ordem do feed global em qualquer cliente Drift.'
   }
   if (strength < 0.34) {
     return 'Posts de quem você acompanha (e do entorno deles) sobem um pouco. Resto do feed quase inalterado.'

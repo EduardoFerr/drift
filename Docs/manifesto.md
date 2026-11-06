@@ -543,6 +543,11 @@ usá-lo.
 Score é função pura de eventos públicos. Não há "reputação" pessoal
 calculada de forma diferente em cada cliente.
 
+> **Nota (2026-11-05, ver §24 emendado):** o vínculo da aba Contágio não
+> é reputação. É a confiança do leitor nos próprios contatos, calculada
+> das ações dele, nunca publicada e sem efeito no score nem no peso de
+> ninguém.
+
 **Regras:**
 - Score é calculado pela mesma fórmula em todos os clientes Drift
 - Peso de perfil é função pura de antiguidade + engajamento (eventos
@@ -609,24 +614,48 @@ escolhe a ação líquida e `computeRanking` soma os pesos por kind.
 espalharam"); `posts.score_base` usa soma de pesos. Bury não penaliza o
 autor (§23 preservado). Ver arquitetura §8.
 
-### 24. Sem Algoritmo Personalizado de Feed
+### 24. Algoritmo Público, Entradas Suas
 
-Ranking é determinístico e público. Sem feed "para você", sem bolha,
-sem afinidade automática.
+> **Emendado em 2026-11-05.** Até então este artigo se chamava "Sem
+> Algoritmo Personalizado de Feed" e exigia a mesma ordem global para
+> todos. A emenda e o motivo estão abaixo; o texto original segue no
+> histórico do repositório.
+
+Ranking é determinístico e público. Nenhuma regra é secreta, nenhum
+sinal é escondido do usuário, nada sai do dispositivo. O que pode
+variar entre pessoas são as **entradas** — e elas são do próprio
+usuário.
 
 **Regras:**
+- Toda regra de seleção e ordenação é pública, determinística e
+  documentada em `Docs/algoritmos.md`: com os mesmos eventos e as mesmas
+  escolhas do usuário, qualquer pessoa recalcula o mesmo feed
 - Ordem do feed é função pura: `score = (Σ weight(spreader) −
   Σ weight(burier) × 0.3 + min(Σ weight(comentaristas), 30)) /
   (idade + 2)^1.5`, depois `created_at` desc, depois `id` asc (ver §23
-  "Score weighted" para detalhes)
-- Qualquer cliente Drift mostra a mesma ordem global
-- Não há scoring personalizado por usuário
-- Bloquear / silenciar / seguir são camada de filtragem **local** na
-  visualização, não de ranking
+  "Score weighted" para detalhes) — **em todas as abas**
+- As abas Global e Em alta mostram os mesmos posts, na mesma ordem, para
+  todos; a aba Seguindo filtra pelos follows de quem lê, na mesma ordem
+- A aba **Contágio** escolhe o **conjunto** de posts a partir das
+  entradas do próprio usuário (quem ele segue, o que ele já impulsionou,
+  o que ele denunciou, de quem ele não quer mais receber recomendações),
+  pelas regras de `Docs/algoritmos.md` §9; a ordem dentro dela continua a
+  de cima
+- "Não trazer mais por X" é escolha explícita do usuário, feita a partir
+  da pílula "↪ chegou por": tira os DRIFTs de X da conta dele e dá ao SINK
+  e à denúncia de X o peso de quem ele só segue; não pune ninguém, não é
+  publicado e se desfaz a qualquer momento
+- Na aba Contágio, enterrar continua sendo gosto (§23): o SINK do
+  usuário não pune ninguém. Só a denúncia dele baixa o vínculo com o
+  autor e, se feita com "↪ chegou por" à vista, com quem trouxe o post
+- Proibido: previsão de engajamento, tempo de tela, modelos treinados,
+  otimização escondida, sinal que o usuário não vê ou não controla
+- Bloquear / silenciar / seguir continuam filtros **locais** na
+  visualização
 - O usuário pode escolher categorias para filtrar; a ordenação
   dentro da categoria continua determinística
 
-**Por que essa regra dura existe:**
+**Por que a regra original existia:**
 Afinidade no feed é o que cria bolha. Se o app começa a
 "personalizar" o que você vê com base em quem você seguiu ou no que
 você espalhou, estamos construindo o mesmo algoritmo central que o
@@ -634,8 +663,31 @@ Drift se propõe a substituir — só que rodando localmente em vez de
 num servidor da Meta. O resultado social é idêntico: bolhas,
 manipulação, captura.
 
-**Implementação:** `scoring.ts` é função pura sem inputs do user
-individual. `feed.ts` query é genérica e idêntica entre users.
+**Por que foi emendada:**
+1. **Uma ordem igual para todos é um alvo único.** Simulações com 2.250
+   pessoas (`Docs/simulacao-contagio/`, `Docs/spec-revisao-contagio.md`)
+   mostraram uma fazenda paciente de 2.000 contas no feed de 100% das
+   pessoas no modelo global, mesmo com antiguidade ancorada no Bitcoin;
+   no contágio local, abaixo de 0,3%. A regra tornava possível a captura
+   que o artigo temia.
+2. **É um resultado conhecido:** nenhuma reputação simétrica (igual para
+   todos) resiste a contas falsas; as assimétricas, calculadas a partir
+   de quem olha, podem resistir (Cheng & Friedman, 2005).
+3. **O medo da bolha continua levado a sério:** a aba é opcional e as
+   regras são abertas; as entradas são escolhas explícitas do usuário,
+   não inferências. Na simulação, ~54% do que chega pela aba vem de
+   outras cidades (no feed global, 72%): ela é mais local, como foi
+   desenhada para ser, sem fechar a pessoa na própria cidade. Bolha
+   *ideológica* não foi medida.
+4. **Tem custo, e ele está registrado:** a primeira fase da aba alcança
+   menos gente e ainda deixa passar parte da isca (contas falsas com
+   conteúdo bom) — `Docs/known-limitations.md` §5l.
+
+**Implementação:** `scoring.ts` é função pura sem inputs do usuário
+individual. As queries Global e Em alta de `feed.ts` são idênticas entre
+usuários; Seguindo só recebe os follows. `contagion.ts` é função pura cujas
+entradas são as do próprio leitor. As 4 abas usam a mesma `FEED_ORDER`
+(travado por `tests/score-decay-parity.test.ts`).
 
 ### 25. Sem Scan Automático Obrigatório de Conteúdo (Sem Chave Mestra Disfarçada)
 
@@ -722,7 +774,11 @@ quando esconder do feed default.
 **O que reports não fazem:**
 - Não notificam o autor (manifesto §23 — bury não é punição; report
   é mais sério, mas o fluxo é processar e esconder, não punir
-  individualmente fora da fórmula de peso)
+  individualmente fora da fórmula de peso). Exceção local, §24 emendado:
+  na aba Contágio de quem denunciou, o autor (e quem trouxe o post, se a
+  denúncia foi feita ali) perde 0,5 de vínculo — só nos aparelhos dessa
+  identidade (quem trouxe, só no aparelho da denúncia), sem efeito no
+  score, no peso nem na aba de ninguém mais
 - Não removem da rede — Drift não tem capacidade técnica de fazer
   isso (§17)
 - Não censuram retroativamente histórico do reporter

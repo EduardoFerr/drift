@@ -4,6 +4,98 @@ All notable changes to the Drift client. Uses [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+Contágio local, Fase 1 (2026-11-05). **Emenda ao manifesto §24** — de
+"Sem Algoritmo Personalizado de Feed" para "Algoritmo Público, Entradas
+Suas": regras públicas e determinísticas, entradas do próprio usuário.
+
+### Added
+- **Aba "contágio"** — o que chegou pelas pessoas que você segue: DRIFTs
+  de contatos somando 0,8 (follow 0,5; 0,8 se você já driftou algo da
+  pessoa), vacina (SINK) e quarentena (denúncias) dos contatos, posts
+  recentes de quem você segue. Teto de 0,5 para quem você só segue no
+  DRIFT, na vacina e na quarentena (contas só seguidas não trazem nem
+  escondem nada sozinhas). A ordem é a canônica. `src/lib/contagion.ts`
+  (núcleo puro), `src/lib/contagion-data.ts` (SQLite), `Docs/algoritmos.md` §9.
+- **"↪ chegou por X"** — etiqueta no texto do card da aba Contágio, acima
+  do autor, com os contatos de maior vínculo que trouxeram o post ("Ana,
+  Bia +1" no empate). Post direto não mostra.
+- **"Não trazer mais por X"** — tocar na etiqueta abre a folha "chegou
+  por", com um botão por pessoa (nome + começo e fim da chave): os DRIFTs dela
+  param de trazer post, e o SINK e a denúncia dela passam a pesar como os
+  de quem você só segue (sozinha, ela não esconde nada); os posts dela
+  continuam. Não pune, não é publicado (tabela local `contagion_no_bring`)
+  e se desfaz na hora ("desfazer" na própria folha, com foco e aviso para
+  leitor de tela) ou em config → conteúdo → listas → não trazem. Com a
+  folha aberta a aba não se mexe, nem com evento novo do relay
+  (`holdFeed`). Na simulação, com denúncia em 10% dos spams vistos, segura
+  a isca em 4,8% se usado em 20% das vezes (sem o gesto, 12,4%), quando
+  usado contra spam (`Docs/spec-revisao-contagio.md` §4.8). Com o vínculo
+  inteiro no SINK e na denúncia (primeira versão), a isca cortada escondia
+  post honesto de 27% dos leitores; com o peso fraco, 0,4%.
+- **Experiência ruim = denúncia** — sua denúncia tira 0,5 do vínculo com o
+  autor e, se feita na aba, com cada contato que a etiqueta mostrava
+  (tabela local `contagion_bad_experiences`, nunca publicada). O passo de
+  confirmação da denúncia avisa isso antes do envio. A punição é
+  permanente: o cache não apaga posts que você denunciou e `reports`
+  guarda o alvo (tag `p`, coluna `target_pub`). O SINK continua sendo
+  gosto e não pune ninguém (§23): na simulação, punir no SINK derrubava o
+  alcance honesto de 29% para 5% com 10% de SINK por gosto.
+- **Guia do app** — tópico "aba contágio"; textos que negavam a aba
+  corrigidos (introdução, tela Sobre, denunciar, SINK).
+- **Índices** `spreads(spreader_pub, created_at)`, `buries(burier_pub,
+  created_at)`, `reports(reporter_pub, created_at)`.
+- **Simulação reproduzível no repositório** — `Docs/simulacao-contagio/`
+  (2.250 pessoas, 6 cidades, fazendas adaptadas) e
+  `Docs/spec-revisao-contagio.md` (spec para revisão externa).
+- **Testes** — `tests/contagion.test.ts` (propriedades: fazenda de até
+  2.000 contas só seguidas nunca passa; ordem de chegada não muda nada;
+  monotonia; pipeline real) e `e2e/contagion-tab.spec.ts` (oráculo SQL
+  independente no app real).
+
+### Changed
+- Manifesto §24 emendado (motivo e simulação no próprio artigo); notas em
+  §22 (vínculo não é reputação) e §26 (efeito local da denúncia).
+- Denúncia e a ingestão de denúncias atualizam o feed na hora (a aba
+  Contágio não espera o próximo evento).
+- Abas cabem em 320 px (tracking e padding menores abaixo de 375 px).
+- O motor da aba Contágio (`contagion.ts` + `contagion-data.ts`) sai do
+  chunk de entrada: carrega em segundo plano logo depois do boot (o arquivo
+  vem da mesma versão do app; um carregamento tardio falharia depois de um
+  deploy). Se mesmo assim a primeira carga de uma aba falhar, a aba mostra
+  "não deu para carregar" com "recarregar" — nunca os posts da aba
+  anterior. Denunciar e remover identidade carregam o motor antes de
+  qualquer efeito.
+- Testes que travavam "3 abas usam `FEED_ORDER`" agora travam 4.
+
+### Fixed
+- **Boot travava no primeiro acesso com o banco em disco** (erro na etapa
+  2/5: "Init do SQLite worker excedeu 15000ms" ou `SQLITE_IOERR: disk I/O
+  error`). No OPFS em disco cada transação cria, sincroniza e apaga o
+  journal (~100 ms no Windows); o schema rodava em dezenas de transações
+  avulsas (5–8 s) e o banco novo ainda era reconstruído à toa (+8–10 s).
+  O prazo fixo de 15 s matava o worker no meio, o próximo boot refazia
+  tudo (laço) e o worker antigo seguia escrevendo no OPFS. Agora: schema e
+  reconstrução numa transação só (schema em ~0,1 s); índice novo sobre
+  tabela que já existe (atualização num banco grande) é criado antes, um
+  por vez, cada um salvo ao ficar pronto, com "organizando os dados deste
+  aparelho (1 de 3)…" na tela de boot; sem reconstrução em banco sem
+  posts; nova tentativa em erro passageiro de E/S (espera por trava de 1 s
+  durante o init); trava que não passa vira o aviso "Drift já está aberto
+  em outra aba"; até o banco abrir, 30 s sem sinal de vida = travado;
+  depois, só o teto de 10 min (matar no meio só faria o próximo boot
+  refazer tudo); no estouro o worker é encerrado. O self-heal só apaga
+  journal vazio: um com conteúdo é a cópia de desfazer de uma transação
+  interrompida, e apagá-lo corromperia o banco. Já acontecia em `main`;
+  os outros specs E2E não pegavam porque usam contexto efêmero (OPFS em
+  memória) — `e2e/boot-persistent.spec.ts` usa perfil persistente.
+- **Revisão em par (05/11/2026), aba Contágio:** a etiqueta ↪ não abria a
+  folha em post com imagem (camada `pointer-events-none`); as 4 abas de
+  listas locais não cabiam abaixo de ~440 px (agora 2 × 2); a folha
+  "chegou por" perdia o foco e não anunciava a confirmação; a aba podia se
+  recalcular com a folha aberta; textos de erro do boot e do aviso de
+  outra aba com jargão (e o aviso de "limpar local" dizia que preservava a
+  identidade — apaga).
+
 Auditoria do algoritmo (2026-11-03, `Docs/auditoria-algoritmo-2026-11.md`):
 14 defeitos com prova executável, todos corrigidos. **Mudança de
 semântica do peso** — ver "Changed".

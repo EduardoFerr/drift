@@ -17,6 +17,124 @@ Formato:
 - Item aberto: `- [ ] <decisão> — contexto: <origem> — bloqueio: <quem/quê>`
 - Item fechado: `- [x] <decisão> — fechado YYYY-MM-DD em <commit-hash> — <1 linha resolução>`
 
+## Contágio local (2026-11-05)
+
+Fase 1 shipada (aba "contágio"; manifesto §24 emendado). Simulação e spec
+em `Docs/simulacao-contagio/` e `Docs/spec-revisao-contagio.md`.
+
+- [ ] **Fase 2: lockstep + aval + período de experiência; contágio como
+  padrão** — contexto: simulação v7 (isca 2,9% na Fase 1 → 0,2%; aval fecha
+  enganados no mapa). Exige ingerir kind 3 dos contatos (hoje o app só
+  guarda a lista do próprio usuário — `sync.ts` não assina kind 3) e
+  histórico de 30 dias de DRIFTs de terceiros — bloqueio: nenhum, trabalho
+  a fazer, simular a versão exata antes.
+- [ ] **Fase 3: mapa da área + encontros físicos** — contexto: alcance
+  honesto 38% → 82–92% na simulação. Exige ler a posição atual para o
+  feed (hoje nunca lida) e um evento de encontro co-assinado (não existe).
+  Privacidade: geo-indistinguishability e k-anonimato espacial (relatório
+  Marshall) — bloqueio: desenho.
+- [ ] **Piso de diversidade de relays (anti-eclipse)** — contexto:
+  eclipse de 30% dos clientes derruba o alcance honesto ~25 pontos
+  (Heilman et al. 2015; Nostr: maioria usa 1–2 relays) — bloqueio:
+  desenho (≥ 6 relays de ≥ 3 operadores, 2 fixos + 4 rotativos).
+- [ ] **"Por que vi isto"** na aba Contágio — mostrar quem trouxe e a
+  soma (o núcleo já devolve `contributors`) — bloqueio: desenho (revela o
+  limiar a atacante; Marshall).
+- [ ] **Grafo social realista na simulação** (amigos de amigos agrupados)
+  para testar avais independentes e teto por grupo — bloqueio: nenhum.
+- [ ] **Assinatura própria para as ações dos contatos** — contexto:
+  revisão pré-merge da Fase 1 (Satoshi #5). O sync pede os eventos
+  recentes da rede com limite por assinatura; uma fazenda publicando em
+  volume pode empurrar para fora da janela os DRIFTs/SINKs/denúncias de
+  quem você segue, e a aba Contágio fica com menos entradas. Correção:
+  assinatura de kinds 9079/9080/9081 com `authors` = seus follows —
+  bloqueio: nenhum, trabalho a fazer (Fase 2).
+- [ ] **Medir e defender o que a revisão em par achou** (Satoshi, 05/11) —
+  rodadas com Global e Contágio no mesmo mundo (funil: 7,7–20,4% de isca),
+  `farmSpamDirect` (6,5%), troca de mídia/perfil depois do DRIFT (1–3% dos
+  vínculos honestos levam culpa), métrica "posts honestos escondidos"
+  (difamação com vínculo forte); defesas: só mídia verificada na aba,
+  lista local "quem perdeu vínculo por denúncia sua" com "perdoar" —
+  bloqueio: nenhum, trabalho a fazer.
+- [ ] **Publish nos relays sempre conta "ok"** — `transport/wss.ts:60-61`
+  faz `Promise.allSettled` sobre `pool.publish([url], event)`, que no
+  nostr-tools 2.23.3 devolve um ARRAY de promises: cada item resolve na
+  hora, `ok` = nº de relays, `recordRelayOk` roda mesmo com falha e as
+  rejeições ficam sem tratamento (idem `rebroadcast.ts:79`; mocks escondem).
+  Achado colateral do Ted na revisão da aba Contágio — bloqueio: nenhum,
+  tarefa à parte (branch própria, testes que falham hoje).
+- [ ] **Alinhar a simulação ao app** — "quem trouxe" = todos os empatados,
+  SINK de contato 96 h, feed = tudo o que passa (até 50) na ordem canônica
+  (Ted, revisão em par) — bloqueio: nenhum.
+- [ ] **`getMyAction` numa consulta só** — hoje 2 por post a cada mudança
+  de posts, em todas as abas (Ted) — bloqueio: nenhum.
+- [x] **Deixar de seguir quem trouxe, em 1 toque, a partir da pílula ↪** —
+  fechado 2026-11-05 em [05ea98b] — virou "não trazer mais por X": a
+  pílula é botão e abre a folha "chegou por"; corta só os DRIFTs de X (os
+  posts de X, o SINK e a denúncia continuam), local, desfazível em listas
+  locais → não trazem. Bateria `gesto_*` (spec §4.8): com 10% de denúncia,
+  isca 12,4% → 4,8% (uso 20%) → 2,6% (uso 40%), sem custo de alcance; não
+  pega spam direto de quem a pessoa segue.
+- [ ] **Fallback kvvfs morto dentro do Worker (grave, pré-existente)** —
+  contexto: revisão Barney+Satoshi de 05/11/2026: `db.worker.ts` testa
+  `typeof localStorage`, que é sempre `'undefined'` num Worker; quem não
+  tem OPFS cai direto em memória e perde tudo a cada recarga — inclusive a
+  identidade — achando que está no modo "localStorage, persistente" —
+  bloqueio: decidir o caminho (kvvfs pelo main thread, IndexedDB no
+  worker, ou avisar e bloquear o boot sem persistência).
+- [ ] **Motor da aba Contágio no precache do service worker** — contexto:
+  revisão Ted+Marshall: o chunk sob demanda (`contagion-data-*.js`) fica
+  fora do `globPatterns`; a pré-carga logo depois do boot e o estado
+  `failed` cobrem o deploy novo, mas uma sessão offline que nunca baixou o
+  chunk não abre a aba — bloqueio: nenhum (nome estável via
+  `manualChunks` + entrada no precache, ~6 KB).
+- [ ] **Folhas (`SlideUpOverlay`) sem Esc nem gestão de foco** — contexto:
+  revisão de UX de 05/11/2026 (pré-existente): não fecham com Esc, não
+  põem o foco no diálogo ao abrir, não o prendem dentro e não o devolvem
+  a quem abriu; afeta todas as folhas (a "chegou por" herda). O
+  `FullPageCard` já trata Esc — bloqueio: o componente está sendo
+  redesenhado no branch da Lily (material "velatura"); fazer depois do
+  merge dela, para não conflitar.
+- [ ] **Tela de erro do boot empurra para o botão destrutivo** — contexto:
+  o user quase usou "limpar local + recarregar" no erro de 05/11/2026; é
+  o botão principal da tela, apaga a identidade não exportada e o diálogo
+  pede para exportar, o que é impossível com o app sem abrir. Os textos já
+  avisam (fix de cc0a505 em diante) — bloqueio: desenho (inverter os
+  botões? oferecer exportar a identidade direto do IndexedDB antes?).
+- [ ] **Medir uso real do gesto "não trazer mais" e da denúncia** —
+  contexto: a defesa contra a isca na Fase 1 depende das duas taxas, que a
+  simulação supõe (spec §4.7–§4.8) — bloqueio: decidir como medir sem
+  telemetria (manifesto: nada sai do aparelho); talvez só pesquisa
+  voluntária.
+- [ ] **Chunk de entrada acima do ratchet (dívida de `main`)** — contexto:
+  `tests/bundle-chunks-conformance.test.ts` trava o entry em 210 KB
+  (baseline 190 KB em 2026-05-15); `main` (09b98f2) já está em 239,7 KB e
+  a Fase 1 da aba Contágio soma +4,8 KB (o motor foi para chunk sob
+  demanda). O CI não pega porque roda `npm run test` antes do `build`
+  (sem `dist/`, o teste pula) — bloqueio: nenhum; tarefa à parte: achar o
+  que entrou no entry desde maio, cortar (lazy) ou subir o ratchet com
+  justificativa, e rodar o ratchet depois do build no CI.
+- [x] **Boot trava no 1º acesso com OPFS em disco (pré-existente em `main`;
+  bloqueia o deploy da aba Contágio)** — fechado 2026-11-05 em
+  [cc0a505] — schema e reconstrução em uma transação
+  (5,8 s → 0,1 s), sem rebuild em banco vazio, nova tentativa em IOERR/BUSY,
+  prazo do init que renova com sinal de vida e encerra o worker;
+  `e2e/boot-persistent.spec.ts` (4 testes; o 1º falha no código antigo).
+  Contexto original: em 05/11/2026 o user viu
+  `SQLITE_IOERR: disk I/O error` na etapa 2/5 no preview. Reproduzido em
+  perfil persistente (Chromium/Windows): o schema leva 5–8 s (cada CREATE
+  numa transação própria, com journal criado, sincronizado e apagado no
+  OPFS) e banco novo cai em `schema_v=0 < 6` → reconstrução de domínio
+  (apaga e recria tudo, +8–10 s) → passa de `INIT_TIMEOUT_MS` (15 s).
+  Recarregar mata o worker no meio, o `schema_v` não é gravado e o laço se
+  repete; o timeout não encerra o worker (dois workers no mesmo OPFS →
+  provável origem do IOERR). Igual com o schema de `main`; a branch soma
+  ~0,4 s. Correção proposta: schema e reconstrução numa transação só; pular
+  a reconstrução em banco vazio; prazo que renova enquanto o worker dá sinal
+  de vida e `terminate()` no estouro; IOERR/BUSY no schema com nova
+  tentativa antes de falhar; E2E com perfil persistente (o efêmero deixa o
+  OPFS em memória e esconde o problema) — bloqueio: nenhum.
+
 ## Auditoria do algoritmo (2026-11-03)
 
 - [ ] **PoW opcional anti-spam de volume** — contexto: user perguntou se o próprio

@@ -16,7 +16,7 @@
  *      documentamos HONESTAMENTE o resultado (ver nota "propagação ao
  *      vivo" abaixo).
  *   3. Render do feed + tabs: cada user vê posts (DERIVA no header) e as
- *      3 tabs (global / seguindo / em alta) trocam sem quebrar.
+ *      4 tabs (global / seguindo / em alta / contágio) trocam sem quebrar.
  *
  * ─── Nota: contexts isolados vs. malha BroadcastChannel ──────────────
  *
@@ -153,8 +153,8 @@ test.describe('smoke multi-user — baseline funcional', () => {
           s.page.getByRole('button', { name: /deriva .* abrir guia/i }),
         ).toBeVisible({ timeout: 15_000 })
 
-        // As 3 tabs existem e são clicáveis sem quebrar o app.
-        for (const label of ['global', 'seguindo', 'em alta']) {
+        // As 4 tabs existem e são clicáveis sem quebrar o app.
+        for (const label of ['global', 'seguindo', 'em alta', 'contágio']) {
           const tab = s.page.getByRole('tab', { name: label })
           await expect(tab, `${s.name}: tab "${label}" deveria existir`).toBeVisible()
           await tab.click()

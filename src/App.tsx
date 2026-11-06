@@ -13,6 +13,7 @@ import { rebuildIdentityHistory, restartSync, useSyncStore } from './lib/sync'
 import { parseDeepLinkSearch, cleanDeepLinkParams } from './lib/deep-link'
 import { createPost, spreadPost, buryPost } from './lib/protocol'
 import { getMyAction, markFeedSeen, refreshFeed, useFeedStore } from './lib/feed'
+import { useFollowsStore } from './lib/follows'
 import {
   advanceCursor,
   exitAtEnd,
@@ -263,7 +264,7 @@ function AboutCardLayer({ onClose }: { onClose: () => void }) {
             <div className="space-y-2 pl-3">
               <div className="space-y-2 rounded-xl border border-drift-border/30 bg-drift-surface/30 px-4 py-3.5">
                 <ManifestoLine n="§17" text="sem chave mestra — fundador não controla conteúdo" />
-                <ManifestoLine n="§22" text="sem afinidade no feed — ranking é função pura" />
+                <ManifestoLine n="§24" text="algoritmo público, entradas suas — nenhuma regra secreta" />
                 <ManifestoLine n="§15" text="anti-censura por país — Tor + WebRTC" />
                 <ManifestoLine n="§16" text="disponibilidade distribuída — IPFS, sneakernet, BLE" />
                 <ManifestoLine n="§25" text="sem scanner automático — opt-in vence" />
@@ -850,6 +851,7 @@ function App() {
     global: { postId: null, atEnd: false },
     following: { postId: null, atEnd: false },
     trending: { postId: null, atEnd: false },
+    contagio: { postId: null, atEnd: false },
   })
   // Último idx válido por tab — usado pra snap quando o post atual
   // some do feed (ex: moderação atinge threshold, score = -999 esconde).
@@ -861,6 +863,7 @@ function App() {
     global: 0,
     following: 0,
     trending: 0,
+    contagio: 0,
   })
 
   const cursor = cursorByTab[feedTab]
@@ -1391,7 +1394,10 @@ function App() {
                 <PostViewer
                   key={currentPost.id}
                   custom={exitDir}
-                  post={currentPost}
+                  // "↪ chegou por" só existe na própria aba Contágio: um
+                  // post residual da aba anterior (troca em andamento) não
+                  // mostra a pílula nem pune quem trouxe
+                  post={feedTab === 'contagio' || !currentPost.arrivedVia ? currentPost : { ...currentPost, arrivedVia: undefined }}
                   isMine={currentPost.authorPub === boot.identity?.npub}
                   pendingAction={pending[currentPost.id] ?? null}
                   queue={{
@@ -1828,10 +1834,35 @@ function FeedSnapshotAgeBadge() {
   )
 }
 
-function HomeEmpty({ tab }: { tab: 'global' | 'following' | 'trending' }) {
+function HomeEmpty({ tab }: { tab: FeedTab }) {
+  const followsSomeone = useFollowsStore((s) => s.following.size > 0)
+  const failed = useFeedStore((s) => s.failed)
+  if (failed) {
+    // A carga desta aba falhou (ex.: um arquivo do app mudou com um deploy
+    // novo). Melhor dizer isso do que mostrar a lista de outra aba.
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-4 px-8" role="alert">
+        <p className="max-w-prose text-center font-mono text-[12px] leading-relaxed text-drift-muted">
+          Não deu para carregar esta aba agora. Se o Drift acabou de ser atualizado, recarregar traz a
+          versão nova — seus dados continuam aqui.
+        </p>
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          className="rounded-lg border border-drift-accent2/60 px-4 py-2 font-mono text-[12px] uppercase tracking-meta text-drift-accent2 transition-colors hover:bg-drift-accent2/10 focus:outline-none focus-visible:ring-1 focus-visible:ring-drift-accent2"
+        >
+          ↻ recarregar
+        </button>
+      </div>
+    )
+  }
   const msg =
     tab === 'following'
       ? 'Você não segue ninguém ainda. Toque ➕ pra criar seu primeiro post — depois siga autores ao abrir os posts deles.'
+      : tab === 'contagio'
+      ? followsSomeone
+        ? 'Nada novo chegou pelas pessoas que você segue. Quando você drifta um post de alguém que segue, o que essa pessoa driftar passa a chegar aqui. Quem você denunciou traz menos — ou nada.'
+        : 'Você ainda não segue ninguém. Aqui aparecem os posts de quem você segue e o que essas pessoas driftaram — siga autores ao abrir os posts deles.'
       : tab === 'trending'
       ? 'Nada em alta nas últimas 24h. Driftar um post recente vai puxar ele pro trending.'
       : 'Nenhum post no feed ainda. Toque ➕ pra publicar o primeiro — ele vai dar a volta pelos relays e voltar.'
@@ -1863,14 +1894,14 @@ function EndOfFeed({
   onBack,
   onJumpToTop,
 }: {
-  tab: 'global' | 'following' | 'trending'
+  tab: FeedTab
   /** Voltar 1 post (o último que o user viu). */
   onBack: () => void
   /** Jump explícito pra idx=0 (instant, sem network). */
   onJumpToTop: () => void
 }) {
   const tabLabel =
-    tab === 'following' ? 'seguindo' : tab === 'trending' ? 'em alta' : 'global'
+    tab === 'following' ? 'seguindo' : tab === 'trending' ? 'em alta' : tab === 'contagio' ? 'contágio' : 'global'
   const [refreshing, setRefreshing] = useState(false)
   const [statusMsg, setStatusMsg] = useState<string | null>(null)
 
@@ -2319,7 +2350,7 @@ function SettingsRoot({ onClose }: { onClose: () => void }) {
         {
           target: 'listas',
           label: 'listas',
-          hint: 'pinned, blocked, muted',
+          hint: 'fixados, bloqueados, silenciados, não trazem',
           icon: ListIcon,
         },
         {
@@ -2778,7 +2809,9 @@ function BootView({ state }: { state: BootState }) {
           detail={
             state.storage === null
               ? state.step === 'db'
-                ? 'inicializando worker…'
+                ? state.dbSlow
+                  ? 'ainda trabalhando nos dados deste aparelho — pode esperar ou recarregar, sem perder nada'
+                  : state.dbProgress ?? 'abrindo os dados deste aparelho…'
                 : 'aguardando'
               : state.storage === 'opfs'
               ? 'storage: OPFS (persistente)'
@@ -2792,6 +2825,12 @@ function BootView({ state }: { state: BootState }) {
                   label: '↻ recarregar',
                   onClick: reloadPage,
                   title: 'tenta abrir OPFS de novo — modo memória é fallback temporário',
+                }
+              : state.storage === null && state.step === 'db' && state.dbSlow
+              ? {
+                  label: '↻ recarregar',
+                  onClick: reloadPage,
+                  title: 'recarregar é seguro: o banco desfaz o trabalho pela metade e retoma',
                 }
               : undefined
           }
@@ -2938,7 +2977,8 @@ function BootView({ state }: { state: BootState }) {
               <p className="text-center text-[12px] leading-relaxed text-drift-muted">
                 Remove o cache local (posts, feed, configurações).
                 <br />
-                Sua identidade sera preservada se ja foi exportada.
+                Apaga também a sua identidade neste aparelho: só dá para
+                recuperá-la se você a exportou antes.
               </p>
             </div>
 

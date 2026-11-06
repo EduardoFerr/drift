@@ -53,6 +53,7 @@ ou **Por persona** pra pular direto.
 - **[protocol-spec.md](protocol-spec.md)** — kinds 9078–9081 standalone (CC0); protocolo sobrevive ao cliente. Inclui score/peso determinísticos e âncora NIP-03
 - **[algoritmos.md](algoritmos.md)** — todas as fórmulas (score, peso, moderação, Trust Lens) com exemplos e simulações
 - **[auditoria-algoritmo-2026-11.md](auditoria-algoritmo-2026-11.md)** — auditoria do algoritmo com prova e contra-prova; status das correções
+- **[spec-revisao-contagio.md](spec-revisao-contagio.md)** — spec para revisão externa do modelo de contágio (v1–v7 e Fase 1, a aba "contágio"): regras, simulação reproduzível em `simulacao-contagio/`, resultados, cobertura e fragilidades
 - **[known-limitations.md](known-limitations.md)** — gaps conhecidos com condições de reabertura
 
 ### Operacional

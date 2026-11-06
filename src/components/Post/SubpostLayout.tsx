@@ -46,6 +46,7 @@ import type { Subpost, Post, LayoutKind } from '../../types/drift'
 import { DEFAULT_LAYOUT } from '../../types/drift'
 import { Image } from '../UI/Image'
 import { AuthorChip } from '../UI/AuthorChip'
+import { ContagionViaChip } from './ContagionViaChip'
 import { getDecorativeLetters } from '../../lib/decorativeLetters'
 
 export interface SubpostLayoutProps {
@@ -316,6 +317,9 @@ function CardText({
           aqui — usamos heurística: se post.authorAvatar OU authorAlias
           presentes E variant é overlay/inset/centered, renderiza). Fallback
           identicon + `anon…<last6>` (mesma convenção ProfileModal). */}
+      {/* Aba Contágio: quem trouxe o post, acima do autor — no fluxo do
+          texto, sem cobrir imagem nem a linha de números. */}
+      {post.arrivedVia && post.arrivedVia.length > 0 && <ContagionViaChip vias={post.arrivedVia} />}
       <div className="mb-2">
         <AuthorChip
           authorPub={post.authorPub}

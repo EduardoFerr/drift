@@ -123,6 +123,15 @@ export async function setupUser(browser: Browser, name: string): Promise<UserSes
   // invalidateFeed. Sem isto, contagens/scores variam por boot (race).
   await waitSeedSettled(page)
 
+  // O onboarding de primeiro boot é um diálogo modal por cima do app e
+  // intercepta cliques (causa das falhas antigas de smoke-multi-user: o
+  // clique nas abas esperava 60 s atrás dele). Contexto novo = sempre aparece.
+  await page
+    .getByRole('dialog', { name: 'onboarding do drift' })
+    .getByRole('button', { name: 'pular' })
+    .click({ timeout: 5_000 })
+    .catch(() => {})
+
   return { context, page, name: canonical, nsec, npub }
 }
 

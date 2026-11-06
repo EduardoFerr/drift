@@ -14,10 +14,11 @@
  * publicação substitui a anterior por (pubkey, kind=3). Pra adicionar
  * 1 follow, precisamos publicar a lista INTEIRA (snapshot).
  *
- * Manifesto §24 (sem afinidade no feed): seguir alguém NÃO altera o
- * score que o user vê. É filtro local — feed "Seguindo" usa essa
- * lista pra restringir, mas a ordem dentro do filtro continua
- * determinística (score puro).
+ * Manifesto §24 (emendado: algoritmo público, entradas suas): seguir
+ * alguém NÃO altera o score nem a ordem. É entrada local — a aba
+ * "Seguindo" filtra por essa lista e a aba "Contágio" a usa para saber
+ * por quem os posts chegam (Docs/algoritmos.md §9); a ordem dentro de
+ * qualquer aba continua determinística (score puro).
  */
 
 import { create } from 'zustand'

@@ -22,9 +22,14 @@ import type { ReportReason, Post } from '../../types/drift'
 import { FullPageCard } from '../UI/FullPageCard'
 import { DriftButton } from '../UI/DriftButton'
 import { SectionHeader } from '../UI/SectionHeader'
+import { PeopleNames } from './ContagionViaChip'
+import { useFollowsStore } from '../../lib/follows'
 
 export interface ReportModalProps {
   post: Post
+  /** Aba Contágio: quem a pílula "↪ chegou por" mostrava — também perdem
+   *  vínculo com esta denúncia (o passo de confirmação diz isso). */
+  vias?: readonly string[]
   pending: boolean
   onSubmit: (reason: ReportReason) => Promise<void> | void
   onClose: () => void
@@ -76,9 +81,10 @@ function toneClasses(tone: ReasonOption['tone'], active: boolean) {
   return base[tone]
 }
 
-export function ReportModal({ post, pending, onSubmit, onClose }: ReportModalProps) {
+export function ReportModal({ post, vias = [], pending, onSubmit, onClose }: ReportModalProps) {
   const [selected, setSelected] = useState<ReportReason | null>(null)
   const [confirmStep, setConfirmStep] = useState(false)
+  const followsAuthor = useFollowsStore((s) => s.following.has(post.authorPub))
 
   async function handleSubmit() {
     if (!selected || pending) return
@@ -144,6 +150,8 @@ export function ReportModal({ post, pending, onSubmit, onClose }: ReportModalPro
         {confirmStep && selected && (
           <ConfirmStep
             reason={selected}
+            vias={vias}
+            followsAuthor={followsAuthor}
             pending={pending}
             onBack={() => setConfirmStep(false)}
             onSubmit={handleSubmit}
@@ -157,11 +165,15 @@ export function ReportModal({ post, pending, onSubmit, onClose }: ReportModalPro
 
 function ConfirmStep({
   reason,
+  vias,
+  followsAuthor,
   pending,
   onBack,
   onSubmit,
 }: {
   reason: ReportReason
+  vias: readonly string[]
+  followsAuthor: boolean
   pending: boolean
   onBack: () => void
   onSubmit: () => void
@@ -200,6 +212,25 @@ function ConfirmStep({
         </div>
         <p className="px-1 font-mono text-[10px] leading-relaxed text-drift-muted/40">
           report é evento nostr imutável. não pode ser desfeito (§6).
+        </p>
+        {/* Aba Contágio (manifesto §24 emendado: nenhum sinal escondido):
+            a denúncia também baixa a confiança da aba — dito ANTES do envio. */}
+        <p
+          role="note"
+          data-testid="report-contagion-note"
+          className="px-1 font-mono text-[10px] leading-relaxed text-drift-warning"
+        >
+          {/* Só promete o efeito no autor se o leitor o segue: sem follow o
+              vínculo já é zero e os posts dele seguem chegando pelos contatos. */}
+          {followsAuthor && <>na sua aba contágio, o que vem do autor passa a chegar menos, sem volta.{' '}</>}
+          {vias.length > 0 && (
+            <>
+              {followsAuthor ? 'o mesmo vale para ' : 'na sua aba contágio, o que vem de '}
+              <PeopleNames pubs={vias} withKey />, que {vias.length > 1 ? 'trouxeram' : 'trouxe'} este post
+              {!followsAuthor && ', passa a chegar menos, sem volta'} (registro só no seu aparelho).{' '}
+            </>
+          )}
+          denúncia é para spam, golpe ou abuso — para o que só não te agrada, use sink.
         </p>
 
         {reason === 'illegal' && <AuthoritiesBlock />}

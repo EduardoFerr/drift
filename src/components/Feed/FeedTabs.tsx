@@ -1,5 +1,5 @@
 /**
- * FeedTabs — seletor de aba do feed (Global / Seguindo / Em alta).
+ * FeedTabs — seletor de aba do feed (Global / Seguindo / Em alta / Contágio).
  *
  * V_pre0 extraiu de App.tsx; V3.2 (reskin) adicionou indicator slide
  * elastic + paleta v0.7. V_2026-05-17 (HIMYM consenso 4/4) remove o
@@ -19,7 +19,7 @@ import { type ReactNode } from 'react'
 import { m } from 'framer-motion'
 import { markFeedSeen, refreshFeed, setFeedTab, useFeedStore } from '../../lib/feed'
 
-type FeedTab = 'global' | 'following' | 'trending'
+type FeedTab = 'global' | 'following' | 'trending' | 'contagio'
 
 export interface FeedTabsProps {
   /**
@@ -53,10 +53,12 @@ export function FeedTabs({ onActiveTabTap }: FeedTabsProps = {}) {
     }
   }
 
-  const tabs: { id: FeedTab; label: string }[] = [
+  const tabs: { id: FeedTab; label: string; hint?: string }[] = [
     { id: 'global', label: 'global' },
     { id: 'following', label: 'seguindo' },
     { id: 'trending', label: 'em alta' },
+    // Manifesto §24 emendado: o que chegou pelas pessoas que você segue.
+    { id: 'contagio', label: 'contágio', hint: 'o que chegou pelas pessoas que você segue' },
   ]
   const activeIndex = Math.max(
     0,
@@ -64,7 +66,9 @@ export function FeedTabs({ onActiveTabTap }: FeedTabsProps = {}) {
   )
 
   return (
-    <div className="flex items-stretch font-mono text-[12px] uppercase tracking-[2px]">
+    // 4 abas: abaixo de 375 px o tracking/padding cheio estourava a largura
+    // ("contág" cortado a 320 px — WCAG 1.4.10 Reflow)
+    <div className="flex items-stretch font-mono text-[12px] uppercase tracking-[1px] min-[375px]:tracking-[2px]">
       <div className="relative flex flex-1 items-stretch" role="tablist" aria-label="feed">
         {tabs.map((t) => (
           <FeedTabBtn
@@ -73,7 +77,7 @@ export function FeedTabs({ onActiveTabTap }: FeedTabsProps = {}) {
             // B1 fix (2026-05-22, Marshall): dot só em tab INATIVA com
             // unseen > 0. Tab ativa não mostra dot — ambíguo
             // ("precisa atenção?" vs. "estou aqui mesmo"). Combinado
-            // com bumpUnseenCount que incrementa todas as 3 tabs por
+            // com bumpUnseenCount que incrementa todas as tabs por
             // simplicidade, sem este guard as 3 tabs sempre piscavam
             // dot juntas após qualquer evento.
             unseen={tab === t.id ? 0 : unseenByTab[t.id]}
@@ -81,9 +85,10 @@ export function FeedTabs({ onActiveTabTap }: FeedTabsProps = {}) {
             title={
               tab === t.id
                 ? 'tocar de novo: atualizar + voltar ao topo'
-                : unseenByTab[t.id] > 0
-                ? `${unseenByTab[t.id]} ${unseenByTab[t.id] === 1 ? 'novo' : 'novos'}`
-                : undefined
+                : [
+                    t.hint,
+                    unseenByTab[t.id] > 0 && `${unseenByTab[t.id]} ${unseenByTab[t.id] === 1 ? 'novo' : 'novos'}`,
+                  ].filter(Boolean).join(' · ') || undefined
             }
           >
             {t.label}
@@ -91,10 +96,11 @@ export function FeedTabs({ onActiveTabTap }: FeedTabsProps = {}) {
         ))}
         {/* Indicator único hoisted no container — anima `x` em % via
             `animate` prop (feature `animation` está em `domAnimation`).
-            Largura = 1/3 do container das tabs (flex-1 × 3). */}
+            Largura = 1/N do container das tabs (flex-1 × N). */}
         <m.span
           aria-hidden="true"
-          className="pointer-events-none absolute -bottom-px left-0 h-[2px] w-1/3 bg-drift-accent2"
+          className="pointer-events-none absolute -bottom-px left-0 h-[2px] bg-drift-accent2"
+          style={{ width: `${100 / tabs.length}%` }}
           animate={{ x: `${activeIndex * 100}%` }}
           transition={{
             type: 'spring',
@@ -138,13 +144,14 @@ function FeedTabBtn({
       // indicador de active-state é o underline animado (m.span no
       // container). Tab "em alta" parecia "ter caixa" porque era
       // a última focada; agora foco e ativa têm visuais distintos.
-      className={`relative flex-1 px-2 py-[10px] text-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-drift-accent2 ${
+      className={`relative flex-1 px-1 py-[10px] text-center transition-colors min-[375px]:px-2 focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-drift-accent2 ${
         active
           ? 'text-drift-text'
           : 'text-drift-muted hover:text-drift-text'
       }`}
     >
-      <span className="relative inline-block">
+      {/* nowrap: com 4 abas, "em alta" quebrava em telas de ~320 px */}
+      <span className="relative inline-block whitespace-nowrap">
         {children}
         {/* Dot indicator pra unseen — visível em qualquer tab que tenha
             novo (ativa ou não). Posicionado top-right do label sem

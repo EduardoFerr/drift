@@ -287,6 +287,104 @@ audits só por feio. Defer documentado > silence.
 - **Reopener:** paginação de histórico por `until` (TODO em `sync.ts`)
   ou relays de arquivo dedicados.
 
+### 5l. Aba Contágio — o que a Fase 1 ainda não cobre
+
+- **Status:** ABERTO (fases 2–3 planejadas; `BACKLOG.md` "Contágio").
+- **O que é:** a Fase 1 (`Docs/algoritmos.md` §9) usa só o que o app já
+  tem: follows do leitor, o que ele impulsionou e o que ele denunciou.
+  Ficam de fora, com efeito medido na simulação
+  (`Docs/spec-revisao-contagio.md`, rodadas `fase1__*`):
+  - **Isca:** contas falsas que postam conteúdo bom conquistam o vínculo
+    de 0,8 com quem as impulsiona e depois trazem spam. Na Fase 1, sem
+    ninguém usar o gesto "não trazer mais", 2,9% das pessoas veem ataque,
+    com picos de 11% e mais de 5% em metade dos dias simulados; o lockstep
+    da Fase 2 leva a 0,2%. Punir também no SINK baixaria a isca para 1,4%,
+    mas com 10% de SINK por gosto derruba o alcance honesto de 29% para 5%
+    e deixa 30% dos feeds quase vazios (spec §4.6). **Os 2,9% supõem
+    denúncia em 35% dos spams vistos**: com 10%, a isca vai a 12,4%; com
+    5%, a 22,3% (revisão em par, Satoshi). O gesto privado "não trazer
+    mais por X" (pílula ↪, desde 05/11/2026) é a alavanca de maior
+    retorno: usado em 20% das vezes, segura 10% de denúncia em 4,8% (40%:
+    2,6%) (spec §4.8). "Sem custo de alcance" vale na simulação, onde o
+    gesto só é usado contra spam: quem corta por gosto perde o que aquele
+    contato traria. Quanto as pessoas vão de fato usá-lo é o que medir
+    antes de a aba virar padrão. O cortado continua seguido, mas o SINK e
+    a denúncia dele pesam como de vínculo fraco: na primeira versão
+    (vínculo inteiro), a isca cortada escondia post honesto de 27–31% dos
+    leitores (revisão Barney+Satoshi; com o peso fraco, 0,2–0,4%).
+  - **Spam direto de quem você segue:** o gesto não ajuda quando o spam
+    vem de alguém que a pessoa segue (os "enganados" seguem o fazendeiro):
+    com denúncia em 10%, 2,5% veem ataque com ou sem gesto. Ali, só
+    denunciar ou deixar de seguir.
+  - **Funil do Global:** a fazenda domina o feed global; quem segue e dá
+    DRIFT numa isca lá cria, por escolha própria, o vínculo de 0,8 que traz
+    spam na aba. Aproximação: 0,5%–2% de DRIFT em isca por dia ativo → isca
+    de 7,7% a 20,4%. Exigir DRIFT em 2 dias não compensa (−7 pontos de
+    alcance).
+  - **Fazenda postando spam pelas próprias contas:** conta de isca que já
+    vale 0,8 posta spam direto (o caminho direto só exige vínculo > 0) —
+    6,5% na simulação com denúncia em 35%; com denúncia em 10%, 17,4%, e
+    12,6% com o gesto usado em 20% das vezes (o gesto não corta post
+    direto; só a denúncia zera o vínculo com o autor). Funil do Global (1%
+    dos dias) + gesto em 20%: 18,3%. As rodadas publicadas supõem que a
+    fazenda só impulsiona o spam do dono (números da revisão Barney+Satoshi
+    de 05/11/2026, com o simulador do repositório + `farmSpamDirect`/
+    `baitDiscovery`).
+  - **Culpa trocada induzindo o corte:** trocar mídia, nome ou avatar
+    depois do DRIFT de um contato honesto pode levar o leitor a marcar esse
+    contato com "não trazer mais". Menos grave que a denúncia: é
+    desfazível e aparece na lista "não trazem".
+  - **Culpa trocada:** o atacante posta algo bom, um contato honesto dá
+    DRIFT, e depois troca mídia sem hash, nome ou avatar por abuso; quem
+    denunciar na aba pune o contato honesto (1–3% dos vínculos honestos em
+    24 semanas). Defesa futura: só mídia verificada na aba e uma lista
+    local "quem perdeu vínculo por denúncia sua" com "perdoar" (o atacante
+    não consegue disparar o perdão).
+  - **Difamação com vínculo forte:** uma conta de isca (0,8) + uma só
+    seguida (0,5) somam 1,3 e põem qualquer post em quarentena, inclusive
+    post direto de amigo, sem o leitor ver. Pequeno hoje (0,5% dos
+    leitores); a métrica certa é "posts honestos escondidos", não "% que vê
+    ataque".
+  - **Vínculos invisíveis e sem volta:** o leitor não vê os vínculos nem as
+    experiências ruins registradas, e uma denúncia por engano não se desfaz
+    (quem ele só segue some da aba de vez). Reopener: tela "seus vínculos"
+    (BACKLOG "Por que vi isto").
+  - **Alcance:** o post mais viral chega a ~38% pela aba (29% com 10% de
+    SINK por gosto; 82–92% com encontros físicos e o mapa da área, Fases
+    2–3).
+  - **Engenharia social em escala:** gente real enganada cria vínculo
+    forte de verdade com o atacante; nenhuma regra de grafo separa isso
+    de influência real. Contido pela denúncia, que baixa o vínculo com o
+    autor e com quem trouxe (0,1% veem ataque, pico 9%).
+  - **Quem trouxe fica em cada aparelho:** a experiência ruim com o autor
+    é gravada no aparelho e também sai das denúncias do leitor que o sync
+    trouxe (com o alvo da tag `p`); num aparelho novo, contam só essas. A
+    com quem trouxe só existe no aparelho onde a denúncia foi feita na aba.
+  - **Denúncia offline:** o envio aos relays não é confirmado (bug à parte
+    em `transport/wss.ts`); a denúncia feita sem rede pune localmente o
+    autor e quem trouxe, mas não sai do aparelho.
+  - **Inundação no sync:** o sync pede os eventos recentes da rede com
+    limite por assinatura; quem publica em volume pode empurrar para fora
+    da janela as ações dos contatos, e a aba fica com menos entradas
+    (BACKLOG "Assinatura própria para as ações dos contatos").
+  - **Moderação global vale na aba:** post com `score = −999` (§26) some
+    de todas as abas, inclusive desta; uma brigada que modere post
+    honesto também o tira da aba Contágio (ver §5c).
+  - **Bolha ideológica:** a simulação mediu abertura entre cidades (igual
+    à do feed global), não diversidade de opinião — o simulador não tem
+    opiniões.
+  - **Janela de sync:** o vínculo conquistado usa os DRIFTs do leitor que
+    estão no SQLite local; um dispositivo novo só "lembra" o que o sync de
+    7 dias trouxe (`sync.ts`), então começa com vínculos de 0,5.
+  - **Eclipse:** quem usa 1–2 relays controlados pelo atacante perde a
+    vacina e a quarentena dos contatos (o atacante só omite). O ataque
+    fica contido (0,0%), mas o alcance honesto cai para 27% na Fase 1
+    (38% sem eclipse; ~25 pontos no modelo completo). A defesa é de produto: piso de
+    diversidade de relays (≥ 6 relays de ≥ 3 operadores).
+- **Reopener:** Fase 2 (lockstep, aval, período de experiência; contágio
+  como padrão) e Fase 3 (mapa da área e encontros físicos), cada uma
+  simulada antes de entrar.
+
 ## Anti-spam
 
 ### 6. Content-hash dedup — pesquisado, NO-GO atual

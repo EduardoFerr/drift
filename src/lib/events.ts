@@ -799,17 +799,24 @@ async function upsertReport(
   reason: ReportReason,
   createdAt: number,
   kind: number,
+  targetPub: string | null,
 ): Promise<void> {
+  // `target_pub` = tag `p` (autor denunciado). Guarda o primeiro conhecido:
+  // a aba Contágio usa quando o post não está no cache (contagion-data.ts).
+  const target = targetPub && /^[0-9a-f]{64}$/.test(targetPub) ? targetPub : null
   await runWrite(
-    `INSERT INTO reports (post_id, reporter_pub, reason, weight, created_at, kind)
-     VALUES (?, ?, ?, 0, ?, ?)
+    `INSERT INTO reports (post_id, reporter_pub, reason, weight, created_at, kind, target_pub)
+     VALUES (?, ?, ?, 0, ?, ?, ?)
      ON CONFLICT(post_id, reporter_pub) DO UPDATE SET
-       reason     = excluded.reason,
-       created_at = excluded.created_at,
-       kind       = excluded.kind
-     WHERE excluded.created_at > reports.created_at
-        OR (excluded.created_at = reports.created_at AND excluded.kind < reports.kind)`,
-    [postId, reporterPub, reason, createdAt, kind],
+       reason     = CASE WHEN excluded.created_at > reports.created_at
+                           OR (excluded.created_at = reports.created_at AND excluded.kind < reports.kind)
+                         THEN excluded.reason ELSE reports.reason END,
+       created_at = MAX(reports.created_at, excluded.created_at),
+       kind       = CASE WHEN excluded.created_at > reports.created_at
+                           OR (excluded.created_at = reports.created_at AND excluded.kind < reports.kind)
+                         THEN excluded.kind ELSE reports.kind END,
+       target_pub = COALESCE(reports.target_pub, excluded.target_pub)`,
+    [postId, reporterPub, reason, createdAt, kind, target],
   )
 }
 
@@ -817,9 +824,12 @@ async function persistReport(event: SignedEvent, deferSideEffects: boolean): Pro
   const postId = getTag(event, 'e')!
   const reasonTag = getTag(event, 'reason')
   const reason = isValidReason(reasonTag) ? reasonTag : 'spam'
-  await upsertReport(postId, event.pubkey, reason, event.created_at, DRIFT_KIND.REPORT)
+  await upsertReport(postId, event.pubkey, reason, event.created_at, DRIFT_KIND.REPORT, getTag(event, 'p'))
   await updateUserActivity(event.pubkey, event.created_at)
   if (deferSideEffects) return // dev-seed: bulk recompute no fim
+  // A aba Contágio lê as denúncias direto (quarentena dos contatos e a
+  // experiência ruim do leitor): atualiza já, como spread/bury.
+  invalidateFeed()
   // Moderação é derivada na recomputação global (ranking.ts).
   scheduleRankingRecompute()
 }
@@ -917,9 +927,10 @@ async function persistNip56Report(event: SignedEvent, deferSideEffects: boolean)
   const driftReason = mapNip56ToDrift(reportType)
   if (driftReason === null) return // report_type fora do whitelist NIP-56
 
-  await upsertReport(postId, event.pubkey, driftReason, event.created_at, 1984)
+  await upsertReport(postId, event.pubkey, driftReason, event.created_at, 1984, getTag(event, 'p'))
   await updateUserActivity(event.pubkey, event.created_at)
   if (deferSideEffects) return
+  invalidateFeed()
   scheduleRankingRecompute()
 }
 
