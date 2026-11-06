@@ -16,9 +16,13 @@
 
 import { create } from 'zustand'
 import { db } from './db'
-import { hiddenReason } from './moderation-local'
+import { hiddenReason, useModLocalStore } from './moderation-local'
 import { useFollowsStore } from './follows'
 import { getCurrentNpub } from './identity'
+import { applyActiveLens, activeLensNeedsNetwork } from './lens/init'
+import { useLensRegistryStore } from './lens/registry'
+import { LENS_MAX_AGE_DAYS } from './lens/order'
+import { useLensStore } from './trust-lens'
 import { normalizeLayout } from '../types/drift'
 import { parseImetaTag as parseImetaTagSync, type BlobMeta } from './nip94'
 import { FEED_INITIAL_LIMIT, FEED_QUEUE_CAP } from '../config/constants'
@@ -249,19 +253,109 @@ export async function getPostById(id: string): Promise<Post | null> {
 
 /**
  * Dispatcher por tab — usado por `refreshFeed` pra escolher a query
- * correta baseado em `useFeedStore.tab`.
+ * correta baseado em `useFeedStore.tab`. `now` é um só por leitura: a aba e
+ * os posts da sua rede (lente) usam o mesmo relógio, então o mesmo score.
  */
-async function getFeedByTab(tab: FeedTab, limit: number): Promise<Post[]> {
+async function getFeedByTab(tab: FeedTab, limit: number, now: number): Promise<Post[]> {
   switch (tab) {
     case 'global':
-      return getGlobalFeed(limit)
+      return getGlobalFeed(limit, now)
     case 'following':
-      return getFollowingFeed(limit)
+      return getFollowingFeed(limit, now)
     case 'trending':
-      return getTrendingFeed(limit)
+      return getTrendingFeed(limit, now)
     case 'contagio':
-      return getContagionFeed(limit)
+      return getContagionFeed(limit, now)
   }
+}
+
+// ─── Lente (manifesto §24; Docs/algoritmos.md §6) ───────────────────
+
+/** Abas em que a lente mexe. Seguindo já é só a sua rede e Contágio já
+ *  escolhe o conjunto pela sua rede — as duas ficam na ordem de sempre. */
+const LENS_TABS: ReadonlySet<FeedTab> = new Set<FeedTab>(['global', 'trending'])
+
+/**
+ * Posts de quem o leitor segue (`authors`, "sua rede") que passam no filtro
+ * da aba, na ordem canônica — os candidatos da lente. Mesmo SQL, mesmo
+ * relógio e mesmo limite da aba (com a lente em 100%, no máximo `limit`
+ * deles cabem). A lente só adianta posts de até 7 dias
+ * (`LENS_MAX_AGE_DAYS`): no Global, sem isso, um post antigo com um voto
+ * (score > 0 para sempre) passaria à frente de todo post novo sem voto. Em
+ * alta já recorta 24 h.
+ */
+export async function getNetworkCandidates(
+  tab: 'global' | 'trending',
+  authors: readonly string[],
+  limit: number,
+  now: number,
+): Promise<Post[]> {
+  if (authors.length === 0) return []
+  const params: unknown[] = [nowSeconds(now), JSON.stringify(authors)]
+  const windowMs = tab === 'trending' ? TRENDING_WINDOW_HOURS * 3600 * 1000 : LENS_MAX_AGE_DAYS * 86_400_000
+  const window = 'AND p.created_at >= ?'
+  params.push(Math.floor((now - windowMs) / 1000))
+  params.push(limit)
+  const rows = await db.exec<PostRow>(
+    `${POST_SELECT}
+     WHERE p.score > -999 AND p.author_pub IN (SELECT value FROM json_each(?)) ${window}
+     ${FEED_ORDER}
+     LIMIT ?`,
+    params,
+  )
+  return rows.map(rowToPost)
+}
+
+/**
+ * Aplica a lente ativa à aba (só Global e Em alta). A aba chega na ordem
+ * canônica; a lente decide a ordem final e, se pedir, recebe os posts de
+ * quem o leitor segue — "sua rede" pela mesma regra da aba Contágio
+ * (vínculo > 0: segue, não bloqueou, a denúncia dele não zerou), menos os
+ * silenciados. Nada é gravado: o resultado vive só no store.
+ */
+async function withLens(tab: FeedTab, canonical: Post[], limit: number, now: number): Promise<Post[]> {
+  if (!LENS_TABS.has(tab)) return canonical
+  let network: Post[] = []
+  let viewer: string | null = null
+  if (activeLensNeedsNetwork()) {
+    try {
+      viewer = await getCurrentNpub()
+      const follows = useFollowsStore.getState().following
+      if (viewer && follows.size > 0) {
+        const { lensNetworkAuthors } = await import('./contagion-data')
+        const authors = (await lensNetworkAuthors(viewer, follows)).filter((a) => hiddenReason(a) === null)
+        network = await getNetworkCandidates(tab as 'global' | 'trending', authors, limit, now)
+      }
+    } catch (err) {
+      // A lente nunca derruba a aba: sem a sua rede, fica a ordem de sempre.
+      console.warn('[lente] sem a sua rede nesta leitura; ordem de sempre:', err)
+      network = []
+    }
+  }
+  try {
+    return [...applyActiveLens(canonical, { viewer, now, network })]
+  } catch (err) {
+    console.warn('[lente] falhou; ordem de sempre:', err)
+    return canonical
+  }
+}
+
+/**
+ * Refaz a aba quando muda algo que a lente lê: força, lente ativa, quem o
+ * leitor segue, bloqueios/silenciados. Debounced (invalidateFeed); só nas
+ * abas em que a lente mexe. Devolve a função que desliga.
+ */
+export function startFeedLensSync(): () => void {
+  const bump = () => {
+    if (LENS_TABS.has(useFeedStore.getState().tab)) invalidateFeed()
+  }
+  const offs = [
+    useLensStore.subscribe((s, prev) => { if (s.strength !== prev.strength) bump() }),
+    useLensRegistryStore.subscribe((s, prev) => { if (s.activeId !== prev.activeId) bump() }),
+    useFollowsStore.subscribe((s, prev) => { if (s.following !== prev.following) bump() }),
+    useModLocalStore.subscribe((s, prev) => { if (s.blocked !== prev.blocked || s.muted !== prev.muted) bump() }),
+  ]
+  return () => { for (const off of offs) off() }
 }
 
 /** A ação LÍQUIDA do usuário corrente no post (a mais recente; no empate
@@ -452,8 +546,9 @@ export async function refreshFeed(): Promise<void> {
   }
   refreshInFlight = true
   const { limit, tab } = useFeedStore.getState()
+  const now = Date.now()
   try {
-    const rawPosts = await getFeedByTab(tab, limit)
+    const rawPosts = await getFeedByTab(tab, limit, now)
     // A aba pode ter mudado enquanto a query rodava (a do Contágio é a mais
     // lenta): descarta o resultado velho e refaz para a aba atual, em vez de
     // gravar posts de uma aba sob o rótulo de outra com `loaded = true`.
@@ -465,9 +560,16 @@ export async function refreshFeed(): Promise<void> {
     // mobile low-end. SQLite já tem MAX_POSTS_CACHE (cache.ts) — este é
     // defesa em camada no array da store. Posts vêm ordenados por score
     // DESC, então truncar slice(0, CAP) preserva os mais relevantes.
-    const posts = rawPosts.length > FEED_QUEUE_CAP
+    const canonical = rawPosts.length > FEED_QUEUE_CAP
       ? rawPosts.slice(0, FEED_QUEUE_CAP)
       : rawPosts
+    // A lente (Global e Em alta) decide a ordem final sobre a aba já cortada:
+    // o tamanho não muda. A aba pode ter mudado enquanto ela lia a sua rede.
+    const posts = await withLens(tab, canonical, Math.min(limit, FEED_QUEUE_CAP), now)
+    if (useFeedStore.getState().tab !== tab) {
+      refreshPending = true
+      return
+    }
     useFeedStore.setState({
       posts,
       loaded: true,

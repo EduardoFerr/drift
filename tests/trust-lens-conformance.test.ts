@@ -284,6 +284,9 @@ describe('Trust Lens — conformance (LOCK_VIA_TEST §17 §22 §24 §25 §27)', 
       /\bppr_score\b/,
       /\bcomputeInfluence\b/,
       /\bcomputePpr\b/,
+      /\bcomputePprExact\b/,
+      /\bmixNetwork\b/,
+      /\blensLift\b/,
       /\bgetPprForAuthor\b/,
     ]
     // Arquivos que tocam eventos publicados ou bundle exports

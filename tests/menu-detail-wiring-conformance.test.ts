@@ -40,14 +40,17 @@ describe('SuaLenteCard — consome 3 flags do Menu Detalhado', () => {
     )
   })
 
-  it('menu_detail_show_algorithm gateia parágrafo "Cálculo (PageRank)"', () => {
+  it('menu_detail_show_algorithm gateia o parágrafo "Regra" (a conta da lente)', () => {
     expect(SUA_LENTE).toMatch(/menu_detail_show_algorithm/)
-    // Render condicional do parágrafo PageRank
+    // Render condicional do parágrafo com a regra. Desde 06/11/2026 a lente
+    // do feed é a mistura (Docs/algoritmos.md §6), não o PageRank: o
+    // parágrafo diz a cota ⌊N·k/100⌋, e não pode voltar a citar PageRank.
     const stripped = SUA_LENTE.replace(/\/\*[\s\S]*?\*\//g, '').replace(
       /^\s*\/\/.*$/gm,
       '',
     )
-    expect(stripped).toMatch(/showAlgorithm &&[\s\S]*?PageRank/)
+    expect(stripped).toMatch(/showAlgorithm &&[\s\S]*?Regra:[\s\S]*?N × k ÷ 100/)
+    expect(stripped).not.toMatch(/PageRank/)
   })
 
   it('menu_detail_show_manifesto gateia parágrafo Manifesto §24', () => {

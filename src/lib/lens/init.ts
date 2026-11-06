@@ -1,19 +1,20 @@
 /**
- * Lens init — registra built-in strategies no boot (POC Sprint N+2 P0.2).
+ * Lens init — registra as lentes do app no boot e aplica a lente ativa no
+ * feed (Docs/algoritmos.md §6; manifesto §24).
  *
  * Idempotente: chamadas subsequentes são no-op (registerLens já é
  * resiliente a re-register do mesmo objeto — StrictMode dev OK).
- *
- * Chamado em `bootstrap.ts` depois do DB init (lens-side state pode
- * depender de `loadLens()` que lê PPR cache).
  *
  * **Ordem de registro = ordem em `listLenses()`**, que vira ordem do
  * dropdown UI. Default first (ppr-trust), depois alts.
  */
 
-import { registerLens } from './registry'
+import { getActiveLens, registerLens, setActiveLens, listLenses } from './registry'
 import { PprTrustLens } from './strategies/ppr-trust'
 import { ChronologicalLens } from './strategies/chronological'
+import { getPprForAuthor } from '../trust-lens'
+import { db } from '../db'
+import type { Post } from '../../types/drift'
 
 let initialized = false
 
@@ -25,27 +26,43 @@ export function initBuiltinLenses(): void {
 }
 
 /**
- * Helper applyActiveLens — wrapper conveniente sobre `getActiveLens().apply()`.
- *
- * Use em call-sites de UI/feed que querem reordenar lista de posts pela
- * lente ativa do user. Manter o context build em um único lugar pra
- * consistência cross-callers.
- *
- * **Não substitui `applyLensToPost` (single-post)** — esse helper
- * legacy continua válido pra render path que computa `s_local` por post
- * isoladamente (ex: PostCard chip "lente"). Aqui ordenamos a lista.
+ * Aplica a lente ativa à aba. O feed chama só nas abas Global e Em alta,
+ * já com a aba na ordem canônica e, se a lente pedir (`needsNetwork`), com
+ * os posts de quem o leitor segue. Sem lente registrada (antes do boot),
+ * devolve a aba como veio.
  */
-import { getActiveLens } from './registry'
-import { getPprForAuthor } from '../trust-lens'
-import { useBootStore } from '../bootstrap'
-import type { Post } from '../../types/drift'
+export function applyActiveLens(
+  posts: readonly Post[],
+  ctx: { viewer: string | null; now: number; network?: readonly Post[] },
+): readonly Post[] {
+  if (listLenses().length === 0) return posts
+  return getActiveLens().apply(posts, { ...ctx, getPprScore: getPprForAuthor }).posts
+}
 
-export function applyActiveLens(posts: readonly Post[]): readonly Post[] {
-  const lens = getActiveLens()
-  const viewer = useBootStore.getState().identity?.npub ?? null
-  return lens.apply(posts, {
-    viewer,
-    now: Date.now(),
-    getPprScore: getPprForAuthor,
-  }).posts
+/** A lente ativa quer os posts de quem o leitor segue agora? */
+export function activeLensNeedsNetwork(): boolean {
+  if (listLenses().length === 0) return false
+  return getActiveLens().needsNetwork?.() ?? false
+}
+
+// ─── Lente escolhida persiste entre aberturas (user_prefs.active_lens) ──
+
+const ACTIVE_LENS_KEY = 'active_lens'
+
+/** Troca a lente e guarda a escolha neste aparelho (nunca publicada). */
+export async function chooseLens(id: string): Promise<void> {
+  setActiveLens(id)
+  await db.run(
+    `INSERT INTO user_prefs (key, value) VALUES (?, ?)
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+    [ACTIVE_LENS_KEY, id],
+  )
+}
+
+/** No boot, depois de `initBuiltinLenses`: volta à lente escolhida antes.
+ *  Valor desconhecido (lente que saiu do app) fica no padrão. */
+export async function restoreChosenLens(): Promise<void> {
+  const row = await db.get<{ value: string }>(`SELECT value FROM user_prefs WHERE key = ?`, [ACTIVE_LENS_KEY])
+  if (!row?.value) return
+  if (listLenses().some((l) => l.id === row.value)) setActiveLens(row.value)
 }

@@ -26,7 +26,8 @@ import { loadRelays } from './relays'
 import { loadIdentities } from './identities'
 import { loadFollows, useFollowsStore } from './follows'
 import { loadLens, recomputeLens } from './trust-lens'
-import { initBuiltinLenses } from './lens/init'
+import { initBuiltinLenses, restoreChosenLens } from './lens/init'
+import { startFeedLensSync } from './feed'
 import { loadModLocal } from './moderation-local'
 // V10.11 — passkey movido pra dynamic import. ~3.58 KB raw / 1.4 KB gz
 // fica fora do entry chunk; só carrega se user efetivamente habilitou
@@ -450,15 +451,24 @@ async function doBootstrap(): Promise<void> {
     // acontece em background (não bloqueia boot).
     await loadFollows()
 
-    // Trust Lens — carrega strength persistido + filter rules + cache PPR.
-    // Cold-start (cache vazio) é safe: getPprForAuthor retorna 0 e
-    // viewMultiplier degrada graciosamente. Manifesto §24 (view-layer).
+    // Lente — carrega a força guardada + regras de filtro + cache de PPR (mapa).
+    // Cache vazio é seguro: o mapa usa a cor padrão; a ordem do feed não lê
+    // PPR (Docs/algoritmos.md §6). Manifesto §24.
     await loadLens()
 
-    // Sprint N+2 P0.2 — registra built-in lens strategies (PprTrust + Chronological).
-    // Idempotente. Após este ponto, getActiveLens() está disponível.
-    // Manifesto §17 — registry open, user troca lente livremente.
+    // Registra as lentes do app (quem você segue primeiro + cronológica),
+    // volta à lente escolhida antes neste aparelho e liga a reação do feed:
+    // mexer na força, na lente, em quem você segue ou em bloqueios refaz as
+    // abas Global e Em alta. Manifesto §24 (algoritmo público, entradas
+    // suas) e §17 (o usuário troca de lente livremente).
     initBuiltinLenses()
+    // Best-effort: a lente nunca pode abortar o boot (transportes vêm depois).
+    try {
+      await restoreChosenLens()
+    } catch { /* sem escolha gravada: fica a padrão */ }
+    try {
+      startFeedLensSync()
+    } catch { /* sem reação automática: o feed ainda se refaz a cada evento */ }
 
     // Fase 2b "PPR real" (2026-05-30): a lente PRECISA de um trigger de
     // recompute — sem ele, lens_edges/follows nunca viram pprScores e a

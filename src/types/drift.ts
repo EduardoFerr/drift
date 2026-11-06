@@ -165,6 +165,13 @@ export interface Post {
    * tela pune exatamente estes (manifesto §24 emendado).
    */
   arrivedVia?: readonly string[]
+  /**
+   * Só nas abas Global e Em alta, com a lente ligada: a lente adiantou este
+   * post porque o leitor segue o autor. `from` = lugar que ele tinha na aba
+   * sem a lente (null = estava fora dela), `to` = lugar agora (0 = primeiro).
+   * Calculado na leitura, nunca gravado nem publicado (manifesto §24).
+   */
+  lensLift?: { readonly from: number | null; readonly to: number }
 }
 
 // ─── User metadata kind 0 (NIP-01 — opt-in identity) ────────────────

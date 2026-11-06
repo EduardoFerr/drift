@@ -142,12 +142,17 @@ describe('A expressão de decay do feed.ts não divergiu', () => {
     )
   })
 
-  it('as 4 queries do feed usam a ordenação canônica com tie-break', () => {
+  it('as queries do feed usam a ordenação canônica com tie-break', () => {
     const feed = readFileSync(join(ROOT, 'src/lib/feed.ts'), 'utf8')
     expect(feed).toMatch(/ORDER BY score_now DESC, p\.created_at DESC, p\.id ASC/)
+    // Nenhuma query tem ordenação própria: o único ORDER BY é o da constante.
+    expect((feed.match(/ORDER BY/g) ?? []).length, 'ORDER BY fora de FEED_ORDER').toBe(1)
     const usos = feed.match(/\$\{FEED_ORDER\}/g) ?? []
-    // Contágio (§24 emendado) muda o CONJUNTO, nunca a ordem.
-    expect(usos.length, 'Global, Seguindo, Em alta e Contágio devem usar a mesma ordenação').toBe(4)
+    // Global, Seguindo, Em alta, Contágio (muda o CONJUNTO, §24 emendado) e
+    // os candidatos da lente (posts de quem você segue, mesma ordem). A
+    // lente decide a ordem final em memória (src/lib/lens/order.ts), só em
+    // Global e Em alta — travado em tests/lens-feed-pipeline.test.ts.
+    expect(usos.length, 'as 4 abas e os candidatos da lente devem usar a mesma ordenação').toBe(5)
   })
 
   it('a UI exibe o MESMO valor que ordena o feed', () => {

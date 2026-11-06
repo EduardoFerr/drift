@@ -1,42 +1,32 @@
 /**
- * Trust Lens — orchestrator API + Zustand store.
+ * Trust Lens — store da lente + proximidade (PPR) para o mapa.
  *
- * Camada de integração entre pure functions (`lib/trust/*`) e o resto
- * do app. NÃO toca render path em PR-4b — apenas providencia primitives
- * pra UI (PR-5) e workers futuros (PR-4c).
+ * O que vive aqui:
+ *   - a força da lente (`strength`, 0..1, em `user_prefs.lens_strength`),
+ *     que a lente do feed lê (src/lib/lens/strategies/ppr-trust.ts →
+ *     mixNetwork; Docs/algoritmos.md §6). A ORDEM do feed não usa PPR: na
+ *     produção o grafo é só a sua lista de quem você segue, e a lente usa
+ *     "sua rede" (vínculo > 0, a mesma regra da aba Contágio) direto;
+ *   - o PPR (`pprScores`) e as pontes, que colorem o mapa da sua rede
+ *     (toggle "mostrar quem você segue no mapa") — Docs/algoritmos.md §5;
+ *   - regras de filtro (CRUD; sem uso no feed ainda).
  *
- * Manifesto §24 carve-out: `s_local` calculado aqui, aplicado no
- * view-boundary do feed (PR-5 vai consumir). NUNCA persistido em
- * `posts.score`. Conformance test #2.
+ * **Determinismo** (§7): o PPR é exato (`computePprExact`, sem sorteio) e a
+ * rede é lida com ORDER BY — mesma rede, mesmos números, em qualquer
+ * aparelho e em qualquer dia. Antes era Monte Carlo com semente
+ * pessoa+dia.
  *
- * **Determinismo**: PPR Monte Carlo usa seed determinística por janela
- * de 24h (`createPprRng`). 2 devices da mesma identidade convergem
- * dentro da janela. §7.
- *
- * **Phase 1 scope (PR-4b)**:
- *   - Store reativa Zustand (strength, enabled, ready)
- *   - Filter rules CRUD (read/add/remove)
- *   - PPR score lookup (read-only do cache; recompute em PR-4c via worker)
- *   - applyLensToPost — pure helper que UI usa por post
- *
- * **NÃO em Phase 1 (deferred)**:
- *   - Recompute trigger automático (PR-4c worker thread)
- *   - Path diversity per-target cache (Phase 1.5)
- *   - Cluster coefficient telemetria (Phase 1.5 Ted nodes/clusters)
- *
- * Plano: Docs/plans/trust-lens-phase1-plan.md §1.4
+ * Manifesto §24/§28: nada daqui é gravado em `posts` nem publicado.
  */
 
 import { create } from 'zustand'
 import { db } from './db'
 import {
-  computePpr,
-  viewMultiplier,
+  computePprExact,
   temporalDecay,
   type AdjacencyList,
 } from './trust/ppr'
 import { findBridges } from './wot'
-import { createPprRng } from './trust/rng'
 import { upsertEdge } from './trust/edges'
 import { parsePredicate, evaluatePredicate } from './trust/predicate'
 import { PPR_PARAMS, PPR_DECAY } from './trust/constants'
@@ -194,30 +184,6 @@ export function getPprForAuthor(authorNpub: string): number {
   return score ?? 0
 }
 
-/**
- * Aplica Trust Lens em um post — pure helper que UI consome no render.
- *
- * Retorna `s_local` = `s_global × multiplier`. NUNCA persist.
- *
- * Se strength = 0, retorna `globalScore` bit-exact (off-state preserva
- * canônico — conformance test #19).
- */
-export function applyLensToPost(params: {
-  globalScore: number
-  authorNpub: string
-  mutualSpreadPost?: number
-}): number {
-  const state = useLensStore.getState()
-  if (state.strength === 0) return params.globalScore
-  const pprScore = getPprForAuthor(params.authorNpub)
-  const mult = viewMultiplier({
-    pprScore,
-    mutualSpreadPost: params.mutualSpreadPost ?? 0,
-    strength: state.strength,
-  })
-  return params.globalScore * mult
-}
-
 // ─── Filter rules CRUD ────────────────────────────────────────────
 
 /**
@@ -345,6 +311,8 @@ export async function recomputeLens(source: string): Promise<number> {
   // de bypass. created_at imutável após primeiro INSERT trava esse vetor.
   // COALESCE defensivo: rows pré-migration (backfill via updated_at em
   // db.worker) caem pra updated_at se created_at IS NULL.
+  // ORDER BY: a mesma rede lida na mesma ordem em qualquer aparelho (o
+  // cálculo exato abaixo também não depende dela — defesa em camada).
   const rows = await db.exec<{
     source_npub: string
     target_npub: string
@@ -355,7 +323,8 @@ export async function recomputeLens(source: string): Promise<number> {
     `SELECT source_npub, target_npub, influence, created_at, updated_at FROM lens_edges
      WHERE source_npub = ? OR target_npub IN (
        SELECT target_npub FROM lens_edges WHERE source_npub = ?
-     )`,
+     )
+     ORDER BY source_npub, target_npub`,
     [source, source],
   )
   const decayEnabled = usePrefsStore.getState().lens_ppr_decay_enabled
@@ -388,8 +357,9 @@ export async function recomputeLens(source: string): Promise<number> {
   // observador-relativo. lens_edges (interação-ponderado) tem precedência
   // quando existir — este fallback só preenche o vazio.
   if (graph.size === 0) {
+    // ORDER BY antes do LIMIT: o corte, se houver, é o mesmo em todo aparelho.
     const follows = await db.exec<{ follower_pub: string; following_pub: string }>(
-      `SELECT follower_pub, following_pub FROM follows LIMIT 20000`,
+      `SELECT follower_pub, following_pub FROM follows ORDER BY follower_pub, following_pub LIMIT 20000`,
     )
     for (const f of follows) {
       const list = graph.get(f.follower_pub) ?? []
@@ -398,8 +368,10 @@ export async function recomputeLens(source: string): Promise<number> {
     }
   }
 
-  const rng = createPprRng(source, Date.now())
-  const ppr = computePpr({ source, graph, rng, ...PPR_PARAMS })
+  // PPR exato (média do mesmo passeio, sem sorteio): mesma rede → mesmos
+  // números em qualquer aparelho e em qualquer dia. Antes era Monte Carlo
+  // com semente pessoa+dia (a cor do mapa mudava à meia-noite UTC).
+  const ppr = computePprExact({ source, graph, L: PPR_PARAMS.L, alpha: PPR_PARAMS.ALPHA })
 
   // Persist em walks_cache (REPLACE pra source — LRU eviction Phase 1.5)
   await db.run(`DELETE FROM lens_walks_cache WHERE source_npub = ?`, [source])

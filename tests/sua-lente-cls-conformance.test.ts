@@ -18,6 +18,12 @@
  *
  * NÃO simplesmente remova o assert se o componente mudar de forma —
  * atualize o pattern mantendo a garantia de que os toggles ficam no DOM.
+ *
+ * 06/11/2026 (lente ligada ao feed): o toggle "esquecer follows antigos"
+ * saiu do card — ele só agia em `lens_edges`, que o app nunca preenche, e
+ * a lente passou a usar a lista de quem você segue (o NIP-02 não guarda
+ * desde quando você segue cada pessoa). Ficam 2 sub-toggles; a garantia
+ * é a mesma.
  */
 
 import { describe, expect, it } from 'vitest'
@@ -38,7 +44,7 @@ function stripComments(src: string): string {
 describe('LOCK_VIA_TEST — SuaLenteCard sub-toggles sempre no DOM (anti-CLS)', () => {
   const src = stripComments(readFileSync(CARD, 'utf8'))
 
-  it('os 3 sub-toggles NÃO são gateados por isActive (causa de CLS)', () => {
+  it('os sub-toggles NÃO são gateados por isActive (causa de CLS)', () => {
     // Bloqueia render condicional por intensidade da lente. Os tokens
     // proibidos cobrem as variantes plausíveis de reintrodução do gate.
     const forbidden = [
@@ -61,7 +67,6 @@ describe('LOCK_VIA_TEST — SuaLenteCard sub-toggles sempre no DOM (anti-CLS)', 
   it('cada sub-toggle é renderizado com a prop disabled (espaço reservado)', () => {
     for (const name of [
       'ReorderIndicatorToggle',
-      'PprDecayToggle',
       'MapColorsToggle',
     ]) {
       const renderedDisabled = new RegExp(

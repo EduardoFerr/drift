@@ -28,14 +28,17 @@ import type { Post } from '../../types/drift'
  * Contexto read-only passado pra cada `apply()`. NÃO expõe `db` cru —
  * isolation de write (Marshall LOCK). Lente recebe só hooks específicos.
  *
- * `getPprScore` opcional: chronological lens não precisa, PprTrustLens
- * sim. Lente decide se usa.
+ * `network`: posts de quem o leitor segue que passam no filtro da mesma
+ * aba (na ordem canônica), lidos pelo feed só quando a lente ativa pede
+ * (`needsNetwork`). Sem eles, a lente só pode reordenar a aba.
  */
 export interface LensApplyContext {
   /** npub do user ativo, ou null se anônimo. */
   readonly viewer: string | null
   /** Timestamp ms no momento da chamada (determinismo cross-device). */
   readonly now: number
+  /** Posts de quem o leitor segue, mesma aba (bloqueados/silenciados fora). */
+  readonly network?: readonly Post[]
   /** PPR score lookup (read-only). Retorna 0 pra autor desconhecido. */
   readonly getPprScore?: (authorPub: string) => number
 }
@@ -43,12 +46,14 @@ export interface LensApplyContext {
 // ─── Result ───────────────────────────────────────────────────────
 
 /**
- * Resultado de `apply()`. Apenas reordenação — lente NUNCA adiciona
- * posts novos nem remove (filter vive em `evaluateFilterRules`,
- * separação de concerns).
+ * Resultado de `apply()`. A lente decide a ORDEM da aba. Ela pode trazer
+ * para dentro da aba posts de `ctx.network` (de quem o leitor segue),
+ * empurrando para fora o fim da aba; nunca traz post de outra origem,
+ * nunca muda o tamanho da aba e nunca muta os Post de entrada (os
+ * adiantados saem como cópia com `lensLift`).
  */
 export interface LensApplyResult {
-  /** Posts reordenados. Mesmo conjunto de input, ordem possivelmente diferente. */
+  /** A aba na ordem da lente, com o mesmo tamanho da de entrada. */
   readonly posts: readonly Post[]
 }
 
@@ -79,6 +84,12 @@ export interface LensStrategy<TParams = unknown> {
    * Convenção: NÃO mutar `posts` input. Retornar nova array.
    */
   apply(posts: readonly Post[], ctx: LensApplyContext): LensApplyResult
+
+  /**
+   * A lente quer `ctx.network` agora? (Ex.: a de quem você segue, só com
+   * força > 0.) Ausente = não quer: o feed não faz a consulta extra.
+   */
+  needsNetwork?(): boolean
 
   /** Marker pra futuro params typing — POC não usa. */
   readonly __paramsBrand?: TParams

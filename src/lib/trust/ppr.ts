@@ -139,6 +139,91 @@ export function computePpr(params: {
   return ppr
 }
 
+// ─── Pure: PPR exato (a média do mesmo passeio, sem sorteio) ──────
+
+/**
+ * PPR exato — o valor esperado do MESMO passeio de `computePpr`, calculado
+ * passo a passo em vez de sorteado. Hoje colore o mapa da sua rede; a ORDEM
+ * do feed não usa PPR (Docs/algoritmos.md §5 e §6).
+ *
+ * Por que não o Monte Carlo: a semente dele é pessoa + dia e o resultado
+ * depende da ordem em que a lista de arestas chegou. Ligado ao feed, dois
+ * aparelhos com os mesmos eventos mostravam ordens diferentes, e a ordem
+ * mudava sozinha à meia-noite (UTC). Aqui não há sorteio nem relógio, e a
+ * soma segue uma ordem fixa (nós e alvos ordenados, pesos repetidos do
+ * mesmo alvo somados do menor pro maior): mesma rede → mesmos números, bit
+ * a bit, em qualquer ordem de chegada. Manifesto §7.
+ *
+ * Passeio (idêntico ao de `computePpr`): a cada um dos L passos, a massa
+ * para com probabilidade α; o resto anda para um vizinho na proporção da
+ * influência; num beco (sem saída ou influência total 0) volta ao leitor
+ * sem contar visita; chegar ao próprio leitor não conta visita. O valor de
+ * cada nó é visitas / total de visitas. Sem visita nenhuma → Map vazio
+ * (cold start: a Lente não mexe em nada).
+ *
+ * Custo: L × arestas alcançáveis — na rede de produção (você → quem você
+ * segue) é trivial.
+ */
+export function computePprExact(params: {
+  source: string
+  graph: AdjacencyList
+  L?: number
+  alpha?: number
+}): Map<string, number> {
+  const L = params.L ?? PPR_PARAMS.L
+  const alpha = params.alpha ?? PPR_PARAMS.ALPHA
+  const source = params.source
+  const byKey = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0)
+
+  // Adjacência canônica: alvos em ordem fixa, um peso por alvo.
+  const adj = new Map<string, { targets: string[]; weights: number[]; total: number }>()
+  for (const [node, edges] of params.graph) {
+    const perTarget = new Map<string, number[]>()
+    for (const e of edges) {
+      if (!Number.isFinite(e.influence) || e.influence <= 0) continue
+      const ws = perTarget.get(e.target)
+      if (ws) ws.push(e.influence)
+      else perTarget.set(e.target, [e.influence])
+    }
+    const targets = [...perTarget.keys()].sort(byKey)
+    const weights = targets.map((t) => perTarget.get(t)!.sort((x, y) => x - y).reduce((s, w) => s + w, 0))
+    let total = 0
+    for (const w of weights) total += w
+    adj.set(node, { targets, weights, total })
+  }
+
+  const add = (m: Map<string, number>, k: string, v: number) => m.set(k, (m.get(k) ?? 0) + v)
+  let mass = new Map<string, number>([[source, 1]])
+  const visits = new Map<string, number>()
+  for (let step = 0; step < L; step++) {
+    const next = new Map<string, number>()
+    for (const node of [...mass.keys()].sort(byKey)) {
+      const alive = mass.get(node)! * (1 - alpha)
+      if (!(alive > 0)) continue
+      const a = adj.get(node)
+      if (!a || !(a.total > 0)) {
+        add(next, source, alive) // beco: volta ao leitor, sem visita
+        continue
+      }
+      for (let i = 0; i < a.targets.length; i++) {
+        const t = a.targets[i]!
+        const f = alive * (a.weights[i]! / a.total)
+        add(next, t, f)
+        if (t !== source) add(visits, t, f)
+      }
+    }
+    mass = next
+  }
+
+  const keys = [...visits.keys()].sort(byKey)
+  let total = 0
+  for (const k of keys) total += visits.get(k)!
+  const out = new Map<string, number>()
+  if (!(total > 0)) return out
+  for (const k of keys) out.set(k, visits.get(k)! / total)
+  return out
+}
+
 // ─── Pure: temporal decay (GAP-1 — shipped 2026-05-20) ──────────────
 
 /**

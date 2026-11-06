@@ -20,9 +20,9 @@ import type { Post } from '../../../types/drift'
 
 export const ChronologicalLens: LensStrategy = {
   id: 'chronological',
-  name: 'Cronológico',
+  name: 'cronológica',
   description:
-    'Apenas ordem do tempo — post mais recente primeiro. Sem boost de rede, sem ranking.',
+    'Os mesmos posts das abas global e em alta, do mais novo para o mais velho. Ninguém tem prioridade.',
   version: 1,
 
   apply(posts: readonly Post[], _ctx: LensApplyContext): LensApplyResult {

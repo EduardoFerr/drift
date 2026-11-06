@@ -228,9 +228,11 @@ describe('ChronologicalLens — determinismo + manifesto §22', () => {
     expect(code).not.toMatch(/\bviewMultiplier\b/)
   })
 
-  it('#13 SuaLenteCard wire-up — LensSelector renderizado + setActiveLens chamado', () => {
+  it('#13 SuaLenteCard wire-up — LensSelector renderizado + escolha guardada', () => {
     const src = readFileSync('src/components/Settings/SuaLenteCard.tsx', 'utf8')
-    expect(src).toMatch(/setActiveLens/)
+    // chooseLens = setActiveLens + user_prefs.active_lens (a escolha sobrevive
+    // ao recarregar; antes era volátil e a lente nem chegava ao feed)
+    expect(src).toMatch(/chooseLens/)
     expect(src).toMatch(/listLenses/)
     expect(src).toMatch(/useLensRegistryStore/)
     // Slider gateado por showStrengthControls (chronological esconde slider)

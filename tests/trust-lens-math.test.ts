@@ -636,19 +636,10 @@ describe('Trust Lens orchestrator — pure store ops (PR-4b smoke)', () => {
     __testing.resetStore()
   })
 
-  it('applyLensToPost: strength=0 returns globalScore bit-exact (#19 invariant)', async () => {
-    const { applyLensToPost, setLensStrength, __testing } = await import('../src/lib/trust-lens')
-    __testing.resetStore()
-    setLensStrength(0)
-    expect(
-      applyLensToPost({
-        globalScore: 42,
-        authorNpub: 'npub_anyone',
-        mutualSpreadPost: 99,
-      }),
-    ).toBe(42) // bit-exact, off-state
-    __testing.resetStore()
-  })
+  // `applyLensToPost` (multiplicador por post) saiu em 06/11/2026: a lente
+  // ligada ao feed é a mistura (src/lib/lens/order.ts). O invariante #19
+  // (força 0 = a ordem de sempre, bit a bit) agora é travado no feed real:
+  // tests/lens-order.test.ts e tests/lens-feed-pipeline.test.ts.
 
   it('getPprForAuthor: cold-start retorna 0 (sem cache, sem throw)', async () => {
     const { getPprForAuthor, __testing } = await import('../src/lib/trust-lens')

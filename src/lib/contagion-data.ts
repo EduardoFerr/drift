@@ -48,7 +48,18 @@ async function selectIn<T>(values: readonly string[], run: (placeholders: string
   return out
 }
 
-export async function loadContagionInput(viewer: string, follows: ReadonlySet<string>, nowSec: number): Promise<ContagionInput> {
+/**
+ * O vínculo do leitor com cada pessoa que ele segue, pela regra pública de
+ * `tieOf` (Docs/algoritmos.md §9): quem ele segue (sem ele mesmo e sem
+ * bloqueados), quantos posts de cada um ele impulsionou e quantas
+ * experiências ruins (denúncias) teve com cada um. A aba Contágio e a lente
+ * (Global e Em alta) usam a MESMA leitura — "sua rede" é uma só no app.
+ */
+export async function loadTies(viewer: string, follows: ReadonlySet<string>): Promise<{
+  effectiveFollows: Set<string>
+  earned: Map<string, number>
+  strikes: Map<string, number>
+}> {
   // Bloquear esconde posts E interações da pessoa (manifesto §24, filtro
   // local): quem o leitor bloqueou não traz, não vacina e não denuncia.
   // Silenciar só esconde posts — as interações continuam valendo.
@@ -83,6 +94,24 @@ export async function loadContagionInput(viewer: string, follows: ReadonlySet<st
   )
   const earned = new Map(earnedRows.map((r) => [r.author, Number(r.n)]))
   const strikes = new Map(strikeRows.map((r) => [r.pub, Number(r.n)]))
+  return { effectiveFollows, earned, strikes }
+}
+
+/**
+ * "Sua rede" para a lente: quem o leitor segue, não bloqueado, SEM nenhuma
+ * experiência ruim — `tie ≥ TIE_FOLLOW` na mesma leitura da aba Contágio.
+ * Uma denúncia basta para tirar a pessoa da lente, inclusive quem ele já
+ * impulsionou (na aba Contágio, 8 − 5 = 3 ainda vale como vínculo; na
+ * lente, não: revisão adversarial de 06/11/2026, "isca seguida de volta").
+ * Ordenado pela chave — a ordem de chegada da lista não muda nada (§7).
+ */
+export async function lensNetworkAuthors(viewer: string, follows: ReadonlySet<string>): Promise<string[]> {
+  const { effectiveFollows, earned, strikes } = await loadTies(viewer, follows)
+  return [...effectiveFollows].filter((p) => tieOf(p, effectiveFollows, earned, strikes) >= CONTAGION.TIE_FOLLOW).sort()
+}
+
+export async function loadContagionInput(viewer: string, follows: ReadonlySet<string>, nowSec: number): Promise<ContagionInput> {
+  const { effectiveFollows, earned, strikes } = await loadTies(viewer, follows)
   // Gesto "não trazer mais por X" do leitor: os DRIFTs de X não trazem.
   const noBring = new Set(
     (await db.exec<{ pub: string }>(`SELECT subject_pub AS pub FROM contagion_no_bring WHERE viewer_pub = ?`, [viewer])).map((r) => r.pub),
